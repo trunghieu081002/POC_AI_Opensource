@@ -1,0 +1,90 @@
+name: postgres
+version: 1.0.0
+summary: PostgreSQL server from the official PGDG repository
+maturity: stable
+
+provides: [rdbms, postgres, sql]
+# preflight uses ss and locale, the shared apt-lock autofix uses fuser, and the
+# database step parses JSON with python3. On a minimal image none of those exist,
+# so base is a real dependency rather than a convenience.
+requires: [base]
+
+supports:
+  families: [debian, rhel]
+
+params:
+  version:
+    type: string
+    default: "15"
+    enum: ["14", "15", "16", "17"]
+  port:
+    type: int
+    default: 5432
+  listen_addresses:
+    type: string
+    default: "localhost"
+  max_connections:
+    type: int
+    default: 100
+  shared_buffers:
+    type: string
+    default: ""            # empty = leave the packaged default alone
+  databases:
+    type: list
+    default: []            # ["warehouse", "airflow_meta"]
+  users:
+    type: list
+    default: []            # [{name: app, password: "${PG_APP_PASSWORD}", databases: [warehouse]}]
+    secret_fields: [password]
+  open_firewall:
+    type: bool
+    default: false
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+errors: errors.yaml
+
+steps:
+  - id: repo
+    script: steps/10-repo.sh
+    description: Enable the PGDG repository for this distro
+    timeout: 300
+    guard: >
+      if [ "$DP_OS_FAMILY" = "debian" ]; then
+        test -f /etc/apt/sources.list.d/pgdg.list
+      else
+        rpm -q pgdg-redhat-repo >/dev/null 2>&1
+      fi
+
+  - id: install
+    script: steps/20-install.sh
+    description: Install the PostgreSQL server packages
+    timeout: 1200
+    guard: >
+      if [ "$DP_OS_FAMILY" = "debian" ]; then
+        dpkg -s "postgresql-${DP_PARAM_VERSION}" >/dev/null 2>&1
+      else
+        rpm -q "postgresql${DP_PARAM_VERSION}-server" >/dev/null 2>&1
+      fi
+
+  - id: initdb
+    script: steps/30-initdb.sh
+    description: Initialise the data directory and start the service
+    timeout: 600
+    guard: >
+      if [ "$DP_OS_FAMILY" = "debian" ]; then
+        test -s "/var/lib/postgresql/${DP_PARAM_VERSION}/main/PG_VERSION"
+      else
+        test -s "/var/lib/pgsql/${DP_PARAM_VERSION}/data/PG_VERSION"
+      fi
+
+  - id: config
+    script: steps/40-config.sh
+    description: Apply port, listen_addresses and connection settings
+    timeout: 300
+
+  - id: databases
+    script: steps/50-databases.sh
+    description: Create the requested databases, roles and grants
+    timeout: 600

@@ -1,0 +1,21 @@
+- id: python-modern-no-appstream-module
+  match:
+    output: "No such command|Unknown module|No matching module"
+  cause: >
+    The distro's module system does not recognise the requested Python stream -
+    usually an EL8 host whose AppStream repo is disabled or an EL9 host where
+    the version number differs from what was requested.
+  autofix: []
+  ask_user: >
+    Check `dnf module list python*` for what this host actually offers, and set
+    the `version` param to one that is listed.
+  retry: false
+
+- id: python-modern-appstream-disabled
+  match:
+    output: "repository 'appstream' is listed more than once|AppStream.*disabled"
+  cause: The AppStream repository is disabled on this EL host.
+  autofix:
+    - "dnf config-manager --set-enabled ol8_appstream 2>/dev/null || dnf config-manager --set-enabled appstream 2>/dev/null || true"
+  retry: true
+  max_attempts: 2

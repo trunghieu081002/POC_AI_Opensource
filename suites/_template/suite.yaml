@@ -1,0 +1,64 @@
+# Copy this directory to suites/<name>/ and fill it in.
+#   cp -r suites/_template suites/clickhouse
+#
+# A suite answers a different question from a pack's verify.sh.
+#
+#   verify.sh  — is this component alive?           (liveness)
+#   suite      — does the system actually do its job? (acceptance)
+#
+# The second is what catches an install that reports success and does not work.
+# Writing one is not optional busywork: `dpagent status` marks any component
+# without a passing suite as untested, and `dpagent promote` refuses a draft pack
+# that nothing proves.
+
+suite: CHANGEME
+summary: One line — what this suite proves.
+
+# Packs that must all be installed before the suite runs. A suite naming several
+# packs is a cross-component test (does data actually flow from A through B?)
+# and waits until every one of them is present.
+requires: [CHANGEME]
+
+# Fixtures. Confine them to $DP_TEST_NS — a check that writes into a real
+# database is a liability, not a test.
+setup:
+  - id: create-fixtures
+    script: setup/00-fixtures.sh
+    description: Create an isolated namespace for the checks
+    timeout: 120
+
+checks:
+  # Order cheapest-and-most-fundamental first, and mark the one that everything
+  # else depends on `critical` so a broken system fails fast instead of emitting
+  # five more failures that all say the same thing.
+  - id: write-read-roundtrip
+    script: checks/10-roundtrip.sh
+    description: What was written is what is read back
+    critical: true
+
+  # Persistence. A component can hold data perfectly until it restarts — tmpfs
+  # data directories, disabled fsync, a unit pointing at the wrong path. Nothing
+  # short of an actual restart reveals it.
+  - id: survives-restart
+    script: checks/20-survives-restart.sh
+    description: Committed data is still there after a service restart
+
+  # NEGATIVE. The most valuable kind. Positive checks pass on a wide-open system
+  # too; only asking it to refuse something proves it is not wide open.
+  - id: rejects-bad-credentials
+    script: checks/30-rejects-bad-credentials.sh
+    description: A wrong password is refused
+    negative: true
+
+  # The running system, not the config file. A setting can be written to a file
+  # that is never read, and nothing complains.
+  - id: config-actually-applied
+    script: checks/40-config-applied.sh
+    description: The running service reports the settings that were asked for
+
+teardown:
+  # Always runs, including after a crash mid-suite. Guard every removal so a
+  # partial setup still tears down.
+  - id: drop-fixtures
+    script: teardown/99-fixtures.sh
+    description: Remove everything the suite created

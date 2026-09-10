@@ -1,0 +1,42 @@
+# The most valuable file in the pack — it is how this tool stops needing a human.
+#
+# Only tool-specific failures belong here. apt locks, DNS, TLS, full disk and
+# friends live in packs/_lib/errors.yaml and already apply to every pack.
+#
+# When a failure gets past this file, dpagent drafts a proposed entry into
+# errors.proposed.yaml. Review it, move it here, and that failure is answered
+# automatically from then on — on this project and every one after it.
+
+- id: CHANGEME-port-busy
+  match:
+    # Regex against stdout+stderr together, case-insensitive.
+    # Anchor on the tool's own wording. Strip paths, PIDs, timestamps, versions —
+    # anything that differs between runs will silently stop matching.
+    output: "bind: address already in use|Address already in use"
+  cause: Another process already holds the port this tool wants.
+  autofix: []            # nothing safe to do unattended
+  ask_user: >
+    The port is occupied. Stop the other service, or re-run with a different
+    port param.
+  retry: false
+
+- id: CHANGEME-config-invalid
+  match:
+    output: "failed to parse config|invalid configuration at line"
+  cause: The generated config is malformed — a pack bug, not a host problem.
+  autofix: []
+  ask_user: "Config was rejected. Check the template in steps/10-install.sh."
+  retry: false
+
+# An entry with an autofix. Only write one when the command is safe to run
+# unattended AND safe to run twice. When in doubt, ask instead — a good question
+# beats a risky repair.
+#
+# - id: CHANGEME-stale-cache
+#   match:
+#     output: "cache is corrupt|checksum mismatch in cache"
+#   cause: The download cache is corrupt.
+#   autofix:
+#     - "rm -rf /var/cache/CHANGEME"
+#   retry: true
+#   max_attempts: 2

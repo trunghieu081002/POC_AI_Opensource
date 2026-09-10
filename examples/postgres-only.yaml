@@ -1,0 +1,34 @@
+# A project spec — the reproducible form of an install.
+#
+#   sudo -E dpagent spec examples/postgres-only.yaml --dry-run
+#   sudo -E dpagent spec examples/postgres-only.yaml
+#
+# This file is the only thing that differs between projects. The agent code, the
+# pack library and the acceptance suites stay identical.
+
+project: acme-warehouse
+
+components:
+  # `base` is pulled in automatically as a dependency of postgres — listing it
+  # is optional. Shown here because on a minimal image it is what makes the
+  # difference between an install that works and one that fails obscurely.
+  - base:
+      locale: "en_US.UTF-8"
+
+  - postgres:
+      version: "15"
+      port: 5432
+      listen_addresses: "localhost"
+      max_connections: 200
+      databases:
+        - warehouse
+        - staging
+      users:
+        # Never a literal password. ${NAME} is resolved from the environment at
+        # run time, and the value is masked in every log the agent writes.
+        - name: etl_writer
+          password: "${PG_ETL_PASSWORD}"
+          databases: [warehouse, staging]
+        - name: bi_reader
+          password: "${PG_BI_PASSWORD}"
+          databases: [warehouse]

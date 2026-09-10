@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dpagent"
+version = "0.4.0"
+description = "Install and operate an open-source data stack from reviewed packs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = [
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+# Installing, verifying and testing need no model. Only routing a plain-language
+# request, drafting a pack for an unknown tool, and diagnosing an uncatalogued
+# failure do.
+llm = ["litellm>=1.40"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+dpagent = "dpagent.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"dpagent.llm" = ["prompts/*.md"]
+
+# `packs/` and `suites/` are content, not code: the team authors and reviews them
+# in git, and they stay at the repo root rather than being buried in the wheel.
+# library.loader.find_content_dir() locates them from an editable checkout, a
+# /opt/dpagent bootstrap install, or DPAGENT_PACKS / DPAGENT_SUITES.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,61 @@
+# base runs first on a host that may have nothing, so its failures are about the
+# environment itself rather than any component.
+
+- id: base-no-package-manager-repos
+  match:
+    output: "The repository .* does not have a Release file|Failed to download metadata for repo|Cannot prepare internal mirrorlist"
+  cause: >
+    The host's own distro repositories are unreachable or unconfigured. Nothing
+    can be installed until that is fixed, and it is not something dpagent should
+    paper over by adding mirrors of its own.
+  autofix: []
+  ask_user: >
+    The distro repositories are not reachable. Check /etc/apt/sources.list or
+    /etc/yum.repos.d/, DNS, and whether this host needs a proxy. If it uses an
+    internal mirror, configure it before running dpagent.
+  retry: false
+
+- id: base-rhel-not-registered
+  match:
+    output: "This system is not registered with an entitlement server|Subscription Manager"
+  cause: RHEL host without an active subscription, so no repository is enabled.
+  autofix: []
+  ask_user: >
+    This RHEL host is not registered. Run `subscription-manager register` (or
+    switch to Rocky/Alma/Oracle Linux, which need no entitlement), then re-run.
+  retry: false
+
+- id: base-locale-def-missing-source
+  match:
+    output: "cannot open locale definition file|character map file .* not found"
+  cause: >
+    localedef has no locale source files — the glibc locale data package is not
+    installed.
+  autofix:
+    - "(command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y locales) || true"
+    - "(command -v dnf >/dev/null && dnf install -y glibc-langpack-en glibc-locale-source) || true"
+  retry: true
+  max_attempts: 2
+
+- id: base-iproute-conflict
+  match:
+    output: "conflicts with .*(iproute|net-tools)|file .* from install of iproute"
+  cause: An older net-tools or iproute build conflicts with the one being installed.
+  autofix: []
+  ask_user: >
+    A networking package conflicts with what base wants to install. Resolve it by
+    hand (`dnf swap` / `apt-get -f install`) — dpagent will not force-remove a
+    networking package on a host it reaches over the network.
+  retry: false
+
+- id: base-container-no-systemd
+  match:
+    output: "System has not been booted with systemd|Failed to connect to bus|Running in chroot, ignoring"
+  cause: >
+    This is a container or chroot without a running systemd, so services cannot
+    be enabled.
+  autofix: []
+  ask_user: >
+    No running systemd. dpagent manages components as systemd units, so it needs
+    a real VM or a systemd-enabled container. See the FAQ in docs/architecture.md.
+  retry: false

@@ -1,0 +1,55 @@
+suite: postgres
+summary: Prove PostgreSQL actually stores, returns and protects data
+
+# Every pack named here must be installed before the suite runs.
+requires: [postgres]
+
+# Fixtures live in their own database (DP_TEST_NS). A check that writes into a
+# real database is a liability, not a test.
+setup:
+  - id: create-test-database
+    script: setup/00-fixtures.sh
+    description: Create an isolated database for the checks to work in
+    timeout: 120
+
+checks:
+  # Ordered cheapest-and-most-fundamental first: if the roundtrip fails there is
+  # no point asking anything else, which is why it is critical.
+  - id: write-read-roundtrip
+    script: checks/10-write-read-roundtrip.sh
+    description: A row written is the same row read back
+    critical: true
+    timeout: 120
+
+  - id: survives-restart
+    script: checks/20-survives-restart.sh
+    description: Committed data is still there after a service restart
+    timeout: 300
+
+  - id: rejects-bad-password
+    script: checks/30-rejects-bad-password.sh
+    description: A wrong password is refused
+    negative: true
+    timeout: 120
+
+  - id: declared-databases-usable
+    script: checks/40-declared-databases-usable.sh
+    description: Every database in the spec accepts a connection and a write
+    timeout: 180
+
+  - id: config-actually-applied
+    script: checks/50-config-actually-applied.sh
+    description: The running server reports the port and limits that were asked for
+    timeout: 120
+
+  - id: local-only-is-local-only
+    script: checks/60-local-only-is-local-only.sh
+    description: With listen_addresses=localhost, the server is not reachable off-host
+    negative: true
+    timeout: 120
+
+teardown:
+  - id: drop-test-database
+    script: teardown/99-fixtures.sh
+    description: Remove everything the suite created
+    timeout: 120

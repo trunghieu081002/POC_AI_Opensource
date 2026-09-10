@@ -1,0 +1,39 @@
+name: python-modern
+version: 1.0.0
+summary: Ensure a Python 3.8+ interpreter exists, without touching the system python3
+maturity: stable
+
+provides: [python-modern]
+requires: []
+
+supports:
+  families: [debian, rhel]
+
+# Real problem this solves: on Oracle/RHEL/Rocky/Alma Linux 8, the system
+# `python3` is 3.6 — too old for dbt or Airflow — and yum/dnf itself is written
+# against that 3.6, so replacing or symlinking over it breaks package
+# management. Debian 11+/Ubuntu 20.04+ already ship 3.8+, so on those families
+# this pack's step is normally a guarded no-op.
+params:
+  version:
+    type: string
+    default: "3.11"
+    enum: ["3.9", "3.10", "3.11", "3.12"]
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+host_needs:
+  commands: []   # this pack IS the thing that provides python; nothing to require
+
+steps:
+  - id: install
+    script: steps/10-install.sh
+    description: Install a Python 3.8+ interpreter alongside the system one
+    timeout: 600
+    # Skip entirely when something already satisfies 3.8-3.13 - true on every
+    # debian/ubuntu release this pack targets, and on EL9 (system python3.9).
+    guard: 'dp_find_python 3 8 3 13 >/dev/null 2>&1'

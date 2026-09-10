@@ -1,0 +1,66 @@
+name: base
+version: 1.0.0
+summary: Foundational tooling every other pack assumes is present
+maturity: stable
+
+provides: [base, foundation]
+requires: []
+
+supports:
+  families: [debian, rhel]
+
+# Nothing here is optional in practice. A minimal cloud image ships without most
+# of it, and the failures that causes are indirect and confusing:
+#
+#   no `ss`        -> preflight cannot see that a port is taken; the install
+#                     fails much later with a bind error
+#   no `fuser`     -> the shared catalog's apt-lock autofix silently does nothing
+#   no locale      -> initdb refuses to choose a collation
+#   no python3     -> packs cannot parse their own JSON params
+#   wrong clock    -> repository signatures look invalid
+#   no CA bundle   -> every https download fails with a confusing TLS error
+#
+# So `base` is a dependency, not a suggestion. Other packs declare `requires:
+# [base]` and the resolver installs it first.
+params:
+  install_time_sync:
+    type: bool
+    default: true
+  locale:
+    type: string
+    default: "en_US.UTF-8"
+    enum: ["en_US.UTF-8", "C.UTF-8"]
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+errors: errors.yaml
+
+steps:
+  - id: packages
+    script: steps/10-packages.sh
+    description: Install the shared command-line tooling
+    timeout: 900
+    guard: >
+      command -v python3 >/dev/null 2>&1 &&
+      command -v curl    >/dev/null 2>&1 &&
+      command -v ss      >/dev/null 2>&1 &&
+      command -v fuser   >/dev/null 2>&1 &&
+      command -v tar     >/dev/null 2>&1
+
+  - id: locale
+    script: steps/20-locale.sh
+    description: Generate a UTF-8 locale
+    timeout: 300
+    # `locale -a` prints en_US.utf8 while the param says en_US.UTF-8. Normalise
+    # both sides (lowercase, strip hyphens) rather than trying to build a regex.
+    guard: >
+      locale -a 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '-' |
+      grep -qx "$(printf '%s' "$DP_PARAM_LOCALE" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
+
+  - id: time-sync
+    script: steps/30-time-sync.sh
+    description: Enable clock synchronisation
+    timeout: 300
+    when: 'test "$DP_PARAM_INSTALL_TIME_SYNC" = "1"'
+    optional: true

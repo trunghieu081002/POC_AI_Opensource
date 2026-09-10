@@ -1,0 +1,96 @@
+name: dbt
+version: 1.0.0
+summary: dbt-core in a dedicated virtualenv, configured against a Postgres target
+maturity: stable
+
+provides: [dbt, transform]
+# dbt itself does not need a database to install successfully — the profile
+# just needs one to be USABLE. Composition happens through the spec: point
+# `host`/`port`/`db_user` at whatever postgres install (this agent's, or an
+# existing one) the operator names. See examples/etl-stack.yaml.
+requires: [python-modern]
+
+supports:
+  families: [debian, rhel]
+
+host_needs:
+  disk_mb: { /opt: 1024 }
+
+params:
+  # MVP scope: one adapter. Extending to snowflake/bigquery/etc. means adding a
+  # branch in steps/20-install.sh and a template in steps/30-project.sh — no
+  # change to this schema's shape.
+  adapter:
+    type: string
+    default: "postgres"
+    enum: ["postgres"]
+  dbt_version:
+    type: string
+    default: "1.8.*"
+  install_dir:
+    type: string
+    default: "/opt/dbt"
+  project_dir:
+    type: string
+    default: "/opt/dbt/project"
+  profile_name:
+    type: string
+    default: "default"
+  target:
+    type: string
+    default: "dev"
+  host:
+    type: string
+    default: "localhost"
+  port:
+    type: int
+    default: 5432
+  database:
+    type: string
+    default: "warehouse"
+  db_schema:
+    type: string
+    default: "public"
+  db_user:
+    type: string
+    default: "dbt_user"
+  db_password:
+    type: string
+    default: ""
+    secret: true
+  threads:
+    type: int
+    default: 4
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+steps:
+  - id: venv
+    script: steps/10-venv.sh
+    description: Create a dedicated virtualenv under install_dir
+    timeout: 300
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/python"'
+
+  - id: install
+    script: steps/20-install.sh
+    description: Install dbt-core and the postgres adapter into the venv
+    timeout: 900
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/dbt"'
+
+  - id: project
+    script: steps/30-project.sh
+    description: Seed a minimal dbt project and profiles.yml if none exists
+    timeout: 120
+    # Guarded so an operator's real project (once they add one) is never
+    # overwritten by a re-run.
+    guard: 'test -f "$DP_PARAM_PROJECT_DIR/dbt_project.yml"'
+
+  - id: wrapper
+    script: steps/40-symlink.sh
+    description: Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+    timeout: 60
+    guard: 'test -x /usr/local/bin/dbt'

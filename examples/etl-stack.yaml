@@ -1,0 +1,68 @@
+# Full ETL stack: PostgreSQL (warehouse + Airflow's own metadata) + dbt
+# (transform) + Airflow (orchestrate), on one host.
+#
+#   export AIRFLOW_DB_PASSWORD='...'
+#   export DBT_DB_PASSWORD='...'
+#   export AIRFLOW_ADMIN_PASSWORD='...'
+#   sudo -E dpagent doctor postgres dbt airflow      # check the machine first
+#   sudo -E dpagent spec examples/etl-stack.yaml --dry-run
+#   sudo -E dpagent spec examples/etl-stack.yaml
+#
+# Packs are decoupled on purpose: dbt and airflow do not create their own
+# database or role. This file is where that composition happens — the
+# host/port/database/user values below must agree across sections, because
+# nothing checks that for you except the acceptance suites after install.
+#
+# python-modern is not listed: it is pulled in automatically as a dependency of
+# both dbt and airflow. Listing `base` is optional for the same reason but is
+# spelled out here since it is what makes the very first install painless on a
+# minimal host.
+
+project: etl-stack
+
+components:
+  - base:
+      locale: "en_US.UTF-8"
+
+  - postgres:
+      version: "15"
+      port: 5432
+      listen_addresses: "localhost"
+      max_connections: 200
+      databases:
+        - warehouse       # dbt's target
+        - airflow_meta    # Airflow's own metadata store
+      users:
+        - name: dbt_user
+          password: "${DBT_DB_PASSWORD}"
+          databases: [warehouse]
+        - name: airflow
+          password: "${AIRFLOW_DB_PASSWORD}"
+          databases: [airflow_meta]
+
+  - dbt:
+      adapter: postgres
+      dbt_version: "1.8.*"
+      # Must match the postgres section above.
+      host: localhost
+      port: 5432
+      database: warehouse
+      db_schema: public
+      db_user: dbt_user
+      db_password: "${DBT_DB_PASSWORD}"
+      threads: 4
+
+  - airflow:
+      version: "2.9.3"
+      executor: LocalExecutor
+      webserver_port: 8090
+      load_examples: false
+      # Must match the postgres section above.
+      backend_host: localhost
+      backend_port: 5432
+      backend_db: airflow_meta
+      backend_user: airflow
+      backend_password: "${AIRFLOW_DB_PASSWORD}"
+      admin_user: admin
+      admin_password: "${AIRFLOW_ADMIN_PASSWORD}"
+      admin_email: "admin@example.com"

@@ -1,0 +1,138 @@
+# PostgreSQL-specific failures. Generic ones (apt locks, DNS, disk) live in
+# packs/_lib/errors.yaml and are checked after these.
+#
+# Every entry earns its place by having actually happened. When a failure gets
+# past this file, `dpagent diagnose` drafts a new entry into errors.proposed.yaml
+# for review — move it here and this pack never needs a human for it again.
+
+- id: pg-initdb-locale-missing
+  match:
+    output: "initdb: error: invalid locale settings|could not find suitable encoding|locale .* not recognized"
+  cause: >
+    The image has no usable UTF-8 locale, so initdb cannot choose a collation.
+    Common on minimal cloud images and container-derived VMs.
+  autofix:
+    - "(command -v localedef >/dev/null && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8) || true"
+    - "(command -v locale-gen >/dev/null && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen) || true"
+    - "(command -v dnf >/dev/null && dnf install -y glibc-langpack-en) || true"
+  retry: true
+  max_attempts: 2
+
+- id: pg-initdb-datadir-not-empty
+  match:
+    output: "directory .* exists but is not empty|initdb: error: directory .* is not empty"
+  cause: >
+    The data directory holds files from an earlier, incomplete install. initdb
+    refuses to write into it.
+  autofix: []
+  ask_user: >
+    The data directory is not empty but has no valid cluster. If it holds nothing
+    you need, run `dpagent rollback postgres` then install again. dpagent will
+    not delete a data directory on its own.
+  retry: false
+
+- id: pg-port-taken-by-other
+  match:
+    output: "could not bind IPv4 address|Address already in use|could not create any TCP/IP sockets"
+  cause: Another process — often a second PostgreSQL major version — holds the port.
+  autofix: []
+  ask_user: >
+    The port is occupied. Either stop the other service, or re-run with a
+    different port param, e.g. `dpagent install postgres --set port=5433`.
+  retry: false
+
+- id: pg-peer-auth-failed
+  match:
+    output: "Peer authentication failed for user|FATAL:  Peer authentication failed"
+  cause: >
+    psql was run as the wrong system user. Every SQL step in this pack must go
+    through `runuser -u postgres`, which pg-lib.sh does.
+  autofix: []
+  ask_user: >
+    Peer auth failed — a step ran psql as the wrong user. This is a pack bug, not
+    a host problem. Check that the step uses pg_as_postgres / pg_query.
+  retry: false
+
+- id: pg-role-already-exists
+  match:
+    output: "role \".*\" already exists"
+  cause: >
+    A CREATE ROLE ran without its existence guard. The generated SQL wraps every
+    role in an IF NOT EXISTS block, so this means hand-edited SQL got in.
+  autofix: []
+  ask_user: "A role already exists and the SQL did not guard for it. Check steps/50-databases.sh."
+  retry: false
+
+- id: pg-module-stream-shadowing
+  match:
+    output: "package postgresql-server-.* is filtered out by modular filtering"
+  cause: >
+    The RHEL postgresql module stream is still enabled and hides the PGDG
+    packages.
+  autofix:
+    - "dnf -qy module disable postgresql"
+    - "dnf clean all"
+  retry: true
+  max_attempts: 2
+
+- id: pg-pgdg-repo-el-mismatch
+  match:
+    output: "pgdg-redhat-repo-latest.noarch.rpm.*(404|Not Found)|Cannot download.*pgdg-redhat-repo"
+  cause: >
+    No PGDG repo RPM exists for this EL release and architecture — usually an
+    unsupported EL version or a non-x86_64 arch.
+  autofix: []
+  ask_user: >
+    PGDG has no repo package for this EL release/arch. Check
+    https://download.postgresql.org/pub/repos/yum/reporpms/ for what is
+    published, then adjust the pack's repo step.
+  retry: false
+
+- id: pg-version-not-in-repo
+  match:
+    output: "(Unable to locate package|No match for argument).*postgresql-?1[4-7]"
+  cause: >
+    The requested major version is not published for this distro release —
+    typically a very new major on an older Debian/Ubuntu codename.
+  autofix:
+    - "DEBIAN_FRONTEND=noninteractive apt-get update -y"
+  retry: true
+  max_attempts: 2
+
+- id: pg-service-start-failed
+  match:
+    output: "Job for postgresql.*\\.service failed|Failed to start PostgreSQL"
+  cause: >
+    The unit failed to start. The real reason is in the cluster log, not in the
+    systemd output.
+  autofix: []
+  ask_user: >
+    PostgreSQL failed to start. Read the reason with
+    `journalctl -u <service> -n 50 --no-pager` and, on Debian, the cluster log in
+    /var/log/postgresql/. Common causes: a bad setting in conf.d/10-dpagent.conf,
+    shared_buffers larger than available memory, or a stale postmaster.pid.
+  retry: false
+
+- id: pg-shared-memory
+  match:
+    output: "could not map anonymous shared memory|Cannot allocate memory|shmget.*Invalid argument"
+  cause: >
+    shared_buffers is larger than what the host can allocate. Very common on
+    small VMs when the param is copied from a production config.
+  autofix: []
+  ask_user: >
+    PostgreSQL cannot allocate its shared memory. Lower the shared_buffers param
+    (a safe starting point is 25% of RAM) and re-run.
+  retry: false
+
+- id: pg-stale-postmaster-pid
+  match:
+    output: "lock file .*postmaster.pid.* already exists|is another postmaster .* running"
+  cause: A previous postmaster died without cleaning up its pid file.
+  autofix: []
+  ask_user: >
+    A stale postmaster.pid is blocking startup. Confirm no postgres process is
+    actually running (`pgrep -a postgres`), then remove the pid file and re-run.
+    dpagent will not delete it automatically — if a postmaster IS alive, doing so
+    risks two servers on one data directory and corruption.
+  retry: false

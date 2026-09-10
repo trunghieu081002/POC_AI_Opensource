@@ -1,0 +1,36 @@
+- id: dbt-no-matching-version
+  match:
+    output: "Could not find a version that satisfies the requirement dbt-core"
+  cause: >
+    Either no network access to PyPI, or the interpreter building the venv is
+    outside the range dbt-core publishes wheels for.
+  autofix: []
+  ask_user: >
+    Check network access to pypi.org, and confirm the venv's python
+    (`/opt/dbt/.venv/bin/python --version`) is 3.8-3.12.
+  retry: false
+
+- id: dbt-psycopg2-build-failed
+  match:
+    output: "Error: pg_config executable not found|Failed building wheel for psycopg2"
+  cause: >
+    dbt-postgres normally ships a prebuilt psycopg2-binary wheel; this means pip
+    fell back to building from source, usually because no wheel exists for this
+    platform/python combination.
+  autofix:
+    - "(command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y libpq-dev gcc python3-dev) || true"
+    - "(command -v dnf >/dev/null && dnf install -y libpq-devel gcc python3-devel) || true"
+  retry: true
+  max_attempts: 2
+
+- id: dbt-profile-connection-refused
+  match:
+    output: "could not connect to server: Connection refused"
+  cause: >
+    The database in profiles.yml is not reachable - most often the postgres
+    pack has not finished, or the host/port params do not match it.
+  autofix: []
+  ask_user: >
+    Confirm the target Postgres is up (`dpagent verify postgres`) and that
+    dbt's host/port params point at it.
+  retry: false

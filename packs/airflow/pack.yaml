@@ -1,0 +1,108 @@
+name: airflow
+version: 1.0.0
+summary: Apache Airflow (LocalExecutor) in a dedicated virtualenv, backed by Postgres
+maturity: stable
+
+provides: [airflow, orchestrator]
+# The metadata database is composed through the spec, not created by this pack:
+# point backend_host/backend_port/backend_user/backend_password at a database
+# the postgres pack (or an existing server) already created. See
+# examples/etl-stack.yaml for how the two packs' params line up.
+requires: [postgres, python-modern]
+
+supports:
+  families: [debian, rhel]
+
+host_needs:
+  memory_mb: 2048
+  disk_mb: { /opt: 2048 }
+
+params:
+  version:
+    type: string
+    default: "2.9.3"
+  install_dir:
+    type: string
+    default: "/opt/airflow"
+  executor:
+    type: string
+    default: "LocalExecutor"
+    enum: ["LocalExecutor", "SequentialExecutor"]
+  webserver_port:
+    type: int
+    default: 8090   # 8080 is a very common collision on hosts already running other web apps
+  backend_host:
+    type: string
+    default: "localhost"
+  backend_port:
+    type: int
+    default: 5432
+  backend_db:
+    type: string
+    default: "airflow_meta"
+  backend_user:
+    type: string
+    default: "airflow"
+  backend_password:
+    type: string
+    required: true
+    secret: true
+  admin_user:
+    type: string
+    default: "admin"
+  admin_password:
+    type: string
+    required: true
+    secret: true
+  admin_email:
+    type: string
+    default: "admin@example.com"
+  load_examples:
+    type: bool
+    default: false
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+steps:
+  - id: user
+    script: steps/10-user.sh
+    description: Create the airflow system user and AIRFLOW_HOME
+    timeout: 60
+    guard: 'id -u airflow >/dev/null 2>&1'
+
+  - id: venv
+    script: steps/20-venv.sh
+    description: Create a dedicated virtualenv under install_dir
+    timeout: 300
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/python"'
+
+  - id: install
+    script: steps/30-install.sh
+    description: Install apache-airflow and the postgres provider (constrained)
+    timeout: 1800
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/airflow"'
+
+  - id: config
+    script: steps/40-config.sh
+    description: Write the AIRFLOW__* environment file (executor, backend, port, fernet key)
+    timeout: 60
+
+  - id: db-migrate
+    script: steps/50-db-migrate.sh
+    description: Initialise/upgrade the metadata database schema
+    timeout: 600
+    guard: 'test -f "$DP_PARAM_INSTALL_DIR/home/.dpagent-db-migrated"'
+
+  - id: admin-user
+    script: steps/60-admin-user.sh
+    description: Create the admin user if it does not already exist
+    timeout: 120
+
+  - id: services
+    script: steps/70-services.sh
+    description: Install and start the webserver and scheduler systemd units
+    timeout: 300

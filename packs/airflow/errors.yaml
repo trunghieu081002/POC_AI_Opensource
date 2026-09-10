@@ -1,0 +1,68 @@
+- id: airflow-constraints-python-mismatch
+  match:
+    output: "Could not find a version that satisfies the requirement apache-airflow"
+  cause: >
+    Airflow publishes a constraints file per (airflow_version, python_version)
+    pair. This usually means the chosen python-modern version is not one
+    Airflow ${version} publishes constraints for.
+  autofix: []
+  ask_user: >
+    Check https://github.com/apache/airflow/tree/constraints-<version> for the
+    python versions it lists, and set python-modern's `version` param to match.
+  retry: false
+
+- id: airflow-fernet-key-invalid
+  match:
+    output: "Fernet key must be 32 url-safe base64-encoded bytes|InvalidToken"
+  cause: >
+    The persisted fernet key file is corrupt or was hand-edited into an invalid
+    format.
+  autofix: []
+  ask_user: >
+    Remove the bad key file (<AIRFLOW_HOME>/.dpagent-fernet-key) and re-run the
+    config step - a fresh key will be generated. Note: any Connection password
+    already encrypted with the old key becomes unreadable.
+  retry: false
+
+- id: airflow-db-connection-refused
+  match:
+    output: "could not connect to server: Connection refused|OperationalError.*could not connect"
+  cause: >
+    The backend Postgres is not reachable - not up yet, wrong host/port, or the
+    backend_db/backend_user do not exist there.
+  autofix: []
+  ask_user: >
+    Confirm postgres is installed and verified (`dpagent verify postgres`), and
+    that airflow's backend_host/backend_port/backend_db/backend_user match a
+    database and role the postgres pack actually created.
+  retry: false
+
+- id: airflow-db-auth-failed
+  match:
+    output: "password authentication failed for user"
+  cause: backend_password does not match the role's actual password in Postgres.
+  autofix: []
+  ask_user: >
+    The backend_user/backend_password params must match a role postgres already
+    created with that exact password - check the postgres pack's `users` param.
+  retry: false
+
+- id: airflow-webserver-worker-timeout
+  match:
+    output: "WORKER TIMEOUT|Worker was sent SIGKILL"
+  cause: >
+    The webserver's gunicorn workers are timing out, usually from too little
+    memory for the configured worker count on a small host.
+  autofix: []
+  ask_user: >
+    Lower AIRFLOW__WEBSERVER__WORKERS (add it to the env file) or add memory to
+    the host.
+  retry: false
+
+- id: airflow-port-busy
+  match:
+    output: "\\[Errno 98\\] Address already in use"
+  cause: Another process holds the configured webserver_port.
+  autofix: []
+  ask_user: "Free the port, or re-run with a different webserver_port param."
+  retry: false

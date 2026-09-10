@@ -1,0 +1,188 @@
+# Shared error catalog — checked after the pack's own errors.yaml, so a pack can
+# always override an entry here with a more specific one.
+#
+# What belongs here: failures that have nothing to do with which tool is being
+# installed. Package manager locks, DNS, proxies, disk, clock skew, repo keys.
+# Anything tool-specific belongs in that tool's pack.
+
+# ---------------------------------------------------------------- apt / dpkg
+
+- id: apt-lock-held
+  match:
+    output: "Could not get lock /var/lib/(dpkg|apt)|Unable to acquire the dpkg frontend lock"
+  cause: >
+    Another process holds the dpkg/apt lock — almost always unattended-upgrades
+    on a freshly booted cloud image.
+  autofix:
+    - "systemctl stop unattended-upgrades 2>/dev/null || true"
+    - "systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true"
+    - "timeout 120 bash -c 'while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 3; done' || true"
+  retry: true
+  max_attempts: 3
+
+- id: apt-dpkg-interrupted
+  match:
+    output: "dpkg was interrupted, you must manually run|dpkg --configure -a"
+  cause: A previous package operation was killed part-way and left dpkg mid-transaction.
+  autofix:
+    - "dpkg --configure -a"
+  retry: true
+  max_attempts: 2
+
+- id: apt-stale-index
+  match:
+    output: "has no installation candidate|Unable to locate package|Failed to fetch.*404"
+  cause: The package index is stale or the repo was added after the last update.
+  autofix:
+    - "DEBIAN_FRONTEND=noninteractive apt-get update -y"
+  retry: true
+  max_attempts: 2
+
+- id: apt-repo-key-missing
+  match:
+    output: "NO_PUBKEY|GPG error|is not signed|no longer has a Release file"
+  cause: >
+    A repository's signing key is missing or expired. The pack that added the
+    repo should be re-run rather than the key being blindly trusted.
+  autofix: []
+  ask_user: >
+    A repository is unsigned or its key is missing. Re-run the repo step, or
+    check whether the mirror URL in the pack is still correct. Not auto-fixing —
+    disabling signature checks would be worse than the failure.
+  retry: false
+
+# ---------------------------------------------------------------- dnf / yum
+
+- id: dnf-lock-held
+  match:
+    output: "Waiting for process with pid .* to finish|Another app is currently holding the yum lock"
+  cause: dnf-makecache or another dnf transaction is still running.
+  autofix:
+    - "timeout 180 bash -c 'while pgrep -x dnf >/dev/null || pgrep -x yum >/dev/null; do sleep 5; done' || true"
+  retry: true
+  max_attempts: 3
+
+- id: dnf-no-match
+  match:
+    output: "No match for argument|Unable to find a match|Error: Unable to find a match"
+  cause: >
+    The package name does not exist in the enabled repos — usually a repo the
+    pack expected was not enabled, or the name differs on this EL version.
+  autofix:
+    - "dnf clean all"
+    - "dnf makecache -y"
+  retry: true
+  max_attempts: 2
+
+- id: dnf-module-conflict
+  match:
+    output: "cannot install the best candidate|module .* conflicts|problem with installed package"
+  cause: >
+    A distro module stream provides a conflicting version of this package.
+    Typically needs `dnf -qy module disable <name>` in the pack's repo step.
+  autofix: []
+  ask_user: >
+    A dnf module stream conflicts with the package this pack wants. Check whether
+    the pack's repo step should disable the module first.
+  retry: false
+
+# ---------------------------------------------------------------- network
+
+- id: dns-failure
+  match:
+    output: "Temporary failure resolving|Could not resolve host|Name or service not known"
+  cause: The host cannot resolve DNS — no resolver, or egress is firewalled.
+  autofix: []
+  ask_user: >
+    DNS resolution is failing on this host. Check /etc/resolv.conf and whether
+    outbound DNS is allowed, then re-run. dpagent will not rewrite your resolver.
+  retry: false
+
+- id: tls-cert-verify
+  match:
+    output: "SSL certificate problem|certificate verify failed|unable to get local issuer certificate"
+  cause: >
+    TLS verification failed — usually a corporate MITM proxy whose CA is not in
+    the host trust store, or an expired ca-certificates package.
+  autofix:
+    - "DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates 2>/dev/null || dnf install -y ca-certificates"
+    - "update-ca-trust extract 2>/dev/null || update-ca-certificates 2>/dev/null || true"
+  retry: true
+  max_attempts: 2
+
+- id: proxy-required
+  match:
+    output: "Connection timed out after|Failed to connect to .* port (80|443)|Connection refused.*443"
+  cause: Outbound HTTP(S) is blocked — the host probably needs a proxy configured.
+  autofix: []
+  ask_user: >
+    Cannot reach the package mirror. If this host needs a proxy, export
+    http_proxy/https_proxy/no_proxy and re-run with `sudo -E` so the agent
+    inherits them.
+  retry: false
+
+# ---------------------------------------------------------------- host
+
+- id: disk-full
+  match:
+    output: "No space left on device|write error: No space left"
+  cause: The filesystem filled up mid-install.
+  autofix: []
+  ask_user: >
+    Out of disk. Free space and re-run — dpagent resumes from the last completed
+    step, so nothing already installed is repeated. It will not delete files to
+    make room on its own.
+  retry: false
+
+- id: permission-denied
+  match:
+    output: "Permission denied|are you root\\?|must be run as root|Operation not permitted"
+  cause: The step needs root and the agent is not running with it.
+  autofix: []
+  ask_user: "Re-run with `sudo -E dpagent ...` so the agent has root and keeps your environment."
+  retry: false
+
+- id: systemd-unit-missing
+  match:
+    output: "Unit .* not found|Failed to (start|enable) .*: Unit .* not found"
+  cause: >
+    The service unit does not exist — the package install did not finish, or the
+    unit is named differently on this distro.
+  autofix:
+    - "systemctl daemon-reload"
+  retry: true
+  max_attempts: 2
+
+- id: selinux-denied
+  match:
+    output: "SELinux is preventing|avc:  denied|Permission denied.*selinux"
+  cause: An SELinux policy is blocking the service from its port or data directory.
+  autofix: []
+  ask_user: >
+    SELinux denied this operation. The right fix is a targeted policy
+    (semanage port -a / restorecon), not `setenforce 0`. Check the audit log with
+    `ausearch -m avc -ts recent` and add the rule to the pack.
+  retry: false
+
+- id: clock-skew
+  match:
+    output: "Release file .* is not valid yet|certificate is not yet valid|clock skew"
+  cause: The system clock is wrong, so signatures and certificates look invalid.
+  autofix:
+    - "timedatectl set-ntp true 2>/dev/null || true"
+    - "chronyc makestep 2>/dev/null || systemctl restart systemd-timesyncd 2>/dev/null || true"
+  retry: true
+  max_attempts: 2
+
+- id: step-timeout
+  match:
+    output: "\\[dpagent\\] timed out after"
+  rc: 124
+  cause: >
+    The step exceeded its timeout. On a slow link a large package download can
+    legitimately take longer than the pack allows.
+  autofix: []
+  ask_user: >
+    Step timed out. If the host is just slow, raise `timeout:` for this step in
+    the pack manifest and re-run — completed steps are skipped.
+  retry: false

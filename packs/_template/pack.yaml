@@ -1,0 +1,55 @@
+# Copy this directory to packs/<tool>/ and fill it in.
+#   cp -r packs/_template packs/clickhouse
+# Then:  dpagent lint clickhouse
+#
+# Writing a pack by hand is the normal path for a tool you know. `dpagent synth`
+# exists for tools you do not — it produces a draft in exactly this shape, which
+# you then read and correct. Either way the reviewed pack is what ships.
+
+name: CHANGEME
+version: 0.1.0
+summary: One line — what this installs.
+maturity: draft            # flip to stable only after it has verified on a real host
+
+# Capability names other packs can depend on instead of naming you directly.
+provides: []               # e.g. [object-storage, s3]
+
+# Pack names that must be installed first. The resolver orders them; do not
+# encode ordering by hand anywhere else.
+requires: []               # e.g. [postgres]
+
+supports:
+  families: [debian, rhel]
+
+# Reaches each script as DP_PARAM_<UPPERCASE>. Lists and objects arrive as JSON.
+params:
+  version:
+    type: string           # string | int | bool | list | object
+    default: "1.0"
+    # enum: ["1.0", "2.0"]
+  port:
+    type: int
+    default: 8080
+  # admin_password:
+  #   type: string
+  #   secret: true         # masked everywhere it could be logged
+  # users:
+  #   type: list
+  #   default: []
+  #   secret_fields: [password]
+
+preflight: preflight.sh    # fail early on what predictably breaks
+verify: verify.sh          # required — an install nobody can check is not done
+rollback: rollback.sh      # required — a failed install must be recoverable
+errors: errors.yaml
+
+steps:
+  - id: install
+    script: steps/10-install.sh
+    description: What this step does, in one line.
+    timeout: 900
+    # Shell snippet. Exit 0 means "already applied", and the step is skipped.
+    # Without it, a re-run repeats work it does not need to.
+    guard: 'command -v CHANGEME >/dev/null 2>&1'
+    # when: 'test "$DP_PARAM_ENABLE_TLS" = "1"'   # skip unless applicable
+    # optional: true                              # failure warns, does not halt
