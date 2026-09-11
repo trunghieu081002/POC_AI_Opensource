@@ -60,7 +60,7 @@ def test_quiet_without_set_e(tmp_path):
     path = tmp_path / "plain.sh"
     path.write_text('#!/usr/bin/env bash\nsource "${DP_LIB:?}"\n'
                     '[ -f /etc/foo ] && rm -f /etc/foo\n', encoding="utf-8")
-    assert not any(WARN_AND_TRAP in m for m in lint.lint_script(path, "p/plain.sh"))
+    assert not any(WARN_AND_TRAP in m for m in messages(path, "p/plain.sh"))
 
 
 # ---------------------------------------------------------------- dry-run honesty
@@ -108,4 +108,4 @@ def test_missing_dp_lib_is_flagged(tmp_path):
     path = tmp_path / "bare.sh"
     path.write_text("#!/usr/bin/env bash\nset -euo pipefail\napt-get update\n",
                     encoding="utf-8")
-    assert any("dp.sh" in m for m in lint.lint_script(path, "p/bare.sh"))
+    assert any("dp.sh" in m for m in messages(path, "p/bare.sh"))

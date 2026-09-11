@@ -17,9 +17,10 @@ from pathlib import Path
 import pytest
 
 DP_SH = Path(__file__).resolve().parents[1] / "packs" / "_lib" / "dp.sh"
+BASH = shutil.which("bash")
 
 requires_bash = pytest.mark.skipif(
-    shutil.which("bash") is None,
+    BASH is None,
     reason="bash is not installed on this machine; dp.sh cannot be executed here",
 )
 
@@ -35,7 +36,10 @@ def run(script_body: str, env: dict | None = None) -> subprocess.CompletedProces
     if env:
         full_env.update(env)
     script = f'set -euo pipefail\nsource "{DP_SH}"\n{script_body}\n'
-    return subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+    # BASH is an absolute path so the interpreter itself is found via exec(),
+    # independent of whatever PATH a test passes in full_env (e.g. to prove
+    # dp_find_python finds nothing when PATH has no pythons).
+    return subprocess.run([BASH, "-c", script], capture_output=True, text=True,
                           env=full_env, timeout=15)
 
 

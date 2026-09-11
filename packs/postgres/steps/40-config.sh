@@ -17,7 +17,9 @@ LISTEN="$(dp_param listen_addresses localhost)"
 MAXCONN="$(dp_param max_connections 100)"
 SHARED_BUFFERS="$(dp_param shared_buffers)"
 
-[ -d "$CONFDIR" ] || dp_fail "config directory ${CONFDIR} does not exist — did initdb run?"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -d "$CONFDIR" ] || dp_fail "config directory ${CONFDIR} does not exist — did initdb run?"
+fi
 
 CONF_D="${CONFDIR}/conf.d"
 DROPIN="${CONF_D}/10-dpagent.conf"

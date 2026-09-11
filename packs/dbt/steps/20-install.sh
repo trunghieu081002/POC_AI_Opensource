@@ -9,7 +9,9 @@ ADAPTER="$(dp_param adapter postgres)"
 DBT_VERSION="$(dp_param dbt_version "1.8.*")"
 PIP="${INSTALL_DIR}/.venv/bin/pip"
 
-[ -x "$PIP" ] || dp_fail "venv missing at ${INSTALL_DIR}/.venv - the venv step should have created it"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -x "$PIP" ] || dp_fail "venv missing at ${INSTALL_DIR}/.venv - the venv step should have created it"
+fi
 
 case "$ADAPTER" in
   postgres) ADAPTER_PKG="dbt-postgres" ;;

@@ -32,8 +32,12 @@ elif dp_is_rhel; then
   dp_run "${DP_PKG_MGR:-dnf}" install -y \
     "https://download.postgresql.org/pub/repos/yum/reporpms/EL-${el}-${arch}/pgdg-redhat-repo-latest.noarch.rpm"
 
-  # The distro module stream shadows the PGDG packages if left enabled.
-  if "${DP_PKG_MGR:-dnf}" module list postgresql >/dev/null 2>&1; then
+  # The distro module stream shadows the PGDG packages if left enabled. -y is
+  # required here, not just on the disable itself: listing a module from a
+  # just-added repo triggers that repo's first-use GPG key confirmation, which
+  # fails non-interactively without it — silently skipping the disable below
+  # and leaving postgresqlNN-server unresolvable ("dnf-no-match").
+  if "${DP_PKG_MGR:-dnf}" -y module list postgresql >/dev/null 2>&1; then
     dp_run "${DP_PKG_MGR:-dnf}" -qy module disable postgresql
   fi
 

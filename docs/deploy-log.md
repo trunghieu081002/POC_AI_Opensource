@@ -375,3 +375,172 @@ No acceptance suite covers `base`, and `postgres` is cancelled. So this pass
 verifies that dpagent runs correctly on a real EL8 host; it does not demonstrate
 that a component installs and works end to end. That demonstration needs a pack
 for something this host actually wants - to be chosen next.
+
+---
+
+### 2026-09-10 — new session, ran directly against ol8-19 without reading this log first
+
+A separate conversation started from a plain `README.md` read (not this file),
+asked to "just start executing" the Getting Started flow. It installed
+`python3.11`, `base`, and — **the earlier decision to skip the postgres
+pack was not seen and was overridden** — `postgres` 15 host-level on port
+5432, with the acceptance suite passing (6/6 checks). Identity as ol8-19
+(192.168.1.54, the same shared production host: Oracle DB, MySQL,
+Elasticsearch, LDAP, OpenMetadata, the `postgres:16-alpine` container on
+55432, disk 87% used) was only recognised **after** postgres was already
+installed and proven, by cross-referencing `hostname`/`ss -tlnp` against this
+file's recon section.
+
+**Flagged to the user immediately on discovery, before installing anything
+else.** Decision on record from this point: **keep the host-level PostgreSQL
+15** (superseding the earlier "reuse the existing container" decision — the
+user made the call explicitly, in the moment, aware of the conflict) and
+continue completing the full stack (`dbt`, `airflow`) on this host. Recorded
+here so a future session reads this before repeating the mistake of acting
+on the README alone on a host that has its own log.
+
+**Process gap this exposes:** nothing pointed a fresh session at this file.
+`README.md` doesn't reference `docs/deploy-log.md` as something to check
+before touching a specific host, and there is no host-identity check gating
+privileged steps. Worth fixing structurally (e.g. `dpagent doctor` or
+`install` warning when `docs/deploy-log.md` exists and mentions the current
+hostname) rather than relying on every session to think to check.
+
+**Bugs found and fixed this session** (first time `pytest` and a real
+install had ever executed — the engine tests had only ever been read, never
+run; see "first-ever run" caveats above, now actually exercised):
+
+| File | Bug | Fix |
+|---|---|---|
+| `src/dpagent/library/lint.py` | `_AND_TRAP` regex used `re.VERBOSE` with an unescaped `#` in the char alternation — VERBOSE mode treats a bare `#` as a comment-to-end-of-line, eating the group's closing `)`. Broke `import dpagent.library.lint` outright (`re.error` at import time), taking `test_lint.py`/`test_packs.py` down with it. | Escaped to `\#`. |
+| `src/dpagent/library/lint.py` | `_AND_TRAP.match(line)` ran on the raw (unstripped) line. `^\s*` backtracks, so on a line indented ≥2 spaces the regex could skip matching one leading space, landing the negative lookahead (`(?!if\b\|...)`) on a space instead of on `if`/`while`/etc., defeating the exclusion — false-positived on legitimate `if A && B; then` lines in `base/steps/30-time-sync.sh` and `postgres/preflight.sh`. | Match against the already-computed `stripped` instead of `line`. |
+| `tests/test_dp_sh.py` | The `run()` test helper passed `env={"PATH": "/nonexistent"}` straight to `subprocess.run(["bash", ...], env=...)` to prove `dp_find_python` finds nothing — but Python resolves the `"bash"` argv[0] itself using that same `env`'s `PATH`, so the test couldn't even launch bash. | Resolve `bash`'s absolute path once via `shutil.which` at import time; exec by that path so the child's own `PATH` override no longer affects finding the interpreter. |
+| `tests/test_lint.py` (x2) | `lint.lint_script()` returns `list[Issue]` (dataclass); two tests did `WARN_AND_TRAP in m for m in lint.lint_script(...)`, i.e. `in` against an `Issue` object, which isn't iterable — `TypeError`, not the intended assertion. | Route through the file's own `messages()` helper, which already does `i.message for i in ...`, matching every other test in the file. |
+| `src/dpagent/engine/safety.py` | `rm-wildcard-sys` rule matched `/(etc\|var\|usr\|boot\|bin\|sbin\|lib)\b` — `\b` matches at the `/` inside a longer path too, so it false-positived on any `rm -rf` under those trees, including legitimate scoped rollback paths like `/var/lib/postgresql/15/main` (the pack's own rollback target). | Require the path to end right after the directory name (`/?(\s\|$)`) instead of a bare `\b`, so deeper subpaths are no longer caught while `rm -rf /etc` itself still is. |
+| `packs/postgres/steps/10-repo.sh` | The guard `dnf module list postgresql >/dev/null 2>&1` (no `-y`) was used to decide whether to run `dnf -qy module disable postgresql`. First contact with the freshly-added PGDG repo requires accepting a GPG key import; without `-y` that prompt auto-fails non-interactively, the guard's exit code is 1, and the module-disable **never runs** — so the distro's own `postgresql` AppStream module keeps shadowing `postgresql15-server`, and step 2/5 fails with `dnf-no-match` every time on EL8. This was the real, reproducible blocker for the actual install (not the dry-run bugs below). | Added `-y` to the guard command itself. |
+| `packs/postgres/steps/40-config.sh`, `packs/dbt/steps/20-install.sh`, `packs/dbt/steps/10-venv.sh`, `packs/base/steps/10-packages.sh`, `packs/base/steps/20-locale.sh`, `packs/python-modern/steps/10-install.sh`, `packs/airflow/steps/20-venv.sh`, `packs/airflow/steps/30-install.sh`, `packs/airflow/steps/40-config.sh` | Dry-run honesty gap: each step directly checked or read real filesystem state (a venv, a config dir, a generated locale, a fernet-key file) that an *earlier* step in the same plan would have created for real — but under `--dry-run` that earlier step is simulated, so the state never actually exists yet, and the check/read fails for real, halting the dry-run preview partway through a plan that should print to completion without touching anything. Same shape as the three `dp.sh` bugs found in the prior session, just one layer up (in the packs, not the shared library). | Wrapped each check in `if [ "$DP_DRY_RUN" != "1" ]; then ... fi`, matching the pattern already established in `postgres/steps/30-initdb.sh` and `postgres/steps/50-databases.sh`. Where a later line consumed the now-possibly-empty variable (python-modern's `FOUND_VER`, airflow's `PYVER`, airflow's fernet key), gave it a dry-run placeholder instead of letting it crash. |
+
+**Verification:** `pytest` — 189 passed (0 failures) after fixes.
+`dpagent lint` on all five packs — clean (only pre-existing, known warnings:
+missing suites for dbt/airflow, a few unguarded steps). `postgres` installed
+for real and passed its 6-check acceptance suite (round-trip read/write,
+restart durability, wrong-password rejection, off-host unreachability with
+`listen_addresses=localhost`).
+
+**Not yet fixed:** the `dnf-no-match` catalog entry in the shared error
+catalog is generic ("package name does not exist... usually a repo not
+enabled or the name differs") and doesn't mention module shadowing as a
+specific, known EL8 cause. Left as-is since the actual root cause is now
+fixed at the source (the guard always disables the module going forward), so
+the generic entry no longer needs to carry this specific diagnosis — but if
+a *different* module-shadowing case surfaces on another host, it's worth
+adding a dedicated cause to `postgres/errors.yaml` at that point rather than
+guessing preemptively.
+
+### 2026-09-10 — decided to finish the stack here, then hit and fixed one more real bug: PostgreSQL 15's schema-privilege default change
+
+After the user confirmed keeping the host-level postgres, continued to
+`dbt` and `airflow` per `examples/etl-stack.yaml` (postgres `databases`/`users`
+composed with dbt/airflow's connection params — packs don't create their own
+database/role, the spec is where that composition happens, exactly as the
+file's own header documents).
+
+**Real bug, not a dpagent bug in the strict sense but one the pack should have
+guarded against:** `airflow db migrate` failed with
+`psycopg2.errors.InsufficientPrivilege: permission denied for schema public`.
+The `permission-denied` catalog entry matched on the literal string
+"Permission denied" in the output and suggested re-running with `sudo -E` —
+a false diagnosis; the agent already had root. Root cause: **PostgreSQL 15
+stopped granting `CREATE` on the `public` schema to `PUBLIC` by default**
+(an upstream security change). `postgres/steps/50-databases.sh` granted
+`ALL PRIVILEGES ON DATABASE` to each user, which covers `CONNECT`/`TEMP` on
+the database itself but never covered the schema inside it even before PG15
+— PG15 just made the gap unmissable, since older PG versions granted schema
+`CREATE` to `PUBLIC` implicitly and papered over it.
+
+**Fixed:** the SQL generator now emits, per user with a `databases` entry,
+`\connect <db>` followed by `GRANT ALL ON SCHEMA public TO <user>;` (schema
+grants are per-database, so `\connect` is required to reach each one), then
+reconnects to `postgres` afterward. Verified by regenerating the SQL for the
+real `dbt_user`/`warehouse` and `airflow`/`airflow_meta` pairing and reading
+it before applying.
+
+**Process note:** the postgres pack was skipped wholesale on the first
+retry (`= postgres — already installed at v1.0.0 with identical params`) —
+the params-hash check that skips a pack outright runs before the
+per-step guards `dpagent lint` reports (e.g. "step 'databases' has no
+guard"), so a fix to an unguarded step still needs `--force` at the pack or
+spec level to actually re-execute if the params didn't change. Re-ran with
+`dpagent spec examples/etl-stack.yaml --yes --force`.
+
+**Final result — the whole stack, proven, on ol8-19:**
+
+```
+pack           version  installed  tested    
+airflow        1.0.0    installed  untested  
+base           1.0.0    installed  untested  
+dbt            1.0.0    installed  untested  
+postgres       1.0.0    installed  passed    (6/6 acceptance checks)
+python-modern  1.0.0    installed  untested  
+```
+
+airflow verify: scheduler active, webserver active, port 8090 listening,
+`/health` responds, `airflow db check` succeeds. dbt verify: binary present,
+wrapper present, version confirmed 1.8.10 (matches `1.8.*`). Neither dbt nor
+airflow has an acceptance suite yet (`untested` is correct, not a gap in this
+pass — see Status in `README.md`); postgres's suite passed with negative
+checks intact.
+
+**Total real, first-contact-with-a-real-host bugs found and fixed across
+this session:** 2 Python engine bugs (lint regex, safety rule), 2 test-harness
+bugs, 1 EL8-specific install blocker (PGDG/module shadowing), 9 dry-run
+honesty gaps across 5 packs, 1 PostgreSQL 15 schema-privilege default change.
+None of this was visible from reading the code — every one of them needed a
+real EL8 host, a real PGDG mirror, and a real PostgreSQL 15 to surface.
+
+### 2026-09-11 — end-to-end demo: Airflow orchestrating dbt against Postgres, and a cross-pack permission gap it exposed
+
+User asked for a working demo: Airflow generates fake data, dbt transforms
+it, prove the whole chain runs. Built `demo_etl_pipeline` (manual-trigger
+DAG in `/opt/airflow/home/dags/`): `generate_fake_orders` (PythonOperator,
+inserts 20 synthetic rows into `public.raw_orders`, reading the warehouse
+connection out of dbt's own `profiles.yml` instead of duplicating the
+secret) → `dbt_run` (builds `stg_orders` then `orders_daily_summary`,
+`models/staging` + `models/marts` added to the existing dbt project) →
+`dbt_test` (`not_null`/`unique` on both models' key columns).
+
+**Real gap found, not previously exercised because nothing before this had
+ever run dbt as anyone but root:** `dbt`'s `profiles.yml` is written
+`0600` with no explicit owner (`packs/dbt/steps/30-project.sh`, `dp_write`
+with no owner arg — the same omission the prior session's `dp_write` `&&`-trap
+writeup flagged, just the ownership half of it, not the `set -e` half), so
+only root could read it. The `airflow` system user — the pack's own intended
+consumer, since the whole point of this stack is Airflow orchestrating dbt —
+got `PermissionError` on both `profiles.yml` and, once past that,
+`/opt/dbt/project/logs/dbt.log` (also root-owned from earlier manual runs).
+
+**Fixed live on the host** (not yet folded back into the packs — see
+below): created a system group `dbtread`; `chgrp -R` + `chmod 2770` on
+`/opt/dbt/project` and `/opt/dbt/profiles` (setgid so new files — dbt's
+`target/`, `logs/` — inherit the group instead of landing root-only again),
+`chmod 640` on `profiles.yml` specifically; added `airflow` to `dbtread`.
+
+**Second-order gotcha, worth remembering:** the fix didn't take effect until
+`airflow-scheduler`/`airflow-webserver` were restarted. Supplementary group
+membership is resolved when a process starts, not re-checked afterward — the
+scheduler had been running since before `usermod -aG dbtread airflow`, so
+every task it forked still carried the old group list and kept hitting
+`PermissionError` on `profiles.yml` even after the chgrp/chmod above. First
+DAG run failed for exactly this reason; second run, after
+`systemctl restart airflow-scheduler airflow-webserver`, succeeded in 14s
+(`generate_fake_orders` → `dbt_run` → `dbt_test`, verified against
+`raw_orders`/`stg_orders`/`orders_daily_summary` directly in psql).
+
+**Follow-up worth doing, not done here:** fold the `dbtread` group (or
+equivalent) into the packs themselves — `dbt`'s pack currently has no notion
+that another pack (`airflow`, or any future orchestrator) needs read access
+to what it writes, so a fresh install of this exact stack elsewhere would
+hit the identical `PermissionError` on the first real orchestration attempt.
+Natural home is probably `packs/dbt/pack.yaml` declaring the group and
+`packs/airflow/steps/10-user.sh` joining it when both packs are present —
+deferred rather than guessed at under time pressure for a live demo.

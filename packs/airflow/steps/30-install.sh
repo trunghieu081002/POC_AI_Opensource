@@ -12,9 +12,12 @@ dp_require_root
 VERSION="$(dp_param version 2.9.3)"
 PIP="$(af_venv)/bin/pip"
 
-[ -x "$PIP" ] || dp_fail "venv missing at $(af_venv) - the venv step should have created it"
-
-PYVER="$("$(af_venv)/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -x "$PIP" ] || dp_fail "venv missing at $(af_venv) - the venv step should have created it"
+  PYVER="$("$(af_venv)/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+else
+  PYVER="py3"
+fi
 CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${VERSION}/constraints-${PYVER}.txt"
 
 dp_info "installing apache-airflow==${VERSION} for python ${PYVER}"

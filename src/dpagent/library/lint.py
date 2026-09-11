@@ -28,7 +28,7 @@ WARN = "warn"
 # absent file is the normal case.
 _AND_TRAP = re.compile(
     r"""^\s*                     # start of a statement
-        (?!if\b|while\b|until\b|elif\b|&&|\|\||\}|then\b|do\b|#)
+        (?!if\b|while\b|until\b|elif\b|&&|\|\||\}|then\b|do\b|\#)
         [^#\n]*?                 # some command
         \s&&\s                   # joined with &&
         (?![^#\n]*\|\|)          # and no || fallback anywhere after it
@@ -96,7 +96,7 @@ def lint_script(path: Path, rel: str, check_raw_mutation: bool = True) -> list[I
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            if _AND_TRAP.match(line):
+            if _AND_TRAP.match(stripped):
                 issues.append(Issue(
                     WARN, f"{rel}:{number}",
                     "`A && B` as a bare statement exits the script under `set -e` "

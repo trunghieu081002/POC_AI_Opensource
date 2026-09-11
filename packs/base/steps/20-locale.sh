@@ -32,5 +32,7 @@ else
   dp_run localedef -i "${WANT%%.*}" -c -f UTF-8 "$WANT"
 fi
 
-have_locale "$WANT" || dp_fail "generated ${WANT} but the system still does not list it"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  have_locale "$WANT" || dp_fail "generated ${WANT} but the system still does not list it"
+fi
 dp_ok "locale ${WANT} available"

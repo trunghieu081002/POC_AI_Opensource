@@ -13,7 +13,8 @@ from dataclasses import dataclass
 RULES: list[tuple[str, str, str]] = [
     ("rm-root", r"\brm\s+(-[a-zA-Z]*\s+)*-?[a-zA-Z]*[rR][a-zA-Z]*f?\s+/(\s|$|\*)",
      "rm -rf on / would destroy the host"),
-    ("rm-wildcard-sys", r"\brm\s+.*-[a-zA-Z]*r[a-zA-Z]*\s+/(etc|var|usr|boot|bin|sbin|lib)\b",
+    ("rm-wildcard-sys",
+     r"\brm\s+.*-[a-zA-Z]*r[a-zA-Z]*\s+/(etc|var|usr|boot|bin|sbin|lib)/?(\s|$)",
      "recursive rm on a system directory"),
     ("dd-disk", r"\bdd\b[^|;&]*\bof=/dev/(sd|nvme|vd|hd|xvd)",
      "dd onto a raw block device wipes the disk"),

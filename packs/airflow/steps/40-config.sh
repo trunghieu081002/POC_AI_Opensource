@@ -23,14 +23,18 @@ BACKEND_USER="$(dp_param backend_user airflow)"
 BACKEND_PASSWORD="$(dp_param_required backend_password)"
 
 FERNET_FILE="${HOME_DIR}/.dpagent-fernet-key"
-if [ ! -f "$FERNET_FILE" ]; then
-  # Generated once and kept: regenerating it would make every password already
-  # encrypted in existing Connections unreadable.
-  KEY="$("$(af_venv)/bin/python" -c \
-    'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
-  printf '%s' "$KEY" | dp_write "$FERNET_FILE" 0600 airflow:airflow
+if [ "$DP_DRY_RUN" != "1" ]; then
+  if [ ! -f "$FERNET_FILE" ]; then
+    # Generated once and kept: regenerating it would make every password already
+    # encrypted in existing Connections unreadable.
+    KEY="$("$(af_venv)/bin/python" -c \
+      'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+    printf '%s' "$KEY" | dp_write "$FERNET_FILE" 0600 airflow:airflow
+  fi
+  FERNET_KEY="$(cat "$FERNET_FILE")"
+else
+  FERNET_KEY="(dry-run: generated on first real run)"
 fi
-FERNET_KEY="$(cat "$FERNET_FILE")"
 
 # URL-encode user/password: a Postgres connection URI breaks silently (or in
 # hard-to-diagnose ways) if either contains `@`, `:`, `/` or `%`.

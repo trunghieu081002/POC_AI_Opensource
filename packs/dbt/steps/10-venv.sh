@@ -7,7 +7,9 @@ dp_require_root
 INSTALL_DIR="$(dp_param install_dir /opt/dbt)"
 
 PYTHON="$(dp_find_python 3 8 3 12 || true)"
-[ -n "$PYTHON" ] || dp_fail "no python 3.8-3.12 on PATH (python-modern should have provided one)"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -n "$PYTHON" ] || dp_fail "no python 3.8-3.12 on PATH (python-modern should have provided one)"
+fi
 
 dp_run mkdir -p "$INSTALL_DIR"
 dp_run "$PYTHON" -m venv "${INSTALL_DIR}/.venv"

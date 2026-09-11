@@ -27,6 +27,10 @@ else
 fi
 
 FOUND="$(dp_find_python 3 8 3 13 || true)"
-[ -n "$FOUND" ] || dp_fail "installed python${VERSION} but dp_find_python still cannot see it - check PATH"
-FOUND_VER="$("$FOUND" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-dp_ok "python ${FOUND_VER} available at ${FOUND}"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -n "$FOUND" ] || dp_fail "installed python${VERSION} but dp_find_python still cannot see it - check PATH"
+  FOUND_VER="$("$FOUND" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+  dp_ok "python ${FOUND_VER} available at ${FOUND}"
+else
+  dp_ok "python ${VERSION} available at ${FOUND:-(dry-run: not yet installed)}"
+fi

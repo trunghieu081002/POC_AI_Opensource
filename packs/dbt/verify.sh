@@ -23,7 +23,10 @@ else
 fi
 
 if [ "$failed" -eq 0 ]; then
-  version_line="$(/usr/local/bin/dbt --version 2>/dev/null | head -1 || true)"
+  # Newer dbt-core prints a multi-line "Core:\n  - installed: X.Y.Z\n..." block
+  # rather than a single "installed version: X.Y.Z" line, so the version is
+  # never on line 1 — grep for the line that actually names it.
+  version_line="$(/usr/local/bin/dbt --version 2>/dev/null | grep -m1 -i 'installed' || true)"
   dp_info "reported version: ${version_line}"
   case "$version_line" in
     *"${DBT_VERSION%.*}"*) dp_ok "version matches the requested ${DBT_VERSION}" ;;

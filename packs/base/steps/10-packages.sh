@@ -42,6 +42,8 @@ missing=""
 for tool in python3 curl tar gzip ss fuser pgrep; do
   dp_have "$tool" || missing="${missing} ${tool}"
 done
-[ -z "$missing" ] || dp_fail "still missing after install:${missing}"
+if [ "$DP_DRY_RUN" != "1" ]; then
+  [ -z "$missing" ] || dp_fail "still missing after install:${missing}"
+fi
 
 dp_ok "base tooling installed"

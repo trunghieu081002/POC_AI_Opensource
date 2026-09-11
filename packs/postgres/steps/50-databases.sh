@@ -93,6 +93,22 @@ for user in users:
     if user.get("superuser"):
         out.append(f"ALTER ROLE {ident(name)} WITH SUPERUSER;")
 
+# PostgreSQL 15 stopped granting CREATE on the `public` schema to PUBLIC by
+# default (a deliberate upstream security change). `GRANT ... ON DATABASE`
+# above covers CONNECT/TEMP on the database itself but not the schema inside
+# it, so a role that owns no objects yet still can't CREATE TABLE there -
+# `airflow db migrate` and a fresh dbt run both hit exactly this. Schema
+# grants are per-database, so \connect into each one to apply them.
+for user in users:
+    if isinstance(user, str):
+        continue
+    name = user.get("name")
+    for db in user.get("databases", []):
+        out.append(f"\\connect {ident(db)}")
+        out.append(f"GRANT ALL ON SCHEMA public TO {ident(name)};")
+if any(user.get("databases") if not isinstance(user, str) else None for user in users):
+    out.append("\\connect postgres")
+
 with open(sys.argv[1], "w", encoding="utf-8") as fh:
     fh.write("\n".join(out) + "\n")
 PY
