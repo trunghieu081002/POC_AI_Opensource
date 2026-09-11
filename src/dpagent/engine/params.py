@@ -67,7 +67,9 @@ _COERCE = {
     "string": lambda v: v if isinstance(v, str) else str(v),
     "int": lambda v: int(v),
     "bool": lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on"),
-    "list": lambda v: v if isinstance(v, list) else [v],
+    "list": lambda v: v if isinstance(v, list) else (
+        [s.strip() for s in v.split(",")] if isinstance(v, str) and "," in v else [v]
+    ),
     "object": lambda v: v,
 }
 

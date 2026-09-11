@@ -46,7 +46,13 @@ def parse_set(pairs: tuple[str, ...], default_pack: str | None) -> dict[str, dic
         try:
             value = json.loads(raw)
         except json.JSONDecodeError:
-            value = [v.strip() for v in raw.split(",")] if "," in raw else raw
+            # Leave it as the raw string. Whether a comma means "split this
+            # into a list" depends on the param's declared type, which isn't
+            # known here - params.resolve() does that split for `list` typed
+            # params. A `string` param (e.g. postgres.listen_addresses, whose
+            # own GUC syntax is itself a comma-joined value) must reach there
+            # unsplit, or it round-trips through str(a_list) into garbage.
+            value = raw
         out.setdefault(pack_name, {})[param] = value
     return out
 

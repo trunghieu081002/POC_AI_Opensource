@@ -544,3 +544,73 @@ hit the identical `PermissionError` on the first real orchestration attempt.
 Natural home is probably `packs/dbt/pack.yaml` declaring the group and
 `packs/airflow/steps/10-user.sh` joining it when both packs are present —
 deferred rather than guessed at under time pressure for a live demo.
+
+### 2026-09-11 — opened airflow and postgres to the LAN, and a `--set` bug that took postgres down
+
+User asked to make airflow (8090) and postgres (5432) reachable from other
+machines on this host's own LAN (192.168.1.0/24 via `enp6s0`), not the
+public internet — confirmed explicitly before touching the firewall, since
+this is the shared ol8-19 host.
+
+**airflow:** straightforward. `firewall-cmd --permanent --add-port=8090/tcp`
+in the active `public` zone, same unscoped pattern this host already uses
+for 8080/8000/8585 — the interface itself is what bounds it to the LAN, not
+a firewalld source rule. No app-level change needed; the webserver already
+binds `0.0.0.0:8090`.
+
+**postgres: not straightforward, and it broke the running stack.**
+`listen_addresses` defaults to `localhost`; reaching it from the LAN needs
+the host's own IP added. First attempt:
+`--set postgres.listen_addresses=192.168.1.54` — this *replaced* the
+listen list rather than extending it. PostgreSQL bound only to
+`192.168.1.54:5432` and stopped listening on `127.0.0.1`/`::1` entirely,
+which is exactly what airflow's `backend_host=localhost` and dbt's
+`profiles.yml` `host: localhost` both depend on. The acceptance suite's
+"wrong password refused" check caught it immediately (its control
+connection over TCP loopback failed outright) — a good example of why that
+suite exists; `verify` alone (checks `something is listening on 5432`, not
+*where*) would have reported this install as fine.
+
+**Fix, take one:** `--set postgres.listen_addresses="localhost,192.168.1.54"`
+(PostgreSQL's own GUC natively accepts a comma-joined list in one string).
+This exposed a second, unrelated bug: **`dpagent install`'s `--set` flag
+silently corrupts any `string`-typed param whose value contains a comma.**
+`cli/render.py:parse_set` guessed at CLI-parse time that a comma means "this
+is a list" and split unconditionally, with no knowledge of the target
+param's declared schema type (that's resolved later, per-pack, in
+`engine/params.py:resolve`). For a `list`-typed param (`postgres.databases`)
+this split happens to produce the right value by accident; for a
+`string`-typed param whose *own* legitimate value contains a comma
+(`listen_addresses`), it produced a Python list, which `resolve()`'s
+`string` coercer then stringified with `str()` — `"['localhost',
+'192.168.1.54']"`, single-quotes-and-all, written straight into
+`postgresql.conf`. Postgres refused to start on invalid config syntax, and
+because the *previous* run had already gotten as far as writing that broken
+`conf.d/10-dpagent.conf` before failing, every re-run thereafter also failed
+at `initdb` (systemd's restart-rate-limit kicked in: "Start request repeated
+too quickly") until the stale file was deleted and the service reset by
+hand — an unattended re-run would not have self-healed from this on its own.
+
+**Real fix:** moved the comma-split out of the CLI layer entirely.
+`parse_set` now leaves an unparsed value exactly as given (no guessing);
+`params.py`'s `"list"` coercer does the comma-split itself, since it is the
+one place that actually knows the param is a list. A `string` param with a
+comma in it now survives `--set` unchanged, and a `list` param supplied as
+`a,b,c` still resolves to `["a", "b", "c"]` as before - verified both
+directions with `pytest` (`tests/test_params.py`, 12/12) and a direct
+`parse_set` → `resolve` round-trip for each type.
+
+**Verified after the fix:** postgres listens on `127.0.0.1:5432`,
+`[::1]:5432` *and* `192.168.1.54:5432`; firewalld has `5432/tcp` open;
+acceptance suite 6/6; airflow `/health` still reports `metadatabase:
+healthy`; `dbt debug` from the `airflow` user still succeeds. Nothing
+downstream broke.
+
+**Not yet fixed:** `postgres/pack.yaml`'s param schema still declares
+`listen_addresses` as a plain `string` with no guidance that a comma-joined
+value is how you keep `localhost` while adding a LAN/public IP - an operator
+following `dpagent packs -v`'s param listing alone would hit the same
+listen-address-replaces-loopback trap that just happened here. Worth a line
+in the param's description, or a dedicated `extra_listen_addresses` param
+that's additive by construction - deferred, same reasoning as the dbtread
+group gap above.
