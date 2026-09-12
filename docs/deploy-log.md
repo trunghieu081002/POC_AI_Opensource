@@ -673,3 +673,91 @@ two params at all, which is exactly why the fix could be this narrow.
 `dpagent status` shows `postgres`/`dbt`/`airflow` all `tested: passed`.
 README's status checklist updated to match; `base`/`python-modern` are the
 only packs left without a suite now, which the checklist says plainly.
+
+### 2026-09-12 — cross-referenced deploy-log against code/tests/catalog, then fault-injected in an isolated container
+
+Three-part request: read current status, check every documented fix actually
+has code+test+catalog coverage, then deliberately break things somewhere
+that isn't this production host.
+
+**Status read (all real, all current):** postgresql-15/airflow-scheduler/
+airflow-webserver all `active`; `warehouse`/`airflow_meta` both present and
+queryable; airflow `/health` reports `metadatabase: healthy`; the latest
+`demo_etl_pipeline` run (`manual__2026-09-12T04:02:01+00:00`) is `success`
+in 17s.
+
+**Cross-reference found two real, previously-uncovered gaps:**
+
+1. **`postgres/errors.yaml`'s `pg-module-stream-shadowing` entry never
+   actually matched anything.** Its regex (`package postgresql-server-.* is
+   filtered out by modular filtering`) was written against a phrasing dnf on
+   this EL8.10 does not use. The real message, pulled directly from
+   `/var/log/dpagent/run-5.jsonl` (the original failed attempt): `All matches
+   were filtered out by modular filtering for argument: postgresql15-server`.
+   Because the entry never matched, the failure fell through to the generic
+   `dnf-no-match` in `_lib/errors.yaml`, whose autofix (`dnf clean all` +
+   `makecache`) does not disable the module and therefore never actually
+   recovers from this specific cause - which is exactly what we lived through
+   on this host before finding the real root cause by hand. Fixed the regex
+   to `filtered out by modular filtering` (matches the real text; broad
+   enough to survive minor future dnf wording changes, specific enough to
+   stay unambiguous).
+2. **No unit tests existed for either CLI-level bug fixed this week**
+   (`--set` comma-splitting in `cli/render.py` / `engine/params.py`, and the
+   required+secret param fix in `cli/operate.py:_stored_params`). Both were
+   verified live at the time but had no regression coverage. Added
+   `tests/test_cli_render.py`, extended `tests/test_params.py`, and added
+   `tests/test_cli_operate.py` (12 new cases).
+
+**Fault injection, in an isolated Docker container (`oraclelinux:8` with
+real systemd as PID 1 - not this production host), not a VM:** chose a
+container over libvirt for the actual budget it costs (~2 minutes to boot
+vs. downloading and installing a full OS image on a host already at 87%
+disk). Copied this repo's working tree into it, built the same venv, `pytest`
+203/203 passed there too.
+
+- **Test 1 - does the corrected catalog entry actually recover the fault
+  it's named for?** Reintroduced the *exact* original bug in the
+  container's copy only (removed `-y` from `10-repo.sh`'s guard) and ran a
+  real install. It did not reproduce - the guard exited 0 without `-y` in
+  this clean container, meaning **the original failure was environment-
+  dependent (a GPG-keyring race/state issue), not a 100%-deterministic bug**.
+  The `-y` fix remains correct regardless - it removes the possibility
+  entirely rather than depending on timing. To test the catalog's *reactive*
+  side deterministically, neutralized the guard outright (`if false; then`)
+  and force-re-enabled the module, guaranteeing the real dnf failure.
+  Result: `matched pg-module-stream-shadowing (errors.yaml)` → ran its
+  autofix (`dnf -qy module disable postgresql`, `dnf clean all`) → **step
+  succeeded after 2 fix attempts, fully automatically** → postgres installed,
+  verified, and passed its 6-check acceptance suite. The two layers of
+  defense (a proactive source fix, and a reactive catalog safety net) were
+  each proven independently: the source fix prevents the fault; the catalog
+  now recovers it even with the source fix deliberately disabled.
+- **Test 2 (found by accident, not the plan) - a third real bug:**
+  `dpagent rollback postgres` followed by a same-params `dpagent install
+  postgres` (no `--force`) skipped every step as "checkpointed on a previous
+  run" and failed verify - because `rollback_cmd` updates the `installs`
+  table but never touches `step_runs`, the table `completed_steps()` actually
+  reads. A rollback that destroys the system leaves the *next* install
+  thinking it has nothing to do. Fixed: `state.clear_step_runs(pack)`
+  (new function) called from `rollback_cmd` after a successful rollback
+  script. Verified in the same container: rollback, then a plain `install`
+  with unchanged params, now genuinely re-runs steps 2-5 (`ok`, not `skip`)
+  and verify passes. Added `tests/test_state_checkpoints.py` (3 cases,
+  including the exact rollback→reinstall sequence).
+
+**Verified end to end:** `pytest` 203/203, `dpagent lint` clean, and the
+live container re-run (rollback → reinstall → verify → 6/6 acceptance)
+confirms all three fixes together. Container removed after; the
+`oraclelinux:8` base image (251MB) was left in place for reuse next time,
+since pulling it is what actually costs time on this network.
+
+**Not investigated further, flagged for whoever picks this up next:** why
+the original `10-repo.sh` guard failure didn't reproduce in a clean
+container. The working theory is that the real host's failure was a GPG
+keyring/metadata race from running many dnf-touching commands back to back
+in quick succession (autofix retries included) rather than something
+inherent to a bare `dnf module list` without `-y`. Worth a dedicated,
+narrower repro attempt (rapid concurrent dnf invocations against a
+freshly-added repo) if this class of failure is seen again - but the `-y`
+fix already closes it regardless of which explanation is right.

@@ -65,10 +65,22 @@
 
 - id: pg-module-stream-shadowing
   match:
-    output: "package postgresql-server-.* is filtered out by modular filtering"
+    # Real EL8.10 dnf wording, confirmed against an actual failure: "All
+    # matches were filtered out by modular filtering for argument:
+    # postgresql15-server" - not the "package X- is filtered out" phrasing
+    # this entry was originally written against, which never matched a real
+    # failure and let it fall through to the generic dnf-no-match entry
+    # instead (whose autofix - clean all + makecache - does not disable the
+    # module, so it never actually recovers from this one).
+    output: "filtered out by modular filtering"
   cause: >
     The RHEL postgresql module stream is still enabled and hides the PGDG
-    packages.
+    packages. Should not recur since 10-repo.sh now disables the module
+    proactively (its guard needed `dnf -y module list ...` - listing a
+    module from a just-added repo triggers a first-use GPG key prompt that
+    silently failed the guard without -y, skipping the disable below it).
+    Kept as a safety net for a host where the module got re-enabled some
+    other way.
   autofix:
     - "dnf -qy module disable postgresql"
     - "dnf clean all"

@@ -253,6 +253,18 @@ def completed_steps(pack: str, params_hash_: str) -> set[str]:
     return {row["step_id"] for row in cur.fetchall()}
 
 
+def clear_step_runs(pack: str) -> None:
+    """Forget every checkpoint for a pack, regardless of params_hash.
+
+    Call this after a successful rollback. Without it, a fresh `install` with
+    the same params sees the old step_runs rows, treats every step as
+    "checkpointed on a previous run", and skips them — even though rollback
+    just destroyed the packages/data those steps produced. The next `verify`
+    then fails against a system that install claims to have just set up.
+    """
+    conn().execute("DELETE FROM step_runs WHERE pack=?", (pack,))
+
+
 # ---------------------------------------------------------------- installs
 
 def record_install(pack: str, pack_version: str, params: dict, params_hash_: str,

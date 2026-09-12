@@ -94,3 +94,36 @@ def test_audit_params_are_stable_for_hashing():
     first = state.params_hash("1.0.0", params.for_audit(SCHEMA, resolved))
     second = state.params_hash("1.0.0", params.for_audit(SCHEMA, resolved))
     assert first == second
+
+
+# ------------------------------------------------------- list-typed comma values
+
+def test_list_type_splits_a_comma_joined_string():
+    """--set postgres.databases=warehouse,airflow_meta arrives here as the raw
+    string "warehouse,airflow_meta" (parse_set no longer guesses); the `list`
+    coercer is where the actual split has to happen."""
+    out = params.resolve(SCHEMA, {"databases": "warehouse,airflow_meta"}, pack="postgres")
+    assert out["databases"] == ["warehouse", "airflow_meta"]
+
+
+def test_list_type_passes_through_an_actual_list():
+    out = params.resolve(SCHEMA, {"databases": ["warehouse", "airflow_meta"]}, pack="postgres")
+    assert out["databases"] == ["warehouse", "airflow_meta"]
+
+
+def test_list_type_wraps_a_single_value_with_no_comma():
+    out = params.resolve(SCHEMA, {"databases": "warehouse"}, pack="postgres")
+    assert out["databases"] == ["warehouse"]
+
+
+def test_string_type_with_a_comma_is_not_split():
+    """The regression this guards: postgres.listen_addresses is a `string` param
+    whose own GUC syntax is itself a comma-joined value
+    ("localhost,192.168.1.54"). A `--set` that put this through the same
+    comma-split as a `list` param corrupted it into a Python list, which the
+    string coercer then stringified with str() into the literal text
+    "['localhost', '192.168.1.54']" - written straight into postgresql.conf,
+    which refused to start on the invalid syntax."""
+    schema = dict(SCHEMA, listen_addresses={"type": "string", "default": "localhost"})
+    out = params.resolve(schema, {"listen_addresses": "localhost,192.168.1.54"}, pack="postgres")
+    assert out["listen_addresses"] == "localhost,192.168.1.54"

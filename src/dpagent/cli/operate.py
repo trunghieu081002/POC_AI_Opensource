@@ -242,6 +242,10 @@ def rollback_cmd(name, fake_os, dry_run, yes):
     if result.ok and not dry_run:
         state.record_install(name, pack.version, {}, "", os_info.family,
                              "rolled_back", run_id)
+        # Otherwise a later `install` with the same params sees the old
+        # step_runs rows and skips every step as "already done" - against a
+        # system rollback just tore down.
+        state.clear_step_runs(name)
     state.finish_run(run_id, "ok" if result.ok else "failed")
     console.print("[green]rolled back[/green]" if result.ok
                   else "[red]rollback failed[/red]")
