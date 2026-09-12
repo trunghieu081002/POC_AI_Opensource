@@ -857,3 +857,43 @@ real value.
 **Verified:** `pytest` 219 collected / 218 passed / 1 skipped (the
 documented python-modern/ubuntu exception), `dpagent lint` clean across
 `_lib`, all five suites, and all five packs.
+
+### 2026-09-12 — Layer 1 close-out: one more real bug in the base suite, found running it on the real host for the first time
+
+Running `dpagent test base python-modern` on ol8-19 (not the container) for
+the first time: `python-modern` passed 2/2, but `base`'s TLS check failed
+identically to the container — meaning the fixes in the prior entry (SAN,
+the `A && B` retry loop) were real but incomplete; a third bug in the same
+check had been masked in every manual debug session by accident.
+
+Debugging this one took a wrong turn worth recording: reproducing the
+check's curl calls by hand, piped through `tail` for readability, kept
+aborting partway through with no error — because `packs/_lib/dp.sh` itself
+sets `set -euo pipefail` (line 15) the moment it's sourced, and a `curl |
+tail` pipeline with `pipefail` active takes curl's exit status, which is
+non-zero on the expected untrusted-cert failure. That aborted my ad-hoc
+reproduction, not the real check (whose actual curl calls are correctly
+wrapped in `if`, exempt from `errexit`). Lesson: debug the actual script
+file with `bash -x`, not a hand-rewritten approximation of it - the
+approximation had its own bug that had nothing to do with the real one.
+
+**The real bug, once found with `bash -x`:** `openssl s_server -naccept 2`
+caps the server at exactly 2 accepted connections before it exits. The
+readiness-probe loop added in the prior fix — a bare `exec 3<>/dev/tcp/...`
+TCP connect, used only to confirm the server is listening before either
+curl call runs — itself counts as one of those 2 connections, even though
+it never sends a TLS ClientHello. So the accounting was: probe consumes
+slot 1, the untrusted-cert curl (expected to fail) consumes slot 2, the
+server exits — and the trusted-cert curl (expected to succeed) then fails
+with connection-refused, which looks identical to "TLS itself is broken"
+from the check's own error message. Fixed by raising `-naccept` to 10 -
+generous headroom rather than trying to count exactly, since the cost of
+extra headroom is zero and the cost of getting the count wrong again is
+another silent false failure.
+
+**Verified:** the fixed check run standalone via `bash -x` (clean trace,
+`dp_ok` reached); `dpagent test base` on ol8-19 - 4/4 passed; `dpagent
+status` now shows all five packs `installed` / `tested: passed` on the real
+host, closing every remaining gap from the two prior entries. `pytest`
+218/1-skipped and `dpagent lint` clean, unchanged (this fix only touched a
+suite check, not the harness).

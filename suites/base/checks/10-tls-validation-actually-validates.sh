@@ -38,7 +38,15 @@ openssl req -x509 -newkey rsa:2048 -keyout "${CERT_DIR}/key.pem" -out "${CERT_DI
 # -www: answer any request with a canned status page instead of the default
 # echo-to-stdin behaviour, which never sends an HTTP response and would hang
 # the positive (trusted-cert) curl call until it times out - a false failure.
-openssl s_server -quiet -www -naccept 2 -accept "$PORT" \
+#
+# -naccept needs headroom beyond the two curl calls below: the readiness
+# probe further down (a bare TCP connect to confirm the server is listening,
+# before either curl call happens) counts as a connection against this limit
+# too, even though it never sends a ClientHello. Sized too tight (2, matching
+# only the two curl calls) the probe consumes the first slot and the server
+# exits after the untrusted-cert curl - making the second, trusted-cert curl
+# fail with connection-refused, indistinguishable from a real TLS failure.
+openssl s_server -quiet -www -naccept 10 -accept "$PORT" \
   -cert "${CERT_DIR}/cert.pem" -key "${CERT_DIR}/key.pem" >/dev/null 2>&1 &
 SERVER_PID=$!
 
