@@ -1,0 +1,38 @@
+suite: base
+summary: Prove the shared tooling every other pack assumes actually works
+
+# base has no service and no port - "prove it works" here means proving each
+# tool does the specific job the pack's own comment says the rest of the
+# library depends on (see packs/base/pack.yaml's header), not just that the
+# binary exists on PATH the way `verify.sh` already checks.
+requires: [base]
+
+checks:
+  - id: tls-validation-actually-validates
+    script: checks/10-tls-validation-actually-validates.sh
+    description: curl genuinely rejects an untrusted cert and accepts a trusted one
+    critical: true
+    negative: true
+    timeout: 60
+
+  - id: tar-roundtrips-real-content
+    script: checks/20-tar-roundtrips-real-content.sh
+    description: A file with awkward content survives a tar/untar round trip byte-for-byte
+    critical: true
+    timeout: 60
+
+  - id: locale-changes-real-sort-order
+    script: checks/30-locale-changes-real-sort-order.sh
+    description: The generated locale actually changes collation, not just `locale -a`'s listing
+    timeout: 60
+
+  - id: clock-is-synchronised
+    script: checks/40-clock-is-synchronised.sh
+    description: NTP reports the clock as actually synchronised, when install_time_sync is on
+    timeout: 60
+
+teardown:
+  - id: remove-fixtures
+    script: teardown/99-fixtures.sh
+    description: Kill any leftover test TLS server and remove temp files
+    timeout: 30

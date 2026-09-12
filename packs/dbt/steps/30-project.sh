@@ -21,6 +21,15 @@ PROFILES_DIR="$(dirname "$PROJECT_DIR")/profiles"
 
 dp_run mkdir -p "$PROJECT_DIR/models" "$PROFILES_DIR"
 
+# Group-shared, not world-readable: dbtread members (airflow, once it joins -
+# see packs/airflow/steps/10-user.sh) can read the profile and traverse/write
+# the project tree, everyone else cannot. setgid so target/ and logs/, which
+# dbt itself creates the first time it runs, inherit the group too instead of
+# landing owned by whichever user (root or airflow) happened to run first.
+dp_run chgrp dbtread "$PROJECT_DIR" "$PROFILES_DIR"
+dp_run chmod 2775 "$PROJECT_DIR"
+dp_run chmod 2750 "$PROFILES_DIR"
+
 dp_write "${PROJECT_DIR}/dbt_project.yml" 0644 <<EOF
 name: '${PROFILE_NAME}'
 version: '1.0.0'
@@ -38,8 +47,8 @@ dp_write "${PROJECT_DIR}/models/.gitkeep" 0644 <<'EOF'
 EOF
 
 # Secret handling matches the rest of the agent: the password is written into a
-# file readable only by the account running dbt, never echoed to a log.
-dp_write "${PROFILES_DIR}/profiles.yml" 0600 <<EOF
+# file readable only by root and the dbtread group, never echoed to a log.
+dp_write "${PROFILES_DIR}/profiles.yml" 0640 "root:dbtread" <<EOF
 ${PROFILE_NAME}:
   target: ${TARGET}
   outputs:

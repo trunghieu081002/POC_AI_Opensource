@@ -166,3 +166,92 @@ fi
 ''', env={"PATH": "/nonexistent"})
     assert result.returncode == 0, result.stderr
     assert "NO_MATCH_AS_EXPECTED" in result.stdout
+
+
+@requires_bash
+def test_dp_ensure_group_creates_when_absent():
+    result = run('''
+dp_group_exists() { return 1; }
+groupadd() { echo "GROUPADD_CALLED $*"; }
+dp_ensure_group dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "GROUPADD_CALLED --system dbtread" in result.stdout
+    assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_ensure_group_skips_cleanly_when_present():
+    result = run('''
+dp_group_exists() { return 0; }
+groupadd() { echo "SHOULD_NOT_BE_CALLED"; }
+dp_ensure_group dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "SHOULD_NOT_BE_CALLED" not in result.stdout
+    assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_join_group_is_a_noop_when_the_user_does_not_exist():
+    """dbt and airflow have no `requires` on each other - whichever installs
+    first must not fail just because its peer is not there yet."""
+    result = run('''
+dp_user_exists() { return 1; }
+usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+dp_join_group airflow dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "SHOULD_NOT_BE_CALLED" not in result.stdout
+    assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_join_group_is_a_noop_when_the_group_does_not_exist():
+    result = run('''
+dp_user_exists() { return 0; }
+dp_group_exists() { return 1; }
+usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+dp_join_group airflow dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "SHOULD_NOT_BE_CALLED" not in result.stdout
+    assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_join_group_joins_when_not_yet_a_member():
+    """The exact bug this guards: `grep -qx "$group" && return 0` aborted the
+    whole script under set -e the instant the user was NOT yet a member -
+    the normal, first-time case - because a bare `A && B` statement's exit
+    status is A's when A is false."""
+    result = run('''
+dp_user_exists() { return 0; }
+dp_group_exists() { return 0; }
+id() { echo "airflow wheel"; }   # not yet a member of dbtread
+usermod() { echo "USERMOD_CALLED $*"; }
+dp_join_group airflow dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "USERMOD_CALLED -aG dbtread airflow" in result.stdout
+    assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_join_group_skips_cleanly_when_already_a_member():
+    result = run('''
+dp_user_exists() { return 0; }
+dp_group_exists() { return 0; }
+id() { echo "airflow wheel dbtread"; }
+usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+dp_join_group airflow dbtread
+echo "REACHED_END"
+''')
+    assert result.returncode == 0, result.stderr
+    assert "SHOULD_NOT_BE_CALLED" not in result.stdout
+    assert "REACHED_END" in result.stdout

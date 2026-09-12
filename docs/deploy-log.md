@@ -761,3 +761,99 @@ inherent to a bare `dnf module list` without `-y`. Worth a dedicated,
 narrower repro attempt (rapid concurrent dnf invocations against a
 freshly-added repo) if this class of failure is seen again - but the `-y`
 fix already closes it regardless of which explanation is right.
+
+### 2026-09-12 — three follow-ups: the dbtread group in the packs themselves, suites for base/python-modern, and an automated dry-run harness
+
+All three were flagged as gaps in the prior entry; the user asked for all
+three.
+
+**1. `dbtread` group moved from a manual host fix into the packs.** Added
+`dp_ensure_group`/`dp_join_group`/`dp_group_exists` to `_lib/dp.sh`. dbt's
+`10-venv.sh` creates the group; `30-project.sh` writes `profiles.yml` as
+`root:dbtread 0640` (was `0600`, no group) and sets the project/profiles
+directories `chgrp dbtread` + setgid so `target/`/`logs/`, which dbt itself
+creates on first run, inherit the group automatically. Airflow's
+`10-user.sh` joins the group - best-effort, since dbt is not a declared
+`requires` of airflow (nor the reverse: dbt calls `dp_join_group airflow
+dbtread` too, from its own side, since the two packs can install in either
+order and whichever runs second is the one for which the call actually does
+anything).
+
+**Caught before it shipped:** the first draft of `dp_join_group` checked
+membership with `... | grep -qx "$group" && return 0` - the exact `A && B`
+trap this project has now hit *six* separate times (three in `_lib/dp.sh`
+last session, one in `bootstrap.sh`, one in `postgres/preflight.sh` x2, and
+this one), caught by rereading the new code with that specific pattern in
+mind rather than by running it and watching it fail. Rewritten with an
+explicit `if`. `tests/test_dp_sh.py` gained 6 cases for the three new
+helpers, including one that pins this exact regression by mocking `id -nG`
+to return a list that does NOT yet contain the group (the normal, first-time
+case that this bug always breaks).
+
+**2. Suites for `base` and `python-modern`** - the two packs `dpagent lint`
+had been warning about since the earlier suites session. Same rule as
+postgres/dbt/airflow's: prove the tool does its specific job, not that the
+binary is on PATH (`verify.sh` already does that).
+- `base` (4 checks): curl's TLS validation genuinely rejects an untrusted
+  cert and accepts a trusted one (spins up a local `openssl s_server`);
+  `tar` round-trips a file with quotes/spaces/`$` byte-for-byte; the
+  configured locale actually changes `sort` collation versus `C` (skipped
+  when the locale param is `C`/`C.UTF-8`, which is not supposed to differ);
+  the clock reports genuinely `NTPSynchronized=yes`, not just that the
+  service is running (skipped when `install_time_sync=false`).
+- `python-modern` (2 checks): a *real* `python -m venv` from the resolved
+  interpreter has working `pip` and the stdlib modules dbt/airflow actually
+  need - `verify.sh` only checks the base interpreter can import them
+  directly, not that the venv machinery (ensurepip) works; the system
+  `python3` still runs and is a different binary than what this pack
+  provides (the pack's own stated promise).
+
+**Two real bugs found writing the base suite, both self-inflicted, both
+instructive:**
+- The TLS check's self-signed cert had no `subjectAltName`. Modern curl/
+  OpenSSL verify the connection's IP against the cert's SAN entries and
+  ignore the CN for that purpose (RFC 6125) - a CN-only cert fails hostname
+  verification against `https://127.0.0.1/` even with its CA explicitly
+  trusted, which reads identically to "TLS is broken" from the curl exit
+  code alone. Fixed with `-addext "subjectAltName=IP:127.0.0.1"`.
+- The server-readiness poll loop had *another* bare `A && B`:
+  `{ exec 3<>"/dev/tcp/..."; } 2>/dev/null && { ...; break; }` — fails on
+  the first iteration (server not up yet) and aborts under `set -e` before
+  the loop ever retries. The exact bug class from finding #1 above,
+  reintroduced a second time in the same afternoon. This is what motivated
+  fix #3 below: **`dpagent lint` had never once looked inside `suites/`** —
+  `lint_pack`/`lint_lib` cover packs and the shared library, but a suite
+  script is shaped identically (sources dp.sh, same conventions) and got zero
+  static coverage. Added `lint_suite()` and wired it into `dpagent lint`
+  with no arguments, next to the existing `_lib` scan. Verified the new
+  scan actually catches the class it's for: reintroduced the exact bug
+  temporarily, confirmed `dpagent lint` flagged it, restored the fix,
+  confirmed clean again.
+
+**3. Automated dry-run integration test** (`tests/test_dry_run_integration.py`)
+— actually executes every pack's steps under `DP_DRY_RUN=1` through real
+bash (`executor.run_script`, the same function the live engine calls),
+instead of only the static lint check. Deliberately ignores step guards: a
+fresh install has nothing installed yet, so every guard would be
+unsatisfied anyway, and running every step unconditionally is the more
+representative simulation of the scenario that broke nine times last
+session. One legitimate exception is carved out and documented in the test
+itself: `python-modern`'s Debian branch unconditionally fails by design (no
+first-party path to a newer Python on Debian/Ubuntu), which is correct
+behavior reached only because this test ignores guards - not a dry-run bug.
+
+**This test found a real, previously-unknown bug on its first run:**
+`postgres/steps/10-repo.sh`'s Debian branch calls `lsb_release -cs` directly.
+`lsb_release` itself comes from the `dp_pkg_install` two lines above, which
+is a no-op under `--dry-run` — so on a fresh Debian/Ubuntu host being
+previewed, it does not exist yet, and the script crashes instead of
+completing the preview. This was never caught by hand because every real
+install this project has actually run has been on an EL8 host, which takes
+the RHEL branch — the Debian path had *never been exercised at all*, dry-run
+or real, until this test forced it. Fixed the same way as the nine prior
+instances: a `DP_DRY_RUN` placeholder (`<detected-codename>`) in place of the
+real value.
+
+**Verified:** `pytest` 219 collected / 218 passed / 1 skipped (the
+documented python-modern/ubuntu exception), `dpagent lint` clean across
+`_lib`, all five suites, and all five packs.

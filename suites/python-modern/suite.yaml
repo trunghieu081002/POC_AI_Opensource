@@ -1,0 +1,21 @@
+suite: python-modern
+summary: Prove the modern interpreter actually creates working venvs, and the system python3 is untouched
+
+# verify.sh already proves the interpreter exists and can import venv/ssl/
+# sqlite3. What that does not prove: that `python -m venv` actually produces
+# a working environment (the real thing dbt and airflow each depend on this
+# pack for), and that the pack kept its own promise — "without touching the
+# system python3" — rather than just not breaking obviously.
+requires: [python-modern]
+
+checks:
+  - id: venv-actually-works
+    script: checks/10-venv-actually-works.sh
+    description: A real venv built from the resolved interpreter has working pip and stdlib TLS/db modules
+    critical: true
+    timeout: 120
+
+  - id: system-python3-is-untouched
+    script: checks/20-system-python3-is-untouched.sh
+    description: The system python3 still runs and is a different binary than the one this pack provides
+    timeout: 30

@@ -296,6 +296,33 @@ dp_ensure_user() {
   fi
 }
 
+dp_group_exists() { getent group "$1" >/dev/null 2>&1; }
+
+# dp_ensure_group name — a system group another pack's user can join to share
+# access to files this pack writes, without making them world-readable.
+dp_ensure_group() {
+  local group="$1"
+  dp_group_exists "$group" || dp_run groupadd --system "$group"
+}
+
+# dp_join_group user group — best-effort: does nothing if either side is
+# absent, so a pack can call this for a peer that may not be installed
+# (e.g. airflow joining dbt's read group only if dbt is actually present)
+# without declaring a hard `requires` on it.
+dp_join_group() {
+  local user="$1" group="$2"
+  dp_user_exists "$user" || return 0
+  dp_group_exists "$group" || return 0
+  # Not `grep ... && return 0`: under `set -e` that aborts the whole script
+  # the instant the user is NOT yet a member — the normal, first-time case —
+  # because a bare `A && B` statement's own exit status is A's when A is
+  # false. An explicit `if` has only one way out of each branch.
+  if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx "$group"; then
+    return 0
+  fi
+  dp_run usermod -aG "$group" "$user"
+}
+
 dp_firewall_allow() {
   local port="$1"
   case "${DP_FIREWALL:-none}" in

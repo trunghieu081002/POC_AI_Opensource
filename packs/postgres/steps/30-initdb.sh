@@ -24,7 +24,16 @@ else
     fi
   else
     dp_info "running initdb for PostgreSQL ${VERSION}"
+    # postgresql-XX-setup's own initdb call carries no locale/encoding flags
+    # of its own, so without this it inherits whatever LANG happens to be set
+    # in the ambient process environment - empty on a plain image, which
+    # makes initdb default the database to encoding SQL_ASCII. The Debian
+    # branch above already passes --encoding/--locale explicitly to
+    # pg_createcluster for the same reason; PGSETUP_INITDB_OPTIONS is the RPM
+    # wrapper's documented equivalent (grep the script itself for the name).
+    export PGSETUP_INITDB_OPTIONS="--encoding=UTF8 --locale=C.UTF-8"
     dp_run "/usr/pgsql-${VERSION}/bin/postgresql-${VERSION}-setup" initdb
+    unset PGSETUP_INITDB_OPTIONS
   fi
 fi
 

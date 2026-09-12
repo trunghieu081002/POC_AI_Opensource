@@ -67,7 +67,9 @@ def lint_cmd(names):
     """Static-check packs: manifest, bash syntax, blacklist, catalog shape.
 
     With no arguments, also checks the shared shell library (`packs/_lib/`) —
-    a bug there is inherited silently by every pack that calls it.
+    a bug there is inherited silently by every pack that calls it — and every
+    acceptance suite, which is shaped exactly like a pack's steps and can
+    carry the same bugs but is otherwise invisible to this command.
     """
     total_blocking = 0
 
@@ -76,6 +78,13 @@ def lint_cmd(names):
         lib_issues = lint_mod.lint_lib()
         print_lint(lib_issues)
         total_blocking += len(lint_mod.blocking(lib_issues))
+
+        from ..suites import loader as suites_mod
+        for suite_name in suites_mod.available():
+            issues = lint_mod.lint_suite(suite_name)
+            console.print(f"\n[bold]suites/{suite_name}[/bold]")
+            print_lint(issues)
+            total_blocking += len(lint_mod.blocking(issues))
 
     targets = list(names) or packs.available()
     if not targets:

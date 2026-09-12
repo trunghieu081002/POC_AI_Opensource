@@ -17,7 +17,15 @@ if dp_is_debian; then
   dp_run install -d /usr/share/postgresql-common/pgdg
   dp_fetch "https://www.postgresql.org/media/keys/ACCC4CF8.asc" "$keyring"
 
-  codename="$(lsb_release -cs)"
+  # lsb_release itself comes from the dp_pkg_install above, which is a no-op
+  # under --dry-run — so on a fresh host being previewed, it does not exist
+  # yet and calling it for real would crash the preview instead of printing
+  # every command as promised.
+  if [ "$DP_DRY_RUN" != "1" ]; then
+    codename="$(lsb_release -cs)"
+  else
+    codename="<detected-codename>"
+  fi
   dp_info "adding PGDG for ${codename}"
   dp_write /etc/apt/sources.list.d/pgdg.list 0644 <<EOF
 deb [signed-by=${keyring}] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main

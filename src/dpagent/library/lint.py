@@ -259,3 +259,33 @@ def lint_lib(packs_dir: Path | None = None) -> list[Issue]:
         # exists to catch (a *pack* bypassing the wrapper it should use).
         issues.extend(lint_script(script, f"_lib/{script.name}", check_raw_mutation=False))
     return issues
+
+
+def lint_suite(name: str) -> list[Issue]:
+    """Check one acceptance suite's shell scripts.
+
+    `lint_pack` never looks inside `suites/` - a suite script sources dp.sh and
+    is shaped exactly like a pack step, so it can carry exactly the same `A &&
+    B` trap a pack step can. It did: the base suite's TLS check had one in its
+    own server-readiness poll loop, found only by actually running it, the
+    same way three bugs in `_lib/dp.sh` were found before `lint_lib` existed
+    to catch a regression. This function is `lint_lib`'s equivalent for
+    suites, wired into `dpagent lint` with no arguments below.
+    """
+    from ..suites import loader as suites_mod
+
+    try:
+        suite = suites_mod.load(name)
+    except suites_mod.SuiteError as exc:
+        return [Issue(ERROR, f"suites/{name}", str(exc))]
+
+    issues: list[Issue] = []
+    for check in (suite.setup or []) + (suite.checks or []) + (suite.teardown or []):
+        # check_raw_mutation=False: a suite proves the system works by mutating
+        # it directly (writing rows, restarting the service under test) - that
+        # is not the "bypassed dp_run" trap the raw-mutation check exists to
+        # catch in a *pack*, whose --dry-run promise depends on going through
+        # dp_run. Suites never run under --dry-run at all (see suites/runner.py).
+        issues.extend(lint_script(suite.path(check.script), f"suites/{name}/{check.script}",
+                                  check_raw_mutation=False))
+    return issues
