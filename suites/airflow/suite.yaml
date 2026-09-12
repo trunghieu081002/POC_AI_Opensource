@@ -1,0 +1,46 @@
+suite: airflow
+summary: Prove Airflow actually schedules, runs and correctly reports on real DAGs
+
+# "the systemd units are active" proves a process exists, not that the
+# scheduler-to-executor-to-worker pipeline actually moves a task from queued
+# to done - or that a failing task is reported as failing rather than lost.
+# Both throwaway DAGs are deployed once in setup and removed in teardown,
+# under a dag_id namespaced with DP_TEST_NS so they never collide with any
+# real DAG the operator has added.
+requires: [airflow]
+
+setup:
+  - id: deploy-throwaway-dags
+    script: setup/00-fixtures.sh
+    description: Deploy a DAG that succeeds and one that deliberately fails
+    timeout: 60
+
+checks:
+  - id: services-active
+    script: checks/10-services-active.sh
+    description: The scheduler and webserver systemd units are active
+    critical: true
+    timeout: 30
+
+  - id: webserver-health
+    script: checks/20-webserver-health.sh
+    description: The webserver's own /health endpoint reports the metadatabase healthy
+    timeout: 30
+
+  - id: dag-runs-to-success
+    script: checks/30-dag-runs-to-success.sh
+    description: A triggered DAG actually runs its task and is reported as succeeded
+    critical: true
+    timeout: 120
+
+  - id: failure-is-detected
+    script: checks/40-failure-is-detected.sh
+    description: A DAG whose task fails is reported as failed, not lost or silently green
+    negative: true
+    timeout: 120
+
+teardown:
+  - id: remove-fixtures
+    script: teardown/99-fixtures.sh
+    description: Remove the throwaway DAGs and their run history
+    timeout: 60

@@ -614,3 +614,62 @@ listen-address-replaces-loopback trap that just happened here. Worth a line
 in the param's description, or a dedicated `extra_listen_addresses` param
 that's additive by construction - deferred, same reasoning as the dbtread
 group gap above.
+
+### 2026-09-12 — wrote acceptance suites for dbt and airflow
+
+The gap the previous session's README status left explicit: `dbt` and
+`airflow` had no acceptance suite, so `dpagent status` could only ever call
+them `untested`. Wrote both, following `suites/postgres`'s shape (setup /
+checks / teardown, at least one `critical` and one `negative` check) and its
+underlying rule: prove the thing actually does its job, not that a process
+exists.
+
+**`suites/dbt`** (3 checks): `dbt debug` against the real target (critical);
+`dbt run` on a throwaway model, verified independently via a direct `psql`
+query rather than trusting dbt's own exit code (critical) — same principle
+as postgres's roundtrip check; a throwaway model with a deliberate duplicate
+key and a `unique` test, asserting `dbt test` actually fails on it
+(negative) — a pack whose "it works" claim was "`dbt test` exited 0" without
+this would sail through on a build that ignores results entirely. All three
+under `models/dpagent_selftest/`, fully removed in teardown along with the
+tables they built. **Passed 3/3 on the first real run.**
+
+**`suites/airflow`** (4 checks): both systemd units active (critical);
+`/health` reports the metadatabase healthy; a throwaway `..._ok` DAG
+triggered through the real scheduler/executor path (`airflow dags trigger`,
+not `airflow tasks test` — the latter bypasses the scheduler entirely and
+would prove nothing about whether the systemd units actually work together),
+polled via `airflow dags list-runs -o json` until terminal, asserting
+`success` (critical); a `..._fail` DAG whose task always raises, same
+trigger-and-poll, asserting the run is reported `failed` rather than lost or
+silently green (negative) — mirrors the dbt-test check's reasoning: prove
+failures are actually caught, not just that successes are. `airflow dags
+reserialize` in setup registers both throwaway DAGs in the metadata DB
+immediately, instead of waiting on the scheduler's own directory-scan
+interval (default 300s, far longer than a check's timeout).
+
+**Real bug found and fixed, not suite-writing but the harness underneath
+it:** the very first `dpagent test airflow` reported *"no acceptance suite
+covers what is installed"* — false; `dpagent suites` listed it fine.
+`airflow`'s `backend_password` and `admin_password` are both `required` and
+`secret`. `cli/operate.py:_stored_params` (shared by `test`, `verify` and
+`rollback`) correctly drops a masked secret so it's never replayed as the
+literal string `***REDACTED***` — but for a `required` field with no
+default, dropping it makes `params.resolve()` refuse the whole pack as
+missing a required param. Not a one-time glitch: **every post-install
+operation on any pack with a required secret would hit this, forever** —
+the value can never be reconstructed from storage, by design. Fixed by
+filling such fields with an inert placeholder string in `_stored_params`
+before calling `resolve()`, purely so "installed" isn't gated on
+"secret is reconstructible" - consistent with `run_suites`'s own documented
+expectation that a suite needing such a value reads it from what install
+actually configured (here, `airflow.env`, via `af_run`/`af_query`) rather
+than from resolved params. Neither of the new suites' scripts touch these
+two params at all, which is exactly why the fix could be this narrow.
+
+**Verified:** `pytest` 189/189, `dpagent lint` clean on all five packs
+(the "no acceptance suite" warning is now gone for `dbt` and `airflow`),
+`dpagent test` (no args, all three suites together) — 13/13 checks passed,
+`dpagent status` shows `postgres`/`dbt`/`airflow` all `tested: passed`.
+README's status checklist updated to match; `base`/`python-modern` are the
+only packs left without a suite now, which the checklist says plainly.

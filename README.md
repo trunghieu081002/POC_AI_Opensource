@@ -299,12 +299,14 @@ are not:
 - [x] `dpagent doctor` — machine/version checks before anything installs
 - [x] `dpagent do` / `spec` / `install` / `scripts/setup.sh` — the one-command path
 - [x] Packs: `base`, `python-modern`, `postgres`, `dbt`, `airflow`
-- [x] `postgres` suite with negative and restart checks; `dbt`/`airflow` have
-      no suite yet — see `dpagent packs -v` for which packs are covered
+- [x] `postgres`, `dbt` and `airflow` suites — negative checks throughout
+      (bad password, off-host reachability, a dbt test that must fail, a DAG
+      task that must be reported as failed); `base`/`python-modern` have no
+      suite yet — see `dpagent packs -v` for which packs are covered
 - [x] `synth` / `lint` / `promote` for unknown tools; `dpagent lint` also
       checks the shared shell library (`packs/_lib/`), not just individual packs
 - [ ] Packs: clickhouse, minio, trino, spark, iceberg, hive-metastore
-- [ ] Acceptance suites for dbt and airflow
+- [ ] Acceptance suites for base and python-modern
 - [ ] Layer 2 — staged ingestion with a gate between every stage
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 

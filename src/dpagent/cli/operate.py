@@ -24,10 +24,23 @@ def _stored_params(pack) -> dict:
     A masked value must never be replayed as if it were the real one — better to
     fall back to the pack default and be obviously wrong than to silently use
     the literal string "***REDACTED***" as a password.
+
+    A `required` secret has no default, so dropping its masked value would make
+    `resolve()` refuse the whole pack as missing a required param - on every
+    post-install operation (verify/test/rollback), forever, for any pack that
+    requires a secret. That's not a install-time validation failure; the secret
+    genuinely cannot be recovered, by design. A suite that needs it is expected
+    to read it from what install actually configured (a generated profile, an
+    env file) rather than from resolved params - see the note in run_suites().
+    Fill it with an obviously-fake placeholder purely so resolve() doesn't
+    treat "reconstructible" as a precondition for "installed".
     """
     record = state.get_install(pack.name)
     supplied = json.loads(record["params_json"]) if record else {}
     supplied = {k: v for k, v in supplied.items() if v != params_mod.MASK}
+    for name, rule in (pack.param_schema or {}).items():
+        if (rule or {}).get("secret") and (rule or {}).get("required") and name not in supplied:
+            supplied[name] = "(redacted - see the pack's own generated config)"
     return params_mod.resolve(pack.param_schema, supplied, pack=pack.name)
 
 

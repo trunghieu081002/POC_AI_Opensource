@@ -1,0 +1,40 @@
+suite: dbt
+summary: Prove dbt actually connects to Postgres, transforms data, and catches bad data
+
+# dbt has no service to be "up" - the only proof that matters is whether a real
+# run against the real target actually moves data and its tests actually
+# catch a violation. Everything here uses a throwaway project under
+# models/dpagent_selftest/, isolated from whatever real models the operator
+# has added, and removed by teardown either way.
+requires: [dbt]
+
+setup:
+  - id: seed-throwaway-models
+    script: setup/00-fixtures.sh
+    description: Write a good and a deliberately-broken throwaway dbt model
+    timeout: 60
+
+checks:
+  - id: connection-works
+    script: checks/10-connection-works.sh
+    description: dbt can actually connect to the configured Postgres target
+    critical: true
+    timeout: 60
+
+  - id: run-materializes-data
+    script: checks/20-run-materializes-data.sh
+    description: dbt run builds a model whose output matches the source data
+    critical: true
+    timeout: 120
+
+  - id: test-catches-bad-data
+    script: checks/30-test-catches-bad-data.sh
+    description: A dbt test fails when the underlying data violates it
+    negative: true
+    timeout: 120
+
+teardown:
+  - id: drop-fixtures
+    script: teardown/99-fixtures.sh
+    description: Remove the throwaway models and the tables they built
+    timeout: 60
