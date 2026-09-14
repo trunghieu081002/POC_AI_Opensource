@@ -1468,3 +1468,38 @@ mount, just pointed elsewhere) and the install completed - proving the
 suggested fix is not just plausible-sounding but actually works. One new
 case in `tests/test_errors.py`'s `REAL_FAILURES` table. `pytest` 234
 passed / 1 skipped; `dpagent lint` clean.
+
+### 2026-09-14 — no systemd: caught by accident for postgres, not caught at all for airflow
+
+Tested the single most common real-world container shape this whole
+engagement had not yet actually used: a plain `docker run -d oraclelinux:8
+sleep infinity`, no `--privileged`, no cgroup mount, no `/usr/sbin/init` -
+every prior container test (including the ones the project's own testing
+methodology documents) deliberately made systemd work. `DP_SVC_MGR` comes
+from `os_detect.py` checking `Path("/run/systemd/system").exists()`; on
+this container that is `False`, so `DP_SVC_MGR=unknown`.
+
+`dpagent install airflow --yes ...` on this host correctly halted at
+`postgres`'s own preflight: *"this pack manages the service through
+systemd, which is not present"* - clean, before any package installed.
+But that is `postgres`'s protection, not `airflow`'s, and it only fires
+because `airflow requires: [postgres]` puts postgres's preflight in the
+plan first. `airflow`'s `services` step manages its own webserver and
+scheduler through systemd too, but grepping `airflow/preflight.sh` turned
+up no `DP_SVC_MGR` check at all - confirmed by running it directly
+(`DP_SVC_MGR=unknown`, a real listener standing in for the backend so
+*only* the systemd condition could be the failure): `preflight passed`.
+`pack.yaml`'s own comment documents `backend_host` pointing at "an
+existing server" as a supported way to skip installing postgres locally -
+so a host with no systemd, given a real external Postgres to point at,
+would sail past preflight and burn through six real steps (user, venv,
+install, config, db-migrate, admin-user - each with real time and real
+side effects) before failing at the seventh trying to `systemctl enable`
+units that cannot work at all. Fixed by adding the same check `postgres`
+already has to `airflow/preflight.sh`. Verified with the same direct
+invocation: `DP_SVC_MGR=unknown` now fails preflight immediately with
+*"this pack manages the webserver and scheduler through systemd, which is
+not present"*, regardless of backend reachability; `DP_SVC_MGR=systemd`
+still passes. Two new cases in `tests/test_airflow_preflight.py`. `pytest`
+236 passed / 1 skipped; `dpagent lint airflow` unaffected (same three
+pre-existing no-guard warnings as before).

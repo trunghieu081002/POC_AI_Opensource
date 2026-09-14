@@ -10,6 +10,15 @@ note_fail() { dp_err "$*"; failed=1; }
 
 dp_check_root || note_fail "not running as root - use: sudo -E dpagent install airflow"
 
+# postgres's own preflight already checks this, and airflow `requires:
+# [postgres]` so that check normally runs first - but backend_host can point
+# at any existing server (see pack.yaml's own note), which is a supported way
+# to skip installing postgres locally. Without this, a host with no systemd
+# would sail through preflight and burn through six real steps (user, venv,
+# install, config, db-migrate, admin-user) before failing at the seventh -
+# `services` - trying to `systemctl enable` units that cannot work at all.
+[ "${DP_SVC_MGR:-}" = "systemd" ] || note_fail "this pack manages the webserver and scheduler through systemd, which is not present"
+
 if dp_find_python 3 8 3 12 >/dev/null 2>&1; then
   dp_info "will build the venv with $(dp_find_python 3 8 3 12)"
 else
