@@ -1151,3 +1151,37 @@ reported `= <pack> — already installed at v1.0.0 with identical params`
 (the wholesale params-hash skip), and the acceptance suites still re-ran and
 passed 4/4 · 4/4 · 3/3 · 6/6 · 2/2 - confirming the whole one-command path is
 safe to re-run, not just to run once. Container removed after.
+
+### 2026-09-14 — naive-newcomer simulation: zero prior knowledge, README's literal words only
+
+Every prior session used foreknowledge accumulated from the bugs already
+found - pre-installing python3.11, setting `DPAGENT_PYTHON` up front, using
+`--yes`. This one deliberately did not: a brand-new `oraclelinux:8`
+container, the tarball placed as if just downloaded, and only the exact two
+commands from README's first code block
+(`tar xzf ... && cd ...`, `sudo bash scripts/setup.sh`) - reacting to each
+prompt and error exactly as a first-time user would, using nothing they had
+not just been told.
+
+Two things that looked like bugs on the first attempt turned out to be
+testing-harness mistakes, not product ones - worth recording because they
+show what a *real* interactive user would never hit but a scripted/piped
+one can: feeding a single `y` through a non-interactive pipe only answers
+the *first* of setup.sh's two separate confirmations (its own "Proceed?"
+gate, then `dpagent spec`'s own later "Apply this plan?" gate) - a real
+person typing at a terminal answers each as it appears and never notices
+there were two. Once that was accounted for, the run proceeded exactly as
+the tool's own messages guided: hit the Python 3.6 gate, read the die()
+message, ran `dnf install -y python3.11`, re-ran with
+`DPAGENT_PYTHON=/usr/bin/python3.11` - which now works, per the earlier fix
+in this log - and the spec's own message about `${ENV_VARS}` was followed
+literally (exported the three it named, nothing more).
+
+**Result: all five packs installed and proven on the first genuinely
+naive attempt** - airflow 4/4, base 4/4, dbt 3/3, postgres 6/6,
+python-modern 2/2. No new product bugs. Confirms the onboarding path is
+now actually navigable by someone with zero prior context, using only what
+the tool tells them at each step - which is the whole point of `die()`
+messages that name the exact next command, and this is the first time that
+claim was tested by someone (something) that had not already read the
+source to know the answer in advance.
