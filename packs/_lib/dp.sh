@@ -343,6 +343,13 @@ dp_fetch() {
     dp_run curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
   elif dp_have wget; then
     dp_run wget -q --tries=3 -O "$dest" "$url"
+  elif [ "$DP_DRY_RUN" = "1" ]; then
+    # Neither exists yet only because installing one is itself simulated
+    # under --dry-run on a genuinely fresh host (every caller installs curl
+    # or wget for real a few lines before calling this). curl is what a real
+    # run actually ends up using, so preview with it rather than halting the
+    # whole plan on a tool that would exist by the time this step really runs.
+    dp_run curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
   else
     dp_fail "neither curl nor wget is available"
   fi

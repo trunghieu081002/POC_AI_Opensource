@@ -51,6 +51,16 @@ KNOWN_UNCONDITIONAL_FAILURES = {
     ("python-modern", "ubuntu"),
 }
 
+# --fake-os simulates the OS *detection* (DP_OS_FAMILY etc.) but the real
+# system binaries on the machine running this test do not change with it -
+# `rpm` genuinely does not exist on a Debian-family host and never will, and
+# vice versa for `dpkg`. A script legitimately calling one of these (e.g.
+# `rpm -E %rhel` to read the EL major version) is not a dry-run-honesty bug;
+# it is this test asking a real Ubuntu box to pretend to be RHEL further than
+# --fake-os is meant to reach. Skip rather than force a family binary to
+# exist that no real host of the other family would ever have missing.
+FAMILY_MARKER_BINARY = {"ol": "rpm", "ubuntu": "dpkg"}
+
 
 def _cases():
     cases = []
@@ -68,6 +78,10 @@ def _cases():
 def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
     if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
         pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+
+    marker = FAMILY_MARKER_BINARY.get(fake_os)
+    if marker and not shutil.which(marker):
+        pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
 
     # run_script() writes a command-log jsonl under executor.LOG_DIR, which
     # defaults to /var/log/dpagent — not writable by whatever unprivileged

@@ -18,6 +18,13 @@ INSTALL_DIR="$(dp_param install_dir /opt/dbt)"
 dp_ensure_group dbtread
 dp_join_group airflow dbtread
 
+# dbt-core shells out to git for `dbt deps` (installing packages from
+# packages.yml) and dbt debug reports its absence as a failed check even
+# when the actual database connection is fine - so a "successful" install
+# that never provisioned git looks broken the moment an operator adds any
+# package dependency. Same package name on both families.
+dp_have git || dp_pkg_install git
+
 PYTHON="$(dp_find_python 3 8 3 12 || true)"
 if [ "$DP_DRY_RUN" != "1" ]; then
   [ -n "$PYTHON" ] || dp_fail "no python 3.8-3.12 on PATH (python-modern should have provided one)"

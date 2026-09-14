@@ -43,6 +43,7 @@ steps:
     timeout: 900
     guard: >
       command -v python3 >/dev/null 2>&1 &&
+      python3 -c 'import venv, ensurepip' >/dev/null 2>&1 &&
       command -v curl    >/dev/null 2>&1 &&
       command -v ss      >/dev/null 2>&1 &&
       command -v fuser   >/dev/null 2>&1 &&

@@ -11,7 +11,7 @@ dp_pkg_update
 if dp_is_debian; then
   dp_pkg_install \
     ca-certificates curl wget gnupg \
-    python3 \
+    python3 python3-venv python3-pip \
     iproute2 psmisc procps \
     tar gzip xz-utils \
     locales tzdata \

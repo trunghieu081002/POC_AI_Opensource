@@ -141,18 +141,28 @@ def run_script(script: Path, env: dict, run_id: str, timeout: int = 600,
 
 def run_command(command: str, env: dict, run_id: str, timeout: int = 300,
                 dry_run: bool = False) -> Result:
-    """Execute a single autofix command string.
+    """Execute a single autofix command string, or a step's guard/when snippet.
 
-    Only reached after safety.check() cleared it. Kept separate from run_script
-    so the audit log can tell a reviewed pack step apart from a repair action.
+    Only reached after safety.check() cleared it (for an autofix) or as a
+    cheap pre-check (for a guard/when). Kept separate from run_script so the
+    audit log can tell a reviewed pack step apart from a repair action.
+
+    dp.sh is sourced first: a guard like python-modern's own
+    `dp_find_python 3 8 3 13 >/dev/null 2>&1` calls a dp_ helper directly,
+    the same as any step script would - without this, "command not found"
+    (rc 127) made the guard always false, so the step always ran even when
+    already satisfied. Invisible on hosts where running it anyway happened
+    to succeed regardless; fatal on Debian/Ubuntu, where the step it
+    wrongly failed to skip has no automated path and always dp_fails.
     """
     if dry_run:
         _log_line(run_id, {"ts": time.time(), "type": "fix.dry", "cmd": command})
         return Result(rc=0, stdout=f"DRY: {command}", stderr="", duration_ms=0)
 
+    sourced = f'source "$DP_LIB" 2>/dev/null || true\n{command}'
     started = time.monotonic()
     try:
-        proc = subprocess.run(["bash", "-c", command], env=env, capture_output=True,
+        proc = subprocess.run(["bash", "-c", sourced], env=env, capture_output=True,
                               text=True, timeout=timeout, errors="replace")
         rc, out, err = proc.returncode, proc.stdout, proc.stderr
     except subprocess.TimeoutExpired:

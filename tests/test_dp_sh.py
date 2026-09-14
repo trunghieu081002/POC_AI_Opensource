@@ -255,3 +255,37 @@ echo "REACHED_END"
     assert result.returncode == 0, result.stderr
     assert "SHOULD_NOT_BE_CALLED" not in result.stdout
     assert "REACHED_END" in result.stdout
+
+
+@requires_bash
+def test_dp_fetch_fails_loudly_when_neither_tool_exists_for_real():
+    """A real run with neither curl nor wget installed is a genuine host
+    problem and must still stop - only the dry-run preview gets a pass."""
+    result = run('''
+dp_have() { return 1; }
+dp_fetch https://example.invalid/file /tmp/dp_sh_test_fetch.out
+echo "SHOULD_NOT_REACH_END"
+''', env={"DP_DRY_RUN": "0"})
+    assert result.returncode != 0
+    assert "neither curl nor wget is available" in result.stderr
+    assert "SHOULD_NOT_REACH_END" not in result.stdout
+
+
+@requires_bash
+def test_dp_fetch_previews_with_curl_under_dry_run_when_neither_installed_yet():
+    """The exact bug: postgres's own repo step installs curl and then calls
+    dp_fetch a few lines later. Under --dry-run that install is simulated, so
+    on a genuinely fresh host curl does not exist yet - and dp_fetch used to
+    dp_fail here instead of previewing, aborting the whole --dry-run plan
+    partway through. Never seen on a host that already had curl installed for
+    an unrelated reason, which is exactly how this stayed hidden."""
+    # dp_run's own dry-run branch only prints and returns - it never actually
+    # execs "$@" - so there is no real curl/wget to mock here; reaching the
+    # end at all, instead of dp_fail aborting first, is the assertion.
+    result = run('''
+dp_have() { return 1; }
+dp_fetch https://example.invalid/file /tmp/dp_sh_test_fetch.out
+echo "REACHED_END"
+''', env={"DP_DRY_RUN": "1"})
+    assert result.returncode == 0, result.stderr
+    assert "REACHED_END" in result.stdout

@@ -897,3 +897,116 @@ status` now shows all five packs `installed` / `tested: passed` on the real
 host, closing every remaining gap from the two prior entries. `pytest`
 218/1-skipped and `dpagent lint` clean, unchanged (this fix only touched a
 suite check, not the harness).
+
+### 2026-09-14 — the Debian branch, executed for real for the first time ever
+
+Every prior real install this project has ever run was on ol8-19 — an EL8/
+RHEL-family host. The Debian/Ubuntu branch of every pack had only ever been
+read, dry-run-simulated, or (per the previous entry) exercised indirectly
+through `test_dry_run_integration.py`'s fake-os matrix. User asked, while
+Layer 2 scope was being agreed, to keep fault-finding across environments in
+parallel: built a genuine systemd-enabled `ubuntu:22.04` container (not the
+production host) and ran the real install path, pack by pack, for the first
+time on a real Debian-family system. Four real bugs found, all invisible on
+ol8-19 for the same underlying reason: **something the pack needed happened
+to already be present on that host for unrelated reasons**, masking that
+the pack itself never provisioned it.
+
+1. **`base`'s Debian package list had no `python3-venv`/`python3-pip`.**
+   Debian/Ubuntu splits the `venv` and `pip` stdlib modules into separate
+   packages from `python3` itself (unlike RHEL, where the system `python3`
+   package includes them) — every downstream pack that does `python3 -m
+   venv` (dbt, airflow, python-modern) failed with "No module named venv"
+   the moment any of them actually ran on a fresh Ubuntu box. Fixed by
+   adding both packages to `base/steps/10-packages.sh`'s Debian branch, and
+   — because the 'packages' step's guard only checked `command -v python3`,
+   which stays true even without the venv module — extended the guard
+   itself to `python3 -c 'import venv, ensurepip'` so a host with `python3`
+   but no venv module doesn't get the step wrongly skipped as "already
+   applied".
+
+2. **`dp_fetch` (shared library) hard-failed under `--dry-run` when neither
+   curl nor wget existed yet.** postgres's Debian repo step installs curl
+   two lines before calling `dp_fetch` to download the PGDG signing key —
+   on a real run that install already happened for real by the time
+   `dp_fetch` runs, but under `--dry-run` it is simulated, so on a
+   genuinely fresh host curl does not exist yet and `dp_fetch` aborted the
+   whole preview instead of completing it. The tenth instance of the
+   dry-run-honesty bug class from the prior sessions, caught this time by
+   `test_dry_run_integration.py` on its very first run against this
+   container rather than by hand. Fixed with the same `DP_DRY_RUN`
+   placeholder pattern as the other nine (preview with curl, since that is
+   what a real run ends up using regardless).
+
+3. **A real architectural gap, not a one-off:** `python-modern`'s guard
+   `dp_find_python 3 8 3 13 >/dev/null 2>&1` calls a `dp_` helper function
+   directly — but `executor.run_command` (what evaluates every guard and
+   `when` condition, shared with catalog autofixes) never sourced `dp.sh`.
+   The guard silently failed with "command not found" (rc 127) — always
+   false — regardless of whether a suitable interpreter already existed.
+   Invisible everywhere it has run before, because on every prior host the
+   step "always runs anyway" happened to also always succeed (the RHEL
+   branch genuinely installs `python3.11`), so a broken guard and a working
+   one looked identical from the outside. Fatal on Debian/Ubuntu 22.04+,
+   whose system `python3` (3.10) already satisfies the requirement: the
+   guard should have skipped the step entirely, and instead the step always
+   ran, always reaching the Debian branch's own unconditional `dp_fail`
+   ("no first-party path to a newer Python on Debian/Ubuntu") — making
+   `python-modern` **uninstallable on the exact OS family the pack's own
+   docstring says is normally a no-op on**. Fixed structurally in
+   `executor.run_command` itself (sources `$DP_LIB` before running the
+   snippet, swallowing a missing/stale path rather than failing), not by
+   patching the one guard that happened to surface it — matching the same
+   reasoning as `lint_lib`/`lint_suite`: a bug in shared plumbing is worse
+   than one in a single pack, because every caller inherits it silently.
+   Grepped every `guard:`/`when:` across all packs afterward: this was the
+   only one currently calling a `dp_` function directly, but the gap would
+   have bitten the next pack author who reasonably assumed guards get the
+   same helpers a step script does. New `tests/test_executor.py` pins both
+   directions: a `dp_` call now resolves, and a missing/bad `DP_LIB` value
+   doesn't break unrelated commands.
+
+4. **`dbt` never provisioned `git`.** `dbt-core` shells out to git for `dbt
+   deps` (installing packages named in `packages.yml`) and `dbt debug`
+   reports its absence as a failed check on its own — so even though the
+   actual Postgres connection worked perfectly, the acceptance suite's
+   `connection-works` check (which requires `dbt debug` to report "All
+   checks passed", not just a successful connection) correctly failed.
+   git happened to already be installed on ol8-19 for unrelated reasons,
+   same pattern as findings 1-3. Fixed by having `dbt/steps/10-venv.sh`
+   install `git` if absent (identical package name on both families, no
+   branching needed).
+
+**Verified, pack by pack, for real, on the Ubuntu container:** `base`
+installed and proven 4/4 (first-ever real Debian-branch install of any
+pack in this project); `python-modern` correctly guard-skipped once
+system Python 3.10 was confirmed sufficient, proven 2/2; `postgres` via
+the PGDG apt repo and `pg_createcluster` installed and proven 6/6 clean on
+the very first attempt, no bugs found there; `dbt` installed and proven
+3/3 after the git fix. `pytest` 222/1-skipped and `dpagent lint` clean on
+the real repo throughout; each fix was deployed into the container and
+re-verified there before being considered closed, not just locally.
+
+**Also hit, and worth remembering as testing methodology rather than a
+product bug:** `dpagent install <pack>` has no notion of "the operator
+deleted some files by hand, please reconverge" — the params-hash
+whole-pack skip and the guard/checkpoint machinery both assume dpagent is
+the sole source of truth for what is on disk. Manually removing dbt's
+profile mid-session (to test a password change) required either
+`dpagent rollback` first or `--force` — and `--force` has no per-pack
+scope, so it cascades to every dependency in the resolved plan, including
+ones whose guard was correctly protecting them (this is exactly how
+`python-modern`'s Debian branch got hit a second time, harmlessly, while
+chasing an unrelated dbt credential issue). Not a bug: `dbt`'s own
+`rollback.sh` deliberately leaves `project_dir` in place, on the explicit
+and correct reasoning that it may hold an operator's real work — the
+friction was self-inflicted by testing outside the tool's own assumptions,
+not a gap in the tool.
+
+**Not yet attempted:** `airflow` on this Debian branch (next), and
+`postgres`'s Debian path only exercised the default single-node,
+no-extra-databases configuration — the `--set databases=...`/`users=...`
+composition path (needed for dbt/airflow to share one Postgres) was
+exercised manually afterward and worked, but is not yet covered by an
+automated equivalent of `examples/etl-stack.yaml` run end-to-end on
+Debian.
