@@ -1273,3 +1273,41 @@ container; verification has to use a plain container (as above) or a real
 Kubernetes pod. Verified: `pytest` 228 passed / 1 skipped; the plain
 `--memory=512m` container's `sysinfo.memory_mb()` now returns `512`, not
 `63904`.
+
+**Disk pressure: `/opt` constrained to 500MB via a sized tmpfs mount.**
+Same idea as the memory scenario but easier to get precise: mounted
+`tmpfs -o size=500m` over `/opt` in a fresh container, below both dbt's
+1024MB and airflow's 2048MB `host_needs.disk_mb`. `dpagent doctor` and
+`dpagent install dbt --yes` both blocked correctly - `doctor` listed both
+packs as `BLOCK needs <N>MB free on /opt, has 500MB` before anything ran,
+and the real install path halted at dbt's own preflight with the same
+message, exit 3, no steps touched. **No bug found** - `sysinfo.disk_free_mb`
+uses `shutil.disk_usage`, which (unlike `/proc/meminfo`) is already mount-
+point-aware, so a constrained filesystem is reported correctly regardless of
+container/cgroup shenanigans.
+
+**SELinux: preflight's own design doc mentions it, no pack ever checked
+it.** `packs/_template/preflight.sh`'s comment names "SELinux" as one of
+the predictable failures preflight exists to catch, alongside busy ports
+and disk - but grepping every real pack's `preflight.sh` turned up zero
+matches; the template's promise was never implemented. `getenforce` shows
+this very host (ol8-19) is `Permissive`, so this had never surfaced in any
+session so far, but a hardened RHEL/OL host commonly ships `Enforcing`,
+and none of these packs set file or port contexts for the non-standard
+paths (`/opt/dbt`, `/opt/airflow`, ...) and ports they use - a denial
+there would surface as a service silently failing to start, with nothing
+from dpagent pointing at the cause. Did not flip SELinux to Enforcing on
+ol8-19 to test this for real: relabeling and enforcing on a production
+host with paths already created under Permissive is exactly the kind of
+hard-to-reverse, service-breaking change this log's standing rules exist
+to prevent, and a container's SELinux state does not reflect independent
+enforcement of its own filesystem regardless. Instead added a
+non-blocking advisory to `packs/base/preflight.sh` (base runs first and is
+common to every pack) - `dp_warn` only, via `getenforce` when present,
+pointing at `ausearch -m avc -ts recent` as the next step if a later
+pack's service does not come up. Verified without touching real SELinux
+state: a fake `getenforce` shim on `PATH` printing `Enforcing` makes the
+warning fire without failing preflight; `Permissive` or no `getenforce`
+binary at all produces no warning. Three new cases in
+`tests/test_base_preflight.py` cover all three. `pytest` 231 passed /
+1 skipped; `dpagent lint base` unaffected.
