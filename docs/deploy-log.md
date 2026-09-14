@@ -1065,3 +1065,22 @@ holds on a second, unrelated family/version combination — and proven 2/2;
 `postgres` via the EL9 PGDG repo path installed and proven 6/6 clean on the
 first attempt, no new bug. `pytest` 222/1-skipped and `dpagent lint` clean
 throughout.
+
+`dbt` and `airflow` installed next (same multi-database `--set` composition
+as the Ubuntu session, giving `airflow` its metadata database) and both
+proved clean on the first attempt — no new bugs. **`dpagent status` on the
+Rocky 9 container: all five packs `installed` and `tested: passed`.**
+
+**Every pack has now been installed and proven, for real, on three distinct
+environments**: Oracle Linux 8 (ol8-19, production), Ubuntu 22.04, and
+Rocky Linux 9 — two RHEL major versions and one Debian-family release,
+covering three genuinely different default toolchains (Python 3.6, 3.10,
+and 3.9 respectively) and two package managers. Container removed after;
+`dpagent-rocky9-systemd` kept for reuse.
+
+**Running tally of environment-specific bugs found this way, none visible
+by reading code or by installing only once:** 4 on the Ubuntu session, 2 on
+this one — 6 total, on top of the ~20 found getting ol8-19 itself working
+in the sessions before either existed. Every one shared the same shape:
+something the pack silently depended on happened to already be present on
+whichever host was tested first.
