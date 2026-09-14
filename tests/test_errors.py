@@ -23,6 +23,8 @@ REAL_FAILURES = [
      "tls-cert-verify"),
     ("dpkg: unrecoverable fatal error: unable to write: No space left on device",
      "disk-full"),
+    ("mkdir: cannot create directory '/opt/dbt': Read-only file system",
+     "read-only-filesystem"),
     ("initdb: error: invalid locale settings; check LANG and LC_* environment variables",
      "pg-initdb-locale-missing"),
     ("initdb: error: directory \"/var/lib/pgsql/15/data\" exists but is not empty",

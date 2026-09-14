@@ -134,6 +134,24 @@
     make room on its own.
   retry: false
 
+- id: read-only-filesystem
+  match:
+    output: "Read-only file system"
+  cause: >
+    The target path is on a filesystem mounted read-only - a hardened/immutable
+    root, a remount after a disk error, or a deliberately read-only bind mount.
+    None of these packs' preflight checks test writability, only free space, so
+    this surfaces as a plain write failure mid-step rather than a preflight
+    block.
+  autofix: []
+  ask_user: >
+    The target path is read-only. Check `mount | grep <path>` for a `ro` flag.
+    If it should be writable, remount it read-write and re-run - dpagent
+    resumes from the last completed step. If it is read-only on purpose,
+    point the pack's install_dir/project_dir param at a writable path instead
+    (--set); dpagent will not remount a filesystem on its own.
+  retry: false
+
 - id: permission-denied
   match:
     output: "Permission denied|are you root\\?|must be run as root|Operation not permitted"

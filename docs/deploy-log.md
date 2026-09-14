@@ -1409,3 +1409,62 @@ a guard is *narrower* than the step it gates. No fix attempted here beyond
 the three instances found; flagged for whoever next touches `lint.py` as a
 candidate check, not implemented now to avoid guessing at a design that
 needs more than one more bug's worth of evidence.
+
+### 2026-09-14 — network loss mid-install: no bugs, two scenarios worth recording so they are not re-litigated
+
+**`base` with no network at all, from the first step.** `docker network
+disconnect` on a container with `base` never installed, then `dpagent
+install base --yes`. `base/preflight.sh` has no network check of its own,
+so preflight passed and the `packages` step ran straight into `dnf`
+failing for real. The shared error catalog's `base-no-package-manager-repos`
+entry matched on the first attempt (no wasted retries) and gave a correct,
+actionable message pointing at `/etc/yum.repos.d`, DNS, and proxy config.
+**No bug** — the catalog covers what the pack's own preflight does not,
+exactly as designed.
+
+**`dbt`'s venv step with no network, mid-plan (python-modern already
+installed, dbt is not).** Same idea, one layer more interesting: the step
+does `dp_have git || dp_pkg_install git` *before* `mkdir -p "$INSTALL_DIR"`
+or creating the venv, specifically so a package-manager failure aborts
+before anything is created on disk (confirmed: `/opt/dbt` did not exist at
+all after the failure - `set -euo pipefail` stopped the script at the
+`dp_pkg_install git` line). The catalog matched a DNS-specific entry this
+time (`Could not resolve host`, distinct from the `dnf` "repos
+unreachable" text `base` hit) with an equally correct message. Reconnected
+the network and re-ran the identical command: the step re-ran clean (no
+half-built venv to confuse its guard, because none was ever created),
+`dbt` finished installing and verified ok. `dpagent status` confirmed
+`dbt: installed`. (Its acceptance suite then failed at `connection-works` -
+expected and unrelated: this container was never given a postgres backend
+to point dbt at, which was never the point of this scenario.) **No bug** -
+this step's ordering already treats "needs network, might fail" work as
+something to get out of the way before anything persistent happens,
+which is exactly what makes a clean resume possible.
+
+**Read-only `/opt`: no preflight check catches it (none test writability,
+only free space), and the error catalog had no entry for it either.**
+Bind-remounted `/opt` read-only in a container (`mount --bind /opt /opt &&
+mount -o remount,bind,ro /opt`) after `base` and `python-modern` were
+already installed - the two packs that do not default anywhere under
+`/opt`. Every preflight checks disk space via `df`, which reports free
+blocks correctly on a read-only mount (space and writability are
+unrelated), so `dbt`'s preflight passed clean and the failure only showed
+up when its `venv` step actually tried `mkdir -p /opt/dbt` and hit
+`Read-only file system`. That text matched nothing in either the pack's
+own `errors.yaml` or the shared one - the full raw output was still shown
+(this project never hides a failure a human could read), but the box said
+`no catalog entry matched this failure` instead of an actual instruction,
+exactly the gap `dpagent audit` is meant to be a manual fallback for, not
+the common path. Added `read-only-filesystem` to the shared catalog
+(`packs/_lib/errors.yaml`, next to `disk-full` - the same "host filesystem
+problem, not autofixable" shape): matches `Read-only file system`,
+`autofix: []`, and an `ask_user` pointing at `mount | grep <path>` plus
+either a remount or `--set install_dir=...`/`project_dir=...` at a
+writable path. Verified both the message and the remedy: re-ran the exact
+same command and got the new message instead of the blank-catalog box;
+then re-ran again with `--set install_dir=/var/opt/dbt --set
+project_dir=/var/opt/dbt/project` (still under the same read-only `/opt`
+mount, just pointed elsewhere) and the install completed - proving the
+suggested fix is not just plausible-sounding but actually works. One new
+case in `tests/test_errors.py`'s `REAL_FAILURES` table. `pytest` 234
+passed / 1 skipped; `dpagent lint` clean.
