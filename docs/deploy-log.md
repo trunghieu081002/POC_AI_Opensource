@@ -1311,3 +1311,101 @@ warning fire without failing preflight; `Permissive` or no `getenforce`
 binary at all produces no warning. Three new cases in
 `tests/test_base_preflight.py` cover all three. `pytest` 231 passed /
 1 skipped; `dpagent lint base` unaffected.
+
+### 2026-09-14 — pre-existing conflicting `airflow` OS user: one bug in the scenario setup, one crash that had nothing to do with it, and the real one three layers down
+
+Set out to test one thing - a host where the `airflow` system user already
+exists, for some reason unrelated to dpagent, before `dpagent install
+airflow` ever runs once - and hit three separate real bugs getting there,
+only the last of which was the scenario actually being tested for.
+
+**1. `base`'s packages-step guard regressed the openssl fix from earlier
+today.** Setting up this container needed `dpagent install base` first,
+which failed verify on `openssl runs` again - the exact symptom already
+fixed once today (`d3838ad`). Root cause: that fix added `openssl` to the
+package list, to `verify.sh`, and to the step's own "still missing after
+install" loop - but never to the step's *guard* in `pack.yaml`, which still
+only checked `python3`+venv, `curl`, `ss`, `fuser`, `tar`. Those five are
+already present on stock `oraclelinux:8` (confirmed directly:
+`command -v` found all five, `import venv, ensurepip` succeeded, only
+`openssl` was missing) - so the guard was satisfied on the very first run
+and the whole packages step, openssl included, was silently skipped. This
+is the same shape of bug as the airflow one below, found by accident before
+the deliberate scenario even started: a guard is a claim that a step's
+*entire* effect already happened, and every addition to what a step does
+has to be added to the guard too, or the guard quietly starts lying. Fixed
+by adding `openssl` (and `pgrep`, which `verify.sh` already checked but the
+guard never did - the same gap, just not yet triggered) to the guard.
+Verified: `dpagent install base --yes --force` in the same container now
+installs and verifies openssl for real.
+
+**2. A missing required param crashed with a raw Python traceback, not a
+message.** Ran `dpagent install airflow --yes` with no spec file and no
+`--set` for `backend_password` (a `required, secret` param) - not the
+scenario under test, just a mistake in the test command - and instead of
+the clean "preflight failed" shape every other failure in this project
+takes, got a full `Traceback (most recent call last)` ending in
+`dpagent.engine.params.ParamError`. Root cause: `runner.py`'s
+`install_pack()` calls `params_mod.resolve()` as its very first line, with
+nothing catching `ParamError` anywhere between there and the CLI's
+top-level handler (which only catches `ResolveError`/`PackError` from the
+*planning* phase, not per-pack resolution during the actual install loop).
+This is the one place left in the install path that broke the project's
+own rule that a failure is an instruction, not a stack trace - and it also
+left the run record open forever, since `install()`'s `state.finish_run()`
+is never reached when the loop body raises instead of returning. Fixed by
+catching `ParamError` inside `install_pack()` and converting it to a
+normal `FAILED` `PackOutcome`, reported exactly like a preflight failure
+(`halted on airflow` / exit 3) and still reaching `finish_run()`. Two new
+cases in `tests/test_runner_install_pack.py` - the missing-param path
+returns a failed outcome instead of raising, and a satisfiable schema is
+unaffected (runs through to a normal `OK`, not the new except branch).
+
+**3. The actual scenario: airflow's `user` step guard checks only that the
+OS user exists, not that the step's other work (AIRFLOW_HOME's directory
+tree, ownership) was ever done.** Pre-created an `airflow` system user by
+hand (`useradd --uid 5000 --home-dir /home/airflow ...`, deliberately
+nothing like what the pack would create) before running `dpagent install
+airflow` for the very first time. `steps/10-user.sh` does three things:
+`dp_ensure_user` (a no-op here, correctly - the user already exists), then
+`mkdir -p` for `install_dir` and its `dags`/`logs`/`plugins`
+subdirectories, then `chown -R airflow:airflow` on all of it. The step's
+guard was `id -u airflow >/dev/null 2>&1` - checks only the first of those
+three things. With the user pre-existing, the guard was satisfied before
+the step ever ran once, so the mkdir and chown never happened:
+`/opt/airflow` stayed `root:root`, and `dags`/`logs`/`plugins` did not
+exist at all. Every later step that doesn't touch these paths (venv,
+install, config) succeeded anyway, masking the problem for three more
+steps - until `db-migrate`, which runs Airflow itself as the `airflow`
+user via `runuser`, tried to create its own log directory under the
+root-owned tree and got `FileNotFoundError` deep inside Python's
+`logging.config`. The error catalog's generic `permission-denied` entry
+matched some fragment of that traceback and reported "Re-run with sudo -E"
+- actively misleading, since the process already had root; the real
+problem was three steps and one skipped guard earlier. Fixed by widening
+the guard to also require `dags`/`logs`/`plugins` to exist under
+`$DP_PARAM_INSTALL_DIR/home` - the same "guard must prove the *whole*
+step's effect, not one symptom of it" fix as #1 above, and the same class
+of bug this project has now hit three times (`python-modern`'s guard
+earlier this session, `base` today, `airflow` here). Verified two ways:
+re-ran the same `dpagent install airflow` command with no other change -
+step 1 now actually ran (`ok 140ms` instead of `skip`), and
+`/opt/airflow`/`home` came back `airflow:airflow` with all three
+subdirectories present. Then closed the loop for real: gave postgres a
+matching `airflow`/`airflow_meta` role via `--set users=...` and re-ran
+the full `base + python-modern + postgres + airflow` install with
+`--force` end to end - all four acceptance suites passed, 16/16 checks,
+airflow's own suite included (a real DAG triggered, run, and reported
+succeeded; a deliberately-failing DAG reported failed, not silently
+green). `pytest` unaffected by the guard-only pack.yaml changes;
+`dpagent lint` clean on both `base` and `airflow` after the fixes.
+
+**Standing lesson recorded, not (yet) automated:** three guard-completeness
+bugs in one project, all the same shape, are enough to call this a
+systemic risk rather than three unrelated mistakes. `dpagent lint` already
+warns when a step has *no* guard at all; it does not - and currently
+cannot, without parsing what each step script actually touches - warn when
+a guard is *narrower* than the step it gates. No fix attempted here beyond
+the three instances found; flagged for whoever next touches `lint.py` as a
+candidate check, not implemented now to avoid guessing at a design that
+needs more than one more bug's worth of evidence.

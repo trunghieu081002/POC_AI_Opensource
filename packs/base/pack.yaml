@@ -47,6 +47,8 @@ steps:
       command -v curl    >/dev/null 2>&1 &&
       command -v ss      >/dev/null 2>&1 &&
       command -v fuser   >/dev/null 2>&1 &&
+      command -v pgrep   >/dev/null 2>&1 &&
+      command -v openssl >/dev/null 2>&1 &&
       command -v tar     >/dev/null 2>&1
 
   - id: locale
