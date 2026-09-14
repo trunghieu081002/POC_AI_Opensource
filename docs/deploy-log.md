@@ -1003,10 +1003,22 @@ and correct reasoning that it may hold an operator's real work — the
 friction was self-inflicted by testing outside the tool's own assumptions,
 not a gap in the tool.
 
-**Not yet attempted:** `airflow` on this Debian branch (next), and
-`postgres`'s Debian path only exercised the default single-node,
-no-extra-databases configuration — the `--set databases=...`/`users=...`
-composition path (needed for dbt/airflow to share one Postgres) was
-exercised manually afterward and worked, but is not yet covered by an
-automated equivalent of `examples/etl-stack.yaml` run end-to-end on
-Debian.
+**`postgres`'s multi-database composition path**
+(`--set databases=warehouse,airflow_meta` + a matching `users` list, the
+same shape `examples/etl-stack.yaml` uses) was then exercised by hand on
+this container to give `airflow` a metadata database — worked cleanly,
+no new bug.
+
+**`airflow`, the last pack, installed and proven 4/4** on the very next
+attempt after that — its own first real Debian-branch run also surfaced
+nothing new; the `backend_user`/`backend_password` mismatch it initially
+hit (no `airflow` role existed yet) was correctly caught and diagnosed by
+the existing `errors.yaml` entry, not a bug.
+
+**Final state: `dpagent status` on the Ubuntu container shows all five
+packs `installed` and `tested: passed`** — `airflow` 4/4, `base` 4/4,
+`postgres` 6/6, `python-modern` 2/2, `dbt` 3/3 (re-verified after the
+postgres user changes). Combined with ol8-19, **every pack has now been
+installed and proven, for real, on both major Linux families this project
+targets.** Container removed after; the `dpagent-ubuntu-systemd` image was
+kept for reuse.
