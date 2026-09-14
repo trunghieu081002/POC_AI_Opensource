@@ -173,7 +173,14 @@ dp_pkg_install() {
   [ $# -gt 0 ] || return 0
   case "${DP_OS_FAMILY:-}" in
     debian) dp_run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" ;;
-    rhel)   dp_run "${DP_PKG_MGR:-dnf}" install -y "$@" ;;
+    # --allowerasing: EL9 ships curl-minimal by default, which flatly
+    # conflicts with the full `curl` this project asks every pack to
+    # install (dnf refuses outright otherwise: "package curl-minimal ...
+    # conflicts with curl ..."). Not module shadowing - a real package
+    # conflict, the fix RHEL's own docs give for it. Safe here because every
+    # caller asks for a specific, known package by name; dnf only erases
+    # something when it directly conflicts with that request.
+    rhel)   dp_run "${DP_PKG_MGR:-dnf}" install -y --allowerasing "$@" ;;
     *)      dp_fail "unsupported OS family: ${DP_OS_FAMILY:-unset}" ;;
   esac
 }

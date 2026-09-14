@@ -16,7 +16,12 @@ tar czf "$ARCHIVE" -C "$SRC" . || dp_fail "tar could not create an archive"
 mkdir -p "$DST"
 tar xzf "$ARCHIVE" -C "$DST" || dp_fail "tar could not extract the archive it just created"
 
-diff -q "${SRC}/subdir/file.txt" "${DST}/subdir/file.txt" >/dev/null \
+# Not diff/cmp: diffutils is not guaranteed present (missing by default on a
+# minimal EL9 image, for one) and base itself does not install it - a plain
+# shell string comparison needs nothing beyond bash itself.
+ORIGINAL="$(cat "${SRC}/subdir/file.txt")"
+EXTRACTED="$(cat "${DST}/subdir/file.txt")"
+[ "$ORIGINAL" = "$EXTRACTED" ] \
   || dp_fail "extracted file content does not match the original — the round trip is lossy"
 
 rm -rf "$SRC" "$DST" "$ARCHIVE"

@@ -1022,3 +1022,46 @@ postgres user changes). Combined with ol8-19, **every pack has now been
 installed and proven, for real, on both major Linux families this project
 targets.** Container removed after; the `dpagent-ubuntu-systemd` image was
 kept for reuse.
+
+### 2026-09-14 — Rocky Linux 9: a different major EL version, two more real bugs
+
+ol8-19 (and the RHEL side of everything above) is EL8. Every EL9 host is a
+genuinely different target: a different system Python default (3.9, not
+3.6 — the exact case `python-modern`'s guard exists to skip cleanly),
+different PGDG repo URLs (`EL-9-x86_64`, never fetched before), and a
+different default package set. Built a systemd `rockylinux:9` container and
+ran the same pack-by-pack real install.
+
+1. **EL9 ships `curl-minimal` by default, which flatly conflicts with the
+   full `curl` every pack installs via `dp_pkg_install`.** `dnf install -y
+   curl ...` refused outright: *"package curl-minimal-... conflicts with
+   curl provided by curl-...-40.el9_8.5"* - not resolvable without either
+   `dnf swap` or `--allowerasing`. The existing shared-catalog entry that
+   matched (`dnf-module-conflict`) gave a misleading fix suggestion for
+   this specific cause (it suggested checking for a module stream to
+   disable - correct for the earlier `pg-module-stream-shadowing` finding,
+   wrong here: this is a straight package conflict, not module shadowing).
+   Real fix, in shared plumbing so every pack's installs benefit:
+   `dp_pkg_install`'s RHEL branch now passes `--allowerasing` to `dnf
+   install`, RHEL's own documented answer to exactly this conflict class.
+   Safe here specifically because every caller names a specific, known
+   package - dnf only erases something that directly conflicts with that
+   named request, not an open-ended cleanup.
+2. **`suites/base`'s own tar round-trip check depended on `diff`**, which
+   `diffutils` — not installed by default on a minimal EL9 image, and not
+   something `base` itself provisions — is needed for. A test-script bug,
+   not a product one, but with the same shape as everything else in this
+   log: something ambiently present on ol8-19 and the Ubuntu container
+   masked a dependency the check never actually declared. Fixed by
+   comparing the two files' content as plain shell strings (`cat file`
+   into a variable, `[ "$a" = "$b" ]`) instead of shelling out to an
+   external diff tool at all.
+
+**Verified on the Rocky 9 container, pack by pack:** `base` installed and
+proven 4/4 after the `--allowerasing` fix (first successful package install
+of any pack on EL9); `python-modern` correctly guard-skipped its install
+step — proof the `run_command`-sources-`dp.sh` fix from the Ubuntu session
+holds on a second, unrelated family/version combination — and proven 2/2;
+`postgres` via the EL9 PGDG repo path installed and proven 6/6 clean on the
+first attempt, no new bug. `pytest` 222/1-skipped and `dpagent lint` clean
+throughout.
