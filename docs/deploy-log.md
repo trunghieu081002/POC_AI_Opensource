@@ -1084,3 +1084,53 @@ this one — 6 total, on top of the ~20 found getting ol8-19 itself working
 in the sessions before either existed. Every one shared the same shape:
 something the pack silently depended on happened to already be present on
 whichever host was tested first.
+
+### 2026-09-14 — the one-command path (`scripts/setup.sh`), run for real, for the first time ever
+
+Every install this project has ever run — across every host and container
+in this log — went through `dpagent install`/`dpagent spec` directly,
+called by hand after the venv already existed. `scripts/setup.sh` -
+literally *"THE single command"* per its own header comment, the thing
+README's very first code block tells a new user to run - had never been
+executed. Built the actual distribution tarball (`tar czf`, matching what
+`scripts/package.ps1` produces) and ran it against a genuinely empty
+`oraclelinux:8` container: no python3, no git, no sudo binary, nothing.
+
+**Found the most serious bug of this entire project so far.**
+`scripts/bootstrap.sh`'s own version gate checked the hardcoded `python3`
+command - always the system default (3.6 on EL8) - and only computed
+`PYTHON="${DPAGENT_PYTHON:-python3}"` *after* that check already ran. Its
+own `die()` message says exactly the right thing - *"On EL8 install
+python3.11 ... and re-run with DPAGENT_PYTHON=/usr/bin/python3.11"* - and
+following that advice to the letter did not work: bootstrap re-checked the
+unchanged system `python3`, ignored the override entirely, and died with
+the identical message a second time. **The documented fix for the exact
+failure this script anticipates on its primary target OS did not fix it.**
+This would have stopped every EL8 user who ever followed the README's
+first code block, unconditionally, with no working escape hatch - not a
+bug that happens to affect one pack under one condition, but the single
+narrowest gate the entire onboarding path has to pass through. Fixed by
+resolving `PYTHON` first and checking *that* interpreter's version instead
+of the hardcoded one.
+
+Re-ran from a clean container after the fix: bootstrap succeeded, `dpagent
+doctor` passed, and `dpagent spec examples/etl-stack.yaml --yes` installed
+`base`, `python-modern`, `postgres` and `airflow` clean on the first
+attempt - no new bugs in any of them. Only `dbt`'s own acceptance suite
+failed, and only in its own test code: `checks/20-run-materializes-data.sh`
+and `teardown/99-fixtures.sh` both shell out to `python3 -c 'import
+yaml...'` to read the generated `profiles.yml` - using the *system*
+python3, which has no PyYAML on EL8 (3.6, no dbt-core anywhere near it).
+Same shape as the `diff` finding on Rocky: an undeclared dependency the
+check happened to get away with on hosts where something unrelated already
+provided it. Fixed by pointing both scripts at dbt's own venv interpreter
+(`${INSTALL_DIR}/.venv/bin/python`) instead - PyYAML is guaranteed there,
+since dbt-core depends on it itself.
+
+**Verified end to end:** after both fixes, deployed into the *running,
+already-bootstrapped* `/opt/dpagent` install (not just the source repo) and
+re-ran `dpagent test dbt` there directly - 3/3. `dpagent status` on this
+container: all five packs `installed` and `tested: passed`, reached
+entirely through the documented one-command path, on a host that started
+with nothing. `pytest` 222/1-skipped and `dpagent lint` clean on the
+source repo throughout. Container and the temporary tarball removed after.

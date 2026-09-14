@@ -26,7 +26,10 @@ printf '%s\n' "$OUTPUT" | grep -qE "Completed successfully" \
   || dp_fail "dbt run did not report success:
 ${OUTPUT}"
 
-PASSWORD="$(python3 -c "
+# The venv's own python, not the system one: PyYAML is guaranteed there
+# (dbt-core depends on it itself) and nowhere else - the system python3 on a
+# real host is whatever it happens to be (3.6 on EL8, no PyYAML at all).
+PASSWORD="$("${INSTALL_DIR}/.venv/bin/python" -c "
 import yaml
 p = yaml.safe_load(open('${PROFILES_DIR}/profiles.yml'))
 t = p['default']['outputs'][p['default']['target']]

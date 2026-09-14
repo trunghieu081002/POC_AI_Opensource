@@ -87,14 +87,21 @@ fi
 
 command -v python3 >/dev/null 2>&1 || die "python3 is still missing after install"
 
-PYVER="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+# Resolved before the version check, not after: checking the hardcoded
+# `python3` here made the escape hatch this very die() message recommends
+# not work at all - DPAGENT_PYTHON=/usr/bin/python3.11 was accepted but
+# silently never consulted, so the version gate re-failed against the
+# unchanged system python3 (3.6 on EL8) even with a real 3.11 present and
+# named explicitly.
+PYTHON="${DPAGENT_PYTHON:-python3}"
+command -v "$PYTHON" >/dev/null 2>&1 || die "DPAGENT_PYTHON=${PYTHON} does not exist or is not executable"
+PYVER="$("$PYTHON" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 case "$PYVER" in
-  3.1[0-9]|3.[2-9][0-9]) ok "python ${PYVER}" ;;
-  *) die "dpagent needs python 3.10 or newer; this host has ${PYVER}.
+  3.1[0-9]|3.[2-9][0-9]) ok "python ${PYVER} (${PYTHON})" ;;
+  *) die "dpagent needs python 3.10 or newer; ${PYTHON} is ${PYVER}.
 On EL8 install python3.11 (dnf install -y python3.11) and re-run with
 DPAGENT_PYTHON=/usr/bin/python3.11" ;;
 esac
-PYTHON="${DPAGENT_PYTHON:-python3}"
 
 # ---------------------------------------------------------------- fetch
 

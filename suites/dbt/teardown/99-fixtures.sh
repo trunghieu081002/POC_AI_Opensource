@@ -6,6 +6,7 @@ set -euo pipefail
 source "${DP_LIB:?dp.sh not found}"
 
 NS="${DP_TEST_NS:?}"
+INSTALL_DIR="$(dp_param install_dir /opt/dbt)"
 PROJECT_DIR="$(dp_param project_dir /opt/dbt/project)"
 PROFILES_DIR="$(dirname "$PROJECT_DIR")/profiles"
 HOST="$(dp_param host localhost)"
@@ -15,7 +16,8 @@ SCHEMA="$(dp_param db_schema public)"
 DB_USER="$(dp_param db_user dbt_user)"
 
 if [ -f "${PROFILES_DIR}/profiles.yml" ]; then
-  PASSWORD="$(python3 -c "
+  # The venv's own python, not the system one - see checks/20 for why.
+  PASSWORD="$("${INSTALL_DIR}/.venv/bin/python" -c "
 import yaml
 p = yaml.safe_load(open('${PROFILES_DIR}/profiles.yml'))
 t = p['default']['outputs'][p['default']['target']]
