@@ -10,7 +10,7 @@ dp_pkg_update
 
 if dp_is_debian; then
   dp_pkg_install \
-    ca-certificates curl wget gnupg \
+    ca-certificates curl wget gnupg openssl \
     python3 python3-venv python3-pip \
     iproute2 psmisc procps \
     tar gzip xz-utils \
@@ -20,7 +20,7 @@ if dp_is_debian; then
 elif dp_is_rhel; then
   # iproute -> ss, psmisc -> fuser, procps-ng -> pgrep. Named differently here.
   dp_pkg_install \
-    ca-certificates curl wget gnupg2 \
+    ca-certificates curl wget gnupg2 openssl \
     python3 \
     iproute psmisc procps-ng \
     tar gzip xz \
@@ -39,7 +39,7 @@ elif dp_have update-ca-certificates; then
 fi
 
 missing=""
-for tool in python3 curl tar gzip ss fuser pgrep; do
+for tool in python3 curl tar gzip ss fuser pgrep openssl; do
   dp_have "$tool" || missing="${missing} ${tool}"
 done
 if [ "$DP_DRY_RUN" != "1" ]; then

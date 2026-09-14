@@ -1185,3 +1185,30 @@ the tool tells them at each step - which is the whole point of `die()`
 messages that name the exact next command, and this is the first time that
 claim was tested by someone (something) that had not already read the
 source to know the answer in advance.
+
+### 2026-09-14 — operational scenarios: a real gap in `base` itself, found via the suite that was supposedly just testing it
+
+Shifted from "does the install path survive a fresh host" to "what does a
+host operators actually run into" - starting with a plain fresh container
+(same image as every prior EL8 session) to install `base` before setting up
+a deliberate port conflict for postgres.
+
+**`base`'s own `tls-validation-actually-validates` check failed:
+"openssl is not on PATH."** First read as a suite-test infrastructure
+assumption (the same shape as the `diff`/PyYAML findings), but this one is
+different: `openssl` had been present, uninspected, on every host tested so
+far (ol8-19, the Ubuntu/Rocky/EL8 containers) - not because `base` provided
+it, but because *something else* always happened to pull it in first
+(other packages' dependencies, or leftover state from an earlier fix
+deployed into the same container in a prior session). A genuinely fresh
+container with nothing but `dnf install python3.11` run against it has no
+`openssl` binary at all. Since `base`'s own stated job includes making TLS
+actually work (`pack.yaml`'s own header: *"no CA bundle -> every https
+download fails with a confusing TLS error"*), and `openssl` is the standard
+tool for inspecting/debugging exactly that, this is a real gap in the pack,
+not a test-only one. Added `openssl` to `10-packages.sh`'s package list on
+both families, to the packages-step's own "still missing after install"
+check, and to `verify.sh` (`openssl version`) - matching the existing
+pattern of checking every tool by actually running it. Verified: `dpagent
+install base --yes --force` on the same container, 4/4 acceptance checks
+now pass.

@@ -15,6 +15,7 @@ check() {  # check <label> <command...>
 
 check "python3 runs"          python3 -c 'import json,sys; json.dumps({})'
 check "curl runs"             curl --version
+check "openssl runs"          openssl version
 check "tar runs"              tar --version
 check "ss lists sockets"      ss -lntH
 check "fuser is present"      bash -c 'command -v fuser'
