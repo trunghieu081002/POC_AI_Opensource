@@ -229,7 +229,22 @@ class Engine:
     # ------------------------------------------------------------ packs
 
     def install_pack(self, pack: packs.Pack, supplied: dict) -> PackOutcome:
-        resolved = params_mod.resolve(pack.param_schema, supplied, pack=pack.name)
+        try:
+            resolved = params_mod.resolve(pack.param_schema, supplied, pack=pack.name)
+        except params_mod.ParamError as exc:
+            # A missing required param (most often a secret nothing supplied,
+            # e.g. no --set and no spec ${ENV_VAR}) used to propagate as a raw
+            # Python traceback all the way to the terminal - the one place in
+            # the install path that broke this project's own rule that a
+            # failure is an instruction, not a stack trace. Report it exactly
+            # like a preflight failure instead, and still let install() reach
+            # state.finish_run() so the run is not left open forever.
+            self.reporter.pack_start(pack, supplied)
+            outcome = PackOutcome(pack.name, FAILED, reason=str(exc))
+            state.event("pack.param_error", str(exc), run_id=self.run_id,
+                        level="error", data={"pack": pack.name})
+            self.reporter.pack_done(outcome)
+            return outcome
         audit_params = params_mod.for_audit(pack.param_schema, resolved)
         phash = state.params_hash(pack.version, audit_params)
 
