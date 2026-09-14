@@ -63,6 +63,25 @@
   ask_user: "A role already exists and the SQL did not guard for it. Check steps/50-databases.sh."
   retry: false
 
+- id: pg-user-database-not-declared
+  match:
+    output: "ERROR:  database \".*\" does not exist"
+  cause: >
+    A `users[].databases` entry names a database that is not also in the
+    top-level `databases` list, so the GRANT/\connect generated for it targets
+    something that was never created. This has been seen matching the shared
+    catalog's generic `permission-denied` entry instead (`runuser -u postgres`
+    prints an unrelated, benign "could not change directory ... Permission
+    denied" warning on the same run, ahead of the real ERROR line in the
+    output) - a misleading diagnosis pointing at sudo when the process was
+    already root. This entry, being pack-specific, is checked first.
+  autofix: []
+  ask_user: >
+    A user's `databases` list names a database this pack was not also asked
+    to create. Add it to the top-level `databases` param (or remove it from
+    that user's `databases` list) and re-run.
+  retry: false
+
 - id: pg-module-stream-shadowing
   match:
     # Real EL8.10 dnf wording, confirmed against an actual failure: "All

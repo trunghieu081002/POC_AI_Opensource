@@ -33,6 +33,14 @@ REAL_FAILURES = [
      "pg-port-taken-by-other"),
     ("psql: error: FATAL:  Peer authentication failed for user \"postgres\"",
      "pg-peer-auth-failed"),
+    # The realistic shape: runuser's own benign cwd warning (unrelated to the
+    # real failure) sits ahead of the actual ERROR line in the captured
+    # output. Must not fall through to the shared catalog's generic
+    # permission-denied entry, which would misdiagnose this as a root/sudo
+    # problem - the process was already root.
+    ("could not change directory to \"/root/dpagent-src/packs/postgres\": Permission denied\n"
+     "psql:/tmp/dpagent-pg-XXXXXX.sql:15: ERROR:  database \"phantom_db\" does not exist",
+     "pg-user-database-not-declared"),
     ("FATAL:  could not map anonymous shared memory: Cannot allocate memory",
      "pg-shared-memory"),
     ("FATAL:  lock file \"postmaster.pid\" already exists",

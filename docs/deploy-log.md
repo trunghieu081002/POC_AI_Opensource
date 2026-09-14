@@ -1503,3 +1503,80 @@ not present"*, regardless of backend reachability; `DP_SVC_MGR=systemd`
 still passes. Two new cases in `tests/test_airflow_preflight.py`. `pytest`
 236 passed / 1 skipped; `dpagent lint airflow` unaffected (same three
 pre-existing no-guard warnings as before).
+
+### 2026-09-14 — rollback after a real mid-install failure: one misleading catalog match repeated, and one real leftover package
+
+Set out to force a genuine partial-install state on purpose - four of
+`postgres`'s five steps with real side effects (PGDG repo, packages,
+initialised data directory, a running, listening service), then a real
+failure on the fifth - and roll it back, to see whether `dpagent rollback`
+actually returns the host to a clean slate or just to a state that looks
+clean.
+
+**Forcing the failure surfaced the same misleading-catalog-match bug found
+yesterday in `airflow`, a second time.** `--set users=[{...,
+"databases": ["realdb", "phantom_db"]}]` without declaring `phantom_db` in
+the top-level `databases` param makes `steps/50-databases.sh`'s generated
+SQL `\connect phantom_db` into a database that was never created - a real
+`ERROR: database "phantom_db" does not exist` from psql. But the box said
+*"Re-run with `sudo -E dpagent ...`"* - misleading again, and for the same
+underlying reason as the airflow case: `runuser -u postgres -- psql ...`
+also printed an unrelated, benign `could not change directory to
+"<pack.root>": Permission denied` (the target user can't read the
+directory dpagent's own script happened to be running from) *ahead* of
+the real `ERROR:` line, and the shared catalog's broad `permission-denied`
+entry matched that instead. Confirmed via `dpagent audit`'s raw output,
+not just the CLI's summary. Fixed the symptom - not yet the underlying
+cause, see below - by adding `pg-user-database-not-declared` to
+`postgres/errors.yaml`: since pack-specific entries are checked before
+shared ones, a correct, specific diagnosis now wins automatically.
+Verified against the exact captured output (`Catalog.for_pack(...).match()`
+returns `pg-user-database-not-declared`, not `permission-denied`), and
+against `dpagent` for real - re-ran the identical install command and got
+the correct message.
+
+**Recorded, not fixed: the underlying `runuser` cwd warning is systemic,
+not specific to this one scenario.** `runuser -u <user> -- <cmd>` (used
+four times across `postgres` and `airflow` - `pg_as_postgres`, `pg_query`,
+`pg_is_up`, the direct call in `50-databases.sh`, and `af_run` twice) all
+share the same shape: invoked from a script whose cwd is `pack.root`,
+readable by root but not necessarily by the low-privilege service user
+being switched to. Any one of them can, in principle, print this same
+benign warning ahead of whatever the real failure is, and the shared
+`permission-denied` entry is broad enough to catch it every time. This
+has now caused a real misdiagnosis twice (airflow's `db-migrate`
+yesterday, postgres's `databases` step here) - both times papered over
+with a pack-specific catalog entry rather than fixed at the source.
+A cleaner fix likely exists (wrap the `runuser` target command to `cd`
+into something universally readable before running), but was not
+attempted here: an interactive repro of the warning outside of a real
+dpagent run did not reproduce it, so the exact trigger condition
+(something about how `executor.run_script` spawns the step, not just cwd
+readability on its own) is not fully understood, and four production code
+paths used by every acceptance suite are too much surface to change on an
+unconfirmed mechanism. Flagged as a candidate for whoever next hits this a
+third time.
+
+**The actual rollback test: one real leftover.** `postgres/rollback.sh`'s
+Debian branch already removes the PGDG apt source file and its downloaded
+signing key; the RHEL branch removed only the `postgresqlNN-server`/
+`-contrib` packages, service, and data directory - not the
+`pgdg-redhat-repo` package that `10-repo.sh` installs to enable the
+repository in the first place (on RHEL this is a real RPM, unlike the
+plain file dropped on Debian). Confirmed before touching anything: after
+`dpagent rollback postgres --yes` on the genuinely-broken install above,
+the service, data directory, packages and listening port were all
+correctly gone, but `rpm -qa | grep pgdg` still showed
+`pgdg-redhat-repo-...` and `/etc/yum.repos.d/pgdg-redhat-all.repo` was
+still there - `dpagent rollback` claiming to remove "everything this pack
+installed" while leaving a package behind. Fixed by removing
+`pgdg-redhat-repo` (guarded by `dp_pkg_installed`, matching this file's
+existing "safe against a partial install" pattern) alongside the server
+packages. Verified the full loop: reinstalled postgres clean (6/6
+acceptance), rolled it back with the fix - `rpm -qa | grep pgdg` and the
+`.repo` file both confirmed gone this time - then reinstalled once more
+from that rolled-back state with no `--force`, no special flags, and got
+6/6 acceptance again, proving rollback leaves a state a normal re-install
+actually trusts, not just one that looks empty. One new case in
+`tests/test_errors.py`. `pytest` 237 passed / 1 skipped; `dpagent lint
+postgres` unaffected (same two pre-existing no-guard warnings).
