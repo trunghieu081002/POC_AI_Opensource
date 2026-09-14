@@ -1212,3 +1212,64 @@ check, and to `verify.sh` (`openssl version`) - matching the existing
 pattern of checking every tool by actually running it. Verified: `dpagent
 install base --yes --force` on the same container, 4/4 acceptance checks
 now pass.
+
+**Port conflict, deliberately staged: `nc -l 5432` bound before
+`dpagent install postgres` was attempted.** With `base` proven in the same
+container, occupied port 5432 with a plain `nc` listener (not PostgreSQL)
+and ran the install. `preflight.sh`'s port check (`packs/postgres/preflight.sh`
+lines 34-40) did exactly what it is documented to do: called `dp_port_busy`,
+saw the port occupied, called `pg_is_up` to distinguish "an existing
+PostgreSQL to adopt" from "something else in the way," and since the
+listener was `nc`, failed preflight with `"port 5432 is occupied by
+something that is not PostgreSQL; free it or set the 'port' param"` -
+before any package was touched. No steps ran, no state changed, exit
+code 3 (halted on preflight, not a crash). Killed the `nc` listener,
+re-ran the same `dpagent install postgres --yes` command with no other
+change, and it resumed and completed cleanly - postgres suite 6/6,
+base suite still 4/4 - confirming the checkpoint/resume path (`step_runs`)
+correctly treated the earlier halt as "nothing completed yet" rather than
+skipping steps that never ran. **No bug found** - this is the preflight
+system working exactly as designed, recorded here as a passing scenario
+so it is not re-litigated later.
+
+**Low-memory host: `dpagent doctor` silently lies about available RAM inside
+any memory-constrained container.** `airflow`'s `pack.yaml` declares
+`host_needs.memory_mb: 2048`; `doctor.py` checks it via
+`sysinfo.memory_mb()`, which read `/proc/meminfo`'s `MemTotal` only.
+`MemTotal` is never cgroup-aware in mainline Linux - it always reports the
+*physical host's* total RAM, not the calling process's cgroup ceiling, no
+matter how the container was launched. Proved it two ways:
+
+1. A plain `docker run --memory=512m oraclelinux:8` (the ordinary way any
+   real container or Kubernetes pod gets a memory limit, using Docker's
+   default private cgroup namespace) - `/proc/meminfo` reported the host's
+   full 65GB while `/sys/fs/cgroup/memory/memory.limit_in_bytes`, read from
+   *inside* that same container, correctly showed `536870912` (512MB).
+2. `dpagent doctor` run inside a 1024MB-capped container (same systemd
+   container recipe this whole engagement uses, `--cgroupns=host`) printed
+   `ok   memory: 63904MB available (needs 2048MB)` - a false pass. An
+   operator following that output straight into `dpagent install airflow`
+   would get the scheduler/webserver OOM-killed by the kernel with no
+   warning from the tool that told them the host was fine.
+
+Fixed `sysinfo.memory_mb()` (`src/dpagent/engine/sysinfo.py`) to also read
+the cgroup limit - `/sys/fs/cgroup/memory.max` (v2) or
+`/sys/fs/cgroup/memory/memory.limit_in_bytes` (v1) - and report
+`min(host total, cgroup limit)`, mirroring how the JVM/Node.js/other
+container-aware runtimes detect their real ceiling. Both cgroup "no limit"
+sentinels are recognised and ignored (`"max"` for v2; v1's non-round
+near-`INT64_MAX` value). Threaded an optional `root` path through
+`memory_mb()`/`_cgroup_memory_limit_mb()` so this is testable without
+actually running inside a constrained container - six new cases in
+`tests/test_sysinfo.py` cover: v1 tighter, v1 unset sentinel, v2 tighter,
+v2 unset sentinel, no cgroup files present, and a cgroup limit *looser*
+than the real host total (must not inflate the reported figure).
+
+One caveat recorded, not fixed: the project's own Docker test containers
+use `--cgroupns=host` for systemd, which makes them see the *host's* root
+cgroup rather than their own `docker/<id>` slice - so this exact bug
+cannot be reproduced or re-verified inside a `dpagent-scenario`-style
+container; verification has to use a plain container (as above) or a real
+Kubernetes pod. Verified: `pytest` 228 passed / 1 skipped; the plain
+`--memory=512m` container's `sysinfo.memory_mb()` now returns `512`, not
+`63904`.

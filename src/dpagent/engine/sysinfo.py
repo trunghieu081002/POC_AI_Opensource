@@ -12,16 +12,64 @@ import socket
 from pathlib import Path
 
 
-def memory_mb() -> int | None:
+def _cgroup_memory_limit_mb(root: Path) -> int | None:
+    """The container's own memory ceiling, if this process is confined by one.
+
+    ``/proc/meminfo``'s ``MemTotal`` is never cgroup-aware in mainline Linux —
+    it always reports the physical host's RAM, regardless of a container's
+    ``--memory`` limit or a Kubernetes pod's resource limit. Every runtime
+    that needs an accurate figure inside a container (the JVM, Node.js, ...)
+    reads the cgroup limit file directly instead; do the same here so
+    `dpagent doctor` does not wave through a host that will OOM-kill the
+    pack it just approved.
+    """
+    v2 = root / "sys/fs/cgroup/memory.max"
+    if v2.exists():
+        try:
+            raw = v2.read_text().strip()
+        except OSError:
+            return None
+        if raw == "max":
+            return None
+        try:
+            return int(raw) // (1024 * 1024)
+        except ValueError:
+            return None
+
+    v1 = root / "sys/fs/cgroup/memory/memory.limit_in_bytes"
+    if v1.exists():
+        try:
+            raw = int(v1.read_text().strip())
+        except (OSError, ValueError):
+            return None
+        # v1's "unlimited" sentinel is the largest page-aligned value below
+        # INT64_MAX, not a round number — anything above ~4PB is not a real
+        # limit anyone set.
+        if raw >= (1 << 62):
+            return None
+        return raw // (1024 * 1024)
+
+    return None
+
+
+def memory_mb(root: Path | str = "/") -> int | None:
+    root = Path(root)
     try:
-        text = Path("/proc/meminfo").read_text()
+        text = (root / "proc/meminfo").read_text()
     except OSError:
         return None
+    total_mb = None
     for line in text.splitlines():
         if line.startswith("MemTotal:"):
             kb = int(line.split()[1])
-            return kb // 1024
-    return None
+            total_mb = kb // 1024
+            break
+    if total_mb is None:
+        return None
+    cgroup_mb = _cgroup_memory_limit_mb(root)
+    if cgroup_mb is not None and cgroup_mb < total_mb:
+        return cgroup_mb
+    return total_mb
 
 
 def disk_free_mb(path: str) -> int | None:
