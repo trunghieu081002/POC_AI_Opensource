@@ -36,6 +36,14 @@ if dp_is_debian; then
   fi
 else
   dp_pkg_remove "postgresql${VERSION}-server" "postgresql${VERSION}-contrib"
+  # 10-repo.sh enables PGDG by installing this actual RPM package (not just
+  # dropping a file, unlike the debian branch above) - left in place, a
+  # re-install of any postgres version keeps seeing the PGDG repo as already
+  # configured, and `dpagent status` shows the package still present even
+  # though rollback claims to have removed everything this pack installed.
+  if dp_pkg_installed pgdg-redhat-repo; then
+    dp_pkg_remove pgdg-redhat-repo
+  fi
 fi
 
 # Guarded so a bad version param can never turn this into a wildcard delete.
