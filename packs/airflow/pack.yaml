@@ -72,7 +72,17 @@ steps:
     script: steps/10-user.sh
     description: Create the airflow system user and AIRFLOW_HOME
     timeout: 60
-    guard: 'id -u airflow >/dev/null 2>&1'
+    # `id -u airflow` alone is not proof this step already ran: a pre-existing
+    # "airflow" system user (a leftover install, an unrelated provisioning
+    # script) satisfies it on the very first run, skipping the mkdir/chown
+    # that build AIRFLOW_HOME - later steps then fail deep inside Airflow's
+    # own logging setup trying to create a log directory under a root-owned
+    # tree, with a misleading "run with sudo" match from the error catalog.
+    guard: >
+      id -u airflow >/dev/null 2>&1 &&
+      test -d "$DP_PARAM_INSTALL_DIR/home/dags" &&
+      test -d "$DP_PARAM_INSTALL_DIR/home/logs" &&
+      test -d "$DP_PARAM_INSTALL_DIR/home/plugins"
 
   - id: venv
     script: steps/20-venv.sh
