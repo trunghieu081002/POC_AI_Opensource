@@ -1134,3 +1134,20 @@ container: all five packs `installed` and `tested: passed`, reached
 entirely through the documented one-command path, on a host that started
 with nothing. `pytest` 222/1-skipped and `dpagent lint` clean on the
 source repo throughout. Container and the temporary tarball removed after.
+
+### 2026-09-14 — confirmation pass: clean container, both fixes together, then a second run for idempotency
+
+Rebuilt the tarball with the two fixes above included and ran `scripts/setup.sh`
+end to end on a brand-new, untouched `oraclelinux:8` container - the first
+time this project has run the full one-command path start to finish without
+hitting an error partway through. All five packs installed and proven on the
+first continuous attempt: airflow 4/4, base 4/4, dbt 3/3, postgres 6/6,
+python-modern 2/2. No new bugs.
+
+Then ran `scripts/setup.sh` a **second** time on that same, already-installed
+host - a genuinely common real scenario (a user re-running the command they
+were told to run, out of habit or after a change). Every pack correctly
+reported `= <pack> — already installed at v1.0.0 with identical params`
+(the wholesale params-hash skip), and the acceptance suites still re-ran and
+passed 4/4 · 4/4 · 3/3 · 6/6 · 2/2 - confirming the whole one-command path is
+safe to re-run, not just to run once. Container removed after.
