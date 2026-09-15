@@ -2053,3 +2053,80 @@ blocked, a real second *process* holding the lock long enough to trigger
 once a holding process exits (the kernel-releases-on-exit guarantee this
 whole design leans on). `pytest` 250 passed / 3 skipped; `dpagent lint`
 clean.
+
+### 2026-09-15 — the other flagged gap: the `runuser` cwd warning's trigger, finally pinned down
+
+Asked to close both remaining flagged gaps. SELinux Enforcing would need
+real virtualisation - `qemu-kvm`/`libvirt` are not installed and
+`libvirtd` is not running on ol8-19, so testing it for real would mean
+installing packages and enabling a new service on the shared production
+host purely for one test. Asked first rather than assuming; told to leave
+it as the advisory it already is and spend the time on the `runuser`
+investigation instead, which needs no host changes at all.
+
+Three earlier attempts (documented in the 2026-09-15 `runuser` entry
+above) to reproduce the original cwd warning outside of a real `dpagent`
+run had all failed - plain `runuser`, a Python `subprocess.run` matching
+`executor.py`'s exact call shape, even on the exact same host. Went back
+with fresh eyes and the exact original invocation chain instead of
+approximations:
+
+1. Temporarily reverted `dp_as_user` back to plain `runuser` in
+   `50-databases.sh` on a fresh container, then ran the *actual*
+   `dpagent install postgres` command (via `sudo -S docker exec <container>
+   bash -c 'dpagent install ...'`, matching the original discovery
+   exactly) with the same `phantom_db`-referencing `users` param used
+   before. **Reproduced immediately** - `dpagent audit`'s raw output
+   showed the exact `could not change directory to
+   ".../packs/postgres": Permission denied` line again.
+2. A plain `docker exec <container> bash -c 'cd ... && runuser -u postgres
+   -- pwd'` - no dpagent, no Python - did **not** reproduce it. Neither
+   did a Python `subprocess.run(["bash", scriptfile], cwd=..., env=...)`
+   replicating `executor.run_script`'s exact call shape, even run inside
+   the same container, even with the *exact* real environment `dpagent`
+   itself builds (captured by injecting `env > /tmp/real_env.txt` into
+   the real script and using that file verbatim).
+3. The actual missing ingredient, found by reintroducing pieces of the
+   real script one at a time: **`dp_run chown postgres:postgres
+   "$SQL_FILE"` running immediately before `dp_run runuser -u postgres --
+   ...`**. A minimal script doing exactly that - `chown <user>:<user> a
+   file`, then `runuser -u <that same user>` - reproduces the warning
+   every time. `chown root:root` (ownership unchanged) right before the
+   same `runuser -u postgres` does **not** reproduce it - it is
+   specifically about `chown`-ing *to the user `runuser` is about to
+   become*. Inserting `sleep 2` between the `chown` and the `runuser`
+   call makes the warning disappear again - **a genuine race, not a
+   persistent state**: something about having just changed a file's
+   ownership to a user leaves that user's session-opening path in a
+   transient state for well under a couple of seconds, in which `runuser`
+   does an extra verification of the caller's cwd it would otherwise skip.
+
+This fully explains both real occurrences, not just the one already
+understood: postgres's `50-databases.sh` does exactly
+`chown postgres:postgres $SQL_FILE` then `runuser -u postgres` in the
+same script. Airflow's `db-migrate` step looked different - no chown
+anywhere in that script - until checking what the *previous* step leaves
+behind: `40-config.sh` ends with `dp_write ... 0600 airflow:airflow`,
+and `dp_write` (`dp.sh`) itself does `chown "$owner" "$target"` as its
+last action - so the sequence is still exactly chown-to-a-user then,
+moments later (the next step starting), `runuser -u` that same user, just
+crossing a step boundary instead of staying within one script.
+
+Did not chase the actual kernel/PAM/NSS mechanism further (a real answer
+would need strace/audit-log-level investigation, not shell experiments) -
+the reproducible *pattern* is now fully characterised and that is what
+matters operationally: any `chown <user> ...` shortly before a
+`runuser -u <that user>` anywhere in this codebase is a latent risk for
+this exact cosmetic-but-misleading warning. Re-verified `dp_as_user`
+against this newly-reliable reproduction specifically (not just the
+inconclusive attempts from earlier): restored the real, current
+`50-databases.sh` (with `dp_as_user`) in the same container and re-ran
+the identical failing command - `dpagent audit`'s raw output now shows
+only the real `ERROR: database "phantom_db" does not exist` line, the
+cwd warning gone entirely. This upgrades the earlier fix from "applied
+defensively, mechanism unconfirmed" to "verified against a reliably
+reproducible trigger, mechanism understood well enough to say why it
+works." No code changed this entry - the existing `dp_as_user` fix from
+earlier today already covers every call site this pattern could hit
+(`pg_as_postgres`, `pg_query`, `pg_is_up`, `50-databases.sh`, `af_run`,
+`af_query`); this closes out the investigation, not a new fix.
