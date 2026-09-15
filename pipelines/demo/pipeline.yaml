@@ -1,0 +1,91 @@
+# Odoo (DB source) -> landing -> raw -> curated, gated at every hop.
+#
+# Chosen as the MVP reference because its schema is real, stable, and dirty
+# in ways that make a gate mean something - see docs/layer2.md, "Why Odoo is
+# the reference source": soft delete, multi-company, retroactive write_date,
+# mixed-currency totals, many2one FKs that break on a hard delete upstream.
+#
+# raw uses dbt (1:1-shaped mapping from landing); curated uses a stored
+# procedure (currency conversion with a fallback-rate lookup, which does not
+# vectorise cleanly into one dbt select) - see docs/layer2.md, Concepts #3,
+# "first hop dbt, second hop procedure" as the common pattern, not a rule.
+
+name: demo
+summary: Odoo sales data through three gated stages, proving a gate between every stage
+
+source:
+  connector: odoo_postgres       # matches a source def the dlt pack ships, reviewed in git
+  connection:
+    host: "${ODOO_DB_HOST}"
+    port: "${ODOO_DB_PORT:-5432}"
+    database: "${ODOO_DB_NAME}"
+    user: "${ODOO_DB_USER}"
+    password: "${ODOO_DB_PASSWORD}"
+  tables: [res_partner, sale_order, sale_order_line, product_template]
+  # dlt writes each table as-received into demo_landing.<table> - nothing
+  # dropped, nothing cast yet. That is the whole point of "landing".
+
+stages:
+  - name: landing
+    # engine is implicit here - this is dlt's own output, not a choice
+    # (Concepts #3 in layer2.md: the transform-engine choice starts at raw)
+    gates:
+      - type: schema_contract
+        # every column dlt actually wrote must match this - catches an
+        # upstream Odoo schema change before anything downstream trusts it
+        tables:
+          res_partner: {id: bigint, name: text, company_id: bigint, write_date: timestamp}
+          sale_order: {id: bigint, partner_id: bigint, company_id: bigint,
+                       amount_total: numeric, currency_id: bigint, write_date: timestamp}
+          sale_order_line: {id: bigint, order_id: bigint, product_id: bigint, price_subtotal: numeric}
+          product_template: {id: bigint, name: text}
+      - type: freshness
+        tables: [sale_order]
+        column: write_date
+        max_age: 24h
+      - type: row_count_bounds
+        table: sale_order
+        min: 1
+        max_delta_pct: 50      # vs. the previous run - catches a truncated or duplicated extract
+    # no quarantine block: these are whole-table/structural checks, not
+    # row-level ones - a failure here halts the run, nothing to reject per-row
+
+  - name: raw
+    engine: dbt                 # 1:1-shaped mapping - the common case (layer2.md #3)
+    depends_on: landing
+    models: [stg_partners, stg_sale_orders, stg_sale_order_lines, stg_products]
+    gates:
+      - type: not_null
+        table: stg_sale_orders
+        columns: [id, partner_id, currency_id]
+      - type: unique
+        table: stg_sale_orders
+        columns: [id]
+      - type: referential_integrity
+        table: stg_sale_order_lines
+        column: order_id
+        references: {table: stg_sale_orders, column: id}
+    quarantine:
+      table: stg_sale_orders_quarantine   # rejected rows land here, with a reason column
+      reject_threshold_pct: 5             # >5% of rows rejected halts the run; below that, continues
+
+  - name: curated
+    engine: procedure
+    depends_on: raw
+    procedure: procedures/convert_to_reporting_currency.sql
+    gates:
+      - type: business_rule
+        name: currency_consistent_totals
+        # a fct_sales row must never mix currencies within one order - this
+        # is the exact "sum() silently drops a currency" failure the whole
+        # design doc opens with
+        sql: |
+          select order_id from {{ this }}
+          group by order_id having count(distinct currency_id) > 1
+        expect: no_rows
+      - type: not_null
+        table: fct_sales
+        columns: [converted_amount]   # gate does not trust the procedure - verifies it too
+    quarantine:
+      table: fct_sales_quarantine
+      reject_threshold_pct: 1
