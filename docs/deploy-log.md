@@ -2213,3 +2213,54 @@ existing install.** Reinstalled cleanly, 4/4 acceptance, and
 `/opt/dbt/.venv/bin/dbt --version` confirmed the venv actually holds
 `1.7.20`, not a stale `1.8.x` left over from the previous install. **No
 bug.**
+
+### 2026-09-15 — a real corporate proxy: package management was already fine, dpagent's own health checks were not
+
+Built a realistic simulation: an `--internal` Docker network (no route to
+the outside world at all - confirmed with a direct `curl` getting
+`Could not resolve host`), a `squid` proxy container bridging that network
+and the real one, and a target container reachable *only* via that proxy
+(`http_proxy`/`https_proxy` pointed at the proxy's address, no
+`no_proxy`). This is the ordinary shape of a real corporate network,
+deliberately not given any special accommodation dpagent does not already
+get for free.
+
+**`dnf`, `pip`, and `dpagent install base`'s own steps all worked
+correctly through the proxy with zero dpagent-side changes** - `dnf`,
+`curl`, and `pip` all honour `http_proxy`/`https_proxy` natively, and
+nothing in this codebase does its own DNS/socket handling that would
+bypass that. `base`'s own install steps and `verify.sh` (including its
+own "CA bundle is usable" external reachability check) passed cleanly.
+
+**Real bug: the acceptance suite's own health/TLS checks - which spin up
+a local test server and `curl` straight to `127.0.0.1` - don't exclude
+localhost from the proxy, so they got routed through squid too and failed
+with a proxy-shaped error that reads exactly like the thing under test is
+actually broken.** `base`'s TLS-validation check failed:
+*"curl failed even when explicitly given the correct CA cert — TLS itself
+is broken here, not just validation"* - while curl's real TLS handling
+was completely fine; the *test's own* loopback traffic just wasn't
+exempted from `https_proxy`. curl (unlike a browser) never exempts
+localhost from a configured proxy on its own - that needs an explicit
+`--noproxy` or a `no_proxy` env var naming it, and this codebase had
+neither anywhere it talks to itself over HTTP.
+
+Grepped for every other `curl ... 127.0.0.1|localhost` in the codebase
+and found four more genuinely at risk, not just the one that happened to
+be caught first: `packs/airflow/verify.sh`'s webserver health check,
+`suites/airflow/checks/20-webserver-health.sh` (the same check from the
+acceptance suite's side), and `packs/_template/verify.sh` (the pattern
+every future pack would copy). Fixed all five call sites across four
+files with curl's own `--noproxy '*'` flag - explicit at the call site,
+independent of whatever `no_proxy` value (or absence of one) the
+environment happens to have, so it cannot silently stop working if
+someone's proxy config changes shape.
+
+Verified both the original failure and the fix against the same
+container: `dpagent test base` now passes 4/4 with the identical
+`http_proxy`/`https_proxy` set that broke it before. Then closed the loop
+for the airflow side specifically, not just by the same reasoning: full
+`base + python-modern + postgres + airflow` install through the same
+proxy, all four acceptance suites passing (16/16 checks, a real DAG
+triggered and run), webserver-health included. `pytest` unaffected
+(shell-only change); `dpagent lint` clean.

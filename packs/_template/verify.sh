@@ -18,7 +18,10 @@ check() {  # check <label> <command...>
 
 check "service is active"                dp_svc_active CHANGEME
 check "listening on ${PORT}"             dp_port_busy "$PORT"
-check "health endpoint answers"          curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/health"
+# --noproxy '*': curl follows http_proxy/https_proxy for every request,
+# loopback included, unless told not to - a host behind a corporate proxy
+# would otherwise route this local check through it.
+check "health endpoint answers"          curl -fsS --max-time 10 --noproxy '*' "http://127.0.0.1:${PORT}/health"
 
 [ "$failed" -eq 0 ] || dp_fail "CHANGEME verify failed"
 dp_ok "CHANGEME verified"

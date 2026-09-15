@@ -63,11 +63,16 @@ for _ in $(seq 1 20); do
   sleep 0.2
 done
 
-if curl -fsS --max-time 5 "https://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
+# --noproxy '*': curl follows http_proxy/https_proxy for every request,
+# loopback included, unless told not to - on a host behind a real corporate
+# proxy this test's own local server would otherwise get routed through it,
+# failing with a proxy-level error that looks exactly like "TLS itself is
+# broken" from curl's exit code alone.
+if curl -fsS --max-time 5 --noproxy '*' "https://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
   dp_fail "curl accepted a self-signed, untrusted certificate without -k — TLS validation is not actually enforced"
 fi
 
-if ! curl -fsS --max-time 5 --cacert "${CERT_DIR}/cert.pem" "https://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
+if ! curl -fsS --max-time 5 --noproxy '*' --cacert "${CERT_DIR}/cert.pem" "https://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
   dp_fail "curl failed even when explicitly given the correct CA cert — TLS itself is broken here, not just validation"
 fi
 

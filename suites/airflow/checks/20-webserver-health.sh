@@ -5,7 +5,11 @@ source "${DP_LIB:?dp.sh not found}"
 
 PORT="$(dp_param webserver_port 8090)"
 
-BODY="$(curl -fsS "http://localhost:${PORT}/health")" \
+# --noproxy '*': curl follows http_proxy/https_proxy for every request,
+# loopback included, unless told not to - a host behind a real corporate
+# proxy would otherwise route this local health check through it, failing
+# with a proxy/connection error that looks like airflow itself is broken.
+BODY="$(curl -fsS --noproxy '*' "http://localhost:${PORT}/health")" \
   || dp_fail "GET /health on port ${PORT} did not respond"
 
 printf '%s\n' "$BODY" | grep -q '"metadatabase".*"status": *"healthy"' \

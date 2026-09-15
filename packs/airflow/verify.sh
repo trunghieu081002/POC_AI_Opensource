@@ -20,9 +20,12 @@ check "airflow-scheduler is active"  dp_svc_active airflow-scheduler
 check "airflow-webserver is active"  dp_svc_active airflow-webserver
 check "port ${PORT} is listening"    dp_port_busy "$PORT"
 
-if curl -fsS --max-time 15 -o /dev/null "http://127.0.0.1:${PORT}/health" 2>/dev/null; then
+# --noproxy '*': a host behind a real corporate proxy otherwise routes this
+# loopback check through it, failing with a proxy/connection error that
+# looks like the webserver itself is down.
+if curl -fsS --max-time 15 --noproxy '*' -o /dev/null "http://127.0.0.1:${PORT}/health" 2>/dev/null; then
   dp_ok "webserver /health responds"
-elif curl -fsS --max-time 15 -o /dev/null "http://127.0.0.1:${PORT}/" 2>/dev/null; then
+elif curl -fsS --max-time 15 --noproxy '*' -o /dev/null "http://127.0.0.1:${PORT}/" 2>/dev/null; then
   dp_ok "webserver root responds (no /health endpoint on this version)"
 else
   dp_err "webserver does not answer HTTP on ${PORT}"
