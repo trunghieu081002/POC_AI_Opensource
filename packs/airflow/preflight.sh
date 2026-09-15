@@ -38,6 +38,20 @@ if dp_port_busy "$PORT"; then
   note_fail "port ${PORT} is already in use; free it or set the webserver_port param"
 fi
 
+# Unlike postgres (which has an `open_firewall` param and a step that acts on
+# it), the webserver always binds 0.0.0.0 with no option to keep it loopback-
+# only - so on any host with a managed firewall this port is unreachable from
+# anywhere the firewall blocks by default, and this pack has no automated way
+# to open it. verify.sh and the acceptance suite only ever check reachability
+# from this same host, so "installed and proven working" says nothing about
+# whether the one thing an operator actually wants - reaching the UI from
+# somewhere else - works. Confirmed for real: a firewalld-active host reports
+# 16/16 acceptance checks passing while an actual LAN client gets a flat
+# connection failure at the firewall.
+if [ "${DP_FIREWALL:-none}" != "none" ]; then
+  dp_warn "a ${DP_FIREWALL} firewall is active; the webserver on port ${PORT} will not be reachable from off this host until it is opened - this pack does not do that for you (see packs/postgres's open_firewall param for the equivalent this one lacks)"
+fi
+
 # The metadata database (postgres) is a declared dependency, so the resolver
 # installs it before airflow's steps run — but the specific backend_db/user
 # named here still have to actually exist; that composition happens in the
