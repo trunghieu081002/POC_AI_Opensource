@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 import sys
+from contextlib import nullcontext
 
 import click
 from rich.panel import Panel
 from rich.table import Table
 
-from ..engine import executor, os_detect, params as params_mod, state
+from ..engine import executor, hostlock, os_detect, params as params_mod, state
 from ..library import loader as packs
 from ..suites import loader as suites_loader
 from ..suites import runner as suites_runner
@@ -121,27 +122,34 @@ def test_cmd(names, fake_os):
         console.print("[yellow]nothing installed to test[/yellow]")
         return
 
-    run_id = state.start_run("test", ",".join(names or installed), os_info.as_dict())
-    state.event("run.start", f"acceptance test {list(names) or installed}",
-                run_id=run_id, actor="user")
+    lock = hostlock.host_lock(on_wait=lambda: console.print(
+        "[yellow]another dpagent operation is running on this host — waiting "
+        "for it to finish...[/yellow]"))
+    try:
+        with lock:
+            run_id = state.start_run("test", ",".join(names or installed), os_info.as_dict())
+            state.event("run.start", f"acceptance test {list(names) or installed}",
+                        run_id=run_id, actor="user")
 
-    outcomes = run_suites(installed, os_info, run_id, only=list(names) or None)
+            outcomes = run_suites(installed, os_info, run_id, only=list(names) or None)
 
-    if not outcomes:
-        state.finish_run(run_id, "ok")
-        console.print(Panel(
-            "[yellow]no acceptance suite covers what is installed[/yellow]\n"
-            "[dim]An install with no suite is unproven, whatever verify said.\n"
-            f"Write one under {suites_loader.SUITES_DIR}/<name>/suite.yaml.[/dim]",
-            border_style="yellow", expand=False))
-        return
+            if not outcomes:
+                state.finish_run(run_id, "ok")
+                console.print(Panel(
+                    "[yellow]no acceptance suite covers what is installed[/yellow]\n"
+                    "[dim]An install with no suite is unproven, whatever verify said.\n"
+                    f"Write one under {suites_loader.SUITES_DIR}/<name>/suite.yaml.[/dim]",
+                    border_style="yellow", expand=False))
+                return
 
-    suite_summary(outcomes)
-    ok = all(o.ok for o in outcomes)
-    state.finish_run(run_id, "ok" if ok else "failed")
-    if not ok:
-        console.print(f"[dim]detail: dpagent audit {run_id}[/dim]")
-        sys.exit(1)
+            suite_summary(outcomes)
+            ok = all(o.ok for o in outcomes)
+            state.finish_run(run_id, "ok" if ok else "failed")
+            if not ok:
+                console.print(f"[dim]detail: dpagent audit {run_id}[/dim]")
+                sys.exit(1)
+    except hostlock.HostLockTimeout as exc:
+        fail(str(exc))
 
 
 @click.command("verify")
@@ -230,24 +238,31 @@ def rollback_cmd(name, fake_os, dry_run, yes):
             f"Really roll back {name}?", default=False):
         sys.exit(1)
 
-    resolved = _stored_params(pack)
-    run_id = state.start_run("rollback", name, os_info.as_dict(), dry_run=dry_run)
-    state.event("rollback.start", f"rolling back {name}", run_id=run_id, actor="user")
-    env = executor.build_env(os_info.as_env(), resolved, dry_run,
-                             {"DP_PACK": name, "DP_PACK_ROOT": str(pack.root)})
-    result = executor.run_script(pack.path(pack.rollback), env, f"run-{run_id}",
-                                 timeout=900, cwd=pack.root)
-    echo_output(result.output, style="dim" if result.ok else "red")
+    lock = nullcontext() if dry_run else hostlock.host_lock(on_wait=lambda: console.print(
+        "[yellow]another dpagent operation is running on this host — waiting "
+        "for it to finish...[/yellow]"))
+    try:
+        with lock:
+            resolved = _stored_params(pack)
+            run_id = state.start_run("rollback", name, os_info.as_dict(), dry_run=dry_run)
+            state.event("rollback.start", f"rolling back {name}", run_id=run_id, actor="user")
+            env = executor.build_env(os_info.as_env(), resolved, dry_run,
+                                     {"DP_PACK": name, "DP_PACK_ROOT": str(pack.root)})
+            result = executor.run_script(pack.path(pack.rollback), env, f"run-{run_id}",
+                                         timeout=900, cwd=pack.root)
+            echo_output(result.output, style="dim" if result.ok else "red")
 
-    if result.ok and not dry_run:
-        state.record_install(name, pack.version, {}, "", os_info.family,
-                             "rolled_back", run_id)
-        # Otherwise a later `install` with the same params sees the old
-        # step_runs rows and skips every step as "already done" - against a
-        # system rollback just tore down.
-        state.clear_step_runs(name)
-    state.finish_run(run_id, "ok" if result.ok else "failed")
-    console.print("[green]rolled back[/green]" if result.ok
-                  else "[red]rollback failed[/red]")
-    if not result.ok:
-        sys.exit(1)
+            if result.ok and not dry_run:
+                state.record_install(name, pack.version, {}, "", os_info.family,
+                                     "rolled_back", run_id)
+                # Otherwise a later `install` with the same params sees the old
+                # step_runs rows and skips every step as "already done" - against a
+                # system rollback just tore down.
+                state.clear_step_runs(name)
+            state.finish_run(run_id, "ok" if result.ok else "failed")
+            console.print("[green]rolled back[/green]" if result.ok
+                          else "[red]rollback failed[/red]")
+            if not result.ok:
+                sys.exit(1)
+    except hostlock.HostLockTimeout as exc:
+        fail(str(exc))

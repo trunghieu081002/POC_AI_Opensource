@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import click
@@ -9,7 +10,7 @@ import yaml
 from rich.panel import Panel
 from rich.table import Table
 
-from ..engine import os_detect, resolver, runner, state
+from ..engine import hostlock, os_detect, resolver, runner, state
 from ..library import loader as packs
 from ..library import synth
 from ..llm import client as llm
@@ -61,73 +62,82 @@ def _do_install(names, params_by_name, fake_os, dry_run, force, yes, allow_draft
     elif not yes and not confirm("Apply this plan?", default=True):
         sys.exit(1)
 
-    run_id = state.start_run("install", ",".join(p.name for p in resolution.order),
-                             os_info.as_dict(), dry_run=dry_run,
-                             meta={"requested": names})
-    state.event("run.start", f"install {names}", run_id=run_id, actor="user",
-                data={"dry_run": dry_run, "force": force})
+    # Real work below (dry_run already reported nothing will actually run, so
+    # it costs nothing to skip waiting for a lock nobody else needs it for).
+    lock = nullcontext() if dry_run else hostlock.host_lock(on_wait=lambda: console.print(
+        "[yellow]another dpagent operation is running on this host — waiting "
+        "for it to finish...[/yellow]"))
+    try:
+        with lock:
+            run_id = state.start_run(
+                "install", ",".join(p.name for p in resolution.order),
+                os_info.as_dict(), dry_run=dry_run, meta={"requested": names})
+            state.event("run.start", f"install {names}", run_id=run_id, actor="user",
+                        data={"dry_run": dry_run, "force": force})
 
-    engine = runner.Engine(os_info, run_id, dry_run=dry_run, force=force,
-                           reporter=InstallReporter(),
-                           diagnose=synth.diagnose if llm.available() else None)
-    outcome = engine.install(resolution)
+            engine = runner.Engine(os_info, run_id, dry_run=dry_run, force=force,
+                                   reporter=InstallReporter(),
+                                   diagnose=synth.diagnose if llm.available() else None)
+            outcome = engine.install(resolution)
 
-    console.print()
-    if not outcome.ok:
-        _report_failure(outcome, run_id)
-        sys.exit(3)
+            console.print()
+            if not outcome.ok:
+                _report_failure(outcome, run_id)
+                sys.exit(3)
 
-    installed = [p.pack for p in outcome.packs]
+            installed = [p.pack for p in outcome.packs]
 
-    # An install is not finished because the installer finished. Nothing is
-    # reported as successful until an acceptance suite says the system works.
-    if dry_run:
-        console.print(Panel("[yellow]dry-run complete — nothing was executed, "
-                            "and nothing was proven[/yellow]",
-                            border_style="yellow", expand=False))
-        return
+            # An install is not finished because the installer finished. Nothing is
+            # reported as successful until an acceptance suite says the system works.
+            if dry_run:
+                console.print(Panel("[yellow]dry-run complete — nothing was executed, "
+                                    "and nothing was proven[/yellow]",
+                                    border_style="yellow", expand=False))
+                return
 
-    if not run_tests:
-        console.print(Panel(
-            "[yellow]installed, but NOT tested[/yellow]\n"
-            "[dim]--no-test was given. `dpagent status` will show these as untested\n"
-            "until `dpagent test` has run.[/dim]",
-            border_style="yellow", expand=False))
-        return
+            if not run_tests:
+                console.print(Panel(
+                    "[yellow]installed, but NOT tested[/yellow]\n"
+                    "[dim]--no-test was given. `dpagent status` will show these as untested\n"
+                    "until `dpagent test` has run.[/dim]",
+                    border_style="yellow", expand=False))
+                return
 
-    test_run = state.start_run("test", ",".join(installed), os_info.as_dict(),
-                               meta={"after_install": run_id})
-    outcomes = run_suites(installed, os_info, test_run)
+            test_run = state.start_run("test", ",".join(installed), os_info.as_dict(),
+                                       meta={"after_install": run_id})
+            outcomes = run_suites(installed, os_info, test_run)
 
-    if not outcomes:
-        state.finish_run(test_run, "ok")
-        console.print(Panel(
-            f"[green]installed[/green] — but [yellow]unproven[/yellow]\n\n"
-            f"No acceptance suite covers {', '.join(installed)}, so nothing beyond\n"
-            f"each pack's own liveness check was tested.\n\n"
-            f"[dim]Write one: {Path('suites') / installed[-1] / 'suite.yaml'}[/dim]",
-            border_style="yellow", expand=False))
-        return
+            if not outcomes:
+                state.finish_run(test_run, "ok")
+                console.print(Panel(
+                    f"[green]installed[/green] — but [yellow]unproven[/yellow]\n\n"
+                    f"No acceptance suite covers {', '.join(installed)}, so nothing beyond\n"
+                    f"each pack's own liveness check was tested.\n\n"
+                    f"[dim]Write one: {Path('suites') / installed[-1] / 'suite.yaml'}[/dim]",
+                    border_style="yellow", expand=False))
+                return
 
-    suite_summary(outcomes)
-    passed = all(o.ok for o in outcomes)
-    state.finish_run(test_run, "ok" if passed else "failed")
+            suite_summary(outcomes)
+            passed = all(o.ok for o in outcomes)
+            state.finish_run(test_run, "ok" if passed else "failed")
 
-    if passed:
-        console.print(Panel(
-            f"[bold green]installed and proven working[/bold green]\n"
-            f"[dim]install run {run_id} · acceptance run {test_run}[/dim]",
-            border_style="green", expand=False))
-        return
+            if passed:
+                console.print(Panel(
+                    f"[bold green]installed and proven working[/bold green]\n"
+                    f"[dim]install run {run_id} · acceptance run {test_run}[/dim]",
+                    border_style="green", expand=False))
+                return
 
-    console.print(Panel(
-        "[bold red]the installer finished, but the system does not work[/bold red]\n\n"
-        "Every step succeeded and verify passed. The acceptance suite found the\n"
-        "system failing anyway — which is the entire reason it runs.\n\n"
-        f"[dim]what failed: dpagent audit {test_run}[/dim]\n"
-        f"[dim]re-run just the tests: dpagent test[/dim]",
-        border_style="red", expand=False))
-    sys.exit(4)
+            console.print(Panel(
+                "[bold red]the installer finished, but the system does not work[/bold red]\n\n"
+                "Every step succeeded and verify passed. The acceptance suite found the\n"
+                "system failing anyway — which is the entire reason it runs.\n\n"
+                f"[dim]what failed: dpagent audit {test_run}[/dim]\n"
+                f"[dim]re-run just the tests: dpagent test[/dim]",
+                border_style="red", expand=False))
+            sys.exit(4)
+    except hostlock.HostLockTimeout as exc:
+        fail(str(exc))
 
 
 def _report_failure(outcome, run_id: int) -> None:

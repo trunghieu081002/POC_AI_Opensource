@@ -1992,3 +1992,64 @@ after still installs cleanly and creates exactly the intended role (6/6
 acceptance, `\du` shows only `dbt_user` and `postgres`, no leftover
 garbage). `pytest` unaffected count-wise beyond the four new cases;
 `dpagent lint` clean.
+
+### 2026-09-15 — the concurrency gap from earlier today, now actually fixed: a host-wide flock
+
+The 2026-09-15 concurrent-install entry above deliberately stopped at
+"recorded, not fixed" - a real design decision, not a bolt-on, was called
+for. User asked for exactly that fix next.
+
+**Design, settled before writing code**: per-host, not per-pack - the
+demonstrated failure was two runs of the *same* pack, but a per-pack lock
+still would not stop two *different* packs racing on a shared resource
+(the rpm/dpkg database, a port, a systemd unit another pack's step also
+touches), and dpagent already resolves a multi-pack request into one
+`Engine.install()` call, so a host-wide lock only ever serialises
+genuinely separate invocations, not steps that were always going to run
+together anyway. Fail-with-a-clear-message beyond a bounded wait, not
+wait forever - a stuck automation script is worse than a clear error
+naming exactly what to do. `--dry-run` skips the lock entirely - it never
+touches real state, and forcing a preview to queue behind someone else's
+real work would be its own new annoyance. `verify` stays unlocked on
+purpose too - it is a read-only liveness probe by the project's own
+design convention (`packs/*/verify.sh`'s header comments), and keeping it
+always available is more useful than protecting it from a race it cannot
+actually be party to.
+
+**Implementation**: `src/dpagent/engine/hostlock.py` - a single
+`flock(LOCK_PATH, LOCK_EX)` (`$DPAGENT_LOG_DIR/dpagent.lock`, so it lives
+next to every other per-run artifact) wrapped in a context manager that
+polls non-blocking with a 1s interval up to a 300s timeout, raising
+`HostLockTimeout` (a clear, named exception, not a bare timeout) if still
+held past that. Released automatically by the kernel if a holding process
+dies without ever calling `flock(LOCK_UN)`, so a crashed `dpagent` cannot
+wedge the lock for the next real run. Wrapped around the actual
+work in three places: `install.py::_do_install` (covers `install`,
+`spec`, and `do` - all three route through it), `operate.py::test_cmd`,
+and `operate.py::rollback_cmd`; `verify_cmd` deliberately left alone.
+
+**Verified against the exact real failure, not just new unit tests**:
+re-ran the identical two-concurrent-`--force`-reinstalls scenario that
+produced `FATAL: the database system is shutting down` earlier today.
+First attempt still raced - turned out to be re-testing the *old* code,
+because `git archive HEAD` only archives what is committed and this fix
+was not yet committed; redeployed the actual working-tree files directly
+and re-ran. This time: both processes exited `0` ("installed and proven
+working"), the second process's log showed "another dpagent operation is
+running on this host — waiting for it to finish..." printed before any
+real step ran, and the two processes' finish times were ~74s apart -
+consistent with the second genuinely waiting out the first's entire run
+rather than interleaving with it. Confirmed `dpagent verify` stays
+responsive while another process holds the lock (started a real install
+in the background, ran `verify postgres` 3s later, got a normal fast `ok`
+with no wait).
+
+Five new cases in `tests/test_hostlock.py`, exercising the real `flock`
+rather than mocking it: sequential reentrant use, a second thread
+genuinely blocking until the first releases (checked by execution order,
+not internal state), the `on_wait` callback firing only when actually
+blocked, a real second *process* holding the lock long enough to trigger
+`HostLockTimeout` with a clear message, and a waiter correctly proceeding
+once a holding process exits (the kernel-releases-on-exit guarantee this
+whole design leans on). `pytest` 250 passed / 3 skipped; `dpagent lint`
+clean.
