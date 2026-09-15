@@ -10,8 +10,16 @@ import click
 from rich.panel import Panel
 from rich.table import Table
 
+from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
 from .render import console, fail
+
+
+def _load_or_fail(name):
+    try:
+        return pipelines_mod.load(name)
+    except pipelines_mod.PipelineError as exc:
+        fail(str(exc))
 
 
 @click.group("pipeline")
@@ -28,10 +36,7 @@ def lint_cmd(name):
     section - a manifest that passes lint is one the generator can turn into
     an Airflow DAG and dbt schema/test YAML without guessing.
     """
-    try:
-        pipeline = pipelines_mod.load(name)
-    except pipelines_mod.PipelineError as exc:
-        fail(str(exc))
+    pipeline = _load_or_fail(name)
 
     table = Table(box=None)
     table.add_column("stage", style="bold")
@@ -50,3 +55,46 @@ def lint_cmd(name):
     console.print(Panel(table, title=f"{pipeline.name} · {pipeline.source.connector}",
                         border_style="cyan", expand=False))
     console.print("[green]lint clean[/green]")
+
+
+@pipeline_group.command("plan")
+@click.argument("name")
+def plan_cmd(name):
+    """Print every artifact and command `deploy`/`run` would produce. Changes nothing.
+
+    Same promise as `dpagent install --dry-run`: every DAG task, every file
+    that would be written, and the exact SQL each gate would run - printed,
+    never executed, nothing written to disk or to a warehouse.
+    """
+    pipeline = _load_or_fail(name)
+    result = generator_mod.plan(pipeline)
+
+    tasks = Table(box=None, title="DAG tasks")
+    tasks.add_column("id", style="bold")
+    tasks.add_column("kind", style="dim")
+    tasks.add_column("depends_on", style="dim")
+    tasks.add_column("would run")
+    for task in result.tasks:
+        tasks.add_row(task.id, task.kind, ", ".join(task.depends_on) or "-", task.description)
+    console.print(Panel(tasks, border_style="cyan", expand=False))
+
+    artifacts = Table(box=None, title="artifacts deploy would write")
+    artifacts.add_column("path", style="bold")
+    artifacts.add_column("kind", style="dim")
+    artifacts.add_column("what")
+    for artifact in result.artifacts:
+        artifacts.add_row(artifact.path, artifact.kind, artifact.description)
+    console.print(Panel(artifacts, border_style="cyan", expand=False))
+
+    for stage in pipeline.stages:
+        compiled = result.gates[stage.name]
+        if not compiled:
+            continue
+        console.print(f"\n[bold]gates · {stage.name}[/bold]")
+        for cg in compiled:
+            console.print(f"  [cyan]{cg.gate.type}[/cyan] — {cg.verdict}")
+            for query in cg.queries:
+                console.print(f"      [dim][{query.name}][/dim] {query.sql}")
+
+    console.print(
+        "\n[yellow]plan complete — nothing was written, nothing was executed[/yellow]")
