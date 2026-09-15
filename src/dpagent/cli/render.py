@@ -91,11 +91,9 @@ class InstallReporter(runner.Reporter):
         console.print(f"[green]=[/green] [bold]{pack.name}[/bold] — {reason}")
 
     def preflight(self, pack, result):
-        if result.ok:
-            console.print("  [green]preflight ok[/green]")
-        else:
-            console.print("  [red]preflight failed[/red]")
-            echo_output(result.output, style="red")
+        style = "green" if result.ok else "red"
+        console.print(f"  [{style}]preflight {'ok' if result.ok else 'failed'}[/{style}]")
+        echo_output(result.output, style="dim" if result.ok else "red")
 
     def step_start(self, pack, step, index, total):
         console.print(f"  [cyan]{index}/{total}[/cyan] {step.id} · [dim]{step.description}[/dim]")
