@@ -64,9 +64,11 @@ from the architecture already in place:
 - **It owns the genuinely hard parts** — schema evolution, incremental state,
   flattening nested JSON (unavoidable for Elasticsearch and REST APIs).
 
-dlt does extract+load. dbt still does every transform, in SQL a human wrote.
-Airflow still orchestrates. Nothing about "the model is never in the execution
-path" changes.
+dlt does extract+load. Every transform is still SQL (or PL/pgSQL) a human
+wrote and reviewed - dbt for the common 1:1-shaped case, a stored procedure
+where the logic is genuinely procedural (Concepts, #3). Airflow still
+orchestrates. Nothing about "the model is never in the execution path"
+changes.
 
 ## Why Odoo is the reference source
 
@@ -90,37 +92,68 @@ Postgres, so pointing at a real Odoo later is a config change, not a rewrite.
 ## Shape
 
 ```
-[dlt]   source ─────────────▶ landing      (as-received, typed, nothing dropped)
-                                 │
-                                 ├── GATE: schema contract · freshness · row-count bounds
-                                 ▼
-[dbt]   landing ─────────────▶ raw          (normalised, cast, de-duplicated)
-                                 │
-                                 ├── GATE: not-null/unique keys · referential integrity
-                                 │         rejected rows ──▶ <stage>_quarantine (+ reason)
-                                 ▼
-[dbt]   raw ─────────────────▶ curated      (facts/dims a report can be built on)
-                                 │
-                                 └── GATE: business rules (e.g. currency-consistent totals)
+[dlt]            source ─────────▶ landing      (as-received, typed, nothing dropped)
+                                      │
+                                      ├── GATE: schema contract · freshness · row-count bounds
+                                      ▼
+[dbt|procedure]  landing ─────────▶ raw          (normalised, cast, de-duplicated)
+                                      │
+                                      ├── GATE: not-null/unique keys · referential integrity
+                                      │         rejected rows ──▶ <stage>_quarantine (+ reason)
+                                      ▼
+[dbt|procedure]  raw ─────────────▶ curated      (facts/dims a report can be built on)
+                                      │
+                                      └── GATE: business rules (e.g. currency-consistent totals)
 ```
 
 Three stages is the minimum that demonstrates a gate *between* stages rather
-than only at the end — which is the whole point.
+than only at the end — which is the whole point. `[dbt|procedure]` marks
+where the transform engine choice applies (see Concepts, #3) — `dlt`'s own
+hop is not a choice, it is what dlt is for.
 
 ## Concepts
 
 1. **Source** — a dlt source definition, reviewed, in git.
-2. **Stage** — a named, materialised step. `landing` is dlt's output; `raw` and
-   `curated` are dbt models written by a human.
-3. **Gate** — declarative assertions that run after a stage materialises and
-   before the next stage is permitted to run. Five kinds in the MVP: schema
-   contract, not-null/unique, referential integrity, row-count bounds
-   (absolute or versus the previous run), freshness.
-4. **Quarantine** — rejected rows land in `<stage>_quarantine` with the reason
+2. **Stage** — a named, materialised step. `landing` is dlt's output; `raw`
+   and `curated` are produced by a **transform engine** (below) — the stage's
+   identity is its name and its schema contract, not which engine wrote it.
+3. **Transform engine** — decided 2026-09-15, per team lead: `landing → raw →
+   curated` is built with **both** dbt and PL/pgSQL stored procedures, chosen
+   per hop by the shape of the logic, not by a project-wide default:
+   - **dbt** for 1:1-shaped mapping — a source field maps onto a dim/fact
+     column with no branching, no loop, no multi-statement state. This is
+     the common case and stays the default.
+   - **A stored procedure** for genuinely procedural logic a declarative SQL
+     model fights against — per-row branching, iteration, or a multi-step
+     merge that does not vectorise cleanly into a `select`.
+
+   A procedure is a peer of a dbt model, not an escape hatch from this
+   document's rules: it must be a reviewed `.sql` file in git, applied
+   through a migration step (never hand-run DDL against the warehouse), and
+   its input and output are still named stages a gate can query. **The gate
+   after it is exactly as strict as the gate after a dbt model, and does not
+   trust the procedure to have gotten it right** — this is what keeps
+   "which engine" a genuinely free choice instead of a second set of rules:
+   Sections 4 (Gate) and 5 (Quarantine) already don't ask how a stage was
+   produced, so adding a second engine costs this document nothing beyond
+   this entry.
+
+   Before reaching for a procedure, check whether dbt's own `snapshot` (SCD
+   Type 2) or `incremental` materializations already say what's needed
+   declaratively — a lot of what looks procedural at first (an Odoo
+   `write_date`-driven merge, e.g.) is exactly what those exist for, and a
+   model reviewer can read a snapshot config in seconds where a hand-rolled
+   merge procedure needs a careful line-by-line read every time it changes.
+4. **Gate** — declarative assertions that run after a stage materialises and
+   before the next stage is permitted to run, regardless of which transform
+   engine produced it. Five kinds in the MVP: schema contract, not-null/
+   unique, referential integrity, row-count bounds (absolute or versus the
+   previous run), freshness.
+5. **Quarantine** — rejected rows land in `<stage>_quarantine` with the reason
    they were rejected. Never deleted, never silently passed.
-5. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
+6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
-   they already do for installs.
+   they already do for installs, whichever engine ran.
 
 ### Failure semantics
 
@@ -149,13 +182,24 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
 - Two connectors, proving both mechanisms: **Odoo PostgreSQL** (DB) and **CSV**
   (file). The remaining four are linear extensions of the same pattern.
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
-  Airflow DAG plus dbt schema/test YAML — deterministic, no model involved
+  Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
+  The manifest names a transform engine (`dbt` or `procedure`) per hop; the
+  generator emits a dbt model reference for the former and an Airflow task
+  invoking a reviewed, migration-applied `.sql` procedure for the latter -
+  the gate step it wires in afterward is identical either way (Concepts #3)
 - Quarantine tables and a declared rejection threshold
 - `stage_runs` / `gate_runs` state, wired into `status` and `audit`
 - The six CLI verbs above
 - An acceptance suite for the pipeline machinery, including the negative that
   matters: **a file with known-bad rows must leave those rows in quarantine and
   must not let them reach `curated`**
+
+The Odoo/CSV reference itself is expected to stay dbt-only end to end - its
+mapping is 1:1-shaped by design (that is why Odoo was picked, see "Why Odoo
+is the reference source"). The `procedure` engine is built and proven by the
+generator/gate machinery above understanding it, not by forcing one into the
+reference pipeline where dbt already says what is needed; the first real
+procedure lands whenever a genuinely procedural transform actually shows up.
 
 ## Out of scope (MVP)
 
