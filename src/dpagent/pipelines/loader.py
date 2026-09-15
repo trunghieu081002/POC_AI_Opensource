@@ -75,6 +75,24 @@ class Source:
 
 
 @dataclass
+class Warehouse:
+    """Where landing/raw/curated actually live - the dbt/procedure target.
+
+    Deliberately the same connection shape as `packs/postgres`'s own params
+    (host/port/database/user/password via ${ENV_VAR}) rather than a new
+    convention: in the common case this *is* the Postgres dpagent's own
+    postgres pack already installed and proved (docs/deploy-log.md has the
+    acceptance suite that proves it works before a pipeline ever touches it).
+    """
+    host: str
+    port: str = "5432"
+    database: str = ""
+    user: str = ""
+    password: str = ""
+    schema: str = "public"
+
+
+@dataclass
 class Stage:
     name: str
     engine: str = ""                              # "" only for the first (dlt) stage
@@ -95,6 +113,7 @@ class Pipeline:
     summary: str
     root: Path
     source: Source
+    warehouse: Warehouse
     stages: list[Stage]
 
     def path(self, relative: str) -> Path:
@@ -171,6 +190,28 @@ def _validate_source(raw: dict, where: str) -> Source:
         connection=connection,
         tables=list(raw.get("tables") or []),
         files=files,
+    )
+
+
+def _validate_warehouse(raw: dict, where: str) -> Warehouse:
+    if not isinstance(raw, dict):
+        raise PipelineError(f"{where}: warehouse must be a mapping")
+    host = raw.get("host")
+    if not host:
+        raise PipelineError(
+            f"{where}: warehouse has no host - this is where landing/raw/curated "
+            f"actually live (dbt's target, where a procedure's CREATE PROCEDURE "
+            f"is applied), not the source")
+    database = raw.get("database")
+    if not database:
+        raise PipelineError(f"{where}: warehouse has no database")
+    return Warehouse(
+        host=host,
+        port=str(raw.get("port", "5432")),
+        database=database,
+        user=raw.get("user", ""),
+        password=raw.get("password", ""),
+        schema=raw.get("schema", "public"),
     )
 
 
@@ -273,6 +314,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         summary=data.get("summary", ""),
         root=root,
         source=_validate_source(data.get("source") or {}, where),
+        warehouse=_validate_warehouse(data.get("warehouse") or {}, where),
         stages=stages,
     )
 

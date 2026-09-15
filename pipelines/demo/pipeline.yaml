@@ -25,6 +25,19 @@ source:
   # dlt writes each table as-received into demo_landing.<table> - nothing
   # dropped, nothing cast yet. That is the whole point of "landing".
 
+warehouse:
+  # Where landing/raw/curated actually live - dbt's target, and where a
+  # procedure's CREATE PROCEDURE is applied. In the common case (this demo
+  # included) this is the same Postgres the postgres pack already installed
+  # and proved works (docs/deploy-log.md has its acceptance suite) - not a
+  # second database to stand up.
+  host: "${WAREHOUSE_DB_HOST:-localhost}"
+  port: "${WAREHOUSE_DB_PORT:-5432}"
+  database: "${WAREHOUSE_DB_NAME:-warehouse}"
+  user: "${WAREHOUSE_DB_USER}"
+  password: "${WAREHOUSE_DB_PASSWORD}"
+  schema: demo
+
 stages:
   - name: landing
     # engine is implicit here - this is dlt's own output, not a choice

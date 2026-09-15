@@ -10,9 +10,10 @@ import click
 from rich.panel import Panel
 from rich.table import Table
 
+from ..pipelines import deploy as deploy_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
-from .render import console, fail
+from .render import confirm, console, fail
 
 
 def _load_or_fail(name):
@@ -98,3 +99,39 @@ def plan_cmd(name):
 
     console.print(
         "\n[yellow]plan complete — nothing was written, nothing was executed[/yellow]")
+
+
+@pipeline_group.command("deploy")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True)
+@click.option("--no-db", is_flag=True,
+              help="Write the DAG/schema files only - skip applying procedure migrations.")
+def deploy_cmd(name, yes, no_db):
+    """Write the DAG + dbt schema, and apply procedure migrations.
+
+    Writing files is always safe to repeat (each run overwrites the last).
+    Applying a procedure runs `CREATE OR REPLACE PROCEDURE` against
+    `warehouse:` in the manifest - idempotent by construction, but it is a
+    real command against a real database, so it asks first unless --yes.
+    """
+    pipeline = _load_or_fail(name)
+
+    if not no_db and not yes and not confirm(
+            f"Apply {name}'s procedure migration(s) against "
+            f"{pipeline.warehouse.host}:{pipeline.warehouse.port}/"
+            f"{pipeline.warehouse.database}?", default=True):
+        no_db = True
+        console.print("[yellow]skipping procedure migrations - files only[/yellow]")
+
+    try:
+        result = deploy_mod.deploy(pipeline, apply_db=not no_db)
+    except deploy_mod.DeployError as exc:
+        fail(str(exc))
+
+    console.print("[bold]written:[/bold]")
+    for path in result.written:
+        console.print(f"  {path}")
+    if result.procedures_applied:
+        console.print("[bold]procedures applied:[/bold] "
+                     + ", ".join(result.procedures_applied))
+    console.print("[green]deployed[/green]")

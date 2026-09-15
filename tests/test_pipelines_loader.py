@@ -29,6 +29,7 @@ def _minimal(**overrides):
             "connection": {"host": "${DB_HOST}"},
             "tables": ["res_partner"],
         },
+        "warehouse": {"host": "localhost", "database": "warehouse"},
         "stages": [
             {"name": "landing", "gates": [
                 {"type": "schema_contract", "tables": {"res_partner": {"id": "bigint"}}},
@@ -226,6 +227,31 @@ def test_source_needs_a_connector(root):
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="no connector"):
         loader.load("demo", root)
+
+
+def test_warehouse_needs_a_host(root):
+    data = _minimal()
+    data["warehouse"] = {"database": "warehouse"}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="warehouse has no host"):
+        loader.load("demo", root)
+
+
+def test_warehouse_needs_a_database(root):
+    data = _minimal()
+    data["warehouse"] = {"host": "localhost"}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="warehouse has no database"):
+        loader.load("demo", root)
+
+
+def test_warehouse_defaults_port_and_schema(root):
+    data = _minimal()
+    data["warehouse"] = {"host": "localhost", "database": "warehouse"}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.warehouse.port == "5432"
+    assert pipeline.warehouse.schema == "public"
 
 
 def test_source_needs_either_connection_or_files(root):

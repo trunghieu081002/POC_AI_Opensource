@@ -15,6 +15,7 @@ def _pipeline(root, stages_extra=None):
         "name": "demo",
         "summary": "test",
         "source": {"connector": "odoo_postgres", "connection": {"host": "x"}, "tables": ["t"]},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
         "stages": [
             {"name": "landing", "gates": [
                 {"type": "schema_contract", "tables": {"t": {"id": "bigint"}}},
