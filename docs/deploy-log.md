@@ -2190,3 +2190,26 @@ end with all four acceptance suites passing (16/16 checks, including a
 real DAG triggered and run through airflow) - the first full stack ever
 proven on real Debian in this engagement. `pytest` unaffected; `dpagent
 lint python-modern` clean.
+
+### 2026-09-15 — changing a `version` param on an already-installed pack: no bugs, both directions checked
+
+Still on the Debian 12 container, with postgres 15 and a full stack
+already proven. **postgres: `--set version=16` on top of an existing 15
+install.** Preflight refused, correctly - `another PostgreSQL major
+version is present: postgresql-15` / `two majors can coexist, but they
+must not share a port`, no state touched. This pack does not attempt an
+in-place major-version upgrade (that is `pg_upgrade`, a real operation
+with its own real risks - not something a generic install pack should
+attempt silently), and says so through the preflight message rather than
+either refusing outright or trying something risky. Re-ran with
+`--set port=5433` as the message suggested: postgres 16 installed
+cleanly alongside 15, 6/6 acceptance, and both clusters confirmed
+independently alive and answering `SELECT version()` correctly afterward
+- 15 on 5432 unaffected by 16 being added. **No bug** - this is exactly
+the safe behaviour the message promises.
+
+**dbt: `--set dbt_version=1.7.*` (down from `1.8.*`) with `--force` on an
+existing install.** Reinstalled cleanly, 4/4 acceptance, and
+`/opt/dbt/.venv/bin/dbt --version` confirmed the venv actually holds
+`1.7.20`, not a stale `1.8.x` left over from the previous install. **No
+bug.**
