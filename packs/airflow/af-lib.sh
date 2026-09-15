@@ -15,7 +15,7 @@ af_run() {
   local env_file venv_bin
   env_file="$(af_env_file)"
   venv_bin="$(af_venv)/bin"
-  dp_run runuser -u airflow -- bash -c '
+  dp_run dp_as_user airflow -- bash -c '
     set -a
     # shellcheck disable=SC1090
     source "'"$env_file"'"
@@ -31,7 +31,7 @@ af_query() {
   local env_file venv_bin
   env_file="$(af_env_file)"
   venv_bin="$(af_venv)/bin"
-  runuser -u airflow -- bash -c '
+  dp_as_user airflow -- bash -c '
     set -a
     # shellcheck disable=SC1090
     source "'"$env_file"'"

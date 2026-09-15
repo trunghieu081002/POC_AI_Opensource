@@ -35,14 +35,14 @@ pg_bindir() {
 
 # Run as the postgres system user. runuser is in util-linux on both families,
 # so this works on a minimal image where sudo is not installed.
-pg_as_postgres() { dp_run runuser -u postgres -- "$@"; }
+pg_as_postgres() { dp_run dp_as_user postgres -- "$@"; }
 
 # Read-only query, straight to stdout. Never wrapped in dp_run: guards and verify
 # need the real answer even under --dry-run.
 pg_query() {
-  runuser -u postgres -- psql -tAX -p "$(dp_param port 5432)" -c "$1" 2>/dev/null
+  dp_as_user postgres -- psql -tAX -p "$(dp_param port 5432)" -c "$1" 2>/dev/null
 }
 
 pg_is_up() {
-  runuser -u postgres -- "$(pg_bindir)/pg_isready" -q -p "$(dp_param port 5432)" 2>/dev/null
+  dp_as_user postgres -- "$(pg_bindir)/pg_isready" -q -p "$(dp_param port 5432)" 2>/dev/null
 }

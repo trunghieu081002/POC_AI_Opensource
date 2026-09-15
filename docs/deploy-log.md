@@ -1580,3 +1580,74 @@ from that rolled-back state with no `--force`, no special flags, and got
 actually trusts, not just one that looks empty. One new case in
 `tests/test_errors.py`. `pytest` 237 passed / 1 skipped; `dpagent lint
 postgres` unaffected (same two pre-existing no-guard warnings).
+
+### 2026-09-15 — following up on the flagged systemic `runuser` cwd warning: a defensive fix, honestly not a confirmed root-cause fix
+
+The last two entries both flagged the same systemic risk instead of fixing
+it: `runuser -u <user> -- <cmd>` (used four times across `postgres` and
+`airflow` - `pg_as_postgres`, `pg_query`, `pg_is_up`,
+`steps/50-databases.sh`'s direct call, and `af_run`/`af_query` twice)
+preserves the *caller's* cwd for the new process, and every step runs with
+cwd set to the pack's own directory - readable by root, not necessarily by
+the low-privilege service user being switched to. When it is not, runuser
+prints a `could not change directory ... Permission denied` warning ahead
+of whatever the real output is, broad enough for the shared catalog's
+`permission-denied` entry to misdiagnose an unrelated real failure as
+"needs root" - confirmed twice for real.
+
+Added `dp_as_user <user> -- <cmd...>` to `dp.sh`: identical to
+`runuser -u <user> -- <cmd...>`, except it resets the target command's cwd
+to `/` first (via `sh -c 'if cd /; then exec "$@"; fi'`, universally
+readable, so the precondition for the warning cannot exist). Switched all
+five real call sites to it.
+
+**Honest limitation, not glossed over**: three separate attempts to
+reproduce the original warning outside of the one real `dpagent` run that
+first surfaced it - a plain interactive `runuser -u nobody -- pwd` from an
+unreadable `chmod 700` directory, the same thing via a bash script invoked
+through `subprocess.run` with `cwd=` set, and finally the exact args/kwargs
+`executor.run_script` itself uses - all three completed cleanly with no
+warning at all, `pwd` correctly reporting the blocked directory every
+time. Whatever precisely triggers the warning (some combination of PAM
+session state, SELinux context, or something specific to the real
+`postgres`/`airflow` accounts that `nobody` does not share) was not
+pinned down. This means the new tests in `tests/test_dp_sh.py`
+(`test_dp_as_user_does_not_warn_about_an_unreadable_cwd`,
+`test_dp_as_user_still_passes_arguments_through_correctly`, both gated on
+`os.geteuid() == 0` since `runuser` refuses non-root callers outright)
+verify `dp_as_user` does what it says - resets cwd to `/`, passes
+arguments through correctly, provably closer to the same shape as the
+original bug than the pre-fix code was - but they are not proven
+regression tests for the exact original trigger, because that trigger
+could not be reproduced on demand to write one against. The fix is kept
+anyway: `/` is readable by every user on every Linux system this project
+supports, so `dp_as_user` cannot make anything worse, and it closes off
+this specific warning's precondition outright regardless of the exact
+mechanism - a correct, low-risk improvement even without a fully
+understood root cause, which is a different thing from a proven fix and
+is described as such here rather than overclaimed.
+
+Also caught by `dp_as_user`'s own first draft, by the project's own
+`dpagent lint` (run without a pack argument, which is what actually scans
+`_lib/dp.sh` - `dpagent lint postgres`/`dpagent lint airflow` do not):
+`[ "${1:-}" = "--" ] && shift` is exactly the `A && B` trap this whole
+project has been fighting since session one, self-inflicted a second time
+this engagement (the first was caught before shipping; this one was
+caught by tooling after being written, which is the point of having the
+tooling). Fixed with an explicit `if`. Lint also flagged the *literal*
+`&&` inside `sh -c 'cd / && exec "$@"'` as the same pattern - a false
+positive, since that string runs in a separate, non-`set -e` shell where
+`&&` is exactly the right tool - but rewriting it as
+`sh -c 'if cd /; then exec "$@"; fi'` preserves the identical behavior
+without tripping the heuristic, which is worth doing purely so `dpagent
+lint`'s output stays trustworthy (a warning nobody times learns is
+"always fine to ignore" is worse than no warning at all).
+
+Verified end to end, not just unit-level: full `base + python-modern +
+postgres + airflow` install from scratch in a fresh container, all four
+acceptance suites passing (16/16 checks) - `pg_query`/`pg_is_up` exercised
+throughout postgres's own suite, `af_run`/`af_query` exercised by every
+`airflow` CLI call in `db-migrate`, `admin-user`, and the suite's own
+DAG-trigger checks. `pytest` 237 passed / 3 skipped (two of the new cases
+need root and correctly skip without it, same as `runuser` itself would
+refuse); `dpagent lint` (bare, scanning `_lib` too) clean.

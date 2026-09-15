@@ -10,6 +10,7 @@ instead of waiting for the next real install to hit it.
 Skipped entirely where bash is unavailable (e.g. this project's own Windows dev
 machine) rather than silently passing — see test_bash_is_available_here.
 """
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,14 +25,19 @@ requires_bash = pytest.mark.skipif(
     reason="bash is not installed on this machine; dp.sh cannot be executed here",
 )
 
+requires_root = pytest.mark.skipif(
+    os.geteuid() != 0,
+    reason="runuser refuses non-root callers outright, even switching to themself",
+)
 
-def run(script_body: str, env: dict | None = None) -> subprocess.CompletedProcess:
+
+def run(script_body: str, env: dict | None = None, cwd: Path | None = None) -> subprocess.CompletedProcess:
     """Run a snippet with dp.sh sourced and DP_DRY_RUN set, capturing output."""
     full_env = {
         "DP_OS_FAMILY": "debian", "DP_OS_ID": "ubuntu", "DP_OS_VERSION": "22.04",
         "DP_PKG_MGR": "apt", "DP_SVC_MGR": "systemd", "DP_FIREWALL": "ufw",
         "DP_DRY_RUN": "0",
-        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin",
     }
     if env:
         full_env.update(env)
@@ -40,7 +46,7 @@ def run(script_body: str, env: dict | None = None) -> subprocess.CompletedProces
     # independent of whatever PATH a test passes in full_env (e.g. to prove
     # dp_find_python finds nothing when PATH has no pythons).
     return subprocess.run([BASH, "-c", script], capture_output=True, text=True,
-                          env=full_env, timeout=15)
+                          env=full_env, timeout=15, cwd=str(cwd) if cwd else None)
 
 
 @requires_bash
@@ -289,3 +295,36 @@ echo "REACHED_END"
 ''', env={"DP_DRY_RUN": "1"})
     assert result.returncode == 0, result.stderr
     assert "REACHED_END" in result.stdout
+
+
+@requires_root
+@requires_bash
+def test_dp_as_user_does_not_warn_about_an_unreadable_cwd(tmp_path):
+    """The bug this exists to prevent: `runuser -u <user> -- cmd` preserves
+    the *caller's* cwd for the new process. Every pack's steps run with cwd
+    set to the pack's own directory (root-owned) - readable by root, not by
+    the low-privilege service user being switched to - so plain runuser
+    prints "could not change directory ... Permission denied" ahead of
+    whatever the command actually does. That text is broad enough for the
+    shared error catalog's `permission-denied` entry to match it instead of
+    the real failure - confirmed twice for real (airflow's db-migrate,
+    postgres's databases step). `nobody` (uid 65534, present on every Linux)
+    stands in for postgres/airflow so this needs no pack-specific setup."""
+    blocked = tmp_path / "blocked"
+    blocked.mkdir(mode=0o700)  # unreadable by anyone but its owner (root, here)
+
+    result = run("dp_as_user nobody -- pwd", cwd=blocked)
+
+    assert result.returncode == 0, result.stderr
+    assert "Permission denied" not in result.stderr
+    assert "could not change directory" not in result.stderr
+    assert result.stdout.strip() == "/"
+
+
+@requires_root
+@requires_bash
+def test_dp_as_user_still_passes_arguments_through_correctly(tmp_path):
+    result = run('dp_as_user nobody -- echo one "two three" four', cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "one two three four"

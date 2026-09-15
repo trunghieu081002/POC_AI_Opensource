@@ -120,7 +120,7 @@ if [ "$DP_DRY_RUN" = "1" ]; then
   grep -vE "PASSWORD" "$SQL_FILE" >&2 || true
   dp_info "(password statements withheld from this preview)"
 else
-  dp_run runuser -u postgres -- psql -v ON_ERROR_STOP=1 -p "$PORT" -d postgres -f "$SQL_FILE"
+  dp_run dp_as_user postgres -- psql -v ON_ERROR_STOP=1 -p "$PORT" -d postgres -f "$SQL_FILE"
 fi
 
 # Report what exists now, without echoing any secret.

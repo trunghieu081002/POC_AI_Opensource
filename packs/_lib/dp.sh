@@ -56,6 +56,30 @@ dp_sh() {
   bash -c "$1"
 }
 
+# dp_as_user <user> -- <cmd...> — run a command as another user.
+#
+# Same as `runuser -u <user> -- <cmd...>`, except the target command's cwd is
+# reset to `/` first. runuser preserves the *caller's* cwd for the new
+# process, and every pack's steps run with cwd set to the pack's own
+# directory (root-owned) - readable by root, not necessarily by the
+# low-privilege service user (postgres, airflow, ...) being switched to.
+# When it is not, runuser prints "could not change directory ... Permission
+# denied" and carries on - harmless on its own, but broad enough that the
+# shared error catalog's `permission-denied` entry can match it ahead of
+# whatever the command actually failed at, misdiagnosing an unrelated real
+# error as "needs root" when the process was already root (seen twice: the
+# airflow db-migrate step, postgres's databases step). `/` is readable by
+# every user on every Linux system this project supports, so this removes
+# the precondition for the warning outright rather than special-casing its
+# text in every catalog that could otherwise see it.
+dp_as_user() {
+  local user="$1"; shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  runuser -u "$user" -- sh -c 'if cd /; then exec "$@"; fi' sh "$@"
+}
+
 # dp_write /path/to/file <<'EOF' ... EOF   — write a config file from stdin.
 dp_write() {
   local target="$1" mode="${2:-0644}" owner="${3:-}"
