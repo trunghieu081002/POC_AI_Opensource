@@ -1858,3 +1858,67 @@ guarded on `dbt_project.yml` already existing, so a plain re-run skips it
 - fixing an existing install needs `dpagent install dbt --force` (or
 `--set` the same params again with `--force`) to actually re-run this step
 and apply the ACL retroactively.
+
+**Follow-up check on the same fix, before moving on**: does `PROFILES_DIR`
+(`profiles.yml`, `.user.yml`) need the same ACL treatment? Ran `dbt debug`
+*and* a real `dbt run` as `nobody` (added to `dbtread`) against an
+already-installed project and confirmed neither touches anything under
+`profiles/` - `.user.yml`'s mtime was unchanged after both. dbt only ever
+reads that directory after the pack's own install creates it; the fix
+committed above is correctly scoped to `PROJECT_DIR` alone, not half-done.
+
+### 2026-09-15 — two concurrent `dpagent install postgres` on the same host: one real, scoped bug, and one real, deliberately-unfixed architectural gap
+
+Nothing in this codebase takes any kind of lock - not on the SQLite state
+db (which has its own file locking and stayed consistent throughout this
+test), and not around the actual work a step or a suite does. Ran two
+genuinely concurrent `dpagent install postgres --yes` processes (backgrounded
+in the same shell, not sequential) against the same freshly-`base`-installed
+container to see what that actually costs.
+
+**Both installs' own steps completed cleanly and correctly - postgres
+itself is safely idempotent under this race.** Both processes independently
+enabled the PGDG repo, installed the same packages, ran initdb, wrote the
+same config, and both `verify.sh` runs passed. No corruption, no
+half-written config, no duplicate service units. The install path itself
+held up.
+
+**Real, scoped bug: the acceptance suite's fixture namespace was a fixed
+literal, not unique per run.** `suites/runner.py` set
+`DP_TEST_NS="dpagent_selftest"` unconditionally - so both processes'
+postgres suites tried `CREATE DATABASE dpagent_selftest` against the same
+server at the same time. One succeeded; the other got
+`ERROR: duplicate key value violates unique constraint
+"pg_database_datname_index"` and reported "could not run" - a confusing
+failure about a fixture collision, not about postgres itself, on a host
+where postgres was in fact fine. This is not purely a race-condition
+curiosity: two operators (or two CI jobs) independently running `dpagent
+test postgres` against the same host at the same time would hit the exact
+same collision with no race required beyond "at the same time." Fixed by
+suffixing `DP_TEST_NS` with the already-unique-per-invocation `run_id`
+(`dpagent_selftest_{run_id}`) - every other suite just reads `$DP_TEST_NS`
+as an opaque prefix, so this needed no changes anywhere else. Re-ran the
+same concurrent test with the fix: the namespace collision is gone (each
+process now uses its own database name).
+
+**Real, deliberately unfixed here: with the naming collision out of the
+way, a deeper race surfaced immediately - two `--force` reinstalls
+restarting the same `postgresql-15` service at the same time.** The second
+run's suite got `FATAL: the database system is shutting down` - a real,
+if narrower, symptom of the same absence of any mutual exclusion, one
+level down from fixture naming: nothing stops two step-execution passes
+from restarting, reconfiguring, or reinitializing the same service
+concurrently. Not attempted here: this needs an actual design decision
+(a lock scoped per-pack or per-host; fail-fast with a clear message vs.
+wait-with-timeout; whether `--dry-run` needs it; whether `dpagent
+test`/`rollback` need the same guard as `install`) - a real feature with
+real tradeoffs, not a bug fix, and the same reasoning that kept an
+automated `open_firewall` step out of scope for airflow earlier in this
+log applies here at even larger scope. Recorded here as a genuine gap:
+**dpagent has no protection today against two of itself running against
+the same host concurrently**, and the natural next step is a `flock`-based
+mutex wrapping step/suite execution, scoped and designed properly rather
+than bolted on mid-fault-hunt.
+
+`pytest` unaffected (shell/one Python-string-format-line change);
+`dpagent lint` clean.

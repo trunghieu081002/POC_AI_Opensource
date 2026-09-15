@@ -78,7 +78,13 @@ def run_suite(suite: loader.Suite, os_info, resolved_params: dict, run_id: int,
         "DP_SUITE_ROOT": str(suite.root),
         # A dedicated namespace for fixtures. Checks must confine themselves to
         # it: an acceptance test that writes into a real database is a liability.
-        "DP_TEST_NS": "dpagent_selftest",
+        # Suffixed with run_id (unique per invocation) rather than a fixed
+        # string - two suite runs against the same pack at once (a genuine
+        # install race, or just two operators/CI jobs both running `dpagent
+        # test` against the same host) used to collide on the exact same
+        # database/dag_id/filename and fail with a confusing "already exists"
+        # that had nothing to do with either run's actual health.
+        "DP_TEST_NS": f"dpagent_selftest_{run_id}",
     })
     log_run = f"run-{run_id}"
 
