@@ -109,3 +109,36 @@ def test_missing_dp_lib_is_flagged(tmp_path):
     path.write_text("#!/usr/bin/env bash\nset -euo pipefail\napt-get update\n",
                     encoding="utf-8")
     assert any("dp.sh" in m for m in messages(path, "p/bare.sh"))
+
+
+# ------------------------------------------------- guard narrower than step
+
+def test_flags_a_user_existence_guard_on_a_step_that_also_builds_directories():
+    """The exact shape that shipped in airflow's `user` step: a pre-existing
+    "airflow" system user (unrelated to dpagent) satisfies `id -u airflow` on
+    the very first run, so the step's real work - mkdir/chown for
+    AIRFLOW_HOME - silently never happens."""
+    script = (
+        'dp_ensure_user airflow "$HOME_DIR" /bin/bash\n'
+        'dp_run mkdir -p "$HOME_DIR/dags" "$HOME_DIR/logs"\n'
+        'dp_run chown -R airflow:airflow "$(af_install_dir)"\n'
+    )
+    assert lint.guard_misses_step_effects("id -u airflow >/dev/null 2>&1", script)
+
+
+def test_accepts_a_guard_that_checks_one_of_the_paths_the_step_creates():
+    script = (
+        'dp_ensure_user airflow "$HOME_DIR" /bin/bash\n'
+        'dp_run mkdir -p "$HOME_DIR/dags" "$HOME_DIR/logs"\n'
+        'dp_run chown -R airflow:airflow "$(af_install_dir)"\n'
+    )
+    guard = (
+        'id -u airflow >/dev/null 2>&1 && '
+        'test -d "$DP_PARAM_INSTALL_DIR/home/dags"'
+    )
+    assert not lint.guard_misses_step_effects(guard, script)
+
+
+def test_ignores_a_step_that_does_not_create_or_own_paths_at_all():
+    script = 'dp_run "${DP_PKG_MGR:-dnf}" install -y postgresql15-server\n'
+    assert not lint.guard_misses_step_effects("command -v psql >/dev/null 2>&1", script)

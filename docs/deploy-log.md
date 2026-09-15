@@ -1651,3 +1651,63 @@ throughout postgres's own suite, `af_run`/`af_query` exercised by every
 DAG-trigger checks. `pytest` 237 passed / 3 skipped (two of the new cases
 need root and correctly skip without it, same as `runuser` itself would
 refuse); `dpagent lint` (bare, scanning `_lib` too) clean.
+
+### 2026-09-15 — the second flagged systemic gap: a lint rule for "guard proves a symptom, not the effect"
+
+Three real bugs this engagement have had the same shape: a step's guard
+checks that *something related* is already true, not that the step's own
+work actually happened - `python-modern`'s guard calling `dp_find_python`
+directly instead of through the sourced library, `base`'s packages guard
+never updated when `openssl` was added to the package list, and airflow's
+`user` step guard checking only `id -u airflow` while the step also builds
+and chowns AIRFLOW_HOME. Each was found by hand, on a host where the
+narrow precondition happened to already be true for an unrelated reason.
+Flagged twice in this log as a lint candidate rather than implemented,
+pending more evidence of the actual shape worth checking for.
+
+Scoped one precise, checkable instance rather than attempting a fully
+general "does the guard prove everything the step does" check, which would
+need real semantic understanding of arbitrary shell to do safely: **a step
+that calls `mkdir` or `chown` needs a guard that checks at least one path**
+(`test -X <path>` or `[ -X <path> ]`, any single-letter test flag - `-d`,
+`-f`, `-x`, whatever fits the step). A guard based only on an unrelated
+precondition (a user that happens to already exist, a package that happens
+to already be present) does not prove the directories/ownership that step
+also sets up were ever touched.
+
+Simulated against every real step in the repo before writing a single line
+of the check, both to size the false-positive risk and to confirm it would
+actually have caught the real bug: with the *current* (already-fixed)
+`airflow/user` guard, zero flags anywhere in the tree - `airflow/venv`,
+`airflow/db-migrate`, `dbt/venv`, `dbt/project` all already guard on a path
+their own step created, for unrelated reasons, and the check correctly
+leaves them alone. Fed the *original*, pre-fix `airflow/user` guard
+(`id -u airflow >/dev/null 2>&1`, no path check) through the same
+simulation and confirmed it flags - proof this is not just a check that
+never fires.
+
+Implemented as `guard_misses_step_effects(guard, script_text)` in
+`lint.py` (a standalone, directly-unit-testable predicate, not inlined
+into the step loop, precisely so it does not need a full synthetic pack
+fixture to test) plus its call site in `lint_pack`'s existing per-step
+loop, next to the "no guard at all" check it complements. Three new
+`tests/test_lint.py` cases: the airflow shape is flagged, a guard that
+checks one of the step's own paths is not, and a step that never
+creates/owns anything is left alone regardless of its guard. `pytest` 240
+passed / 3 skipped; `dpagent lint` (which is what exercises this against
+every real pack, not the unit tests) still clean across all five -
+confirming, on the actual codebase and not just the simulation, that the
+three known-fixed instances stay fixed and nothing else newly trips it.
+
+**Scope, stated plainly**: this catches the `mkdir`/`chown`-vs-path-check
+shape specifically, which is what airflow's bug was. It does not catch
+base's `openssl`-guard shape (a guard missing a `command -v` for a package
+the step installs) - that pattern's the harder one, since packages and the
+binaries/files they provide don't line up predictably enough to check
+without a real package database, and a check built to catch it would
+likely flag `base` itself even after the openssl fix (14 packages installed,
+nowhere near 14 corresponding `command -v` checks in the guard, most of
+them legitimately not needing one). Left unimplemented rather than shipped
+noisy; the current check being narrower than every case that produced this
+gap in the past is a defensible trade against a broader one nobody would
+trust the output of.

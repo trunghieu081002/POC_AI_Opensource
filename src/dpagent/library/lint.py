@@ -52,6 +52,25 @@ _RAW_MUTATION = re.compile(
     re.VERBOSE,
 )
 
+# A guard is a claim that the *whole* step already ran - not that some
+# precondition for it happens to be true. `id -u airflow` (a user that could
+# pre-exist for reasons that have nothing to do with this pack) is not proof
+# that this step's `mkdir`/`chown` on AIRFLOW_HOME ever happened; a step whose
+# script creates or takes ownership of paths needs its guard to check for at
+# least one of them, or a host where that precondition is already true skips
+# the step - and everything it was supposed to set up - forever. This exact
+# shape shipped for real in airflow's `user` step and in base's `packages`
+# step (there checking commands existed, not paths, but the same "guard
+# proves a symptom, not the effect" gap).
+_MKDIR_OR_CHOWN = re.compile(r"^\s*(?:dp_run\s+)?(mkdir|chown)\b", re.MULTILINE)
+_GUARD_HAS_PATH_CHECK = re.compile(r"(?:test\s+-[a-zA-Z]\s|\[\s+-[a-zA-Z]\s)")
+
+
+def guard_misses_step_effects(guard: str, script_text: str) -> bool:
+    """True when the script creates/chowns paths but the guard checks none."""
+    return bool(_MKDIR_OR_CHOWN.search(script_text)) \
+        and not _GUARD_HAS_PATH_CHECK.search(guard)
+
 
 @dataclass
 class Issue:
@@ -171,6 +190,13 @@ def lint_pack(name: str, packs_dir: Path | None = None) -> list[Issue]:
         if not step.guard:
             issues.append(Issue(WARN, f"{name}/pack.yaml",
                                 f"step {step.id!r} has no guard; re-running cannot skip it"))
+        elif guard_misses_step_effects(step.guard, pack.path(step.script).read_text(
+                encoding="utf-8", errors="replace")):
+            issues.append(Issue(
+                WARN, f"{name}/pack.yaml",
+                f"step {step.id!r} creates directories or ownership but its guard "
+                f"checks no path - a precondition unrelated to that work (e.g. a "
+                f"user that already exists) could satisfy the guard and skip it"))
         issues.extend(lint_script(pack.path(step.script), f"{name}/{step.script}"))
 
     for rel in (pack.preflight, pack.verify, pack.rollback):
