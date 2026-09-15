@@ -9,6 +9,7 @@ YAML as plaintext, and never reach a log file. So:
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any
@@ -63,13 +64,38 @@ def resolve_refs(value: Any, *, path: str = "") -> Any:
     return value
 
 
+def _coerce_list(v: Any) -> list:
+    if isinstance(v, list):
+        return v
+    if isinstance(v, str):
+        stripped = v.strip()
+        # Every `list`-typed param in this project's packs holds either plain
+        # strings (postgres's own `databases: ["warehouse", "airflow_meta"]`)
+        # or JSON objects (`users: [{name: ..., password: ...}]`) - a value
+        # that *looks* like JSON (starts `[` or `{`) is always meant to be
+        # parsed as JSON, never taken as one literal opaque string. Getting
+        # this wrong silently: a typo in --set users=... used to produce a
+        # one-element list containing the whole malformed string, which
+        # steps.sh's own downstream JSON parsing then treated as *the user's
+        # name* - a role named "[{malformed" got created for real, with
+        # every check reporting success, and the operator's actually-intended
+        # users/databases were never created. Letting json.loads raise here
+        # (json.JSONDecodeError is a ValueError) is what makes that a clean
+        # ParamError from resolve() below instead of silent data loss.
+        if stripped[:1] in ("[", "{"):
+            parsed = json.loads(stripped)
+            return parsed if isinstance(parsed, list) else [parsed]
+        if "," in v:
+            return [s.strip() for s in v.split(",")]
+        return [v]
+    return [v]
+
+
 _COERCE = {
     "string": lambda v: v if isinstance(v, str) else str(v),
     "int": lambda v: int(v),
     "bool": lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on"),
-    "list": lambda v: v if isinstance(v, list) else (
-        [s.strip() for s in v.split(",")] if isinstance(v, str) and "," in v else [v]
-    ),
+    "list": _coerce_list,
     "object": lambda v: v,
 }
 

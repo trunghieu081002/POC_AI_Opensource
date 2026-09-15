@@ -127,3 +127,34 @@ def test_string_type_with_a_comma_is_not_split():
     schema = dict(SCHEMA, listen_addresses={"type": "string", "default": "localhost"})
     out = params.resolve(schema, {"listen_addresses": "localhost,192.168.1.54"}, pack="postgres")
     assert out["listen_addresses"] == "localhost,192.168.1.54"
+
+
+def test_list_type_parses_a_json_array_string():
+    """render.parse_set already tries json.loads first and only falls back to
+    a raw string on failure - this is the path a *successful* --set
+    users='[{"name":"x"}]' takes once render.py's own attempt succeeds and
+    hands params.resolve() an already-parsed list. Covered here too so the
+    coercer's own JSON branch doesn't regress independently of render.py."""
+    out = params.resolve(SCHEMA, {"databases": '["warehouse","airflow_meta"]'}, pack="postgres")
+    assert out["databases"] == ["warehouse", "airflow_meta"]
+
+
+def test_list_type_parses_a_single_json_object_string():
+    out = params.resolve(
+        SCHEMA, {"users": '{"name":"dbt_user","password":"x"}'}, pack="postgres")
+    assert out["users"] == [{"name": "dbt_user", "password": "x"}]
+
+
+def test_list_type_rejects_malformed_json_instead_of_wrapping_it():
+    """The regression: a typo in --set users=[{malformed used to silently
+    wrap the entire broken string as a single-element list -
+    ["[{malformed"] - which steps/50-databases.sh's own JSON parsing then
+    accepted as one *string* user entry, creating a real postgres role
+    literally named "[{malformed" and reporting complete success. Anything
+    that starts with `[` or `{` is unambiguously meant to be JSON; failing
+    to parse as JSON must be a loud ParamError, not silent data loss."""
+    try:
+        params.resolve(SCHEMA, {"users": "[{malformed"}, pack="postgres")
+        assert False, "expected a ParamError"
+    except params.ParamError as exc:
+        assert "users" in str(exc)

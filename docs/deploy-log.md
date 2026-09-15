@@ -1922,3 +1922,73 @@ than bolted on mid-fault-hunt.
 
 `pytest` unaffected (shell/one Python-string-format-line change);
 `dpagent lint` clean.
+
+### 2026-09-15 — three quick follow-ups, then a silent-corruption bug in --set's own JSON handling
+
+**Closing the loop on the firewall fix: `open_firewall=true` genuinely
+works, not just the warning.** Only the *warning* half of the 2026-09-15
+firewall finding had been verified end to end (postgres's remedy, dbt's
+remote-connectivity guidance did not need this since it has no such
+param). Installed postgres with both `listen_addresses=0.0.0.0` and
+`open_firewall=true`: `firewall-cmd --list-ports` showed `5432/tcp`, and a
+real off-host connection attempt succeeded this time. Re-ran the same
+install again and confirmed the warning correctly does *not* fire when
+`open_firewall` is already `true` - only the (expected, unrelated) "will
+adopt" notice for the already-running server. **No bug** - the remedy the
+warning points at actually works.
+
+**A `/etc/hosts` with no `localhost` entry: could not reproduce a
+failure.** Stripped every `localhost` line from `/etc/hosts` in a
+systemd-managed container; `getent hosts localhost` still resolved via
+`::1` - systemd's own NSS modules (`nss-myhostname` and friends) synthesize
+the loopback mapping regardless of `/etc/hosts` content on every OS family
+this project targets. **No bug, and not reproducible on this project's
+actual target OSes** - recorded so this specific attack angle is not
+re-tried; a real DNS-vs-hosts gap would need a fundamentally different
+setup (systemd-resolved genuinely down, or a non-systemd distro) to even
+attempt.
+
+**Real bug, found trying a plain shell typo: `--set users=[{malformed`
+(a missing closing brace) silently created a real Postgres role literally
+named `[{malformed`, and reported complete success the entire way
+through.** No error anywhere - `postgres: 6 checks passed`, `installed and
+proven working`. Confirmed with `\du`: the garbage role was really there.
+
+Root cause, three layers: (1) `render.py`'s `parse_set()` already tries
+`json.loads` on every `--set` value and only falls back to the raw string
+on failure - by design, since whether a comma means "split this" depends
+on the param's declared type, which `parse_set` does not know. (2) That
+raw string then reached `params.py`'s `_COERCE["list"]`, which - for a
+string with no comma - just wrapped the *entire malformed string* as a
+single-element list (`["[{malformed"]`), with no attempt to notice it
+looked like broken JSON rather than a literal value. (3) postgres's own
+`steps/50-databases.sh` does its own JSON parsing of the `DP_USERS`
+env var, built by re-serializing that one-element list - which
+re-serializes to perfectly valid JSON (`["[{malformed"]`) containing one
+string, so *that* parse succeeded too, and its `if isinstance(user, str):
+user = {"name": user}` fallback (meant for a plain `--set users=alice`
+with no password) took the entire garbled string as a role name and
+created it for real.
+
+Fixed at layer (2), the one place with enough context to draw the line
+correctly: every `list`-typed param in this project's packs holds either
+plain strings or JSON objects, so a string value that *starts* with `[` or
+`{` is unambiguously meant to be parsed as JSON - `_coerce_list` now tries
+`json.loads` on exactly that shape and lets a `json.JSONDecodeError`
+(a `ValueError` subclass) propagate into `resolve()`'s existing
+`except (TypeError, ValueError)` handler, which already turns it into a
+clean `ParamError`. Plain comma-joined and single-value strings are
+unaffected - they never start with `[`/`{`, so they still take the
+existing split-or-wrap path exactly as before. Four new cases in
+`tests/test_params.py`: a JSON array string and a single JSON object
+string both still parse correctly, and the exact malformed shape that
+created the bad role now raises `ParamError` instead of silently
+succeeding. Verified against the real bug, not just the unit tests:
+dropped the `[{malformed` role, re-ran the identical `--set` command with
+the fix deployed, and it now halts immediately - before `base` or any
+postgres step even starts - with `param 'users'='[{malformed' is not a
+valid list`; a correct `--set users='[{"name":"dbt_user",...}]'` right
+after still installs cleanly and creates exactly the intended role (6/6
+acceptance, `\du` shows only `dbt_user` and `postgres`, no leftover
+garbage). `pytest` unaffected count-wise beyond the four new cases;
+`dpagent lint` clean.
