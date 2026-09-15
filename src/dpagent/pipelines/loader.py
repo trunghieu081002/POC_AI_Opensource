@@ -32,7 +32,12 @@ GATE_REQUIRED_FIELDS = {
     "not_null": ["table", "columns"],
     "unique": ["table", "columns"],
     "referential_integrity": ["table", "column", "references"],
-    "business_rule": ["name", "sql", "expect"],
+    # "table" + "id_column": which table and column the rule's own query's
+    # first result column identifies - what run_gate() joins the rule's
+    # offending identifiers back against to quarantine a real row, since the
+    # rule's own SQL (a group-by/aggregate, typically) does not return full
+    # rows itself.
+    "business_rule": ["name", "sql", "expect", "table", "id_column"],
 }
 
 # Gate types that reject individual rows, as opposed to a whole-stage
@@ -62,8 +67,16 @@ class Gate:
 
 @dataclass
 class Quarantine:
-    table: str
+    """No table name of its own: each row-level gate quarantines into
+    `<gate.table>_quarantine` (see `quarantine_table_for`) - a stage can gate
+    more than one table (e.g. a referential_integrity check across two
+    tables in the same stage), and each needs its own quarantine shape, so
+    there is no single table a stage-level quarantine block could name."""
     reject_threshold_pct: float
+
+
+def quarantine_table_for(table: str) -> str:
+    return f"{table}_quarantine"
 
 
 @dataclass
@@ -156,9 +169,6 @@ def _validate_quarantine(raw: dict | None, where: str) -> Quarantine | None:
         return None
     if not isinstance(raw, dict):
         raise PipelineError(f"{where}: quarantine must be a mapping")
-    table = raw.get("table")
-    if not table:
-        raise PipelineError(f"{where}: quarantine has no table")
     threshold = raw.get("reject_threshold_pct")
     if threshold is None:
         raise PipelineError(f"{where}: quarantine has no reject_threshold_pct")
@@ -170,7 +180,7 @@ def _validate_quarantine(raw: dict | None, where: str) -> Quarantine | None:
     if not (0 <= threshold <= 100):
         raise PipelineError(
             f"{where}: quarantine's reject_threshold_pct {threshold!r} must be 0-100")
-    return Quarantine(table=table, reject_threshold_pct=threshold)
+    return Quarantine(reject_threshold_pct=threshold)
 
 
 def _validate_source(raw: dict, where: str) -> Source:

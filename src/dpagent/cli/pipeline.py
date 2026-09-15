@@ -13,6 +13,7 @@ from rich.table import Table
 from ..pipelines import deploy as deploy_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
+from ..pipelines.loader import quarantine_table_for
 from .render import confirm, console, fail
 
 
@@ -46,12 +47,16 @@ def lint_cmd(name):
     table.add_column("gates")
     table.add_column("quarantine", style="dim")
     for stage in pipeline.stages:
+        quarantine_tables = sorted({
+            quarantine_table_for(g["table"]) for g in stage.gates
+            if stage.quarantine and "table" in g.params
+        })
         table.add_row(
             stage.name,
             stage.engine or "[dim]dlt[/dim]",
             stage.depends_on or "[dim]-[/dim]",
             ", ".join(g.type for g in stage.gates) or "[dim]none[/dim]",
-            stage.quarantine.table if stage.quarantine else "[dim]-[/dim]",
+            ", ".join(quarantine_tables) if quarantine_tables else "[dim]-[/dim]",
         )
     console.print(Panel(table, title=f"{pipeline.name} · {pipeline.source.connector}",
                         border_style="cyan", expand=False))

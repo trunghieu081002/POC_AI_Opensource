@@ -133,6 +133,39 @@ CREATE TABLE IF NOT EXISTS error_hits (
     resolved     INTEGER NOT NULL DEFAULT 0,
     ts           TEXT NOT NULL
 );
+
+-- Layer 2 (docs/layer2.md, Concepts #6 "Run ledger"). Same shape as
+-- suite_runs/check_runs on purpose, one level down: a stage_run is "this
+-- stage materialised, here is what happened", a gate_run is one gate's
+-- verdict within it - a stage can have several gates, same as a suite has
+-- several checks.
+CREATE TABLE IF NOT EXISTS stage_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id      INTEGER,
+    pipeline    TEXT NOT NULL,
+    stage       TEXT NOT NULL,
+    status      TEXT NOT NULL,              -- running | passed | failed
+    -- The stage's own row count once it has materialised - what the *next*
+    -- stage_run's row_count_bounds gate (max_delta_pct) compares itself
+    -- against (docs/layer2.md's row_count_bounds description: "vs the
+    -- previous run"). NULL until the stage actually finishes.
+    row_count   INTEGER,
+    started_at  TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_stage_runs_pipeline ON stage_runs(pipeline, stage, id);
+
+CREATE TABLE IF NOT EXISTS gate_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    stage_run_id  INTEGER NOT NULL REFERENCES stage_runs(id),
+    gate_type     TEXT NOT NULL,
+    status        TEXT NOT NULL,            -- passed | failed
+    rows_checked  INTEGER,
+    rows_rejected INTEGER,                  -- quarantined - NULL for a structural gate
+    detail        TEXT,                     -- human-readable reason on failure
+    ts            TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_gate_runs_stage_run ON gate_runs(stage_run_id);
 """
 
 
@@ -383,6 +416,49 @@ def failed_checks(suite_row_id: int) -> list[sqlite3.Row]:
         " ORDER BY id", (suite_row_id,)).fetchall()
 
 
+def start_stage(run_id: int | None, pipeline: str, stage: str) -> int:
+    cur = conn().execute(
+        "INSERT INTO stage_runs (run_id, pipeline, stage, status, started_at)"
+        " VALUES (?,?,?,?,?)",
+        (run_id, pipeline, stage, "running", now()),
+    )
+    conn().commit()
+    return int(cur.lastrowid)
+
+
+def finish_stage(stage_row_id: int, status: str, row_count: int | None = None) -> None:
+    conn().execute(
+        "UPDATE stage_runs SET status=?, row_count=?, finished_at=? WHERE id=?",
+        (status, row_count, now(), stage_row_id),
+    )
+    conn().commit()
+
+
+def record_gate(stage_row_id: int, gate_type: str, status: str,
+                rows_checked: int | None = None, rows_rejected: int | None = None,
+                detail: str = "") -> None:
+    conn().execute(
+        "INSERT INTO gate_runs (stage_run_id, gate_type, status, rows_checked,"
+        " rows_rejected, detail, ts) VALUES (?,?,?,?,?,?,?)",
+        (stage_row_id, gate_type, status, rows_checked, rows_rejected, detail, now()),
+    )
+    conn().commit()
+
+
+def latest_stage(pipeline: str, stage: str) -> sqlite3.Row | None:
+    """The most recently *finished* run of this stage - what the next run's
+    row_count_bounds gate (max_delta_pct) compares its own row_count
+    against, when one is declared."""
+    return conn().execute(
+        "SELECT * FROM stage_runs WHERE pipeline=? AND stage=? AND status != 'running'"
+        " ORDER BY id DESC LIMIT 1", (pipeline, stage)).fetchone()
+
+
+def gates_for_stage(stage_row_id: int) -> list[sqlite3.Row]:
+    return conn().execute(
+        "SELECT * FROM gate_runs WHERE stage_run_id=? ORDER BY id", (stage_row_id,)).fetchall()
+
+
 def stats() -> dict[str, Any]:
     c = conn()
     q = lambda sql: c.execute(sql).fetchone()[0]  # noqa: E731
@@ -396,4 +472,6 @@ def stats() -> dict[str, Any]:
         "errors_unmatched": q("SELECT COUNT(*) FROM error_hits WHERE matched=0"),
         "suites_run": q("SELECT COUNT(*) FROM suite_runs"),
         "checks_failed": q("SELECT COUNT(*) FROM check_runs WHERE status='failed'"),
+        "stages_run": q("SELECT COUNT(*) FROM stage_runs"),
+        "gates_failed": q("SELECT COUNT(*) FROM gate_runs WHERE status='failed'"),
     }

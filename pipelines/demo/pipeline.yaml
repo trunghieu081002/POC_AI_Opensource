@@ -79,8 +79,10 @@ stages:
         column: order_id
         references: {table: stg_sale_orders, column: id}
     quarantine:
-      table: stg_sale_orders_quarantine   # rejected rows land here, with a reason column
-      reject_threshold_pct: 5             # >5% of rows rejected halts the run; below that, continues
+      # rejected rows land in <table>_quarantine (+ a reason column) - one
+      # per gated table, since not_null/unique gate stg_sale_orders but
+      # referential_integrity gates stg_sale_order_lines in this same stage.
+      reject_threshold_pct: 5   # >5% of a gated table's rows rejected halts the run
 
   - name: curated
     engine: procedure
@@ -91,14 +93,20 @@ stages:
         name: currency_consistent_totals
         # a fct_sales row must never mix currencies within one order - this
         # is the exact "sum() silently drops a currency" failure the whole
-        # design doc opens with
+        # design doc opens with.
+        #
+        # Plain SQL, not dbt's `{{ this }}` jinja: gates are engine-agnostic
+        # and run directly against the warehouse (docs/layer2.md, Concepts
+        # #4), never through dbt's own templating, even on a stage a dbt
+        # model happens to produce.
         sql: |
-          select order_id from {{ this }}
+          select order_id from fct_sales
           group by order_id having count(distinct currency_id) > 1
         expect: no_rows
+        table: fct_sales       # what order_id (the rule's first column) identifies
+        id_column: order_id    # joined back against this column to quarantine the real row
       - type: not_null
         table: fct_sales
         columns: [converted_amount]   # gate does not trust the procedure - verifies it too
     quarantine:
-      table: fct_sales_quarantine
-      reject_threshold_pct: 1
+      reject_threshold_pct: 1   # both gates here target fct_sales -> fct_sales_quarantine

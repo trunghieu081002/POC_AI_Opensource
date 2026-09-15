@@ -28,12 +28,12 @@ def _pipeline(root, stages_extra=None):
                 {"type": "unique", "table": "stg_t", "columns": ["id"]},
                 {"type": "referential_integrity", "table": "stg_t", "column": "fk_id",
                  "references": {"table": "stg_other", "column": "id"}},
-             ], "quarantine": {"table": "stg_t_quarantine", "reject_threshold_pct": 5}},
+             ], "quarantine": {"reject_threshold_pct": 5}},
             {"name": "curated", "engine": "procedure", "depends_on": "raw",
              "procedure": "procedures/convert.sql", "gates": [
                 {"type": "business_rule", "name": "x", "sql": "select id from {{ this }}",
-                 "expect": "no_rows"},
-             ], "quarantine": {"table": "fct_quarantine", "reject_threshold_pct": 1}},
+                 "expect": "no_rows", "table": "fct", "id_column": "id"},
+             ], "quarantine": {"reject_threshold_pct": 1}},
         ],
     }
     d = root / "demo"

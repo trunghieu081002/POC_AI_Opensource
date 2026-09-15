@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .loader import Gate, Pipeline, Stage
+from .loader import Gate, Pipeline, Stage, quarantine_table_for
 
 _DURATION_UNITS = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days"}
 _DURATION = re.compile(r"^(\d+)([smhd])$")
@@ -134,10 +134,9 @@ def compile_gate(gate: Gate, stage: Stage) -> CompiledGate:
     elif gate.type == "business_rule":
         queries = [Query("rule", gate["sql"])]
         verdict = (
-            f"fails if the query returns any rows ({gate['expect']}); by "
-            f"convention its first returned column identifies which row(s) to "
-            f"quarantine - the manifest author's responsibility to get right, "
-            f"same as a procedure's idempotency (docs/layer2.md, Concepts #3)")
+            f"fails if the rule query returns any rows ({gate['expect']}); "
+            f"each returned {gate['id_column']} is joined back against "
+            f"{gate['table']}.{gate['id_column']} to quarantine the real row")
 
     else:  # pragma: no cover - loader.py already rejects this at lint time
         raise ValueError(f"no SQL compiler for gate type {gate.type!r}")
@@ -166,10 +165,14 @@ def dag_tasks(pipeline: Pipeline) -> list[Task]:
                           depends_on=[previous_gate]))
 
         gate_id = f"gate_{stage.name}"
+        quarantine_tables = sorted({
+            quarantine_table_for(gate["table"]) for gate in stage.gates
+            if stage.quarantine and "table" in gate.params
+        })
         tasks.append(Task(id=gate_id, kind="gate",
                           description=f"{len(stage.gates)} gate(s) on {stage.name}"
-                                      + (f", quarantine -> {stage.quarantine.table}"
-                                         if stage.quarantine else ""),
+                                      + (f", quarantine -> {', '.join(quarantine_tables)}"
+                                         if quarantine_tables else ""),
                           depends_on=[transform_id]))
         previous_gate = gate_id
 

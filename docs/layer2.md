@@ -99,7 +99,7 @@ Postgres, so pointing at a real Odoo later is a config change, not a rewrite.
 [dbt|procedure]  landing ─────────▶ raw          (normalised, cast, de-duplicated)
                                       │
                                       ├── GATE: not-null/unique keys · referential integrity
-                                      │         rejected rows ──▶ <stage>_quarantine (+ reason)
+                                      │         rejected rows ──▶ <table>_quarantine (+ reason)
                                       ▼
 [dbt|procedure]  raw ─────────────▶ curated      (facts/dims a report can be built on)
                                       │
@@ -166,8 +166,11 @@ hop is not a choice, it is what dlt is for.
    engine produced it. Five kinds in the MVP: schema contract, not-null/
    unique, referential integrity, row-count bounds (absolute or versus the
    previous run), freshness.
-5. **Quarantine** — rejected rows land in `<stage>_quarantine` with the reason
-   they were rejected. Never deleted, never silently passed.
+5. **Quarantine** — rejected rows land in `<table>_quarantine` with the reason
+   they were rejected — one quarantine table per *gated table*, not per
+   stage, since a stage's gates can touch more than one table (e.g. a
+   referential-integrity check spanning two tables in the same stage) and
+   each needs its own shape. Never deleted, never silently passed.
 6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
    they already do for installs, whichever engine ran.

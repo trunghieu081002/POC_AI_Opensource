@@ -60,10 +60,10 @@ def test_loads_the_real_demo_shape(root):
         "name": "curated", "engine": "procedure", "depends_on": "raw",
         "procedure": "procedures/convert.sql",
         "gates": [{"type": "business_rule", "name": "x", "sql": "select 1",
-                   "expect": "no_rows"}],
-        "quarantine": {"table": "curated_quarantine", "reject_threshold_pct": 1},
+                   "expect": "no_rows", "table": "fct", "id_column": "id"}],
+        "quarantine": {"reject_threshold_pct": 1},
     })
-    data["stages"][1]["quarantine"] = {"table": "raw_quarantine", "reject_threshold_pct": 5}
+    data["stages"][1]["quarantine"] = {"reject_threshold_pct": 5}
     _write(root, "demo", data, procedure_files=["procedures/convert.sql"])
 
     pipeline = loader.load("demo", root)
@@ -160,12 +160,14 @@ def test_duplicate_stage_names_are_refused(root):
     ("unique", "columns"),
     ("referential_integrity", "references"),
     ("business_rule", "expect"),
+    ("business_rule", "id_column"),
 ])
 def test_gate_missing_a_required_field_is_refused(root, gate_type, missing_field):
     data = _minimal()
     gate = {"type": gate_type, "tables": {"x": {}}, "table": "x", "column": "x",
             "columns": ["x"], "references": {"table": "x", "column": "x"},
-            "max_age": "1h", "name": "x", "sql": "select 1", "expect": "no_rows"}
+            "max_age": "1h", "name": "x", "sql": "select 1", "expect": "no_rows",
+            "id_column": "id"}
     del gate[missing_field]
     data["stages"][0]["gates"] = [gate]
     _write(root, "demo", data)
@@ -195,6 +197,7 @@ def test_business_rule_expect_must_be_no_rows(root):
     data = _minimal()
     data["stages"][1]["gates"][0] = {
         "type": "business_rule", "name": "x", "sql": "select 1", "expect": "42_rows",
+        "table": "fct", "id_column": "id",
     }
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="expect"):
@@ -207,7 +210,7 @@ def test_quarantine_without_a_row_level_gate_is_refused(root):
     row_count_bounds) can never actually receive a row - nothing there is
     attributable to one row, per-stage failure is the only outcome."""
     data = _minimal()
-    data["stages"][0]["quarantine"] = {"table": "x_quarantine", "reject_threshold_pct": 5}
+    data["stages"][0]["quarantine"] = {"reject_threshold_pct": 5}
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="no row-level gate"):
         loader.load("demo", root)
@@ -215,7 +218,7 @@ def test_quarantine_without_a_row_level_gate_is_refused(root):
 
 def test_quarantine_threshold_out_of_range_is_refused(root):
     data = _minimal()
-    data["stages"][1]["quarantine"] = {"table": "x", "reject_threshold_pct": 150}
+    data["stages"][1]["quarantine"] = {"reject_threshold_pct": 150}
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="0-100"):
         loader.load("demo", root)
