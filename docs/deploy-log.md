@@ -1711,3 +1711,77 @@ them legitimately not needing one). Left unimplemented rather than shipped
 noisy; the current check being narrower than every case that produced this
 gap in the past is a defensible trade against a broader one nobody would
 trust the output of.
+
+### 2026-09-15 — the firewall gap: exactly the 2026-09-11 incident, still possible, plus the reason every preflight warning since then has been invisible
+
+Every container tested so far in this whole engagement reports
+`DP_FIREWALL: none`, because containers do not run firewalld/ufw. Every
+*real* host this project targets does, by default - confirmed on ol8-19
+itself (`firewall-cmd --state` -> `running`) - so this entire class of
+behavior had never actually been exercised. Built a systemd container with
+`dnf install firewalld && systemctl enable --now firewalld` to close that
+gap, matching this project's real target instead of every prior
+container's absence of one.
+
+**postgres: `listen_addresses=0.0.0.0` with `open_firewall` left at its
+default `false` reports 6/6 acceptance passing while a real client cannot
+connect at all.** Installed postgres with `--set listen_addresses=0.0.0.0`
+and nothing else; `dpagent` reported "installed and proven working".
+Confirmed with a real off-host connection attempt (from the Docker host to
+the container's own bridge IP, standing in for "another machine on the
+LAN"): `No route to host` - firewalld silently dropping it. `verify.sh`
+and the acceptance suite only ever check reachability from the same host
+they run on, so neither could have caught this even in principle. This is
+not a hypothetical: it is *exactly* the 2026-09-11 incident recorded
+earlier in this log, where opening postgres to the LAN broke and had to be
+fixed by hand with a direct `firewall-cmd --permanent --add-port` - the
+`open_firewall` param existed by then but nothing ever told the operator
+they needed to set it. Added a preflight check: when `listen_addresses` is
+not loopback, `open_firewall` is off, and a managed firewall is detected,
+warn with the exact remedy (`open_firewall=true`, or open the port by
+hand).
+
+**airflow: the same gap, unconditionally, on every single install - the
+webserver always binds `0.0.0.0` and this pack has no `open_firewall`
+param at all.** Confirmed the same way: full airflow install, 16/16
+acceptance checks passed, then a real off-host connection to port 8090
+got `No route to host`. Unlike postgres, there is no param to set - this
+pack has no automated way to open its own port, a real functionality gap
+this fix does not attempt to close (adding one is a small feature, not a
+bug fix, and out of scope for this pass). Added the equivalent preflight
+warning instead, naming the postgres param as the pattern this pack lacks
+and pointing at a manual `firewall-cmd`/`ufw` command as the only present
+option.
+
+**The reason neither warning would have reached a real user even after
+being written: `InstallReporter.preflight()` only ever echoed a preflight
+script's captured output on *failure*.** `verify()` (`render.py`) already
+echoes its script's full output on both outcomes (`style="dim"` on
+success, `style="red"` on failure) - `preflight()` printed only
+"preflight ok" or "preflight failed" and, on success, silently discarded
+everything the script wrote to get there. This is not specific to the two
+checks just added: it is the same reason the SELinux advisory added
+earlier this engagement (`base/preflight.sh`) was only ever confirmed via
+a direct script invocation capturing stderr by hand, never through an
+actual `dpagent install base` run - and the same reason postgres's own
+pre-existing warnings ("another PostgreSQL major version is present", "a
+PostgreSQL container is already running under docker", "no C.UTF-8 or
+en_US.UTF-8 locale found") have been silently invisible in every real
+install this whole engagement, on every host, the entire time. Every
+`dp_warn` any preflight script has ever written, on a preflight that
+ultimately passed, never reached a terminal. Fixed by making `preflight()`
+mirror `verify()` exactly: echo the captured output on both outcomes.
+Verified for real, not just at the unit level: re-ran the exact postgres
+and airflow install commands above with the fix deployed and both
+warnings now appear in the actual `dpagent install` output, in place next
+to `preflight ok`/`preflight failed` as everything else already does. Two
+new cases in `tests/test_cli_render.py`. `pytest` 242 passed / 3 skipped;
+`dpagent lint` clean on both packs.
+
+This is likely the highest-value finding of this entire fault-finding
+phase: not a bug in one pack, but a UX defect in the reporting layer that
+silenced every advisory every preflight script in the project has ever
+written, on every host, for the whole engagement - the SELinux warning,
+the port-adoption notice, the multi-major-version notice, the locale
+notice, and now these two firewall notices, all now visible for the first
+time.

@@ -7,6 +7,7 @@ source "${DP_LIB:?dp.sh not found}"
 source "${DP_PACK_ROOT:?}/pg-lib.sh"
 
 PORT="$(dp_param port 5432)"
+LISTEN_ADDRESSES="$(dp_param listen_addresses localhost)"
 VERSION="$(pg_version)"
 failed=0
 
@@ -38,6 +39,26 @@ if dp_port_busy "$PORT"; then
     note_fail "port $PORT is occupied by something that is not PostgreSQL; free it or set the 'port' param"
   fi
 fi
+
+# --- firewall vs. listen_addresses ------------------------------------------
+# verify.sh and the acceptance suite only ever check reachability from this
+# same host - a real gap on any host with a managed firewall, since neither
+# can tell "the server answers locally" from "the server answers from where
+# it was actually meant to be reached". Confirmed for real: listen_addresses
+# opened to 0.0.0.0 with open_firewall left at its default false reports
+# "installed and proven working" while an actual LAN client gets a flat
+# connection failure at the firewall, with nothing from dpagent pointing at
+# why - exactly the shape of a real, previously hand-fixed incident (see the
+# 2026-09-11 deploy-log entry, done with a manual firewall-cmd because this
+# check did not yet exist).
+case "$LISTEN_ADDRESSES" in
+  localhost|127.0.0.1|::1) ;;  # loopback only - firewall state does not matter
+  *)
+    if [ "$(dp_param open_firewall 0)" != "1" ] && [ "${DP_FIREWALL:-none}" != "none" ]; then
+      dp_warn "listen_addresses is '$LISTEN_ADDRESSES' but open_firewall is off and a ${DP_FIREWALL} firewall is active - the server can still fail every remote connection even after this install reports success. Set open_firewall=true, or open port $PORT yourself."
+    fi
+    ;;
+esac
 
 # --- disk -------------------------------------------------------------------
 datadir_parent="$(dirname "$(pg_datadir)")"
