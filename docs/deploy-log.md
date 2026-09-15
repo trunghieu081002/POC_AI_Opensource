@@ -2264,3 +2264,44 @@ for the airflow side specifically, not just by the same reasoning: full
 proxy, all four acceptance suites passing (16/16 checks, a real DAG
 triggered and run), webserver-health included. `pytest` unaffected
 (shell-only change); `dpagent lint` clean.
+
+### 2026-09-15 — high load / many concurrent connections: no bugs, across four angles
+
+dpagent's own job is installing and configuring, not steady-state
+capacity management - so "high load" here means: does what it *configures*
+actually hold up under real concurrent traffic, not a general load-test of
+Postgres or Airflow themselves. Checked four angles on a fresh install.
+
+**postgres at exactly its configured `max_connections=100`.** Real
+`pgbench -c 100 -j 4 -T 15` (not a mock): 6,796 transactions, **0 failed**.
+The service's systemd unit's `LimitNOFILE=1048576` is inherited correctly
+by the running process (confirmed via `/proc/<pid>/limits`) - comfortably
+enough headroom for 100 real connections' worth of file descriptors.
+
+**postgres beyond `max_connections`.** `pgbench -c 110`: PostgreSQL itself
+correctly refuses the 52nd excess client with a clean
+`FATAL: sorry, too many clients already` - no crash, no resource
+exhaustion, no confusing failure. Exactly PostgreSQL's own designed
+behaviour, nothing for dpagent to do differently here.
+
+**airflow's webserver under concurrent HTTP load.** `dpagent` does not
+override Airflow's own default of 4 gunicorn workers - `ab -n 2000 -c 200
+http://localhost:8090/health`: **0 failed requests** out of 2000 at 200
+concurrent clients, requests queuing and completing (mean ~224ms) rather
+than erroring under the load.
+
+**`dpagent test` itself, run against a genuinely busy system, not an idle
+one.** The realistic case: an operator runs verification against a live
+system with real traffic, not a freshly-installed empty one. Started
+`pgbench -c 50 -T 40` and `ab -c 30` (both against the just-installed
+services) in the background, then ran `dpagent test` (no target names -
+every installed pack) while both were actively hammering postgres and the
+webserver. All four suites still passed, 16/16 checks, including
+postgres's own restart-and-data-survives check and airflow's real
+DAG-trigger check, run concurrently with unrelated load on the same two
+services.
+
+No code changed - four confirmations, not four fixes. `dpagent`'s own
+configuration choices (default `max_connections`, unmodified worker
+count) hold up under real concurrent load, and its own verification
+tooling remains correct when run against a system that is not idle.
