@@ -201,31 +201,48 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
             total, rejected)
 
 
-def run_gate(*, pipeline_name: str, stage: str) -> None:
+def run_gate(*, pipeline_name: str, stage: str, run_id: int | None = None) -> None:
+    """`run_id` ties this stage's run back to the `runs` row `dpagent pipeline
+    run` started (kind='data') - the DAG passes it through from
+    `dag_run.conf["dpagent_run_id"]` (see `deploy.render_dag`), so `dpagent
+    audit <run>` sees pipeline gate decisions in the same event stream as
+    install/verify/rollback, not a separate untied table."""
     pipeline = loader.load(pipeline_name)
     target = next(s for s in pipeline.stages if s.name == stage)
 
-    stage_row_id = state.start_stage(None, pipeline_name, stage)
+    stage_row_id = state.start_stage(run_id, pipeline_name, stage)
     failures = []
+    row_count = None
 
     for gate in target.gates:
         passed, detail, checked, rejected = _evaluate_gate(pipeline, gate, target)
+        if gate.type == "row_count_bounds":
+            row_count = checked
         state.record_gate(stage_row_id, gate.type, "passed" if passed else "failed",
                           rows_checked=checked, rows_rejected=rejected, detail=detail)
+        state.event(f"gate.{'passed' if passed else 'failed'}",
+                    f"{pipeline_name}/{stage} {gate.type}: {detail or 'ok'}",
+                    run_id=run_id, level="info" if passed else "error",
+                    data={"stage_run_id": stage_row_id, "gate_type": gate.type})
         if not passed:
             failures.append(f"{gate.type}: {detail}")
 
     if failures:
-        state.finish_stage(stage_row_id, "failed")
+        state.finish_stage(stage_row_id, "failed", row_count=row_count)
+        state.event("stage.failed", f"{pipeline_name}/{stage} halted: " + "; ".join(failures),
+                    run_id=run_id, level="error", data={"stage_run_id": stage_row_id})
         raise GateFailed(f"{pipeline_name}/{stage}: " + "; ".join(failures))
 
-    state.finish_stage(stage_row_id, "passed")
+    state.finish_stage(stage_row_id, "passed", row_count=row_count)
+    state.event("stage.passed", f"{pipeline_name}/{stage} gates passed", run_id=run_id,
+                data={"stage_run_id": stage_row_id})
 
 
-def run_transform(*, pipeline_name: str, stage: str) -> None:
+def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) -> None:
     pipeline = loader.load(pipeline_name)
     target = next(s for s in pipeline.stages if s.name == stage)
 
+    state.event("transform.start", f"{pipeline_name}/{stage} via {target.engine}", run_id=run_id)
     if target.engine == "dbt":
         # Not yet verified end to end - no real dbt project exists for this
         # pipeline's models (docs/layer2.md's "Out of scope (MVP)" territory
@@ -233,6 +250,8 @@ def run_transform(*, pipeline_name: str, stage: str) -> None:
         proc = subprocess.run(["dbt", "run", "--select", *target.models],
                               cwd=pipeline.root, capture_output=True, text=True)
         if proc.returncode != 0:
+            state.event("transform.failed", f"dbt run failed for {stage!r}", run_id=run_id,
+                        level="error")
             raise GateFailed(f"dbt run failed for {stage!r}:\n{proc.stderr}")
     elif target.engine == "procedure":
         proc_name = pipeline.path(target.procedure).stem
@@ -240,10 +259,13 @@ def run_transform(*, pipeline_name: str, stage: str) -> None:
         proc = subprocess.run(cmd + ["-c", f"CALL {proc_name}();"], env=env,
                               capture_output=True, text=True, timeout=300)
         if proc.returncode != 0:
+            state.event("transform.failed", f"CALL {proc_name}() failed for {stage!r}",
+                        run_id=run_id, level="error")
             raise GateFailed(f"CALL {proc_name}() failed for {stage!r}:\n{proc.stderr}")
+    state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
 
 
-def run_extract(*, pipeline_name: str) -> None:
+def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
     raise NotImplementedError(
         f"run_extract({pipeline_name!r}): the dlt pack this calls into does "
         f"not exist yet - see docs/layer2.md's 'In scope (MVP)'")

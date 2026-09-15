@@ -76,3 +76,37 @@ def test_stats_counts_stage_and_gate_runs(tmp_path, monkeypatch):
     stats = state.stats()
     assert stats["stages_run"] == 1
     assert stats["gates_failed"] == 1
+
+
+def test_stages_for_run_groups_every_stage_under_one_pipeline_run(tmp_path, monkeypatch):
+    """What `dpagent pipeline status`/`audit` read: every stage_runs row a
+    single `dpagent pipeline run` produced, in stage order - not just the
+    most recent per-stage row `latest_stage()` answers."""
+    _fresh_db(tmp_path, monkeypatch)
+
+    run_id = state.start_run("data", "demo")
+    landing = state.start_stage(run_id, "demo", "landing")
+    state.finish_stage(landing, "passed")
+    raw = state.start_stage(run_id, "demo", "raw")
+    state.finish_stage(raw, "passed")
+    # a different run must not leak in
+    other_run = state.start_run("data", "demo")
+    state.start_stage(other_run, "demo", "landing")
+
+    stages = state.stages_for_run(run_id)
+    assert [s["stage"] for s in stages] == ["landing", "raw"]
+
+
+def test_latest_run_can_be_scoped_to_a_target(tmp_path, monkeypatch):
+    _fresh_db(tmp_path, monkeypatch)
+
+    state.start_run("data", "demo")
+    other = state.start_run("data", "other_pipeline")
+
+    found = state.latest_run(kind="data", target="other_pipeline")
+    assert found["id"] == other
+
+
+def test_get_run_returns_none_for_an_unknown_id(tmp_path, monkeypatch):
+    _fresh_db(tmp_path, monkeypatch)
+    assert state.get_run(999) is None

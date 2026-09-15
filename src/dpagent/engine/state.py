@@ -239,13 +239,21 @@ def finish_run(run_id: int, status: str) -> None:
     conn().commit()
 
 
-def latest_run(kind: str | None = None) -> sqlite3.Row | None:
+def latest_run(kind: str | None = None, target: str | None = None) -> sqlite3.Row | None:
+    clauses, params = [], []
     if kind:
-        cur = conn().execute(
-            "SELECT * FROM runs WHERE kind=? ORDER BY id DESC LIMIT 1", (kind,))
-    else:
-        cur = conn().execute("SELECT * FROM runs ORDER BY id DESC LIMIT 1")
+        clauses.append("kind=?")
+        params.append(kind)
+    if target:
+        clauses.append("target=?")
+        params.append(target)
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    cur = conn().execute(f"SELECT * FROM runs{where} ORDER BY id DESC LIMIT 1", params)
     return cur.fetchone()
+
+
+def get_run(run_id: int) -> sqlite3.Row | None:
+    return conn().execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
 
 
 # ---------------------------------------------------------------- steps
@@ -457,6 +465,14 @@ def latest_stage(pipeline: str, stage: str) -> sqlite3.Row | None:
 def gates_for_stage(stage_row_id: int) -> list[sqlite3.Row]:
     return conn().execute(
         "SELECT * FROM gate_runs WHERE stage_run_id=? ORDER BY id", (stage_row_id,)).fetchall()
+
+
+def stages_for_run(run_id: int) -> list[sqlite3.Row]:
+    """Every stage_runs row tied to one `runs` row (kind='data') - what
+    `dpagent pipeline status`/`audit` group together, since a single pipeline
+    run touches several stages and `latest_stage()` only ever answers for one."""
+    return conn().execute(
+        "SELECT * FROM stage_runs WHERE run_id=? ORDER BY id", (run_id,)).fetchall()
 
 
 def stats() -> dict[str, Any]:

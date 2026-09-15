@@ -9,6 +9,7 @@ rather than adding psycopg2 as a new dependency for one feature.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import textwrap
@@ -67,18 +68,27 @@ def render_dag(pipeline: Pipeline) -> str:
 
     for task in tasks:
         if task.kind == "extract":
-            call = f'runtime.run_extract(pipeline_name="{pipeline.name}")'
+            call = f'runtime.run_extract(pipeline_name="{pipeline.name}", run_id=run_id)'
         elif task.kind == "gate":
             stage_name = task.id[len("gate_"):]
             call = (f'runtime.run_gate(pipeline_name="{pipeline.name}", '
-                    f'stage="{stage_name}")')
+                    f'stage="{stage_name}", run_id=run_id)')
         else:
             stage_name = task.id[len("transform_"):]
             call = (f'runtime.run_transform(pipeline_name="{pipeline.name}", '
-                    f'stage="{stage_name}")')
+                    f'stage="{stage_name}", run_id=run_id)')
+        # `run_id` is dpagent's own runs.id (kind='data'), started by `dpagent
+        # pipeline run` before it triggers this DAG - passed through
+        # dag_run.conf so every task's stage_runs/gate_runs/events row ties
+        # back to that one run, the same run `dpagent audit <run>` reads.
+        lines.append(f'    def _{task.id}(dag_run=None, **_):')
+        lines.append(f'        run_id = (dag_run.conf or {{}}).get("dpagent_run_id") '
+                     f'if dag_run else None')
+        lines.append(f'        {call}')
+        lines.append(f'')
         lines.append(f'    {task.id} = PythonOperator(')
         lines.append(f'        task_id="{task.id}",')
-        lines.append(f'        python_callable=lambda: {call},')
+        lines.append(f'        python_callable=_{task.id},')
         lines.append(f'    )')
 
     for task in tasks:
@@ -186,3 +196,45 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True) -> DeployResult:
     if apply_db:
         result.procedures_applied = apply_procedures(pipeline)
     return result
+
+
+def _airflow_paths() -> tuple[Path, Path]:
+    """(venv bin dir, env file) for the installed airflow pack - the same
+    convention `packs/airflow/af-lib.sh`'s af_venv/af_env_file use, read from
+    the pack's own recorded install params (falling back to the pack's
+    default) rather than hard-coding `/opt/airflow`, since install_dir is a
+    pack param a real install can override."""
+    from ..engine import state
+    from ..library import loader as packs_mod
+
+    pack = packs_mod.load("airflow")
+    install_dir = (pack.param_schema.get("install_dir") or {}).get("default", "/opt/airflow")
+    record = state.get_install("airflow")
+    if record:
+        supplied = json.loads(record["params_json"])
+        install_dir = supplied.get("install_dir", install_dir)
+    install_dir = Path(install_dir)
+    return install_dir / ".venv" / "bin", install_dir / "home" / "airflow.env"
+
+
+def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
+    """The exact command `dpagent pipeline run` shells out to - built here,
+    separately from the subprocess call, so it can be printed/tested without
+    actually running it (mirrors `_psql_command`).
+
+    Same shape as `af_run` in af-lib.sh: run as the `airflow` OS user with
+    its env file sourced and its venv on PATH, since the airflow CLI must
+    run as the user the webserver/scheduler/metadata DB were set up for."""
+    venv_bin, env_file = _airflow_paths()
+    conf = json.dumps({"dpagent_run_id": dpagent_run_id})
+    inner = (
+        f'set -a; source "{env_file}"; set +a; '
+        f'export PATH="{venv_bin}:$PATH"; '
+        f'exec "{venv_bin}/airflow" dags trigger "{pipeline_name}" --conf {conf!r}'
+    )
+    return ["sudo", "-u", "airflow", "bash", "-c", inner]
+
+
+def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.CompletedProcess:
+    cmd = trigger_dag_command(pipeline_name, dpagent_run_id)
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)

@@ -6,10 +6,14 @@ before anything is generated or run against a real warehouse.
 """
 from __future__ import annotations
 
+import sys
+
 import click
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
+from ..engine import state
 from ..pipelines import deploy as deploy_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
@@ -140,3 +144,139 @@ def deploy_cmd(name, yes, no_db):
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
     console.print("[green]deployed[/green]")
+
+
+@pipeline_group.command("run")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True)
+def run_cmd(name, yes):
+    """Trigger this pipeline's deployed Airflow DAG - through Airflow, not around it.
+
+    Records a `runs` row (kind='data') first and passes its id into the DAG
+    run's `conf`, so every stage/gate the DAG's tasks execute ties back to
+    it - `dpagent pipeline status`/`audit` read exactly that row, nothing
+    dpagent executes itself. Triggering runs the CLI as the `airflow` OS
+    user (same as `packs/airflow`'s own af_run), a real command against this
+    host's real Airflow, so it asks first unless --yes. dpagent does not
+    wait for the DAG to finish - Airflow runs it asynchronously.
+    """
+    _load_or_fail(name)   # fail before touching state if the manifest itself is broken
+
+    if not yes and not confirm(
+            f"Trigger the deployed {name!r} DAG now (runs as the airflow OS user)?",
+            default=True):
+        sys.exit(1)
+
+    run_id = state.start_run("data", name)
+    state.event("pipeline.trigger", f"triggering Airflow DAG {name!r}",
+               run_id=run_id, actor="user")
+
+    result = deploy_mod.trigger_dag(name, run_id)
+    if result.returncode != 0:
+        state.finish_run(run_id, "failed")
+        state.event("pipeline.trigger_failed", result.stderr.strip(),
+                   run_id=run_id, level="error")
+        fail(f"could not trigger the Airflow DAG for {name!r} (run {run_id}):\n"
+             f"{result.stderr.strip()}")
+
+    console.print(f"[green]triggered[/green] — dpagent run {run_id}")
+    console.print(f"[dim]dpagent does not wait for Airflow to finish this run. "
+                 f"Check progress with: dpagent pipeline status {name}[/dim]")
+
+
+@pipeline_group.command("status")
+@click.argument("name")
+def status_cmd(name):
+    """Stages, last run, gate verdicts - from dpagent's own journal, not a live Airflow query."""
+    _load_or_fail(name)
+    run = state.latest_run(kind="data", target=name)
+    if not run:
+        console.print(f"[dim]no runs recorded for {name!r} yet[/dim]")
+        console.print(f"[dim]run: dpagent pipeline run {name}[/dim]")
+        return
+
+    stage_rows = state.stages_for_run(run["id"])
+    colour = {"ok": "green", "failed": "red"}.get(run["status"], "yellow")
+    table = Table(box=None,
+                 title=f"{name} · run {run['id']} [{colour}]{run['status']}[/{colour}] "
+                       f"· started {run['started_at']}")
+    table.add_column("stage", style="bold")
+    table.add_column("status")
+    table.add_column("rows", justify="right")
+    table.add_column("gates")
+    table.add_column("started", style="dim")
+    for stage_row in stage_rows:
+        gates = state.gates_for_stage(stage_row["id"])
+        stage_colour = {"passed": "green", "failed": "red"}.get(stage_row["status"], "yellow")
+        gate_summary = ", ".join(
+            f"[green]{g['gate_type']}[/green]" if g["status"] == "passed"
+            else f"[red]{g['gate_type']}[/red]"
+            for g in gates) or "[dim]none[/dim]"
+        table.add_row(
+            stage_row["stage"],
+            f"[{stage_colour}]{stage_row['status']}[/{stage_colour}]",
+            str(stage_row["row_count"]) if stage_row["row_count"] is not None else "-",
+            gate_summary,
+            stage_row["started_at"],
+        )
+    console.print(table)
+    if not stage_rows:
+        console.print("[dim]triggered but no stage has reported in yet - "
+                      "Airflow may still be scheduling it[/dim]")
+
+
+@pipeline_group.command("audit")
+@click.argument("run_id", type=int, required=False)
+def audit_cmd(run_id):
+    """Every stage and gate decision for one pipeline run, and who made it."""
+    if run_id is None:
+        run = state.latest_run(kind="data")
+        if not run:
+            console.print("[dim]no pipeline runs recorded[/dim]")
+            return
+        run_id = run["id"]
+    else:
+        run = state.get_run(run_id)
+        if not run or run["kind"] != "data":
+            fail(f"run {run_id} is not a pipeline run (dpagent audit {run_id} "
+                 f"shows any run kind)")
+
+    console.print(f"[bold]{run['target']}[/bold] · run {run_id} · {run['status']}")
+
+    # Gate detail/event message come from the manifest's own table/column
+    # names and generated SQL, not a fixed vocabulary like gate_type - built
+    # as Text rather than interpolated into an f-string, so a stray "["
+    # in one can't be parsed as rich markup and silently eaten (the same
+    # trap `report.py`'s own audit_cmd avoids the same way).
+    for stage_row in state.stages_for_run(run_id):
+        colour = {"passed": "green", "failed": "red"}.get(stage_row["status"], "yellow")
+        header = Text(f"\n{stage_row['stage']} ")
+        header.append(stage_row["status"], style=colour)
+        if stage_row["row_count"] is not None:
+            header.append(f" · {stage_row['row_count']} rows")
+        console.print(header)
+
+        for gate in state.gates_for_stage(stage_row["id"]):
+            gate_colour = "green" if gate["status"] == "passed" else "red"
+            line = Text("  ")
+            line.append(gate["gate_type"], style=gate_colour)
+            if gate["detail"]:
+                line.append(f" — {gate['detail']}")
+            console.print(line)
+
+    events = state.events_for(run_id)
+    if events:
+        console.print("\n[bold]events[/bold]")
+        table = Table(box=None)
+        table.add_column("time", style="dim")
+        table.add_column("actor", style="cyan")
+        table.add_column("kind", style="magenta")
+        table.add_column("message")
+        for row in events:
+            text = Text(row["message"])
+            if row["level"] == "error":
+                text.stylize("red")
+            elif row["level"] == "warn":
+                text.stylize("yellow")
+            table.add_row(row["ts"].split("T")[-1], row["actor"], row["kind"], text)
+        console.print(table)

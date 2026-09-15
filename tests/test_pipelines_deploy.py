@@ -16,6 +16,7 @@ import subprocess
 import pytest
 import yaml
 
+from dpagent.engine import state
 from dpagent.pipelines import deploy, loader
 
 requires_psql = pytest.mark.skipif(
@@ -80,6 +81,55 @@ def test_dag_names_the_source_pipeline_yaml_for_regeneration(pipeline):
     src = deploy.render_dag(pipeline)
     assert "pipelines/demo/pipeline.yaml" in src
     assert "do not" in src.lower() and "hand-edit" in src.lower()
+
+
+def test_dag_threads_dpagent_run_id_from_dag_run_conf_into_every_task(pipeline):
+    """The regression this guards: without this, every stage_runs/gate_runs
+    row a real DAG run produces would have run_id=NULL, and `dpagent
+    pipeline status`/`audit` (which group stages by run_id) would never be
+    able to find them."""
+    src = deploy.render_dag(pipeline)
+    assert 'dag_run.conf or {}).get("dpagent_run_id")' in src
+    assert "run_id=run_id" in src
+
+
+# ---------------------------------------------------------------- trigger_dag_command
+
+@pytest.fixture
+def isolated_db(tmp_path, monkeypatch):
+    """`trigger_dag_command` reads the airflow pack's recorded install params
+    via state.get_install() - must not touch the real production journal."""
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    yield
+    state.close()
+
+
+def test_trigger_dag_command_runs_as_the_airflow_os_user(isolated_db):
+    cmd = deploy.trigger_dag_command("demo", 42)
+    assert cmd[:3] == ["sudo", "-u", "airflow"]
+
+
+def test_trigger_dag_command_passes_the_dpagent_run_id_as_conf(isolated_db):
+    cmd = deploy.trigger_dag_command("demo", 42)
+    inner = cmd[-1]
+    assert 'dags trigger "demo"' in inner
+    assert '{"dpagent_run_id": 42}' in inner
+
+
+def test_trigger_dag_command_uses_the_pack_default_install_dir_with_no_recorded_install(isolated_db):
+    cmd = deploy.trigger_dag_command("demo", 1)
+    inner = cmd[-1]
+    assert "/opt/airflow/.venv/bin/airflow" in inner
+    assert "/opt/airflow/home/airflow.env" in inner
+
+
+def test_trigger_dag_command_honours_a_recorded_install_dir_override(isolated_db):
+    state.record_install("airflow", "1.0.0", {"install_dir": "/srv/af"}, "hash",
+                         "rhel", "installed")
+    cmd = deploy.trigger_dag_command("demo", 1)
+    inner = cmd[-1]
+    assert "/srv/af/.venv/bin/airflow" in inner
 
 
 # ---------------------------------------------------------------- render_dbt_schema
