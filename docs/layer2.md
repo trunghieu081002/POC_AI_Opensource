@@ -138,6 +138,23 @@ hop is not a choice, it is what dlt is for.
    produced, so adding a second engine costs this document nothing beyond
    this entry.
 
+   **Observed default, not a rule the generator enforces**: in practice this
+   settles as *"landing → raw uses dbt, raw → curated uses a procedure"* —
+   the first hop is normalisation/casting, almost always 1:1-shaped; the
+   second builds business-rule-encoded facts (currency conversion, an
+   allocation, a merge), where procedural logic tends to actually live. Per
+   team lead, this is the expected shape for most pipelines and is worth
+   documenting as the common pattern a reviewer should expect to see - but
+   it is a consequence of what each hop's logic usually looks like, not a
+   position-based constraint the schema enforces. A pipeline where the later
+   hop is still 1:1-shaped, or where the earlier one genuinely needs
+   procedural logic (an iterative dedup, e.g.), still declares `engine:`
+   per stage exactly as any other. Hard-coding "first hop = dbt, second =
+   procedure" into `pipeline lint` would force a procedure where dbt already
+   says what is needed, or block one where dbt fights the logic - the exact
+   cost this document already rejected once by keeping the choice per-hop
+   instead of project-wide.
+
    Before reaching for a procedure, check whether dbt's own `snapshot` (SCD
    Type 2) or `incremental` materializations already say what's needed
    declaratively — a lot of what looks procedural at first (an Odoo
