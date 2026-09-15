@@ -2130,3 +2130,63 @@ works." No code changed this entry - the existing `dp_as_user` fix from
 earlier today already covers every call site this pattern could hit
 (`pg_as_postgres`, `pg_query`, `pg_is_up`, `50-databases.sh`, `af_run`,
 `af_query`); this closes out the investigation, not a new fix.
+
+### 2026-09-15 — real Debian 12, for the first time this whole engagement, and a real `--force` bug it took to find
+
+Every "debian family" test so far had actually been Ubuntu - genuinely
+untested until now whether Debian itself, not just an Ubuntu-flavoured
+member of the same `supports.families` entry, actually works. Built a
+`debian:12` (bookworm) container with systemd properly installed as PID 1
+(`apt-get install systemd systemd-sysv`, `exec /lib/systemd/systemd`) -
+`os_detect` correctly reported `id: debian, family: debian`, distinct
+from `ubuntu`.
+
+**`base`, `postgres`, `dbt` all installed and passed their full acceptance
+suites cleanly on the first try** - 4/4, 6/6, 4/4, including the newest
+and most complex checks (`dbtread-group-can-actually-write`, the
+`50-databases.sh` catalog entry). One expected, harmless difference from
+every RHEL run so far: postgres's `initdb` step showed
+`skip — guard says already applied` on a *fresh* install - correct, not a
+bug: Debian's `postgresql-15` package auto-creates its cluster via
+`pg_createcluster` as part of package installation, unlike RHEL's
+`postgresql-setup initdb`, which needs its own explicit step. The guard
+correctly recognised the package manager had already done that work.
+
+**Real bug, found by the first `--force` chain ever run on a Debian-family
+host in this whole engagement**: `dpagent install airflow --force` (airflow
+depends on python-modern) failed at python-modern's own step -
+`no Python 3.8+ found and this Debian/Ubuntu release is too old for a
+first-party package to provide one` - on a host that demonstrably has
+python3.11 as its own system default, moments after this exact pack's own
+preflight had printed `already satisfied: .../python3.11`. Root cause:
+`runner.py`'s `_run_step` skips a step's guard entirely under `--force`
+(`step.guard and not self.force and ...`) - by design, force means "run
+it anyway." `steps/10-install.sh`'s Debian branch never itself re-checked
+whether a suitable Python already existed; its own header comment said as
+much - *"Only reached when the guard found nothing satisfying 3.8-3.13
+already"* - a premise that was true under the normal guarded path and
+silently false the moment `--force` bypassed the guard that was supposed
+to guarantee it. RHEL's branch happened to be immune by accident (it
+re-installs the same package unconditionally, which `dnf` treats as a
+harmless no-op) - Debian's branch actively refused, based on a stale
+assumption, contradicting what the same run had just said two panels
+above. Every prior `--force` run in this engagement had been on a
+RHEL-family host, so this had never been exercised until the very first
+Debian `--force` chain.
+
+Fixed by having the step check `dp_find_python` itself, first, instead of
+trusting the caller: already-satisfied short-circuits to a no-op before
+either OS-family branch is reached, matching what preflight and the guard
+already independently verify. Checked the rest of the codebase for the
+same shape (a `dp_fail` whose correctness implicitly depends on why the
+step was reached, not on it re-checking current state) - the only other
+unconditional `dp_fail` calls in any step are the generic "unsupported OS
+family" fallbacks, which are facts independent of guard state, not the
+same bug. Verified against the exact real failure: redeployed the fix
+into the same container and re-ran the identical `--force` chain -
+python-modern's step now completes `ok 54ms` instead of failing, and the
+full `base + python-modern + postgres + airflow` install completes end to
+end with all four acceptance suites passing (16/16 checks, including a
+real DAG triggered and run through airflow) - the first full stack ever
+proven on real Debian in this engagement. `pytest` unaffected; `dpagent
+lint python-modern` clean.

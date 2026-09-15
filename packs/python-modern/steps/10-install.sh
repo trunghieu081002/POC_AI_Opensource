@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Only reached when the guard found nothing satisfying 3.8-3.13 already.
+# Normally only reached when the guard found nothing satisfying 3.8-3.13
+# already - but `--force` skips every step's guard unconditionally
+# (runner.py's _run_step: `step.guard and not self.force and ...`), so this
+# script cannot assume that premise still holds. A `--force` reinstall on a
+# Debian/Ubuntu host that already has a perfectly good system python3 used to
+# hit the Debian branch below and fail outright, claiming "no Python 3.8+
+# found" while `dpagent doctor`/this pack's own preflight, moments earlier in
+# the same run, had just said the opposite - confirmed for real running
+# `dpagent install airflow --force` on Debian 12, which ships python3.11 as
+# its own default `python3`.
 set -euo pipefail
 # shellcheck source=/dev/null
 source "${DP_LIB:?dp.sh not found}"
@@ -7,7 +16,9 @@ source "${DP_LIB:?dp.sh not found}"
 dp_require_root
 VERSION="$(dp_param version 3.11)"
 
-if dp_is_rhel; then
+if dp_find_python 3 8 3 13 >/dev/null 2>&1; then
+  : # already satisfied - nothing to install; the check below reports it
+elif dp_is_rhel; then
   # EL8/EL9 AppStream ships these as installable alongside the 3.6/3.9 default
   # without touching /usr/bin/python3 or anything dnf itself depends on.
   dp_pkg_install "python${VERSION}" "python${VERSION}-pip"
