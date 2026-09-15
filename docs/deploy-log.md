@@ -1785,3 +1785,76 @@ written, on every host, for the whole engagement - the SELinux warning,
 the port-adoption notice, the multi-major-version notice, the locale
 notice, and now these two firewall notices, all now visible for the first
 time.
+
+### 2026-09-15 — the dbtread group, finally proven with a real DAG that calls dbt: setgid was never enough
+
+The `dbtread` group (`packs/dbt/steps/30-project.sh`,
+`packs/airflow/steps/10-user.sh`) was built specifically so airflow could
+orchestrate dbt - literally this stack's stated whole point since the very
+first end-to-end demo. It has been in the codebase for days, exercised by
+airflow's own acceptance suite the entire time... except that suite's test
+DAGs are two plain `PythonOperator`s that print a string and raise an
+exception - nothing in this whole engagement had ever actually deployed a
+DAG that calls `dbt` through the group it was built for, until now.
+
+Built the full stack end to end in a fresh container (base, postgres with
+both a `dbt_user` and an `airflow` role, dbt against the `warehouse`
+database, airflow against `airflow_meta`), then hand-wrote a DAG with a
+`BashOperator` running `dbt debug --project-dir /opt/dbt/project
+--profiles-dir /opt/dbt/profiles` and triggered it for real. It failed:
+
+```
+PermissionError: [Errno 13] Permission denied: '/opt/dbt/project/logs/dbt.log'
+```
+
+**Root cause: setgid fixes group *ownership* on new files, never their
+permission bits.** `dbt.log` and everything under `target/` get created
+the first time anything runs `dbt` in the project - in practice, that is
+this pack's own acceptance suite (`suites/dbt/checks/10-connection-works.sh`),
+running as root, immediately after install. Root's own umask leaves those
+files at the ordinary `644` - group *read-only*. `30-project.sh`'s own
+comment claimed dbtread members could "traverse/write the project tree" -
+wrong, and wrong in a way nothing had ever tested until a real second user
+tried to actually write there. Confirmed the exact file: `getfacl`/`ls -la`
+on `/opt/dbt/project/logs/dbt.log` showed `-rw-r--r-- root dbtread` -
+group has `r--`, not `rw-`. Every dbt+airflow install this whole
+engagement produced this state; nothing had ever run a second `dbt`
+invocation as a different user against it before now.
+
+**Fix: a default POSIX ACL, not a wider chmod.** A wider directory mode
+(e.g. `2775` instead of `2750`) only helps *future* files created after
+the chmod - it does nothing for `dbt.log`, which already existed with its
+own restrictive mode by the time any fix could run, and does nothing for
+whatever dbt creates *next* under a umask nobody controls. `setfacl -R -m
+g:dbtread:rwX -d -m g:dbtread:rwX "$PROJECT_DIR"` in the same step that
+already chgrp/chmods the project tree: the `-m` grant retroactively fixes
+anything already there (a project dropped in by hand before this step
+first ran), and the `-d` default ACL makes every file dbt creates *after*
+this point inherit `dbtread:rwx` regardless of who creates it or what
+their umask is - because this step runs before this pack's own suite ever
+invokes `dbt` for the first time, the suite's own root-run inherits the
+default ACL too, so the fix does not depend on install order. Falls back
+to a `dp_warn` (not a hard failure) if `setfacl`/the `acl` package is
+unavailable, matching this pack's existing best-effort pattern for git.
+
+Verified three ways, not just the one DAG that first found it: (1) cleared
+and re-triggered the *exact same* failed task after deploying the fix -
+same DAG, same task, `success` this time, log showing a real `dbt debug`
+connecting to Postgres; (2) `getfacl` confirms both the retroactive grant
+on the pre-existing `dbt.log` and the default ACL for future files; (3)
+added `suites/dbt/checks/40-dbtread-group-can-actually-write.sh` - adds
+`nobody` (present on every Linux, no pack-specific user needed) to
+`dbtread`, has it `touch` a file under `project/logs`, asserts success,
+removes `nobody` from the group in a trap regardless of outcome. Confirmed
+this new check is not a check that never fires: stripped the ACL by hand
+(`setfacl -R -b`) on the already-fixed install and re-ran `dpagent test
+dbt` - the new check failed with exactly the expected message, the other
+three checks stayed green - then restored the fix via a real `--force`
+reinstall and got 4/4 again. `pytest` unaffected by this shell/YAML-only
+change; `dpagent lint` clean on `dbt` and its suite.
+
+Caveat for any host that installed dbt before this fix: `30-project.sh` is
+guarded on `dbt_project.yml` already existing, so a plain re-run skips it
+- fixing an existing install needs `dpagent install dbt --force` (or
+`--set` the same params again with `--force`) to actually re-run this step
+and apply the ACL retroactively.

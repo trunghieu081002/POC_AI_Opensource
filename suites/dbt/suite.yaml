@@ -33,6 +33,11 @@ checks:
     negative: true
     timeout: 120
 
+  - id: dbtread-group-can-actually-write
+    script: checks/40-dbtread-group-can-actually-write.sh
+    description: A dbtread member other than whoever ran dbt first can still write to the project
+    timeout: 30
+
 teardown:
   - id: drop-fixtures
     script: teardown/99-fixtures.sh

@@ -22,13 +22,33 @@ PROFILES_DIR="$(dirname "$PROJECT_DIR")/profiles"
 dp_run mkdir -p "$PROJECT_DIR/models" "$PROFILES_DIR"
 
 # Group-shared, not world-readable: dbtread members (airflow, once it joins -
-# see packs/airflow/steps/10-user.sh) can read the profile and traverse/write
-# the project tree, everyone else cannot. setgid so target/ and logs/, which
-# dbt itself creates the first time it runs, inherit the group too instead of
-# landing owned by whichever user (root or airflow) happened to run first.
+# see packs/airflow/steps/10-user.sh) can read the profile and traverse the
+# project tree, everyone else cannot. setgid so target/ and logs/, which dbt
+# itself creates the first time it runs, inherit the *group* too instead of
+# landing owned by whichever user (root, during this pack's own acceptance
+# suite, or airflow later) happened to run first.
+#
+# setgid alone is not enough for a *different* group member to then write
+# there, though: it only fixes group ownership on new entries, not their
+# permission bits, which come from the creating process's umask - root's own
+# `dbt run` (this pack's suite) leaves logs/dbt.log and everything under
+# target/ at the usual 644, group read-only. The next dbt invocation under a
+# different user (airflow orchestrating it, exactly this stack's point) then
+# fails with a raw `PermissionError: ... dbt.log` that looks nothing like a
+# permissions problem from the traceback alone. A default ACL is what
+# actually keeps this working regardless of which user creates a file next -
+# `-m` fixes anything already here (this pack's own suite runs before this
+# step's guard would ever skip it, but a project dropped in by hand might
+# not be empty), `-d` covers everything dbt creates after that.
 dp_run chgrp dbtread "$PROJECT_DIR" "$PROFILES_DIR"
 dp_run chmod 2775 "$PROJECT_DIR"
 dp_run chmod 2750 "$PROFILES_DIR"
+dp_have setfacl || dp_pkg_install acl
+if dp_have setfacl; then
+  dp_run setfacl -R -m "g:dbtread:rwX" -d -m "g:dbtread:rwX" "$PROJECT_DIR"
+else
+  dp_warn "setfacl unavailable; dbtread members can read this project but may hit Permission denied writing logs/target if they did not create them first"
+fi
 
 dp_write "${PROJECT_DIR}/dbt_project.yml" 0644 <<EOF
 name: '${PROFILE_NAME}'
