@@ -20,12 +20,16 @@ from .loader import quarantine_table_for
 # necessarily what a manifest author writes - confirmed empirically
 # (docs/deploy-log.md): a contract declaring `write_date: timestamp` failed
 # to match Postgres's own report of `timestamp without time zone` for the
-# exact same column until this map was added.
+# exact same column until this map was added. varchar/character varying was
+# added the same way: dlt's postgres destination lands its own "text" type
+# as Postgres VARCHAR, not TEXT - confirmed by actually running dlt against
+# a throwaway database and reading back \d on the table it created, not
+# assumed from dlt's docs.
 _TYPE_ALIASES = {
     "int": "integer", "int4": "integer", "integer": "integer",
     "int8": "bigint", "bigint": "bigint",
     "bool": "boolean", "boolean": "boolean",
-    "text": "text",
+    "text": "text", "varchar": "text", "character varying": "text",
     "numeric": "numeric", "decimal": "numeric",
     "timestamp": "timestamp without time zone",
     "timestamptz": "timestamp with time zone",
@@ -57,6 +61,15 @@ def _warehouse_conn(pipeline: loader.Pipeline) -> tuple[list[str], dict[str, str
     env = os.environ.copy()
     if resolved.get("password"):
         env["PGPASSWORD"] = resolved["password"]
+    # Every generated query (compile_gate, _quarantine_sql, `CALL <proc>()`)
+    # is unqualified ("select * from {table}", not "{schema}.{table}") -
+    # found by actually running a schema_contract gate against a pipeline
+    # whose warehouse.schema is not "public" (the demo pipeline's is
+    # `schema: demo`): the field was declared in loader.Warehouse but never
+    # once read anywhere, so every query silently fell back to Postgres's
+    # default search_path instead. PGOPTIONS sets it for the whole psql
+    # session, however many -c/-f arguments follow.
+    env["PGOPTIONS"] = f"-c search_path={pipeline.warehouse.schema},public"
     return cmd, env
 
 

@@ -34,6 +34,22 @@ def test_sql_literal_escapes_single_quotes():
     assert runtime._sql_literal("it's a test") == "it''s a test"
 
 
+def test_warehouse_conn_sets_search_path_to_the_declared_schema():
+    """The regression this guards: warehouse.schema was declared in the
+    manifest schema but never once read anywhere - every generated query
+    ("select * from {table}", never schema-qualified) silently fell back to
+    Postgres's own default search_path instead. Found by actually running a
+    schema_contract gate against a pipeline whose warehouse.schema was not
+    "public" (the demo pipeline's own `schema: demo`) against a real
+    database - it found nothing, since the table lived in a schema psql was
+    never told to look in."""
+    wh = loader.Warehouse(host="h", port="5432", database="d", schema="demo_landing")
+    pipeline = loader.Pipeline(name="p", summary="", root=__import__("pathlib").Path("."),
+                               source=loader.Source(connector="x"), warehouse=wh, stages=[])
+    _cmd, env = runtime._warehouse_conn(pipeline)
+    assert env["PGOPTIONS"] == "-c search_path=demo_landing,public"
+
+
 def _stage(**kw):
     return loader.Stage(name="raw", quarantine=loader.Quarantine(reject_threshold_pct=5), **kw)
 

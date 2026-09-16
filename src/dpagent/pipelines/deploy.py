@@ -167,6 +167,11 @@ def _psql_command(pipeline: Pipeline, *extra: str) -> tuple[list[str], dict[str,
     env = os.environ.copy()
     if resolved.get("password"):
         env["PGPASSWORD"] = resolved["password"]
+    # A procedure file's own SQL is unqualified ("TRUNCATE TABLE fct_sales",
+    # not "demo.fct_sales") - same gap as runtime.py's _warehouse_conn, found
+    # the same way: warehouse.schema was declared but never applied to the
+    # session it runs the migration against.
+    env["PGOPTIONS"] = f"-c search_path={pipeline.warehouse.schema},public"
     return cmd, env
 
 

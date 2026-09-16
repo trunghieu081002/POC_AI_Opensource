@@ -159,6 +159,15 @@ def test_write_artifacts_lands_under_the_pipelines_build_directory(pipeline):
         assert "build" in path.parts
 
 
+def test_psql_command_sets_search_path_to_the_declared_schema(pipeline):
+    """Same gap as runtime.py's _warehouse_conn, same fix: a procedure
+    file's own SQL ("TRUNCATE TABLE fct_sales", never schema-qualified)
+    silently ran against the connecting role's default search_path unless
+    warehouse.schema is actually applied to the session."""
+    _cmd, env = deploy._psql_command(pipeline)
+    assert env["PGOPTIONS"] == f"-c search_path={pipeline.warehouse.schema},public"
+
+
 # ---------------------------------------------------------------- apply_procedures (real DB)
 
 @pytest.fixture
