@@ -1,0 +1,53 @@
+- id: dlt-no-matching-version
+  match:
+    output: "Could not find a version that satisfies the requirement dlt"
+  cause: >
+    Either no network access to PyPI, or the interpreter building the venv is
+    outside the range dlt publishes wheels for (dlt 1.x needs Python 3.9+;
+    this pack's own preflight should have caught a too-old interpreter
+    before this step ever ran).
+  autofix: []
+  ask_user: >
+    Check network access to pypi.org, and confirm the venv's python
+    (`/opt/dlt/.venv/bin/python --version`) is 3.9-3.12.
+  retry: false
+
+- id: dlt-psycopg2-build-failed
+  match:
+    output: "Error: pg_config executable not found|Failed building wheel for psycopg2"
+  cause: >
+    The postgres extra normally ships a prebuilt psycopg2-binary wheel; this
+    means pip fell back to building from source, usually because no wheel
+    exists for this platform/python combination.
+  autofix:
+    - "(command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y libpq-dev gcc python3-dev) || true"
+    - "(command -v dnf >/dev/null && dnf install -y libpq-devel gcc python3-devel) || true"
+  retry: true
+  max_attempts: 2
+
+- id: dlt-destination-connection-refused
+  match:
+    output: "could not connect to server: Connection refused"
+  cause: >
+    The destination Postgres named in a pipeline's `warehouse:` (or the
+    source database, for the odoo_postgres connector) is not reachable -
+    most often the postgres pack has not finished, or host/port do not
+    match it.
+  autofix: []
+  ask_user: >
+    Confirm the target Postgres is up (`dpagent verify postgres`) and that
+    the pipeline's warehouse/source host and port actually point at it.
+  retry: false
+
+- id: dlt-schema-does-not-exist
+  match:
+    output: 'schema "[a-z0-9_]+" does not exist'
+  cause: >
+    dlt's postgres destination creates the dataset's schema itself on first
+    load if the connecting role has CREATE privilege on the database - this
+    only fires when it does not (a role scoped down to one schema, e.g.).
+  autofix: []
+  ask_user: >
+    Either grant the warehouse role CREATE on the target database, or
+    create the pipeline's landing schema by hand before the first run.
+  retry: false

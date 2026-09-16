@@ -1,0 +1,78 @@
+name: dlt
+version: 1.0.0
+summary: dlt (data load tool) in a dedicated virtualenv - extract+load only, never transforms
+maturity: stable
+
+provides: [dlt, extract_load]
+requires: [python-modern]
+
+supports:
+  families: [debian, rhel]
+
+host_needs:
+  # dlt pulls in sqlalchemy, pyarrow, pandas et al. transitively - a heavier
+  # footprint than dbt's own venv.
+  disk_mb: { /opt: 2048 }
+
+params:
+  dlt_version:
+    type: string
+    default: "1.*"
+  install_dir:
+    type: string
+    default: "/opt/dlt"
+  # Not read by any real pipeline - a pipeline.yaml's own source:/warehouse:
+  # sections are always the actual truth at run time (docs/layer2.md). These
+  # exist only so this pack's own acceptance suite has a real Postgres to
+  # prove an actual extract+load against, the same reason dbt's pack.yaml
+  # carries host/port/db_user/db_password despite not strictly needing a
+  # database to install successfully either. Composition happens through the
+  # spec, same as dbt/airflow - see examples/etl-stack.yaml.
+  host:
+    type: string
+    default: "localhost"
+  port:
+    type: int
+    default: 5432
+  database:
+    type: string
+    default: "dlt_selftest"
+  db_user:
+    type: string
+    default: "dlt_user"
+  db_password:
+    type: string
+    default: ""
+    secret: true
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+steps:
+  - id: venv
+    script: steps/10-venv.sh
+    description: Create a dedicated virtualenv under install_dir
+    timeout: 300
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/python"'
+
+  - id: install
+    script: steps/20-install.sh
+    description: Install dlt (with the postgres destination and sql_database source extras) into the venv
+    timeout: 900
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/dlt"'
+
+  - id: wrapper
+    script: steps/30-symlink.sh
+    description: Put a `dlt` wrapper on PATH
+    timeout: 60
+    guard: 'test -x /usr/local/bin/dlt'
+
+  - id: selftest-config
+    script: steps/40-selftest-config.sh
+    description: Write the resolved self-test connection config (root-only)
+    timeout: 30
+    # Not guarded: must always reflect the current db_password, see the
+    # script's own comment.

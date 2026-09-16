@@ -1,0 +1,42 @@
+suite: dlt
+summary: Prove dlt actually extracts and loads real data through both MVP connectors
+
+# dlt has no service to be "up" - liveness (the binary exists, its extras
+# import) is verify.sh's job. The only proof that matters here is whether a
+# real extract+load actually moves data, through both connector shapes
+# docs/layer2.md scopes for the MVP (odoo_postgres and csv), and whether a
+# bad manifest (a table that is not there) fails loudly instead of silently
+# moving nothing. Everything uses throwaway schemas/files namespaced with
+# DP_TEST_NS, removed by teardown either way.
+requires: [dlt]
+
+setup:
+  - id: seed-fixtures
+    script: setup/00-fixtures.sh
+    description: Create a throwaway source table and a throwaway CSV file
+    timeout: 60
+
+checks:
+  - id: extract-from-postgres
+    script: checks/10-extract-from-postgres.sh
+    description: sql_database source lands a real Postgres table as-received
+    critical: true
+    timeout: 120
+
+  - id: extract-from-csv
+    script: checks/20-extract-from-csv.sh
+    description: A CSV file lands as-received through the csv connector's mechanism
+    critical: true
+    timeout: 120
+
+  - id: missing-table-fails-loudly
+    script: checks/30-missing-table-fails-loudly.sh
+    description: A source table that does not exist halts extraction instead of moving nothing
+    negative: true
+    timeout: 60
+
+teardown:
+  - id: drop-fixtures
+    script: teardown/99-fixtures.sh
+    description: Remove the throwaway schemas, CSV fixture, and dlt run state
+    timeout: 60
