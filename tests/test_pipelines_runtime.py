@@ -13,6 +13,7 @@ test_pipelines_deploy.py's own throwaway_warehouse tests, when passwordless
 sudo isn't available)."""
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -21,6 +22,9 @@ from dpagent.pipelines import loader, runtime
 
 requires_psql = pytest.mark.skipif(
     shutil.which("psql") is None, reason="psql is not installed on this machine")
+requires_dlt = pytest.mark.skipif(
+    not Path("/opt/dlt/.venv/bin/python").exists(),
+    reason="the dlt pack is not installed on this machine")
 
 
 # ---------------------------------------------------------------- unit-level
@@ -46,8 +50,24 @@ def test_warehouse_conn_sets_search_path_to_the_declared_schema():
     wh = loader.Warehouse(host="h", port="5432", database="d", schema="demo_landing")
     pipeline = loader.Pipeline(name="p", summary="", root=__import__("pathlib").Path("."),
                                source=loader.Source(connector="x"), warehouse=wh, stages=[])
-    _cmd, env = runtime._warehouse_conn(pipeline)
+    _cmd, env = runtime._warehouse_conn(pipeline, "demo_landing")
     assert env["PGOPTIONS"] == "-c search_path=demo_landing,public"
+
+
+def test_stage_schema_uses_the_fixed_landing_dataset_for_the_landing_stage():
+    """The regression this guards: found for real by running run_extract
+    (which lands data at `<pipeline>_landing` by fixed convention, never
+    warehouse.schema - see extract.landing_dataset) and then a landing-stage
+    gate against warehouse.schema found nothing, because dlt had written to
+    a completely different schema."""
+    wh = loader.Warehouse(host="h", port="5432", database="d", schema="demo")
+    landing = loader.Stage(name="landing")
+    raw = loader.Stage(name="raw", engine="dbt", depends_on="landing")
+    pipeline = loader.Pipeline(name="demo", summary="", root=__import__("pathlib").Path("."),
+                               source=loader.Source(connector="x"), warehouse=wh,
+                               stages=[landing, raw])
+    assert runtime._stage_schema(pipeline, landing) == "demo_landing"
+    assert runtime._stage_schema(pipeline, raw) == "demo"
 
 
 def _stage(**kw):
@@ -242,3 +262,105 @@ def test_run_transform_calls_a_deployed_procedure(tmp_path, throwaway_warehouse,
         env={"PGPASSWORD": throwaway_warehouse["password"], "PATH": "/usr/bin:/bin"},
         capture_output=True, text=True)
     assert result.stdout.strip() == "1", f"procedure did not actually run: {result.stderr}"
+
+
+# ---------------------------------------------------------------- run_extract (real dlt)
+
+def _extract_pipeline(root, throwaway_warehouse, monkeypatch, *, source):
+    """Source and destination are the same throwaway role/db - dlt itself
+    does not care, and it keeps the fixture to one provisioned database."""
+    for key in ("host", "port", "database", "user", "password"):
+        monkeypatch.setenv(f"RT_{key.upper()}", throwaway_warehouse[key])
+    data = {
+        "name": "rtx", "summary": "t",
+        "source": source,
+        "warehouse": {"host": "${RT_HOST}", "port": "${RT_PORT}", "database": "${RT_DATABASE}",
+                     "user": "${RT_USER}", "password": "${RT_PASSWORD}"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "items", "min": 0}]}],
+    }
+    d = root / "rtx"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    return loader.load("rtx", root)
+
+
+@requires_psql
+@requires_dlt
+def test_run_extract_lands_a_postgres_source_table_as_received(
+        tmp_path, throwaway_warehouse, monkeypatch):
+    throwaway_warehouse["run_sql"](
+        "CREATE SCHEMA rtx_src; "
+        "CREATE TABLE rtx_src.items (id bigint, name text); "
+        "INSERT INTO rtx_src.items VALUES (1, 'widget'), (2, 'gadget');")
+    pipeline = _extract_pipeline(tmp_path / "pipelines", throwaway_warehouse, monkeypatch, source={
+        "connector": "odoo_postgres",
+        "connection": {"host": "${RT_HOST}", "port": "${RT_PORT}", "database": "${RT_DATABASE}",
+                       "user": "${RT_USER}", "password": "${RT_PASSWORD}", "schema": "rtx_src"},
+        "tables": ["items"],
+    })
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    runtime.run_extract(pipeline_name="rtx")
+
+    result = subprocess.run(
+        ["psql", "-h", "localhost", "-U", throwaway_warehouse["user"],
+         "-d", throwaway_warehouse["database"], "-tAc",
+         "select string_agg(name, ',' order by id) from rtx_landing.items"],
+        env={"PGPASSWORD": throwaway_warehouse["password"], "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True)
+    assert result.stdout.strip() == "widget,gadget", (
+        f"data did not land at the expected <pipeline>_landing dataset: {result.stderr}")
+
+    # And the landing-stage gate must find it there too, not warehouse.schema
+    # (loader.Warehouse's default "public") - the same real gap this test's
+    # own _stage_schema fix addresses.
+    runtime.run_gate(pipeline_name="rtx", stage="landing")
+
+
+@requires_psql
+@requires_dlt
+def test_run_extract_lands_a_csv_file_as_received(tmp_path, throwaway_warehouse, monkeypatch):
+    csv_path = tmp_path / "items.csv"
+    csv_path.write_text("id,name\n1,widget\n2,gadget\n")
+    pipeline = _extract_pipeline(tmp_path / "pipelines", throwaway_warehouse, monkeypatch, source={
+        "connector": "csv", "files": {"path": str(csv_path)},
+    })
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    runtime.run_extract(pipeline_name="rtx")
+
+    result = subprocess.run(
+        ["psql", "-h", "localhost", "-U", throwaway_warehouse["user"],
+         "-d", throwaway_warehouse["database"], "-tAc",
+         "select string_agg(name, ',' order by id) from rtx_landing.items"],
+        env={"PGPASSWORD": throwaway_warehouse["password"], "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True)
+    assert result.stdout.strip() == "widget,gadget", (
+        f"CSV data did not land as expected: {result.stderr}")
+
+
+@requires_psql
+@requires_dlt
+def test_run_extract_raises_for_a_source_table_that_does_not_exist(
+        tmp_path, throwaway_warehouse, monkeypatch):
+    throwaway_warehouse["run_sql"]("CREATE SCHEMA rtx_src;")
+    pipeline = _extract_pipeline(tmp_path / "pipelines", throwaway_warehouse, monkeypatch, source={
+        "connector": "odoo_postgres",
+        "connection": {"host": "${RT_HOST}", "port": "${RT_PORT}", "database": "${RT_DATABASE}",
+                       "user": "${RT_USER}", "password": "${RT_PASSWORD}", "schema": "rtx_src"},
+        "tables": ["nope"],
+    })
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    with pytest.raises(runtime.GateFailed):
+        runtime.run_extract(pipeline_name="rtx")

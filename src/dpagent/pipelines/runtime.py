@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import os
 import subprocess
+from urllib.parse import quote
 
 from ..engine import state
 from ..engine.params import resolve_refs
-from . import generator, loader
+from . import extract, generator, loader
 from .loader import quarantine_table_for
 
 # information_schema.columns reports its own canonical spelling, not
@@ -47,7 +49,20 @@ def _normalize_type(t: str) -> str:
     return _TYPE_ALIASES.get(t.strip().lower(), t.strip().lower())
 
 
-def _warehouse_conn(pipeline: loader.Pipeline) -> tuple[list[str], dict[str, str]]:
+def _stage_schema(pipeline: loader.Pipeline, stage: loader.Stage) -> str:
+    """Where a stage's own data actually lives. Landing is dlt's own fixed
+    dataset_name (`extract.landing_dataset`) - never `warehouse.schema`,
+    which is what the *dbt/procedure*-produced raw/curated stages share.
+    Found the same way as the PGOPTIONS gap itself: a landing-stage gate run
+    for real against data `run_extract` had just landed found nothing,
+    because it searched warehouse.schema while dlt had written to
+    `<pipeline>_landing`."""
+    if stage is pipeline.landing:
+        return extract.landing_dataset(pipeline)
+    return pipeline.warehouse.schema
+
+
+def _warehouse_conn(pipeline: loader.Pipeline, schema: str) -> tuple[list[str], dict[str, str]]:
     resolved = resolve_refs(
         {"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
          "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
@@ -69,14 +84,14 @@ def _warehouse_conn(pipeline: loader.Pipeline) -> tuple[list[str], dict[str, str
     # once read anywhere, so every query silently fell back to Postgres's
     # default search_path instead. PGOPTIONS sets it for the whole psql
     # session, however many -c/-f arguments follow.
-    env["PGOPTIONS"] = f"-c search_path={pipeline.warehouse.schema},public"
+    env["PGOPTIONS"] = f"-c search_path={schema},public"
     return cmd, env
 
 
-def _query_rows(pipeline: loader.Pipeline, sql: str) -> list[dict]:
+def _query_rows(pipeline: loader.Pipeline, schema: str, sql: str) -> list[dict]:
     """Run a query, get its result set back as dicts - psql's own --csv
     output, parsed, rather than any DB driver."""
-    cmd, env = _warehouse_conn(pipeline)
+    cmd, env = _warehouse_conn(pipeline, schema)
     proc = subprocess.run(cmd + ["--csv", "-c", sql], env=env,
                           capture_output=True, text=True, timeout=120)
     if proc.returncode != 0:
@@ -84,9 +99,9 @@ def _query_rows(pipeline: loader.Pipeline, sql: str) -> list[dict]:
     return list(csv.DictReader(io.StringIO(proc.stdout)))
 
 
-def _execute(pipeline: loader.Pipeline, sql: str) -> None:
+def _execute(pipeline: loader.Pipeline, schema: str, sql: str) -> None:
     """Run a statement for its effect (an INSERT, e.g.) - no result set."""
-    cmd, env = _warehouse_conn(pipeline)
+    cmd, env = _warehouse_conn(pipeline, schema)
     proc = subprocess.run(cmd + ["-c", sql], env=env,
                           capture_output=True, text=True, timeout=120)
     if proc.returncode != 0:
@@ -146,12 +161,13 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
                    stage: loader.Stage) -> tuple[bool, str, int | None, int | None]:
     """Returns (passed, detail, rows_checked, rows_rejected)."""
     compiled = generator.compile_gate(gate, stage)
+    schema = _stage_schema(pipeline, stage)
 
     if gate.type == "schema_contract":
         for query in compiled.queries:
             table = query.name.removeprefix("columns_")
             actual = {r["column_name"]: _normalize_type(r["data_type"])
-                     for r in _query_rows(pipeline, query.sql)}
+                     for r in _query_rows(pipeline, schema, query.sql)}
             expected = {col: _normalize_type(t) for col, t in gate["tables"][table].items()}
             mismatches = {c: (expected[c], actual.get(c))
                          for c in expected if actual.get(c) != expected[c]}
@@ -161,13 +177,13 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
 
     if gate.type == "freshness":
         for query in compiled.queries:
-            rows = _query_rows(pipeline, query.sql)
+            rows = _query_rows(pipeline, schema, query.sql)
             if rows and rows[0]["is_stale"] == "t":
                 return False, f"{query.name} is stale (older than {gate['max_age']})", None, None
         return True, "", None, None
 
     if gate.type == "row_count_bounds":
-        n = int(_query_rows(pipeline, compiled.queries[0].sql)[0]["n"])
+        n = int(_query_rows(pipeline, schema, compiled.queries[0].sql)[0]["n"])
         if "min" in gate.params and n < gate["min"]:
             return False, f"row count {n} is below min {gate['min']}", n, None
         if "max" in gate.params and n > gate["max"]:
@@ -187,17 +203,17 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
     # now one table per `gate['table']` (see `_quarantine_sql`), so "percent
     # rejected" only means something scoped to the table a given gate looks at.
     failing_query = compiled.queries[-1]   # "failing_rows" or the rule itself
-    failing_rows = _query_rows(pipeline, failing_query.sql)
+    failing_rows = _query_rows(pipeline, schema, failing_query.sql)
     rejected = len(failing_rows)
     table = gate["table"]
-    total = int(_query_rows(pipeline, f"select count(*) as n from {table}")[0]["n"])
+    total = int(_query_rows(pipeline, schema, f"select count(*) as n from {table}")[0]["n"])
 
     if rejected == 0:
         return True, "", total, 0
 
     quarantine_sql = _quarantine_sql(gate, stage)
     if quarantine_sql:
-        _execute(pipeline, quarantine_sql)
+        _execute(pipeline, schema, quarantine_sql)
 
     if not stage.quarantine:
         return (False, f"{rejected}/{total} row(s) in {table} failed {gate.type}, "
@@ -268,7 +284,7 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
             raise GateFailed(f"dbt run failed for {stage!r}:\n{proc.stderr}")
     elif target.engine == "procedure":
         proc_name = pipeline.path(target.procedure).stem
-        cmd, env = _warehouse_conn(pipeline)
+        cmd, env = _warehouse_conn(pipeline, _stage_schema(pipeline, target))
         proc = subprocess.run(cmd + ["-c", f"CALL {proc_name}();"], env=env,
                               capture_output=True, text=True, timeout=300)
         if proc.returncode != 0:
@@ -278,7 +294,57 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
 
 
+def _dlt_python() -> str:
+    """Path to the dlt pack's own venv python - the same install_dir
+    convention deploy.py's `_airflow_paths` uses for the airflow pack, read
+    from the pack's own recorded install params. dlt is never imported into
+    dpagent's own process (this module's own docstring's discipline,
+    extended from psql/dbt to dlt's own DB drivers)."""
+    from ..library import loader as packs_mod
+
+    pack = packs_mod.load("dlt")
+    install_dir = (pack.param_schema.get("install_dir") or {}).get("default", "/opt/dlt")
+    record = state.get_install("dlt")
+    if record:
+        supplied = json.loads(record["params_json"])
+        install_dir = supplied.get("install_dir", install_dir)
+    return f"{install_dir}/.venv/bin/python"
+
+
+def _connection_url(values: dict) -> str:
+    host, port = values.get("host", ""), values.get("port", "")
+    database = values.get("database", "")
+    user, password = values.get("user", ""), values.get("password", "")
+    auth = f"{quote(str(user), safe='')}:{quote(str(password), safe='')}@" if user else ""
+    return f"postgresql://{auth}{host}:{port}/{database}"
+
+
 def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
-    raise NotImplementedError(
-        f"run_extract({pipeline_name!r}): the dlt pack this calls into does "
-        f"not exist yet - see docs/layer2.md's 'In scope (MVP)'")
+    pipeline = loader.load(pipeline_name)
+    state.event("extract.start", f"{pipeline_name} via {pipeline.source.connector}",
+                run_id=run_id)
+
+    script = extract.render_extract_script(pipeline)
+    env = os.environ.copy()
+
+    dest = resolve_refs(
+        {"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
+         "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
+         "password": pipeline.warehouse.password},
+        path=f"{pipeline_name}.warehouse",
+    )
+    env["DEST_URL"] = _connection_url(dest)
+
+    if pipeline.source.connector == "odoo_postgres":
+        src = resolve_refs(pipeline.source.connection,
+                           path=f"{pipeline_name}.source.connection")
+        env["SRC_URL"] = _connection_url(src)
+
+    proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
+                          capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        state.event("extract.failed", f"{pipeline_name} extract failed", run_id=run_id,
+                    level="error")
+        raise GateFailed(f"extract failed for {pipeline_name!r}:\n{proc.stderr}")
+
+    state.event("extract.done", f"{pipeline_name} extract complete", run_id=run_id)

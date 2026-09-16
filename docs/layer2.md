@@ -1,7 +1,14 @@
 # Layer 2 — staged ingestion with a gate between every stage
 
-Status: **agreed scope, not yet built.** Layer 1 (install) is done and proven;
-see `README.md`'s status list and `docs/deploy-log.md` for what that took.
+Status: **in progress.** The manifest schema/generator/deploy/runtime, the
+`dlt` pack, and both MVP connectors (odoo_postgres, csv) are built and
+verified against real systems (loader.py, generator.py, deploy.py,
+runtime.py, extract.py, packs/dlt, suites/dlt). Still missing: `dpagent
+pipeline run` triggering a real deployed DAG end to end, and an acceptance
+suite for the pipeline machinery itself (the negative case: a file with
+known-bad rows must leave those rows in quarantine and never reach
+`curated`). Layer 1 (install) is done and proven; see `README.md`'s status
+list and `docs/deploy-log.md` for what that took.
 
 ## The one insight, restated for data
 

@@ -3,10 +3,10 @@ would write and the DAG `dpagent pipeline run` would execute - without
 writing or executing anything. This is `plan`'s entire job, same as
 `--dry-run` elsewhere in this project: print every command, change nothing.
 
-Deploy/run themselves (actually writing the DAG file, applying a procedure
-migration, executing gate SQL against a real warehouse, recording
-stage_runs/gate_runs) are not built yet - this module is the compiler those
-will call into, not a stand-in for them.
+Deploy/run themselves (writing the DAG file, applying a procedure migration,
+executing gate SQL against a real warehouse, recording stage_runs/gate_runs)
+live in deploy.py/runtime.py - this module is the compiler those call into,
+not a stand-in for them.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class Query:
 class CompiledGate:
     gate: Gate
     verdict: str        # how the query result(s) decide pass/fail - documentation,
-                        # not executed here (that is the gate runner's job, not built yet)
+                        # not executed here (that is runtime.py's _evaluate_gate's job)
     queries: list[Query]
 
 
