@@ -157,6 +157,36 @@ def _quarantine_sql(gate, stage: loader.Stage) -> str | None:
     return None
 
 
+def _dequarantine_sql(gate) -> str | None:
+    """The DELETE that removes offending rows from the gated table itself,
+    run right after `_quarantine_sql`'s INSERT copies them into quarantine.
+
+    Without this, a quarantined row still physically exists in the stage's
+    own table, so whatever the *next* stage reads from it (a dbt source(),
+    a procedure's SELECT) would still see it - exactly the failure
+    docs/layer2.md's negative acceptance case exists to catch: "a file with
+    known-bad rows must leave those rows in quarantine and must not let
+    them reach curated." Quarantine has to mean the row is moved, not
+    copied - this is what makes it mean that."""
+    table = gate["table"]
+    if gate.type == "not_null":
+        cond = " or ".join(f"{c} is null" for c in gate["columns"])
+        return f"DELETE FROM {table} WHERE {cond}"
+    if gate.type == "unique":
+        cols_csv = ", ".join(gate["columns"])
+        return (f"DELETE FROM {table} WHERE ({cols_csv}) IN "
+                f"(SELECT {cols_csv} FROM {table} GROUP BY {cols_csv} HAVING COUNT(*) > 1)")
+    if gate.type == "referential_integrity":
+        col = gate["column"]
+        ref = gate["references"]
+        return (f"DELETE FROM {table} WHERE {col} IS NOT NULL AND NOT EXISTS "
+                f"(SELECT 1 FROM {ref['table']} r WHERE r.{ref['column']} = {table}.{col})")
+    if gate.type == "business_rule":
+        id_col = gate["id_column"]
+        return f"DELETE FROM {table} WHERE {id_col} IN ({gate['sql']})"
+    return None
+
+
 def _evaluate_gate(pipeline: loader.Pipeline, gate,
                    stage: loader.Stage) -> tuple[bool, str, int | None, int | None]:
     """Returns (passed, detail, rows_checked, rows_rejected)."""
@@ -214,6 +244,9 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
     quarantine_sql = _quarantine_sql(gate, stage)
     if quarantine_sql:
         _execute(pipeline, schema, quarantine_sql)
+        dequarantine_sql = _dequarantine_sql(gate)
+        if dequarantine_sql:
+            _execute(pipeline, schema, dequarantine_sql)
 
     if not stage.quarantine:
         return (False, f"{rejected}/{total} row(s) in {table} failed {gate.type}, "

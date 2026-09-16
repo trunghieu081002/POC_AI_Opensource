@@ -111,6 +111,43 @@ def test_quarantine_sql_business_rule_joins_back_on_the_declared_id_column():
         "FROM orders WHERE id IN (select id from orders where bad)")
 
 
+def test_dequarantine_sql_not_null_deletes_the_same_rows_it_quarantines():
+    """The regression this guards: a gate that only copies bad rows into
+    quarantine without removing them from the gated table leaves those rows
+    fully readable by the next stage's transform - exactly the failure
+    docs/layer2.md's negative acceptance case exists to catch ("a file with
+    known-bad rows must... not let them reach curated")."""
+    gate = loader.Gate(type="not_null", params={"table": "orders", "columns": ["id", "fk_id"]})
+    sql = runtime._dequarantine_sql(gate)
+    assert sql == "DELETE FROM orders WHERE id is null or fk_id is null"
+
+
+def test_dequarantine_sql_unique_deletes_every_copy_of_a_duplicate_key():
+    gate = loader.Gate(type="unique", params={"table": "orders", "columns": ["id"]})
+    sql = runtime._dequarantine_sql(gate)
+    assert sql == (
+        "DELETE FROM orders WHERE (id) IN "
+        "(SELECT id FROM orders GROUP BY id HAVING COUNT(*) > 1)")
+
+
+def test_dequarantine_sql_referential_integrity_deletes_the_orphans():
+    gate = loader.Gate(type="referential_integrity", params={
+        "table": "order_lines", "column": "order_id",
+        "references": {"table": "orders", "column": "id"}})
+    sql = runtime._dequarantine_sql(gate)
+    assert sql == (
+        "DELETE FROM order_lines WHERE order_id IS NOT NULL AND NOT EXISTS "
+        "(SELECT 1 FROM orders r WHERE r.id = order_lines.order_id)")
+
+
+def test_dequarantine_sql_business_rule_deletes_by_the_declared_id_column():
+    gate = loader.Gate(type="business_rule", params={
+        "name": "x", "sql": "select id from orders where bad", "expect": "no_rows",
+        "table": "orders", "id_column": "id"})
+    sql = runtime._dequarantine_sql(gate)
+    assert sql == "DELETE FROM orders WHERE id IN (select id from orders where bad)"
+
+
 # ---------------------------------------------------------------- real-DB integration
 
 @pytest.fixture
@@ -194,6 +231,17 @@ def test_run_gate_quarantines_rejects_under_threshold(tmp_path, throwaway_wareho
         env={"PGPASSWORD": throwaway_warehouse["password"], "PATH": "/usr/bin:/bin"},
         capture_output=True, text=True)
     assert "1|not_null: one of id is null" in result.stdout
+
+    # The quarantined row must be gone from `orders` itself, not merely
+    # copied - otherwise whatever reads `orders` next (the next stage's own
+    # transform) would still see it.
+    remaining = subprocess.run(
+        ["psql", "-h", "localhost", "-U", throwaway_warehouse["user"],
+         "-d", throwaway_warehouse["database"], "-tAc",
+         "select count(*) from orders"],
+        env={"PGPASSWORD": throwaway_warehouse["password"], "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True)
+    assert remaining.stdout.strip() == "2"
 
     stage_row = state.latest_stage("rt", "raw")
     assert stage_row["status"] == "passed"
