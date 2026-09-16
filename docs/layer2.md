@@ -5,16 +5,35 @@ Status: **in progress.** The manifest schema/generator/deploy/runtime, the
 machinery's own acceptance test (tests/test_pipeline_acceptance.py - the
 negative case: a file with known-bad rows lands in quarantine and never
 reaches `curated`, proven against a real throwaway database) are built and
-verified against real systems. Still missing: `dpagent pipeline run`
-triggering a real deployed DAG end to end (the command exists and its
-`airflow dags trigger` invocation is unit-tested, but no DAG has actually
-been deployed to a running Airflow on this host yet), and the Odoo/CSV
-reference pipeline's own dbt models (`pipelines/demo`'s `raw` stage
-declares dbt models that do not exist as files yet - the acceptance test
-above proves the machinery with a procedure-only pipeline instead, since
-gates/quarantine are engine-agnostic). Layer 1 (install) is done and
-proven; see `README.md`'s status list and `docs/deploy-log.md` for what
-that took.
+verified against real systems.
+
+Still missing:
+
+- **`dpagent pipeline run` triggering a real DAG to completion.** Attempted
+  for real against this host's actual Airflow install and got partway:
+  `install_dag()` correctly writes and chowns the DAG file, and
+  `trigger_dag()`'s command is right, but Airflow's scheduler could not
+  import it. Root cause, confirmed step by step rather than guessed: (1)
+  dpagent was not pip-installed into Airflow's own venv - fixed by a real
+  `pip install` there, which also exposed and fixed a real bug
+  (`find_content_dir` crashed on `PermissionError` instead of trying the
+  next candidate, `d7dbbae`); (2) even with dpagent importable, a
+  pipeline's own `pipeline.yaml`/`procedures/*.sql` live under
+  `pipelines/`, which on this host sits inside a developer's home
+  directory (mode 700) - the `airflow` OS user cannot read it, same as it
+  could not read dpagent's source before the pip install. This is a
+  deployment-topology question (where `pipelines/` lives so both the CLI
+  and Airflow's execution user can reach it - this project's own
+  `_INSTALL_PREFIX = /opt/dpagent` convention already anticipates exactly
+  this), not a Layer 2 logic gap, and needs an explicit decision rather
+  than a quick patch - left open on purpose.
+- The Odoo/CSV reference pipeline's own dbt models (`pipelines/demo`'s
+  `raw` stage declares dbt models that do not exist as files yet - the
+  acceptance test above proves the machinery with a procedure-only
+  pipeline instead, since gates/quarantine are engine-agnostic).
+
+Layer 1 (install) is done and proven; see `README.md`'s status list and
+`docs/deploy-log.md` for what that took.
 
 ## The one insight, restated for data
 
