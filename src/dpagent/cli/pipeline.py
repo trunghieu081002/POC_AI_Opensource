@@ -115,13 +115,18 @@ def plan_cmd(name):
 @click.option("--yes", "-y", is_flag=True)
 @click.option("--no-db", is_flag=True,
               help="Write the DAG/schema files only - skip applying procedure migrations.")
-def deploy_cmd(name, yes, no_db):
-    """Write the DAG + dbt schema, and apply procedure migrations.
+@click.option("--no-airflow", is_flag=True,
+              help="Skip installing the DAG into Airflow's real DAGS_FOLDER.")
+def deploy_cmd(name, yes, no_db, no_airflow):
+    """Write the DAG + dbt schema, apply procedure migrations, install the DAG.
 
-    Writing files is always safe to repeat (each run overwrites the last).
-    Applying a procedure runs `CREATE OR REPLACE PROCEDURE` against
-    `warehouse:` in the manifest - idempotent by construction, but it is a
-    real command against a real database, so it asks first unless --yes.
+    Writing files under pipelines/<name>/build/ is always safe to repeat
+    (each run overwrites the last). Two other things happen here, each a
+    real action against a real system, so both ask first unless --yes:
+    applying a procedure runs `CREATE OR REPLACE PROCEDURE` against
+    `warehouse:` (idempotent by construction), and installing the DAG
+    copies it into Airflow's DAGS_FOLDER as the airflow OS user (needs
+    root) so `dpagent pipeline run` has something real to trigger.
     """
     pipeline = _load_or_fail(name)
 
@@ -132,8 +137,15 @@ def deploy_cmd(name, yes, no_db):
         no_db = True
         console.print("[yellow]skipping procedure migrations - files only[/yellow]")
 
+    if not no_airflow and not yes and not confirm(
+            f"Install {name}'s DAG into Airflow's real DAGS_FOLDER "
+            f"(runs as the airflow OS user, needs root)?", default=True):
+        no_airflow = True
+        console.print("[yellow]skipping Airflow install - files only[/yellow]")
+
     try:
-        result = deploy_mod.deploy(pipeline, apply_db=not no_db)
+        result = deploy_mod.deploy(pipeline, apply_db=not no_db,
+                                   install_dag_to_airflow=not no_airflow)
     except deploy_mod.DeployError as exc:
         fail(str(exc))
 
@@ -143,6 +155,8 @@ def deploy_cmd(name, yes, no_db):
     if result.procedures_applied:
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
+    if result.dag_installed:
+        console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
     console.print("[green]deployed[/green]")
 
 

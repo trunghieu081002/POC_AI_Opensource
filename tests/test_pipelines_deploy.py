@@ -64,6 +64,18 @@ def test_dag_source_is_valid_python(pipeline):
     ast.parse(deploy.render_dag(pipeline))
 
 
+def test_dag_documents_the_pip_install_precondition(pipeline):
+    """A sys.path.insert pointing at dpagent's own source directory was
+    tried first and looked sufficient - it is not: on a real host, dpagent's
+    source lived under a developer's home directory (mode 700), and the
+    `airflow` OS user has no traverse permission into it regardless of what
+    sys.path says, confirmed by the DAG failing to import for exactly that
+    reason. The real fix is a real `pip install` into Airflow's own venv,
+    which this file cannot do for itself - it can only say so."""
+    src = deploy.render_dag(pipeline)
+    assert "pip-installed" in src
+
+
 def test_dag_has_one_task_per_dag_tasks_entry(pipeline):
     src = deploy.render_dag(pipeline)
     for task_id in ("extract", "gate_landing", "transform_raw", "gate_raw",
@@ -130,6 +142,27 @@ def test_trigger_dag_command_honours_a_recorded_install_dir_override(isolated_db
     cmd = deploy.trigger_dag_command("demo", 1)
     inner = cmd[-1]
     assert "/srv/af/.venv/bin/airflow" in inner
+
+
+# ---------------------------------------------------------------- install_dag
+
+def test_install_dag_refuses_to_run_without_root(isolated_db, pipeline, monkeypatch):
+    """chown-ing the DAG to the airflow user always needs root - this must
+    fail loudly with a clear message, not a raw PermissionError partway
+    through, and never as a silent no-op."""
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.install_dag(pipeline)
+
+
+def test_airflow_install_dir_uses_the_pack_default_with_no_recorded_install(isolated_db):
+    assert deploy._airflow_install_dir() == deploy.Path("/opt/airflow")
+
+
+def test_airflow_install_dir_honours_a_recorded_override(isolated_db):
+    state.record_install("airflow", "1.0.0", {"install_dir": "/srv/af"}, "hash",
+                         "rhel", "installed")
+    assert deploy._airflow_install_dir() == deploy.Path("/srv/af")
 
 
 # ---------------------------------------------------------------- render_dbt_schema

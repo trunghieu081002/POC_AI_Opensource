@@ -37,11 +37,26 @@ def find_content_dir(name: str, env_var: str) -> Path:
         here.parent.parent.parent.parent / name,   # src layout: repo root
         here.parent.parent.parent / name,          # flat layout, just in case
         _INSTALL_PREFIX / name,
-        Path.cwd() / name,
     ]
+    # A regular pip install (not editable) has no repo checkout above it at
+    # all - dpagent then runs as some other OS user entirely (a real DAG a
+    # deployed pipeline installs into Airflow's own venv, executed as the
+    # `airflow` OS user, confirmed on a real host) whose cwd may sit under a
+    # directory that user has no traverse permission into. is_dir() raising
+    # PermissionError there must be treated the same as "this candidate does
+    # not exist" - a candidate this process cannot even ask about is exactly
+    # as unusable as one that is not there, not a reason to crash the whole
+    # lookup this function exists to make robust.
+    try:
+        candidates.append(Path.cwd() / name)
+    except OSError:
+        pass
     for candidate in candidates:
-        if candidate.is_dir():
-            return candidate
+        try:
+            if candidate.is_dir():
+                return candidate
+        except OSError:
+            continue
     return candidates[0]                            # report the expected path
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import textwrap
 from dataclasses import dataclass, field
@@ -31,15 +32,27 @@ class DeployError(Exception):
 class DeployResult:
     written: list[Path] = field(default_factory=list)
     procedures_applied: list[str] = field(default_factory=list)
+    dag_installed: Path | None = None
 
 
 def render_dag(pipeline: Pipeline) -> str:
     """A real, importable Airflow DAG - PythonOperator tasks calling into
-    `dpagent.pipelines.runtime`, the gate/transform execution engine (not
-    built yet). Generated now so the task graph can be reviewed today; it
-    becomes runnable the moment runtime.py exists, with no regeneration
-    needed - this file only encodes *structure*, never executes anything
-    itself.
+    `dpagent.pipelines.runtime`, the gate/transform execution engine.
+
+    Precondition this file relies on but cannot itself satisfy: dpagent must
+    be pip-installed into Airflow's own venv (`<airflow install_dir>/.venv`),
+    not merely importable from wherever `dpagent pipeline deploy` itself
+    runs. A `sys.path.insert` pointing at dpagent's source directory looked
+    like a lighter-weight fix and was tried first, but fails for a reason
+    that has nothing to do with sys.path: on a real host, dpagent's source
+    lived under a developer's home directory (mode 700), which the
+    `airflow` OS user has no traverse permission into at all, regardless of
+    what sys.path says - confirmed by the DAG failing to import with
+    exactly that directory unreadable. A real `pip install` copies the
+    package into a location the `airflow` user already owns and can read,
+    which is also just the architecturally correct fix: production
+    Airflow should not depend on a specific developer's home directory
+    being reachable.
     """
     tasks = dag_tasks(pipeline)
     lines = [
@@ -48,7 +61,9 @@ def render_dag(pipeline: Pipeline) -> str:
         f"",
         f"Source of truth: pipelines/{pipeline.name}/pipeline.yaml. Change that,",
         f"then re-run deploy, instead of editing this file directly - it will",
-        f'be overwritten the next time deploy runs."""',
+        f"be overwritten the next time deploy runs. Requires dpagent to be",
+        f'pip-installed into this Airflow install\'s own venv - see this',
+        f'function\'s own docstring in deploy.py."""',
         "from datetime import datetime",
         "",
         "from airflow import DAG",
@@ -117,10 +132,10 @@ def render_dbt_schema(pipeline: Pipeline, stage: Stage) -> str:
 
 
 def artifact_paths(pipeline: Pipeline) -> dict[str, Path]:
-    """Where write_artifacts() puts things - pipelines/<name>/build/, not a
-    live Airflow DAGS_FOLDER or dbt project. Actually installing generated
-    files where Airflow/dbt pick them up is a later step, tested against a
-    real running Airflow rather than guessed at here.
+    """Where write_artifacts() puts things - pipelines/<name>/build/, a
+    reviewable copy, not a live Airflow DAGS_FOLDER or dbt project.
+    `install_dag()` is the separate step that actually copies the DAG to
+    where Airflow's scheduler polls.
     """
     build = pipeline.root / "build"
     paths = {"dag": build / "dags" / f"{pipeline.name}.py"}
@@ -195,20 +210,22 @@ def apply_procedures(pipeline: Pipeline) -> list[str]:
     return applied
 
 
-def deploy(pipeline: Pipeline, *, apply_db: bool = True) -> DeployResult:
+def deploy(pipeline: Pipeline, *, apply_db: bool = True,
+          install_dag_to_airflow: bool = True) -> DeployResult:
     result = DeployResult()
     result.written = write_artifacts(pipeline)
     if apply_db:
         result.procedures_applied = apply_procedures(pipeline)
+    if install_dag_to_airflow:
+        result.dag_installed = install_dag(pipeline)
     return result
 
 
-def _airflow_paths() -> tuple[Path, Path]:
-    """(venv bin dir, env file) for the installed airflow pack - the same
-    convention `packs/airflow/af-lib.sh`'s af_venv/af_env_file use, read from
-    the pack's own recorded install params (falling back to the pack's
-    default) rather than hard-coding `/opt/airflow`, since install_dir is a
-    pack param a real install can override."""
+def _airflow_install_dir() -> Path:
+    """The airflow pack's own install_dir - read from its recorded install
+    params (falling back to the pack's default) rather than hard-coding
+    `/opt/airflow`, since install_dir is a pack param a real install can
+    override."""
     from ..engine import state
     from ..library import loader as packs_mod
 
@@ -218,8 +235,41 @@ def _airflow_paths() -> tuple[Path, Path]:
     if record:
         supplied = json.loads(record["params_json"])
         install_dir = supplied.get("install_dir", install_dir)
-    install_dir = Path(install_dir)
+    return Path(install_dir)
+
+
+def _airflow_paths() -> tuple[Path, Path]:
+    """(venv bin dir, env file) for the installed airflow pack - the same
+    convention `packs/airflow/af-lib.sh`'s af_venv/af_env_file use."""
+    install_dir = _airflow_install_dir()
     return install_dir / ".venv" / "bin", install_dir / "home" / "airflow.env"
+
+
+def install_dag(pipeline: Pipeline) -> Path:
+    """Copies the rendered DAG into Airflow's real DAGS_FOLDER
+    (`<install_dir>/home/dags/<name>.py`, the same path `af_home()/dags`
+    resolves to in af-lib.sh) and hands it to the `airflow` OS user -
+    `af_home()`'s own directory is 700 airflow-only
+    (packs/airflow/steps/10-user.sh), so the scheduler only ever sees a DAG
+    file that actually belongs to it, the same way
+    suites/airflow/setup/00-fixtures.sh writes its own throwaway DAGs.
+
+    Requires root: chown-ing to a different user always does. write_artifacts()'s
+    build/ copy needs no such privilege, which is why this is a separate,
+    explicit step rather than folded into it.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "installing the DAG into Airflow's real DAGS_FOLDER needs root "
+            "(it must chown the file to the airflow user) - re-run as "
+            "sudo -E dpagent pipeline deploy ...")
+    dags_dir = _airflow_install_dir() / "home" / "dags"
+    dags_dir.mkdir(parents=True, exist_ok=True)
+    dag_path = dags_dir / f"{pipeline.name}.py"
+    dag_path.write_text(render_dag(pipeline))
+    dag_path.chmod(0o644)
+    shutil.chown(dag_path, user="airflow", group="airflow")
+    return dag_path
 
 
 def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
