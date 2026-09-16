@@ -327,16 +327,26 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
 
 
-def _dlt_python() -> str:
-    """Path to the dlt pack's own venv python - the same install_dir
-    convention deploy.py's `_airflow_paths` uses for the airflow pack, read
-    from the pack's own recorded install params. dlt is never imported into
-    dpagent's own process (this module's own docstring's discipline,
-    extended from psql/dbt to dlt's own DB drivers)."""
-    from ..library import loader as packs_mod
+_DLT_DEFAULT_INSTALL_DIR = "/opt/dlt"   # must match packs/dlt/pack.yaml's own default
 
-    pack = packs_mod.load("dlt")
-    install_dir = (pack.param_schema.get("install_dir") or {}).get("default", "/opt/dlt")
+
+def _dlt_python() -> str:
+    """Path to the dlt pack's own venv python - the same install_dir this
+    pipeline's warehouse credentials resolve against, just for a different
+    tool. dlt is never imported into dpagent's own process (this module's
+    own docstring's discipline, extended from psql/dbt to dlt's own DB
+    drivers).
+
+    Deliberately does not consult packs_mod.load("dlt") the way deploy.py's
+    _airflow_install_dir() does for the same lookup: that path relies on
+    PACKS_DIR, which - exactly like PIPELINES_DIR (see deploy.render_dag's
+    docstring) - cannot resolve correctly once dpagent runs from a real
+    pip install rather than its own git checkout, and this function runs
+    inside a DAG task's own process, not dpagent's CLI. Confirmed by this
+    exact call raising PackError ("looked in
+    .../site-packages/packs/dlt") the first time a real Airflow task
+    actually reached it."""
+    install_dir = _DLT_DEFAULT_INSTALL_DIR
     record = state.get_install("dlt")
     if record:
         supplied = json.loads(record["params_json"])

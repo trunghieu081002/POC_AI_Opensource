@@ -23,6 +23,14 @@ from ..engine.params import resolve_refs
 from .generator import dag_tasks
 from .loader import Pipeline, Stage
 
+# Same convention as library.loader's own _INSTALL_PREFIX (/opt/dpagent) -
+# a location every local OS user can read, not a developer's own checkout.
+# `install_pipeline_files()` publishes each deployed pipeline's manifest +
+# procedures here so Airflow's own `airflow` user can read them too, the
+# same reason dpagent's own code has to be pip-installed rather than just
+# imported from wherever `dpagent pipeline deploy` happens to run.
+SHARED_PIPELINES_DIR = Path("/opt/dpagent/pipelines")
+
 
 class DeployError(Exception):
     pass
@@ -32,6 +40,7 @@ class DeployError(Exception):
 class DeployResult:
     written: list[Path] = field(default_factory=list)
     procedures_applied: list[str] = field(default_factory=list)
+    pipeline_files_published: Path | None = None
     dag_installed: Path | None = None
 
 
@@ -39,20 +48,30 @@ def render_dag(pipeline: Pipeline) -> str:
     """A real, importable Airflow DAG - PythonOperator tasks calling into
     `dpagent.pipelines.runtime`, the gate/transform execution engine.
 
-    Precondition this file relies on but cannot itself satisfy: dpagent must
-    be pip-installed into Airflow's own venv (`<airflow install_dir>/.venv`),
-    not merely importable from wherever `dpagent pipeline deploy` itself
-    runs. A `sys.path.insert` pointing at dpagent's source directory looked
-    like a lighter-weight fix and was tried first, but fails for a reason
-    that has nothing to do with sys.path: on a real host, dpagent's source
-    lived under a developer's home directory (mode 700), which the
-    `airflow` OS user has no traverse permission into at all, regardless of
-    what sys.path says - confirmed by the DAG failing to import with
-    exactly that directory unreadable. A real `pip install` copies the
-    package into a location the `airflow` user already owns and can read,
-    which is also just the architecturally correct fix: production
-    Airflow should not depend on a specific developer's home directory
-    being reachable.
+    Two preconditions this file relies on but cannot fully satisfy alone,
+    both found by actually deploying to a real Airflow and watching it fail
+    to import, not guessed at:
+
+    1. dpagent must be pip-installed into Airflow's own venv (`<airflow
+       install_dir>/.venv`), not merely importable from wherever `dpagent
+       pipeline deploy` itself runs. A `sys.path.insert` pointing at
+       dpagent's source directory was tried first and does not work: on a
+       real host, dpagent's source lived under a developer's home
+       directory (mode 700), which the `airflow` OS user has no traverse
+       permission into at all, regardless of what sys.path says. A real
+       `pip install` copies the package into a location the `airflow` user
+       already owns and can read - also just the architecturally correct
+       fix, since production Airflow should not depend on a specific
+       developer's home directory being reachable.
+    2. Once dpagent itself is reachable, `loader.load()` still needs this
+       pipeline's own manifest/procedures - the exact same unreadable-home-
+       directory problem one layer up. `os.environ.setdefault` below points
+       `DPAGENT_PIPELINES` at `install_pipeline_files()`'s published copy
+       (`SHARED_PIPELINES_DIR`) *before* importing `runtime` (which is what
+       first imports `loader.py`, whose `PIPELINES_DIR` is computed once,
+       at that import) - `setdefault` rather than a plain assignment so an
+       operator's own explicit `DPAGENT_PIPELINES` (set some other way)
+       still wins.
     """
     tasks = dag_tasks(pipeline)
     lines = [
@@ -64,7 +83,10 @@ def render_dag(pipeline: Pipeline) -> str:
         f"be overwritten the next time deploy runs. Requires dpagent to be",
         f'pip-installed into this Airflow install\'s own venv - see this',
         f'function\'s own docstring in deploy.py."""',
+        "import os",
         "from datetime import datetime",
+        "",
+        f'os.environ.setdefault("DPAGENT_PIPELINES", {str(SHARED_PIPELINES_DIR)!r})',
         "",
         "from airflow import DAG",
         "from airflow.operators.python import PythonOperator",
@@ -210,6 +232,36 @@ def apply_procedures(pipeline: Pipeline) -> list[str]:
     return applied
 
 
+def install_pipeline_files(pipeline: Pipeline) -> Path:
+    """Publishes this pipeline's manifest + procedures to
+    `SHARED_PIPELINES_DIR/<name>` - world-readable (root:root, 755/644), so
+    the `airflow` OS user (or any other local user) can read them
+    regardless of where the git checkout `dpagent pipeline deploy` itself
+    ran from lives. Only this one pipeline's directory is copied, not the
+    whole pipelines/ tree, so a deploy of one pipeline never exposes
+    another that might still be mid-review. `build/` is excluded - it is
+    itself derived from what gets published here, not an input to it.
+
+    Requires root, same as `install_dag()`: /opt is not writable otherwise,
+    and files must end up world-readable regardless of the deploying
+    user's own umask.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "publishing pipeline files to a host-wide-readable location "
+            "needs root - re-run as sudo -E dpagent pipeline deploy ...")
+    dest = SHARED_PIPELINES_DIR / pipeline.name
+    if dest.exists():
+        shutil.rmtree(dest)
+    SHARED_PIPELINES_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(pipeline.root, dest, ignore=shutil.ignore_patterns("build"))
+    SHARED_PIPELINES_DIR.chmod(0o755)
+    dest.chmod(0o755)
+    for path in dest.rglob("*"):
+        path.chmod(0o755 if path.is_dir() else 0o644)
+    return dest
+
+
 def deploy(pipeline: Pipeline, *, apply_db: bool = True,
           install_dag_to_airflow: bool = True) -> DeployResult:
     result = DeployResult()
@@ -217,6 +269,7 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
     if apply_db:
         result.procedures_applied = apply_procedures(pipeline)
     if install_dag_to_airflow:
+        result.pipeline_files_published = install_pipeline_files(pipeline)
         result.dag_installed = install_dag(pipeline)
     return result
 

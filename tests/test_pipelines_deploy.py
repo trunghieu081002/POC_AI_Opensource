@@ -155,6 +155,28 @@ def test_install_dag_refuses_to_run_without_root(isolated_db, pipeline, monkeypa
         deploy.install_dag(pipeline)
 
 
+def test_install_pipeline_files_refuses_to_run_without_root(isolated_db, pipeline, monkeypatch):
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.install_pipeline_files(pipeline)
+
+
+def test_render_dag_points_dpagent_pipelines_at_the_shared_dir(pipeline):
+    """The regression this guards: even once dpagent's own code is
+    reachable (pip-installed into Airflow's venv), loader.load() still
+    needs this pipeline's own manifest - which, on a real host, lived
+    under the same unreadable developer home directory dpagent's source
+    did. Confirmed for real: the DAG failed to import with exactly this
+    directory unreadable, one layer after fixing the first import."""
+    src = deploy.render_dag(pipeline)
+    assert 'os.environ.setdefault("DPAGENT_PIPELINES", ' in src
+    assert str(deploy.SHARED_PIPELINES_DIR) in src
+    # Must be set before runtime (and therefore loader.py, whose
+    # PIPELINES_DIR is computed once at import time) is imported.
+    assert src.index('os.environ.setdefault("DPAGENT_PIPELINES"') < \
+        src.index("from dpagent.pipelines import runtime")
+
+
 def test_airflow_install_dir_uses_the_pack_default_with_no_recorded_install(isolated_db):
     assert deploy._airflow_install_dir() == deploy.Path("/opt/airflow")
 

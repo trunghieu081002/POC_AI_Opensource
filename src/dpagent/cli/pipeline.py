@@ -138,8 +138,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
         console.print("[yellow]skipping procedure migrations - files only[/yellow]")
 
     if not no_airflow and not yes and not confirm(
-            f"Install {name}'s DAG into Airflow's real DAGS_FOLDER "
-            f"(runs as the airflow OS user, needs root)?", default=True):
+            f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR} and install "
+            f"its DAG into Airflow's real DAGS_FOLDER (runs as the airflow OS user, "
+            f"needs root)?", default=True):
         no_airflow = True
         console.print("[yellow]skipping Airflow install - files only[/yellow]")
 
@@ -155,6 +156,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     if result.procedures_applied:
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
+    if result.pipeline_files_published:
+        console.print(f"[bold]pipeline files published:[/bold] "
+                     f"{result.pipeline_files_published}")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
     console.print("[green]deployed[/green]")

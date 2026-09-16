@@ -38,6 +38,29 @@ def test_sql_literal_escapes_single_quotes():
     assert runtime._sql_literal("it's a test") == "it''s a test"
 
 
+def test_dlt_python_does_not_need_the_packs_library_at_all(monkeypatch, tmp_path):
+    """The regression this guards: found for real inside a DAG task
+    actually executed by Airflow (the `airflow` OS user), not by reading
+    the code - _dlt_python() used to call packs_mod.load("dlt"), which
+    needs PACKS_DIR to resolve, which - exactly like PIPELINES_DIR -
+    cannot resolve correctly once dpagent runs from a real pip install
+    rather than its own git checkout. A DAG task's own process is exactly
+    that situation, so this function must never touch packs_mod."""
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    assert runtime._dlt_python() == "/opt/dlt/.venv/bin/python"
+
+
+def test_dlt_python_honours_a_recorded_install_dir_override(monkeypatch, tmp_path):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    state.record_install("dlt", "1.0.0", {"install_dir": "/srv/dlt"}, "hash",
+                         "rhel", "installed")
+    assert runtime._dlt_python() == "/srv/dlt/.venv/bin/python"
+
+
 def test_warehouse_conn_sets_search_path_to_the_declared_schema():
     """The regression this guards: warehouse.schema was declared in the
     manifest schema but never once read anywhere - every generated query
