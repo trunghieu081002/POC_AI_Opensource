@@ -102,7 +102,13 @@ fi
 # ---------------------------------------------------------------- step 1
 
 say "step 1/3: bootstrapping dpagent"
-BOOTSTRAP_ENV=(env "DPAGENT_PREFIX=${PREFIX}")
+# This script is itself part of an already-extracted checkout (REPO_ROOT,
+# found above via pyproject.toml) - that *is* the source to install, so it is
+# named explicitly rather than left to bootstrap.sh's own auto-detection.
+# Without this, bootstrap.sh had no source argument at all and fell back to
+# git-cloning a placeholder repository URL, silently ignoring the very
+# checkout setup.sh was just run from.
+BOOTSTRAP_ENV=(env "DPAGENT_PREFIX=${PREFIX}" "DPAGENT_SOURCE_DIR=${REPO_ROOT}")
 if [ -n "$PYTHON_OVERRIDE" ]; then
   BOOTSTRAP_ENV+=("DPAGENT_PYTHON=${PYTHON_OVERRIDE}")
 fi
