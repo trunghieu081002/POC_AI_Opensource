@@ -291,7 +291,9 @@ pytest
 
 ## Status
 
-Layer 1 (install) and Layer 2 (staged ingestion) are built. Layer 3 is not:
+Layer 1 (install) is built and acceptance-proven on real hosts. Layer 2
+(staged ingestion) has reached a complete, end-to-end verified MVP. Layer 3 is
+not built yet:
 
 - [x] Pack engine, resolver, error catalog, preflight/verify/rollback, audit
 - [x] Acceptance suites, wired into install so success means proven
@@ -316,10 +318,24 @@ Layer 1 (install) and Layer 2 (staged ingestion) are built. Layer 3 is not:
 - [ ] Packs: clickhouse, minio, trino, spark, iceberg, hive-metastore
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 
-**Not yet executed on a real host.** The engine's Python tests
-(`tests/`, including `tests/test_dp_sh.py` which runs the shell library through
-real bash) have not run anywhere but code review. Several `A && B` / `set -e`
-bugs were found and fixed by hand this way, in both `packs/_lib/dp.sh` and
-individual packs — see [docs/deploy-log.md](docs/deploy-log.md) for the full
-account. Run `pytest` and `dpagent lint` before trusting a pack on a real
-machine; a first real install is expected to surface more.
+Layer 1 has been installed and exercised on real systemd environments across
+Oracle Linux 8, Ubuntu 22.04, Rocky Linux 9 and Debian 12. The full stack has
+passed its acceptance suites on those hosts, including real PostgreSQL
+round-trips and restarts, dbt runs and negative tests, and Airflow DAG success
+and failure detection. It has also been exercised behind a corporate proxy,
+under concurrent load, with parallel install attempts and with multiple
+PostgreSQL major versions. The failures found in those runs and their fixes are
+recorded in [docs/deploy-log.md](docs/deploy-log.md).
+
+Layer 2 has been run end to end through a real Airflow deployment: extract,
+gate, transform, gate, transform, gate; rejected data was quarantined, every
+stage verdict was recorded, and the final curated data was checked. Deploying
+it on a new host still has explicit operational prerequisites: dpagent must be
+available in Airflow's venv, deployed pipeline and dbt files must be readable
+by the Airflow user, and that user must be able to write dpagent's SQLite
+journal. See [docs/layer2.md](docs/layer2.md) for the verified setup and the
+remaining deployment details.
+
+Run `pytest` and `dpagent lint` on every checkout before deployment; historical
+results are evidence for the tested revisions, not a substitute for verifying
+the current one.
