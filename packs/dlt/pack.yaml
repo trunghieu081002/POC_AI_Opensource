@@ -27,7 +27,7 @@ params:
   # prove an actual extract+load against, the same reason dbt's pack.yaml
   # carries host/port/db_user/db_password despite not strictly needing a
   # database to install successfully either. Composition happens through the
-  # spec, same as dbt/airflow - see examples/etl-stack.yaml.
+  # spec, same as dbt/airflow - see examples/layer2-stack.yaml.
   host:
     type: string
     default: "localhost"

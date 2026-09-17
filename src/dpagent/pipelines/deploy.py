@@ -541,25 +541,50 @@ def install_dag(pipeline: Pipeline) -> Path:
     dag_path.write_text(render_dag(pipeline))
     dag_path.chmod(0o644)
     shutil.chown(dag_path, user="airflow", group="airflow")
+    reserialize_dags()
     return dag_path
+
+
+def _airflow_cli_command(*args: str) -> list[str]:
+    """Same shape as `af_run` in af-lib.sh: run the airflow CLI as the
+    `airflow` OS user with its env file sourced and its venv on PATH, since
+    it must run as the user the webserver/scheduler/metadata DB were set
+    up for. Shared by trigger_dag_command and reserialize_dags_command so
+    both stay in sync with how that user/env/venv is actually resolved."""
+    venv_bin, env_file = _airflow_paths()
+    inner = (
+        f'set -a; source "{env_file}"; set +a; '
+        f'export PATH="{venv_bin}:$PATH"; '
+        f'exec "{venv_bin}/airflow" ' + " ".join(args)
+    )
+    return ["sudo", "-u", "airflow", "bash", "-c", inner]
+
+
+def reserialize_dags_command() -> list[str]:
+    return _airflow_cli_command("dags", "reserialize")
+
+
+def reserialize_dags() -> subprocess.CompletedProcess:
+    """Forces the scheduler to notice a new/changed DAG file immediately,
+    rather than waiting for its own periodic directory scan
+    (dag_dir_list_interval, 300s by default) - a real gap found by hand,
+    repeatedly: a freshly `install_dag()`-ed file sat there un-imported,
+    and `dpagent pipeline run` failed with "Dag id ... not found" for
+    several minutes until `airflow dags reserialize` was run manually.
+    Best-effort: a failure here (e.g. Airflow not actually running yet)
+    does not fail install_dag() itself - the scheduler's own scan will
+    still pick the file up eventually, just not immediately.
+    """
+    return subprocess.run(reserialize_dags_command(), capture_output=True,
+                          text=True, timeout=120)
 
 
 def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
     """The exact command `dpagent pipeline run` shells out to - built here,
     separately from the subprocess call, so it can be printed/tested without
-    actually running it (mirrors `_psql_command`).
-
-    Same shape as `af_run` in af-lib.sh: run as the `airflow` OS user with
-    its env file sourced and its venv on PATH, since the airflow CLI must
-    run as the user the webserver/scheduler/metadata DB were set up for."""
-    venv_bin, env_file = _airflow_paths()
+    actually running it (mirrors `_psql_command`)."""
     conf = json.dumps({"dpagent_run_id": dpagent_run_id})
-    inner = (
-        f'set -a; source "{env_file}"; set +a; '
-        f'export PATH="{venv_bin}:$PATH"; '
-        f'exec "{venv_bin}/airflow" dags trigger "{pipeline_name}" --conf {conf!r}'
-    )
-    return ["sudo", "-u", "airflow", "bash", "-c", inner]
+    return _airflow_cli_command("dags", "trigger", f'"{pipeline_name}"', f"--conf {conf!r}")
 
 
 def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.CompletedProcess:

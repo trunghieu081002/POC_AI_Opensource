@@ -139,6 +139,31 @@ def isolated_db(tmp_path, monkeypatch):
     state.close()
 
 
+def test_reserialize_dags_command_runs_as_the_airflow_os_user(isolated_db):
+    """The regression this guards: found by hand, repeatedly - a freshly
+    install_dag()-ed file sat un-imported by the scheduler's own periodic
+    scan (300s default) until `airflow dags reserialize` was run by hand.
+    install_dag() now calls this itself; this test locks in the command
+    shape, not the (best-effort, sudo-requiring) real invocation."""
+    cmd = deploy.reserialize_dags_command()
+    assert cmd[:3] == ["sudo", "-u", "airflow"]
+    assert "dags reserialize" in cmd[-1]
+
+
+def test_install_dag_reserializes_after_writing_the_file(isolated_db, pipeline, monkeypatch, tmp_path):
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    airflow_home = tmp_path / "airflow"
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: airflow_home)
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+
+    calls = []
+    monkeypatch.setattr(deploy, "reserialize_dags", lambda: calls.append("reserialize"))
+
+    deploy.install_dag(pipeline)
+
+    assert calls == ["reserialize"]
+
+
 def test_trigger_dag_command_runs_as_the_airflow_os_user(isolated_db):
     cmd = deploy.trigger_dag_command("demo", 42)
     assert cmd[:3] == ["sudo", "-u", "airflow"]

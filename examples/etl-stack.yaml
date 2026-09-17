@@ -1,5 +1,10 @@
-# Full ETL stack: PostgreSQL (warehouse + Airflow's own metadata) + dbt
+# Layer 1 tool stack: PostgreSQL (warehouse + Airflow's own metadata) + dbt
 # (transform) + Airflow (orchestrate), on one host.
+#
+# This is NOT a Layer 2 pipeline-ready stack - it has no `dlt`, so
+# `dpagent pipeline deploy`/`run` fail at the first extract task. For a
+# stack a real pipeline can actually run against, see
+# examples/layer2-stack.yaml (this file plus dlt).
 #
 #   export AIRFLOW_DB_PASSWORD='...'
 #   export DBT_DB_PASSWORD='...'

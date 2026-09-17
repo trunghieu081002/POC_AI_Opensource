@@ -1,0 +1,95 @@
+# Layer 2-ready stack: everything examples/etl-stack.yaml installs
+# (PostgreSQL + dbt + Airflow), plus dlt - the extract+load tool a real
+# pipeline's `landing` stage needs. Without dlt, `dpagent pipeline deploy`/
+# `run` fail at the first extract task; `etl-stack.yaml` alone is Layer 1
+# only, on purpose - see docs/layer2.md.
+#
+#   export AIRFLOW_DB_PASSWORD='...'
+#   export DBT_DB_PASSWORD='...'
+#   export AIRFLOW_ADMIN_PASSWORD='...'
+#   export DLT_DB_PASSWORD='...'
+#   sudo -E dpagent doctor postgres dbt airflow dlt   # check the machine first
+#   sudo -E dpagent spec examples/layer2-stack.yaml --dry-run
+#   sudo -E dpagent spec examples/layer2-stack.yaml
+#
+# Then a real pipeline:
+#   sudo -E dpagent pipeline lint <name>
+#   sudo -E dpagent pipeline plan <name>
+#   sudo -E dpagent pipeline deploy <name> --yes
+#   sudo -E dpagent pipeline run <name> --yes
+#   dpagent pipeline status <name>
+#
+# Packs are decoupled on purpose: dbt/airflow/dlt do not create their own
+# database or role. This file is where that composition happens - the
+# host/port/database/user values below must agree across sections, because
+# nothing checks that for you except each pack's own acceptance suite after
+# install.
+#
+# python-modern is not listed: it is pulled in automatically as a dependency
+# of dbt, airflow and dlt alike. Listing `base` is optional for the same
+# reason but is spelled out here since it is what makes the very first
+# install painless on a minimal host.
+
+project: layer2-stack
+
+components:
+  - base:
+      locale: "en_US.UTF-8"
+
+  - postgres:
+      version: "15"
+      port: 5432
+      listen_addresses: "localhost"
+      max_connections: 200
+      databases:
+        - warehouse       # dbt's target, and where a real pipeline's landing/raw/curated live
+        - airflow_meta    # Airflow's own metadata store
+        - dlt_selftest    # dlt pack's own acceptance-suite target - not read by any real pipeline
+      users:
+        - name: dbt_user
+          password: "${DBT_DB_PASSWORD}"
+          databases: [warehouse]
+        - name: airflow
+          password: "${AIRFLOW_DB_PASSWORD}"
+          databases: [airflow_meta]
+        - name: dlt_user
+          password: "${DLT_DB_PASSWORD}"
+          databases: [dlt_selftest]
+
+  - dbt:
+      adapter: postgres
+      dbt_version: "1.8.*"
+      # Must match the postgres section above.
+      host: localhost
+      port: 5432
+      database: warehouse
+      db_schema: public
+      db_user: dbt_user
+      db_password: "${DBT_DB_PASSWORD}"
+      threads: 4
+
+  - airflow:
+      version: "2.9.3"
+      executor: LocalExecutor
+      webserver_port: 8090
+      load_examples: false
+      # Must match the postgres section above.
+      backend_host: localhost
+      backend_port: 5432
+      backend_db: airflow_meta
+      backend_user: airflow
+      backend_password: "${AIRFLOW_DB_PASSWORD}"
+      admin_user: admin
+      admin_password: "${AIRFLOW_ADMIN_PASSWORD}"
+      admin_email: "admin@example.com"
+
+  - dlt:
+      dlt_version: "1.*"
+      # Must match the postgres section above. Only used by dlt's own
+      # acceptance suite (packs/dlt) - a real pipeline's source:/warehouse:
+      # in its own pipeline.yaml are always the actual truth at run time.
+      host: localhost
+      port: 5432
+      database: dlt_selftest
+      db_user: dlt_user
+      db_password: "${DLT_DB_PASSWORD}"
