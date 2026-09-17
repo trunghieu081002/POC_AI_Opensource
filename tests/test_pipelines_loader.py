@@ -304,3 +304,17 @@ def test_directory_name_must_match_the_declared_name(root):
 def test_missing_pipeline_is_a_clean_error_not_a_traceback(root):
     with pytest.raises(loader.PipelineError, match="no pipeline for"):
         loader.load("nonexistent", root)
+
+
+# ------------------------------------------------ real, committed pipelines
+
+def test_every_real_pipeline_under_pipelines_dir_loads_cleanly():
+    """No tmp_path fixture here on purpose - this walks the actual
+    `pipelines/` this repo ships (demo, quickstart, ...), the same directory
+    `dpagent pipeline lint` reads by default. A typo in a committed
+    manifest must fail this test, not wait to be found by `lint` on
+    whatever host someone next runs it on."""
+    names = loader.available()
+    assert "demo" in names and "quickstart" in names
+    for name in names:
+        loader.load(name)   # raises PipelineError on any bad manifest

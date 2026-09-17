@@ -128,6 +128,28 @@ def test_csv_script_reads_no_secret_env_var(root):
     assert "SRC_URL" not in script
 
 
+def test_csv_script_resolves_a_relative_path_against_the_pipeline_root(root):
+    """A quickstart pipeline commits its sample CSV alongside its
+    pipeline.yaml and refers to it with a relative path, same convention
+    as Pipeline.path() already uses for procedure files - the generated
+    script runs through dlt's own venv (a different process/cwd), so the
+    relative path must be resolved to absolute at compile time, here."""
+    data = _base(source={"connector": "csv", "files": {"path": "data/orders.csv"}})
+    pipeline_dir = _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    expected = str(pipeline_dir / "data/orders.csv")
+    assert f"glob.glob({expected!r})" in script
+
+
+def test_csv_script_leaves_an_absolute_path_unchanged(root):
+    data = _base(source={"connector": "csv", "files": {"path": "/data/*.csv"}})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "glob.glob('/data/*.csv')" in script
+
+
 def test_unknown_connector_is_refused():
     wh = loader.Warehouse(host="h", database="d")
     pipeline = loader.Pipeline(

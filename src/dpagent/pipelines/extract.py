@@ -10,6 +10,7 @@ script text. `runtime.py` resolves `${ENV_VAR}` secrets and actually runs it.
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 from .loader import Pipeline
 
@@ -40,6 +41,8 @@ def render_extract_script(pipeline: Pipeline) -> str:
 
     if connector == "csv":
         pattern = pipeline.source.files["path"]
+        if not Path(pattern).is_absolute():
+            pattern = str(pipeline.root / pattern)
         return header + textwrap.dedent(f'''\
             import csv
             import glob

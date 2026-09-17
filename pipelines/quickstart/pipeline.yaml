@@ -1,0 +1,83 @@
+# A minimal, self-contained pipeline: a CSV file committed in this repo ->
+# landing -> raw -> curated, gated at every hop - same shape as pipelines/demo
+# but with no external source at all (no Odoo, no other service), so it is
+# the fastest way to prove the whole Layer 2 loop (dlt extract, a gate, a
+# transform, another gate, quarantine) actually runs on a fresh host before
+# ever touching a real upstream database. See docs/layer2.md's "CSV
+# quickstart" section for the full command sequence, including how to
+# reproduce the negative (quarantine-exceeds-threshold, run fails) path with
+# data/orders_negative_example.csv.
+#
+# raw and curated both use the procedure engine (not dbt): this pipeline has
+# no dbt project of its own to keep it self-contained, and the transforms
+# here (cast landing's text columns, compute a VAT-inclusive total) are
+# simple enough that a stored procedure is the lighter-weight choice - see
+# demo/pipeline.yaml's own comment on "first hop dbt, second hop procedure"
+# being the common pattern, not a rule.
+
+name: quickstart
+summary: A self-contained CSV pipeline (no external source) proving extract -> gate -> transform -> gate, including quarantine
+
+source:
+  connector: csv
+  files:
+    # Relative to this pipeline's own directory (extract.render_extract_script
+    # resolves it against pipeline.root) - the sample data ships in this repo,
+    # nothing external to fetch.
+    path: data/orders.csv
+  # dlt names the landing table after the file's own stem ("orders"), and
+  # writes it into quickstart_landing (extract.landing_dataset) - every
+  # column lands as dlt read it from the CSV, uncast.
+
+warehouse:
+  # Same physical warehouse Postgres and env vars as pipelines/demo - just a
+  # different schema, so the two pipelines never collide on table names.
+  host: "${WAREHOUSE_DB_HOST:-localhost}"
+  port: "${WAREHOUSE_DB_PORT:-5432}"
+  database: "${WAREHOUSE_DB_NAME:-warehouse}"
+  user: "${WAREHOUSE_DB_USER}"
+  password: "${WAREHOUSE_DB_PASSWORD}"
+  schema: quickstart
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: orders
+        min: 1
+        # Structural only (docs/layer2.md's Shape diagram): landing's own
+        # columns are whatever dlt inferred from raw CSV strings, not
+        # something worth a schema_contract for a quickstart - the point
+        # here is proving the loop, not a contract on a toy schema.
+
+  - name: raw
+    engine: procedure
+    depends_on: landing
+    procedure: procedures/build_raw_orders.sql
+    gates:
+      - type: unique
+        table: orders_raw
+        columns: [order_id]
+        # data/orders.csv ships with exactly one duplicated order_id
+        # (1002, twice) on purpose - 2 of 10 rows = 20%, under the 25%
+        # threshold below, so the committed file's own happy-path run
+        # quarantines that pair and still reaches curated successfully.
+        # data/orders_negative_example.csv (4 of 5 rows share order_id
+        # 3001 = 80%) is the negative counterpart: swapped in for
+        # orders.csv, it exceeds this same threshold and the run fails
+        # instead - see docs/layer2.md.
+    quarantine:
+      reject_threshold_pct: 25
+
+  - name: curated
+    engine: procedure
+    depends_on: raw
+    procedure: procedures/build_curated_orders.sql
+    gates:
+      - type: not_null
+        table: fct_orders
+        columns: [order_id, amount]
+        # No quarantine block: build_curated_orders.sql only ever inserts
+        # rows it just cast from orders_raw (already deduplicated by raw's
+        # own gate) - a null here would mean the procedure itself is wrong,
+        # which should halt the run, not quietly quarantine.
