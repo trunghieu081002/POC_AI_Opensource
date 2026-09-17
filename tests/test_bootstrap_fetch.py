@@ -95,6 +95,22 @@ def _run_bootstrap(tmp_path: Path, env_extra: dict, cwd: Path | None = None):
         env=env, timeout=30, cwd=str(cwd) if cwd else None)
 
 
+def _run_bootstrap_to_extra_resolution(tmp_path: Path, env_extra: dict):
+    """Like _run_bootstrap, but runs past source resolution into the install
+    stage far enough to resolve DPAGENT_WITH_LLM -> EXTRA, then stops before
+    any pip call (including the plain `pip install --upgrade` - not just the
+    `-e` one) so this stays fast and offline, same reasoning as
+    DPAGENT_BOOTSTRAP_STOP_AFTER_FETCH itself."""
+    fake = _fake_bin(tmp_path)
+    env = os.environ.copy()
+    env["PATH"] = f"{fake}:{env['PATH']}"
+    env["DPAGENT_PYTHON"] = MODERN_PYTHON
+    env["DPAGENT_BOOTSTRAP_STOP_BEFORE_PIP_INSTALL"] = "1"
+    env.update(env_extra)
+    return subprocess.run(
+        [BASH, str(BOOTSTRAP)], capture_output=True, text=True, env=env, timeout=30)
+
+
 def _fake_extracted_tarball(tmp_path: Path, name: str = "dpagent-test") -> Path:
     """A directory shaped like a real release tarball once extracted -
     real source (a real, if trivial, pyproject.toml + package), not the
@@ -212,3 +228,30 @@ def test_rerunning_with_the_same_source_is_idempotent(tmp_path):
     # run's own output must not show a source-resolution error the first
     # run didn't have.
     assert ("no source to install from" not in second.stdout + second.stderr)
+
+
+# --------------------------------------------------------- DPAGENT_WITH_LLM
+
+@requires_bash
+@requires_modern_python
+def test_with_llm_unset_installs_the_plain_package(tmp_path):
+    source = _fake_extracted_tarball(tmp_path)
+    result = _run_bootstrap_to_extra_resolution(tmp_path, {
+        "DPAGENT_SOURCE_DIR": str(source),
+        "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+    })
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "resolved extra=<none>" in result.stderr
+
+
+@requires_bash
+@requires_modern_python
+def test_with_llm_set_adds_the_llm_extra(tmp_path):
+    source = _fake_extracted_tarball(tmp_path)
+    result = _run_bootstrap_to_extra_resolution(tmp_path, {
+        "DPAGENT_SOURCE_DIR": str(source),
+        "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+        "DPAGENT_WITH_LLM": "1",
+    })
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "resolved extra=[llm]" in result.stderr

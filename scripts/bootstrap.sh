@@ -208,6 +208,29 @@ fi
 
 # ---------------------------------------------------------------- install
 
+# DPAGENT_WITH_LLM=1 pulls in litellm (pyproject.toml's [llm] extra) at
+# install time, for the three commands that use a model (dpagent do/synth,
+# and proposing a catalog entry) - everything else (install/verify/rollback/
+# status) needs none of it either way. Without this flag, those three
+# commands fail with a clear "pip install -e '.[llm]'" LLMError
+# (src/dpagent/llm/client.py) rather than silently doing nothing. Resolved
+# before any pip call so the test-only stop hook right below can check it
+# without triggering real network work.
+EXTRA=""
+if [ -n "${DPAGENT_WITH_LLM:-}" ]; then
+  EXTRA="[llm]"
+fi
+
+# Test-only, same reasoning as DPAGENT_BOOTSTRAP_STOP_AFTER_FETCH above: lets
+# tests/test_bootstrap_fetch.py check DPAGENT_WITH_LLM's effect on EXTRA
+# without waiting on the real, possibly slow, network-dependent pip calls
+# further down (the upgrade included - this must come before that too).
+# Never set by a real install.
+if [ -n "${DPAGENT_BOOTSTRAP_STOP_BEFORE_PIP_INSTALL:-}" ]; then
+  ok "resolved extra=${EXTRA:-<none>} (DPAGENT_BOOTSTRAP_STOP_BEFORE_PIP_INSTALL set - stopping here)"
+  exit 0
+fi
+
 say "creating the virtualenv"
 "$PYTHON" -m venv "${PREFIX}/.venv" 2>/dev/null || {
   # Some minimal images ship python3 without ensurepip.
@@ -225,7 +248,7 @@ say "creating the virtualenv"
 }
 
 "${PREFIX}/.venv/bin/pip" install --quiet --upgrade pip setuptools wheel
-"${PREFIX}/.venv/bin/pip" install --quiet -e "${PREFIX}"
+"${PREFIX}/.venv/bin/pip" install --quiet -e "${PREFIX}${EXTRA}"
 
 ln -sf "${PREFIX}/.venv/bin/dpagent" /usr/local/bin/dpagent
 install -d -m 0750 /var/lib/dpagent /var/log/dpagent
@@ -255,10 +278,22 @@ An install is not reported as successful until its acceptance suite passes.
 Installing needs no API key. A model is only involved in three places: routing a
 plain-language request (dpagent do), drafting a pack for a tool with no pack yet
 (dpagent synth), and proposing a catalog entry for a failure nothing matched:
+EOF
+
+if [ -z "$EXTRA" ]; then
+  cat <<EOF
+  sudo ${PREFIX}/.venv/bin/pip install -e '${PREFIX}[llm]'   # litellm - once
+EOF
+else
+  echo "  (litellm already installed - DPAGENT_WITH_LLM was set)"
+fi
+
+cat <<EOF
 
   cp ${PREFIX}/.env.example ${PREFIX}/.env
-  \$EDITOR ${PREFIX}/.env                        # GEMINI_API_KEY is free
-  export \$(grep -v '^#' ${PREFIX}/.env | xargs)
+  \$EDITOR ${PREFIX}/.env                        # GEMINI_API_KEY is free; quote
+                                                 # any value with spaces or \$/*
+  set -a; source ${PREFIX}/.env; set +a
 
 Note the -E in 'sudo -E': it keeps your environment, which is how \${SECRETS}
 referenced by a project.yaml and any http_proxy settings reach the agent.

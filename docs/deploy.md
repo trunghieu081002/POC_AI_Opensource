@@ -228,10 +228,17 @@ is configured, drafts a proposed entry at
 unknown tool), and proposing a catalog entry. To enable those:
 
 ```bash
+sudo /opt/dpagent/.venv/bin/pip install -e '/opt/dpagent[llm]'   # litellm - once
+# (or set DPAGENT_WITH_LLM=1 before running bootstrap.sh in the first place)
+
 cp /opt/dpagent/.env.example /opt/dpagent/.env
-$EDITOR /opt/dpagent/.env          # GEMINI_API_KEY is free
-export $(grep -v '^#' /opt/dpagent/.env | xargs)
+$EDITOR /opt/dpagent/.env          # GEMINI_API_KEY is free; quote any value
+                                    # with spaces or shell metacharacters
+set -a; source /opt/dpagent/.env; set +a
 ```
+
+Without the `[llm]` install, those three commands fail with a clear
+`LLMError: litellm is not installed` rather than doing nothing silently.
 
 ---
 
