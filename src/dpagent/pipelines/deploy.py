@@ -548,17 +548,25 @@ def ensure_airflow_can_run_pipelines() -> list[str]:
     return done
 
 
-def _pipeline_env_var_names(pipeline: Pipeline) -> list[str]:
+def _pipeline_env_refs(pipeline: Pipeline) -> dict[str, str | None]:
     """Every ${VAR} (or ${VAR:-default}) this pipeline's own manifest
-    references, across its source connection and warehouse fields - still
-    literal `${...}` text at this point, since loader.load() validates
-    structure but never calls resolve_refs() itself (deploy.py/runtime.py
-    each do, right where a value is actually used)."""
-    names: set[str] = set()
+    references, across its source connection and warehouse fields, mapped
+    to its default text (None if the reference has none) - still literal
+    `${...}` text at this point, since loader.load() validates structure
+    but never calls resolve_refs() itself (deploy.py/runtime.py each do,
+    right where a value is actually used). Mirrors resolve_refs()'s own
+    ENV_REF parsing exactly, including its defaulting: a ref with a
+    default is never "missing" just because the operator's shell does not
+    have it - the manifest's own literal default already covers it at
+    runtime, in the same process, regardless of this file."""
+    refs: dict[str, str | None] = {}
 
     def scan(value: object) -> None:
         if isinstance(value, str):
-            names.update(m.group(1) for m in ENV_REF.finditer(value))
+            for m in ENV_REF.finditer(value):
+                name, default = m.group(1), m.group(2)
+                if refs.get(name) is None:
+                    refs[name] = default
         elif isinstance(value, dict):
             for v in value.values():
                 scan(v)
@@ -567,7 +575,7 @@ def _pipeline_env_var_names(pipeline: Pipeline) -> list[str]:
     scan({"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
          "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
          "password": pipeline.warehouse.password})
-    return sorted(names)
+    return refs
 
 
 def _pipeline_secrets_file() -> Path:
@@ -627,8 +635,9 @@ def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
             "be root:airflow, and picking up a change needs a service "
             "restart) - re-run as sudo -E dpagent pipeline deploy ...")
 
-    required = _pipeline_env_var_names(pipeline)
-    missing = [name for name in required if os.environ.get(name) is None]
+    refs = _pipeline_env_refs(pipeline)
+    missing = [name for name, default in refs.items()
+              if default is None and os.environ.get(name) is None]
     if missing:
         raise DeployError(
             f"{pipeline.name}: cannot sync these secrets to Airflow - not set "
@@ -638,8 +647,13 @@ def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
     secrets_file = _pipeline_secrets_file()
     existing = _parse_env_file(secrets_file)
     merged = dict(existing)
-    for name in required:
-        merged[name] = os.environ[name]
+    for name in refs:
+        # A ref with a default that the operator never overrode needs
+        # nothing written here - resolve_refs() falls back to that same
+        # literal default at runtime regardless of this file's content.
+        value = os.environ.get(name)
+        if value is not None:
+            merged[name] = value
 
     if merged == existing:
         return False

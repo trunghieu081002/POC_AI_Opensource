@@ -265,8 +265,12 @@ def test_ensure_airflow_can_run_pipelines_does_nothing_when_already_correct(
 
 def _pipeline_with_env_refs(root):
     """A pipeline whose source connection and warehouse both reference
-    ${VAR}s - the shape _pipeline_env_var_names has to scan for, and the
-    same shape pipelines/quickstart and pipelines/demo actually use."""
+    ${VAR}s - the shape _pipeline_env_refs has to scan for, and the same
+    shape pipelines/quickstart and pipelines/demo actually use.
+    WAREHOUSE_DB_HOST carries a default on purpose - pipelines/quickstart's
+    own manifest does exactly this, and the real regression this guards
+    (found running the actual E2E flow) is treating a defaulted ref as
+    "missing" just because the operator's shell does not have it."""
     data = {
         "name": "demo", "summary": "t",
         "source": {"connector": "odoo_postgres",
@@ -283,17 +287,20 @@ def _pipeline_with_env_refs(root):
     return loader.load("demo", root)
 
 
-def test_pipeline_env_var_names_finds_every_ref_across_source_and_warehouse(tmp_path):
+def test_pipeline_env_refs_finds_every_ref_with_its_default_across_source_and_warehouse(tmp_path):
     pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
-    names = deploy._pipeline_env_var_names(pipeline)
-    assert names == sorted(["ODOO_DB_HOST", "ODOO_DB_PASSWORD",
-                            "WAREHOUSE_DB_HOST", "WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD"])
+    refs = deploy._pipeline_env_refs(pipeline)
+    assert refs == {
+        "ODOO_DB_HOST": None, "ODOO_DB_PASSWORD": None,
+        "WAREHOUSE_DB_HOST": "localhost", "WAREHOUSE_DB_USER": None,
+        "WAREHOUSE_DB_PASSWORD": None,
+    }
 
 
-def test_pipeline_env_var_names_is_empty_for_literal_values(pipeline):
+def test_pipeline_env_refs_is_empty_for_literal_values(pipeline):
     """pipeline (the module-level fixture) uses literal host="localhost"/
     connection.host="x" - no ${VAR} refs anywhere."""
-    assert deploy._pipeline_env_var_names(pipeline) == []
+    assert deploy._pipeline_env_refs(pipeline) == {}
 
 
 def test_parse_env_file_reads_back_quoted_values(tmp_path):
@@ -314,15 +321,42 @@ def test_ensure_pipeline_secrets_available_refuses_to_run_without_root(
         deploy.ensure_pipeline_secrets_available(pipeline)
 
 
-def test_ensure_pipeline_secrets_available_lists_every_missing_var(tmp_path, monkeypatch):
+def test_ensure_pipeline_secrets_available_lists_every_missing_var_without_a_default(
+        tmp_path, monkeypatch):
+    """WAREHOUSE_DB_HOST must NOT appear here - it has a ${...:-localhost}
+    default in the manifest, so it is never "missing" just because the
+    operator's shell does not have it."""
     pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
     monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: tmp_path / "airflow")
     with pytest.raises(deploy.DeployError) as exc_info:
         deploy.ensure_pipeline_secrets_available(pipeline)
-    for name in ("ODOO_DB_HOST", "ODOO_DB_PASSWORD", "WAREHOUSE_DB_HOST",
-                 "WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD"):
-        assert name in str(exc_info.value)
+    message = str(exc_info.value)
+    for name in ("ODOO_DB_HOST", "ODOO_DB_PASSWORD", "WAREHOUSE_DB_USER",
+                 "WAREHOUSE_DB_PASSWORD"):
+        assert name in message
+    assert "WAREHOUSE_DB_HOST" not in message
+
+
+def test_ensure_pipeline_secrets_available_does_not_require_a_defaulted_var(
+        tmp_path, monkeypatch):
+    """The real regression: found deploying pipelines/quickstart for real -
+    `deploy` refused with "WAREHOUSE_DB_HOST, WAREHOUSE_DB_NAME,
+    WAREHOUSE_DB_PORT" not set, even though all three carry a manifest
+    default and apply_procedures()/ensure_warehouse_schema() (which run
+    before this, in the same `deploy`) had already succeeded without them -
+    proof the operator did not actually need to export them at all."""
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: tmp_path / "airflow")
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_run_root_command", lambda cmd, what: None)
+    monkeypatch.delenv("WAREHOUSE_DB_HOST", raising=False)
+    for name, value in [("ODOO_DB_HOST", "db.internal"), ("ODOO_DB_PASSWORD", "s3cret"),
+                        ("WAREHOUSE_DB_USER", "dbt_user"), ("WAREHOUSE_DB_PASSWORD", "wh")]:
+        monkeypatch.setenv(name, value)
+
+    deploy.ensure_pipeline_secrets_available(pipeline)   # must not raise
 
 
 def test_ensure_pipeline_secrets_available_writes_the_file_and_restarts_the_scheduler(
