@@ -251,6 +251,29 @@ hop is not a choice, it is what dlt is for.
 6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
    they already do for installs, whichever engine ran.
+7. **Secrets reach the task's own process, not the operator's shell.**
+   `dpagent pipeline run` only calls `airflow dags trigger` - it creates a
+   DagRun row and returns immediately. The DAG's own tasks
+   (`runtime.run_extract`/`run_gate`/`run_transform`) execute later, as
+   LocalExecutor workers forked from the *already running*
+   `airflow-scheduler` process, whose environment was fixed when systemd
+   started it. A `${VAR}` the operator exported in their own shell before
+   running `deploy`/`run` never reaches that process on its own.
+   `dpagent pipeline deploy` closes this gap itself
+   (`deploy.ensure_pipeline_secrets_available`): every `${VAR}` a pipeline's
+   `source`/`warehouse` sections reference is resolved from the *deploying*
+   operator's environment (who must already have it exported - the schema/
+   procedure steps earlier in the same `deploy` need it too) and written to
+   `<airflow install_dir>/home/pipelines.env`, a second file kept separate
+   from the airflow pack's own `airflow.env` (which `dpagent install
+   airflow` rewrites wholesale, and would otherwise wipe on every
+   reinstall) and merged, never overwritten, so deploying one pipeline
+   never drops another's already-synced secrets. `airflow-scheduler` is
+   restarted only when the file's content actually changed. A host whose
+   airflow was installed before this existed needs one `sudo -E dpagent
+   install airflow` to pick up the new (optional) `EnvironmentFile=` line
+   in the scheduler's systemd unit before its first pipeline deploy can
+   sync anything into it.
 
 ### Failure semantics
 

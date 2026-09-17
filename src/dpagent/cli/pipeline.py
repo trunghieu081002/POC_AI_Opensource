@@ -178,7 +178,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
             f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR}, make sure "
             f"Airflow can actually run pipelines (a shared group, an ACL grant, an "
             f"editable dpagent install into its venv - only what is not already true), "
-            f"and install its DAG into Airflow's real DAGS_FOLDER (needs root)?",
+            f"sync this pipeline's secrets into Airflow's own environment (restarting "
+            f"airflow-scheduler if that changed anything), and install its DAG into "
+            f"Airflow's real DAGS_FOLDER (needs root)?",
             default=True):
         no_airflow = True
         console.print("[yellow]skipping Airflow install - files only[/yellow]")
@@ -208,6 +210,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
         console.print("[bold]airflow bridge:[/bold]")
         for action in result.airflow_bridge_actions:
             console.print(f"  {action}")
+    if result.pipeline_secrets_synced:
+        console.print("[bold]pipeline secrets:[/bold] synced to Airflow's "
+                     "own environment, airflow-scheduler restarted")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
     console.print("[green]deployed[/green]")

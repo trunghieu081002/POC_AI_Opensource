@@ -5,6 +5,13 @@ af_install_dir() { dp_param install_dir /opt/airflow; }
 af_home()        { echo "$(af_install_dir)/home"; }
 af_venv()        { echo "$(af_install_dir)/.venv"; }
 af_env_file()    { echo "$(af_home)/airflow.env"; }
+# `dpagent pipeline deploy` owns this one (deploy.ensure_pipeline_secrets_
+# available) - a pipeline's own warehouse/source ${VAR} secrets, kept out of
+# af_env_file() itself so a later `dpagent install airflow` (which rewrites
+# af_env_file() wholesale) can never silently wipe them. May not exist yet on
+# a host with no pipeline deployed - 70-services.sh's EnvironmentFile= line
+# for it is prefixed "-" (optional) for exactly that reason.
+af_pipeline_secrets_file() { echo "$(af_home)/pipelines.env"; }
 af_bin()         { echo "$(af_venv)/bin/airflow"; }
 
 # af_run <airflow subcommand...> — run the CLI as the airflow user with its

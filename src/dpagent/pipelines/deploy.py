@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from ..engine.params import resolve_refs
+from ..engine.params import ENV_REF, resolve_refs
 from .generator import dag_tasks
 from .loader import Pipeline, Stage
 
@@ -46,6 +46,7 @@ class DeployResult:
     dbt_models_published: list[Path] = field(default_factory=list)
     pipeline_files_published: Path | None = None
     airflow_bridge_actions: list[str] = field(default_factory=list)
+    pipeline_secrets_synced: bool = False
     dag_installed: Path | None = None
 
 
@@ -418,6 +419,12 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
     if install_dag_to_airflow:
         result.pipeline_files_published = install_pipeline_files(pipeline)
         result.airflow_bridge_actions = ensure_airflow_can_run_pipelines()
+        if apply_db:
+            # Only makes sense once the operator's own environment has
+            # already been required to carry these values (apply_db's own
+            # ensure_warehouse_schema/apply_procedures above) - under
+            # --no-db there is nothing to resolve from yet.
+            result.pipeline_secrets_synced = ensure_pipeline_secrets_available(pipeline)
         result.dag_installed = install_dag(pipeline)
     return result
 
@@ -539,6 +546,113 @@ def ensure_airflow_can_run_pipelines() -> list[str]:
         done.append(f"installed dpagent (editable) into {venv_bin}")
 
     return done
+
+
+def _pipeline_env_var_names(pipeline: Pipeline) -> list[str]:
+    """Every ${VAR} (or ${VAR:-default}) this pipeline's own manifest
+    references, across its source connection and warehouse fields - still
+    literal `${...}` text at this point, since loader.load() validates
+    structure but never calls resolve_refs() itself (deploy.py/runtime.py
+    each do, right where a value is actually used)."""
+    names: set[str] = set()
+
+    def scan(value: object) -> None:
+        if isinstance(value, str):
+            names.update(m.group(1) for m in ENV_REF.finditer(value))
+        elif isinstance(value, dict):
+            for v in value.values():
+                scan(v)
+
+    scan(pipeline.source.connection)
+    scan({"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
+         "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
+         "password": pipeline.warehouse.password})
+    return sorted(names)
+
+
+def _pipeline_secrets_file() -> Path:
+    return _airflow_install_dir() / "home" / "pipelines.env"
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    result: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        result[key] = value.strip('"')
+    return result
+
+
+def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
+    """Writes/refreshes `<airflow install_dir>/home/pipelines.env` with every
+    ${VAR} this pipeline's manifest references, resolved from *this
+    process's own* environment - the operator must already have them
+    exported for apply_procedures()/ensure_warehouse_schema() above to have
+    worked at all - and restarts airflow-scheduler if the content actually
+    changed. Returns whether anything changed (false is the common case on
+    a repeat deploy, not an error).
+
+    Found for real deploying pipelines/quickstart: `dpagent pipeline run`
+    only ever calls `airflow dags trigger`, which creates a DagRun row and
+    returns immediately - the DAG's own tasks (runtime.run_extract, e.g.)
+    execute later, as LocalExecutor workers forked from the *already
+    running* airflow-scheduler process, whose environment was fixed at
+    systemd start time from the airflow pack's own airflow.env (Airflow's
+    config - AIRFLOW__*, never a pipeline's warehouse/source secrets) alone.
+    A pipeline secret exported in the operator's shell at deploy/run time
+    never reaches that process: runtime.py's resolve_refs() raises a bare
+    ParamError before run_extract's own try/except around the dlt
+    subprocess is ever reached, so the task just shows up "failed" in
+    Airflow with no dpagent event to explain why - confirmed against a
+    real deploy, not guessed at.
+
+    A second, dpagent-pipeline-owned file rather than folding into
+    airflow.env itself: that file is fully rewritten by `dpagent install
+    airflow` (packs/airflow/steps/40-config.sh) - appending pipeline
+    secrets into it would silently wipe them on the next airflow
+    reinstall/upgrade. Read-merge-write (never a wholesale overwrite) so
+    deploying one pipeline never drops another's already-synced secrets.
+
+    Requires root, same as install_dag()/ensure_airflow_can_run_pipelines():
+    the file must end up root:airflow, and restarting a systemd unit always
+    needs it.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "syncing pipeline secrets to Airflow needs root (the file must "
+            "be root:airflow, and picking up a change needs a service "
+            "restart) - re-run as sudo -E dpagent pipeline deploy ...")
+
+    required = _pipeline_env_var_names(pipeline)
+    missing = [name for name in required if os.environ.get(name) is None]
+    if missing:
+        raise DeployError(
+            f"{pipeline.name}: cannot sync these secrets to Airflow - not set "
+            f"in this shell either (export them, same as apply_procedures/"
+            f"ensure_warehouse_schema above already needed): {', '.join(missing)}")
+
+    secrets_file = _pipeline_secrets_file()
+    existing = _parse_env_file(secrets_file)
+    merged = dict(existing)
+    for name in required:
+        merged[name] = os.environ[name]
+
+    if merged == existing:
+        return False
+
+    content = "".join(f'{key}="{value}"\n' for key, value in sorted(merged.items()))
+    secrets_file.parent.mkdir(parents=True, exist_ok=True)
+    secrets_file.write_text(content)
+    os.chmod(secrets_file, 0o600)
+    shutil.chown(secrets_file, user="airflow", group="airflow")
+
+    _run_root_command(["systemctl", "restart", "airflow-scheduler"],
+                      what="restarting airflow-scheduler to pick up pipeline secrets")
+    return True
 
 
 def install_dag(pipeline: Pipeline) -> Path:

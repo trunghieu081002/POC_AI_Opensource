@@ -261,6 +261,147 @@ def test_ensure_airflow_can_run_pipelines_does_nothing_when_already_correct(
     assert not any(cmd[0].split("/")[-1] in action_verbs for cmd in calls)
 
 
+# ---------------------------------------------------------------- ensure_pipeline_secrets_available
+
+def _pipeline_with_env_refs(root):
+    """A pipeline whose source connection and warehouse both reference
+    ${VAR}s - the shape _pipeline_env_var_names has to scan for, and the
+    same shape pipelines/quickstart and pipelines/demo actually use."""
+    data = {
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres",
+                   "connection": {"host": "${ODOO_DB_HOST}", "password": "${ODOO_DB_PASSWORD}"},
+                   "tables": ["t"]},
+        "warehouse": {"host": "${WAREHOUSE_DB_HOST:-localhost}", "user": "${WAREHOUSE_DB_USER}",
+                     "password": "${WAREHOUSE_DB_PASSWORD}", "database": "warehouse"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "schema_contract", "tables": {"t": {"id": "bigint"}}}]}],
+    }
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    return loader.load("demo", root)
+
+
+def test_pipeline_env_var_names_finds_every_ref_across_source_and_warehouse(tmp_path):
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    names = deploy._pipeline_env_var_names(pipeline)
+    assert names == sorted(["ODOO_DB_HOST", "ODOO_DB_PASSWORD",
+                            "WAREHOUSE_DB_HOST", "WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD"])
+
+
+def test_pipeline_env_var_names_is_empty_for_literal_values(pipeline):
+    """pipeline (the module-level fixture) uses literal host="localhost"/
+    connection.host="x" - no ${VAR} refs anywhere."""
+    assert deploy._pipeline_env_var_names(pipeline) == []
+
+
+def test_parse_env_file_reads_back_quoted_values(tmp_path):
+    f = tmp_path / "pipelines.env"
+    f.write_text('FOO="bar baz"\nEMPTY=""\n# a comment\n\nBARE=noquotes\n')
+    assert deploy._parse_env_file(f) == {"FOO": "bar baz", "EMPTY": "", "BARE": "noquotes"}
+
+
+def test_parse_env_file_is_empty_dict_for_a_missing_file(tmp_path):
+    assert deploy._parse_env_file(tmp_path / "does_not_exist.env") == {}
+
+
+def test_ensure_pipeline_secrets_available_refuses_to_run_without_root(
+        tmp_path, monkeypatch):
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.ensure_pipeline_secrets_available(pipeline)
+
+
+def test_ensure_pipeline_secrets_available_lists_every_missing_var(tmp_path, monkeypatch):
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: tmp_path / "airflow")
+    with pytest.raises(deploy.DeployError) as exc_info:
+        deploy.ensure_pipeline_secrets_available(pipeline)
+    for name in ("ODOO_DB_HOST", "ODOO_DB_PASSWORD", "WAREHOUSE_DB_HOST",
+                 "WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD"):
+        assert name in str(exc_info.value)
+
+
+def test_ensure_pipeline_secrets_available_writes_the_file_and_restarts_the_scheduler(
+        tmp_path, monkeypatch):
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    airflow_home = tmp_path / "airflow"
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: airflow_home)
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+    for name, value in [("ODOO_DB_HOST", "db.internal"), ("ODOO_DB_PASSWORD", "s3cret"),
+                        ("WAREHOUSE_DB_HOST", "localhost"), ("WAREHOUSE_DB_USER", "dbt_user"),
+                        ("WAREHOUSE_DB_PASSWORD", "wh pass with spaces")]:
+        monkeypatch.setenv(name, value)
+
+    restarted = []
+    monkeypatch.setattr(deploy, "_run_root_command",
+                        lambda cmd, what: restarted.append((cmd, what)))
+
+    changed = deploy.ensure_pipeline_secrets_available(pipeline)
+
+    assert changed is True
+    assert restarted == [(["systemctl", "restart", "airflow-scheduler"],
+                          "restarting airflow-scheduler to pick up pipeline secrets")]
+    written = deploy._parse_env_file(airflow_home / "home" / "pipelines.env")
+    assert written["WAREHOUSE_DB_PASSWORD"] == "wh pass with spaces"
+    assert written["ODOO_DB_HOST"] == "db.internal"
+
+
+def test_ensure_pipeline_secrets_available_is_idempotent_and_does_not_restart_when_unchanged(
+        tmp_path, monkeypatch):
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    airflow_home = tmp_path / "airflow"
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: airflow_home)
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+    for name, value in [("ODOO_DB_HOST", "db.internal"), ("ODOO_DB_PASSWORD", "s3cret"),
+                        ("WAREHOUSE_DB_HOST", "localhost"), ("WAREHOUSE_DB_USER", "dbt_user"),
+                        ("WAREHOUSE_DB_PASSWORD", "wh")]:
+        monkeypatch.setenv(name, value)
+    restarted = []
+    monkeypatch.setattr(deploy, "_run_root_command",
+                        lambda cmd, what: restarted.append(cmd))
+
+    first = deploy.ensure_pipeline_secrets_available(pipeline)
+    second = deploy.ensure_pipeline_secrets_available(pipeline)
+
+    assert first is True
+    assert second is False
+    assert restarted == [["systemctl", "restart", "airflow-scheduler"]]   # only once
+
+
+def test_ensure_pipeline_secrets_available_never_drops_another_pipelines_vars(
+        tmp_path, monkeypatch):
+    """The real reason this is read-merge-write, not a wholesale overwrite:
+    deploying pipeline A must not wipe pipeline B's already-synced secrets
+    out of the shared pipelines.env file."""
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    airflow_home = tmp_path / "airflow"
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: airflow_home)
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_run_root_command", lambda cmd, what: None)
+
+    secrets_file = airflow_home / "home" / "pipelines.env"
+    secrets_file.parent.mkdir(parents=True)
+    secrets_file.write_text('OTHER_PIPELINE_SECRET="keep-me"\n')
+
+    for name, value in [("ODOO_DB_HOST", "db.internal"), ("ODOO_DB_PASSWORD", "s3cret"),
+                        ("WAREHOUSE_DB_HOST", "localhost"), ("WAREHOUSE_DB_USER", "dbt_user"),
+                        ("WAREHOUSE_DB_PASSWORD", "wh")]:
+        monkeypatch.setenv(name, value)
+
+    deploy.ensure_pipeline_secrets_available(pipeline)
+
+    written = deploy._parse_env_file(secrets_file)
+    assert written["OTHER_PIPELINE_SECRET"] == "keep-me"
+    assert written["WAREHOUSE_DB_USER"] == "dbt_user"
+
+
 # ---------------------------------------------------------------- install_dag
 
 def test_install_dag_refuses_to_run_without_root(isolated_db, pipeline, monkeypatch):
