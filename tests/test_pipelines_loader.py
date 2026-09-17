@@ -232,6 +232,27 @@ def test_source_needs_a_connector(root):
         loader.load("demo", root)
 
 
+def test_lint_rejects_a_connector_runtime_does_not_support(root):
+    """The P1 regression this guards: before this, a manifest naming an
+    unsupported connector (sql_server, e.g. - not wired up yet) linted
+    clean, planned clean, deployed clean, and only failed deep inside a
+    real Airflow task's run_extract(), as a raw ValueError with no
+    indication the mistake was catchable this early."""
+    data = _minimal()
+    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="sql_server.*not supported"):
+        loader.load("demo", root)
+
+
+def test_lint_error_for_an_unsupported_connector_lists_the_valid_ones(root):
+    data = _minimal()
+    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="odoo_postgres"):
+        loader.load("demo", root)
+
+
 def test_warehouse_needs_a_host(root):
     data = _minimal()
     data["warehouse"] = {"database": "warehouse"}

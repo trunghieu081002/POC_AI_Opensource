@@ -76,6 +76,13 @@ def render_dag(pipeline: Pipeline) -> str:
        at that import) - `setdefault` rather than a plain assignment so an
        operator's own explicit `DPAGENT_PIPELINES` (set some other way)
        still wins.
+
+    The DAG's own `on_success_callback`/`on_failure_callback` (Airflow
+    calls exactly one, once the run reaches a terminal state) call
+    `runtime.finish_pipeline_run()` - the only place `runs.status` for a
+    `dpagent pipeline run` ever moves past "running". `dpagent pipeline
+    run` itself only triggers and returns (docs/layer2.md's own "does not
+    wait"); without this callback nothing else ever finished that row.
     """
     tasks = dag_tasks(pipeline)
     lines = [
@@ -98,12 +105,36 @@ def render_dag(pipeline: Pipeline) -> str:
         "from dpagent.pipelines import runtime",
         "",
         "",
+        "def _dpagent_finish_run(context, status):",
+        "    # Airflow itself calls this once the DAG run reaches a terminal",
+        "    # state - the only place that actually knows that, since",
+        '    # `dpagent pipeline run` only triggers and returns immediately',
+        "    # (docs/layer2.md). Without this, runs.status stayed 'running'",
+        "    # forever regardless of what the DAG actually did - found for real,",
+        "    # not guessed: every prior demo run had to call finish_run() by",
+        "    # hand in a throwaway verification script because nothing else did.",
+        "    dag_run = context.get(\"dag_run\")",
+        '    run_id = (dag_run.conf or {}).get("dpagent_run_id") if dag_run else None',
+        "    if run_id is not None:",
+        "        runtime.finish_pipeline_run(run_id, status)",
+        "",
+        "",
+        "def _on_dag_success(context, **_):",
+        '    _dpagent_finish_run(context, "ok")',
+        "",
+        "",
+        "def _on_dag_failure(context, **_):",
+        '    _dpagent_finish_run(context, "failed")',
+        "",
+        "",
         "with DAG(",
         f'    dag_id="{pipeline.name}",',
         "    schedule_interval=None,",
         "    start_date=datetime(2026, 1, 1),",
         "    catchup=False,",
         '    tags=["dpagent-pipeline"],',
+        "    on_success_callback=_on_dag_success,",
+        "    on_failure_callback=_on_dag_failure,",
         ") as dag:",
     ]
 

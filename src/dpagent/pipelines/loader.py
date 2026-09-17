@@ -189,6 +189,18 @@ def _validate_source(raw: dict, where: str) -> Source:
     connector = raw.get("connector")
     if not connector:
         raise PipelineError(f"{where}: source has no connector")
+    # Lazy import: extract.py imports Pipeline/Stage from this module, so a
+    # top-level import here would be circular. Checked against the same set
+    # run_extract actually compiles against (extract.CONNECTORS) - found for
+    # real: a manifest naming an unsupported connector (e.g. "sql_server",
+    # not wired up yet) used to lint clean, plan clean, deploy clean, and
+    # only fail deep inside a real Airflow task's run_extract(), as a raw
+    # ValueError with no indication the mistake was catchable at lint time.
+    from .extract import CONNECTORS
+    if connector not in CONNECTORS:
+        raise PipelineError(
+            f"{where}: source connector {connector!r} is not supported yet - "
+            f"expected one of {sorted(CONNECTORS)}")
     connection = raw.get("connection") or {}
     files = raw.get("files") or {}
     if not connection and not files:

@@ -108,6 +108,25 @@ def test_dag_threads_dpagent_run_id_from_dag_run_conf_into_every_task(pipeline):
     assert "run_id=run_id" in src
 
 
+def test_dag_wires_success_and_failure_callbacks_to_finish_the_run(pipeline):
+    """The P0 regression this guards: `dpagent pipeline run` only triggers
+    Airflow and returns - before this, nothing ever called
+    runtime.finish_pipeline_run(), so runs.status stayed "running" forever
+    regardless of what the DAG actually did. Airflow's own
+    on_success_callback/on_failure_callback are the only hook that fires
+    exactly when the DAG run reaches a terminal state."""
+    src = deploy.render_dag(pipeline)
+    assert "runtime.finish_pipeline_run(run_id, status)" in src
+    assert "on_success_callback=_on_dag_success," in src
+    assert "on_failure_callback=_on_dag_failure," in src
+    # The callback functions must be defined before the DAG(...) call that
+    # references them - a NameError at DAG-parse time would be exactly the
+    # kind of failure that only shows up watching a real scheduler try to
+    # import the file, not reading the generator.
+    assert src.index("def _on_dag_success") < src.index("on_success_callback=_on_dag_success")
+    assert src.index("def _on_dag_failure") < src.index("on_failure_callback=_on_dag_failure")
+
+
 # ---------------------------------------------------------------- trigger_dag_command
 
 @pytest.fixture
@@ -391,7 +410,7 @@ def test_apply_procedures_against_a_real_database(tmp_path, throwaway_warehouse,
     root = tmp_path / "pipelines"
     data = {
         "name": "demo", "summary": "t",
-        "source": {"connector": "x", "connection": {"host": "x"}},
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}},
         "warehouse": {"host": "${WH_HOST}", "port": "${WH_PORT}",
                      "database": "${WH_DATABASE}", "user": "${WH_USER}",
                      "password": "${WH_PASSWORD}"},
