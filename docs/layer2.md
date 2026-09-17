@@ -351,6 +351,11 @@ verdict is.
 
 ## CSV quickstart (no external source)
 
+Run for real on 2026-09-17 (docs/deploy-log.md has the full account): happy
+path, negative path, and the idempotent re-run all produced exactly the
+verdicts described below, through a real Airflow deployment - not merely
+unit-tested.
+
 `demo` needs a real Odoo Postgres to run against. `pipelines/quickstart/`
 needs nothing but this repo: a committed sample CSV
 (`pipelines/quickstart/data/orders.csv`) through
@@ -398,6 +403,11 @@ at `running`, and `curated` never runs at all for that run:
 cp pipelines/quickstart/data/orders.csv /tmp/orders_happy_backup.csv
 cp pipelines/quickstart/data/orders_negative_example.csv pipelines/quickstart/data/orders.csv
 
+# deploy re-publishes pipelines/quickstart/ (data/ included) to the shared,
+# world-readable copy Airflow's own tasks actually read from
+# (deploy.install_pipeline_files) - skipping this re-run re-triggers the
+# *previous* deploy's data, not the file just swapped in above.
+sudo -E dpagent pipeline deploy quickstart --yes
 sudo -E dpagent pipeline run quickstart --yes
 dpagent pipeline status quickstart            # failed - not "running" forever
 dpagent pipeline audit <run>                  # "4/5 (80.0%) ... exceeding the 25% threshold"

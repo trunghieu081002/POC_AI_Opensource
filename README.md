@@ -312,9 +312,12 @@ not built yet:
       just the static lint check
 - [x] Layer 2 — staged ingestion with a gate between every stage: manifest
       schema, generator, deploy, runtime, both MVP connectors, a real
-      Odoo-shaped reference pipeline (dbt + procedure engines together),
-      and `dpagent pipeline run` triggering a real deployed DAG through a
-      real Airflow install, end to end — see `docs/layer2.md`
+      Odoo-shaped reference pipeline (dbt + procedure engines together), a
+      self-contained CSV quickstart pipeline, and `dpagent pipeline run`
+      triggering a real deployed DAG through a real Airflow install —
+      happy path, negative path (quarantine over threshold → terminal
+      `failed`), and idempotent re-run all verified end to end on a real
+      host, not just unit-tested — see `docs/layer2.md`
 - [ ] Packs: clickhouse, minio, trino, spark, iceberg, hive-metastore
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 
@@ -339,11 +342,23 @@ idempotently by `dpagent pipeline deploy`
 deployed DAG immediately rather than waiting on its own scan interval; none of
 this is a manual step to remember on the next host. A deploy/run also refuses
 early, with a specific list, if `dlt`/`dbt`/`airflow` are not installed yet,
-rather than failing deep inside whichever task needs one of them first. See
-[docs/layer2.md](docs/layer2.md) for the verified setup, the CSV quickstart
-pipeline (`pipelines/quickstart/` — no Odoo, no external service, proves the
-whole loop including quarantine on nothing but this repo), and the remaining
-deployment details.
+rather than failing deep inside whichever task needs one of them first. A
+pipeline's own `${VAR}` secrets are synced into Airflow's own process
+environment on deploy (`deploy.ensure_pipeline_secrets_available`) — found
+necessary the same way: `dpagent pipeline run` only ever triggers a DagRun,
+the task itself executes later inside the already-running airflow-scheduler
+process, whose environment an operator's own shell cannot reach on its own.
+
+`pipelines/quickstart/` (no Odoo, no external service — a committed sample
+CSV is the whole source) has been run end to end for real, through this exact
+mechanism, on a real host: a happy-path run quarantines its one deliberately
+duplicated row and still reaches `curated` (8 of 10 rows); a negative-path run
+(a worse copy of the same data, 4 of 5 rows duplicated) exceeds the
+quarantine threshold and the whole run reaches a terminal `failed` state
+instead of hanging at `running`, and `curated` never runs for it; re-running
+the happy path a second time reproduces the exact same quarantine verdict and
+row count, not a duplicate. See [docs/layer2.md](docs/layer2.md) for the
+exact command sequence and the remaining deployment details.
 
 Run `pytest` and `dpagent lint` on every checkout before deployment; historical
 results are evidence for the tested revisions, not a substitute for verifying
