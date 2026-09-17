@@ -306,11 +306,17 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
 
     state.event("transform.start", f"{pipeline_name}/{stage} via {target.engine}", run_id=run_id)
     if target.engine == "dbt":
-        # Not yet verified end to end - no real dbt project exists for this
-        # pipeline's models (docs/layer2.md's "Out of scope (MVP)" territory
-        # is bigger than this one function). The command itself is real.
-        proc = subprocess.run(["dbt", "run", "--select", *target.models],
-                              cwd=pipeline.root, capture_output=True, text=True)
+        # `dbt` is the wrapper packs/dbt/steps/40-symlink.sh installs at
+        # /usr/local/bin/dbt - it already sets DBT_PROFILES_DIR itself, so
+        # only --project-dir is needed here. Runs against
+        # install_dbt_models()'s published copy under the dbt pack's own
+        # project (deploy.py) - pipeline.root itself has no dbt_project.yml
+        # and never did; `dbt run` from there always failed before this,
+        # confirmed the first time this branch actually ran for real.
+        proc = subprocess.run(
+            ["dbt", "run", "--select", *target.models,
+             "--project-dir", _dbt_project_dir()],
+            capture_output=True, text=True, timeout=300)
         if proc.returncode != 0:
             state.event("transform.failed", f"dbt run failed for {stage!r}", run_id=run_id,
                         level="error")
@@ -328,6 +334,20 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
 
 
 _DLT_DEFAULT_INSTALL_DIR = "/opt/dlt"   # must match packs/dlt/pack.yaml's own default
+_DBT_DEFAULT_PROJECT_DIR = "/opt/dbt/project"   # must match packs/dbt/pack.yaml's own default
+
+
+def _dbt_project_dir() -> str:
+    """Same shape as _dlt_python() and the same reason: runs inside a DAG
+    task's own process, so it must not touch packs_mod/PACKS_DIR - only a
+    plain SQLite read of what was actually recorded at install time, with a
+    hard-coded fallback matching the pack's own default."""
+    project_dir = _DBT_DEFAULT_PROJECT_DIR
+    record = state.get_install("dbt")
+    if record:
+        supplied = json.loads(record["params_json"])
+        project_dir = supplied.get("project_dir", project_dir)
+    return project_dir
 
 
 def _dlt_python() -> str:

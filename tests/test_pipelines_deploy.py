@@ -50,6 +50,9 @@ def _pipeline(root):
     (d / "procedures" / "convert.sql").write_text(
         "CREATE OR REPLACE PROCEDURE dpagent_test_proc() LANGUAGE plpgsql "
         "AS $$ BEGIN NULL; END; $$;\n")
+    (d / "models").mkdir()
+    (d / "models" / "stg_a.sql").write_text("select 1 as id\n")
+    (d / "models" / "stg_b.sql").write_text("select 1 as id\n")
     return loader.load("demo", root)
 
 
@@ -194,6 +197,59 @@ def test_dbt_schema_is_valid_yaml_with_every_model(pipeline):
     parsed = yaml.safe_load(deploy.render_dbt_schema(pipeline, stage))
     assert parsed["version"] == 2
     assert {m["name"] for m in parsed["models"]} == {"stg_a", "stg_b"}
+
+
+# ---------------------------------------------------------------- install_dbt_models
+
+def test_install_dbt_models_refuses_to_run_without_root(isolated_db, pipeline, monkeypatch):
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.install_dbt_models(pipeline)
+
+
+def test_install_dbt_models_refuses_a_model_with_no_sql_file(isolated_db, pipeline, monkeypatch,
+                                                             tmp_path):
+    """The regression this guards: `dbt run --select stg_a` against a
+    project missing stg_a.sql fails with a dbt error deep inside a DAG
+    task, not a clean message at deploy time - this must be caught here
+    instead."""
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    (pipeline.root / "models" / "stg_a.sql").unlink()
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: tmp_path / "dbtproject")
+    with pytest.raises(deploy.DeployError, match="stg_a"):
+        deploy.install_dbt_models(pipeline)
+
+
+def test_install_dbt_models_publishes_every_model_and_a_schema_yml(isolated_db, pipeline,
+                                                                   monkeypatch, tmp_path):
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    project_dir = tmp_path / "dbtproject"
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: project_dir)
+
+    written = deploy.install_dbt_models(pipeline)
+
+    dest_dir = project_dir / "models" / "demo"
+    assert (dest_dir / "stg_a.sql").exists()
+    assert (dest_dir / "stg_b.sql").exists()
+    assert (dest_dir / "schema_raw.yml").exists()
+    assert set(written) == {
+        dest_dir / "stg_a.sql", dest_dir / "stg_b.sql", dest_dir / "schema_raw.yml"}
+
+
+def test_install_dbt_models_writes_the_schema_name_macro_once(isolated_db, pipeline,
+                                                               monkeypatch, tmp_path):
+    project_dir = tmp_path / "dbtproject"
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: project_dir)
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+
+    deploy.install_dbt_models(pipeline)
+    macro_path = project_dir / "macros" / "generate_schema_name.sql"
+    assert "custom_schema_name | trim" in macro_path.read_text()
+
+    # A project's own pre-existing override must not be silently replaced.
+    macro_path.write_text("-- an operator's own override\n")
+    deploy.install_dbt_models(pipeline)
+    assert macro_path.read_text() == "-- an operator's own override\n"
 
 
 # ---------------------------------------------------------------- write_artifacts

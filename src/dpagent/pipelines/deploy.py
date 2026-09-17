@@ -40,6 +40,7 @@ class DeployError(Exception):
 class DeployResult:
     written: list[Path] = field(default_factory=list)
     procedures_applied: list[str] = field(default_factory=list)
+    dbt_models_published: list[Path] = field(default_factory=list)
     pipeline_files_published: Path | None = None
     dag_installed: Path | None = None
 
@@ -262,12 +263,100 @@ def install_pipeline_files(pipeline: Pipeline) -> Path:
     return dest
 
 
+_DBT_SCHEMA_NAME_MACRO = """\
+{% macro generate_schema_name(custom_schema_name, node) -%}
+    {%- if custom_schema_name is none -%}
+        {{ target.schema }}
+    {%- else -%}
+        {{ custom_schema_name | trim }}
+    {%- endif -%}
+{%- endmacro %}
+"""
+
+
+def _dbt_project_dir() -> Path:
+    """The dbt pack's own project_dir - same lookup shape as
+    _airflow_install_dir(). Safe to use packs_mod here (unlike
+    runtime._dbt_project_dir's own, deliberately packs_mod-free twin):
+    everything in this module runs on the CLI side, as whatever user calls
+    `dpagent pipeline deploy`, never inside a DAG task's own process."""
+    from ..engine import state
+    from ..library import loader as packs_mod
+
+    pack = packs_mod.load("dbt")
+    project_dir = (pack.param_schema.get("project_dir") or {}).get("default", "/opt/dbt/project")
+    record = state.get_install("dbt")
+    if record:
+        supplied = json.loads(record["params_json"])
+        project_dir = supplied.get("project_dir", project_dir)
+    return Path(project_dir)
+
+
+def install_dbt_models(pipeline: Pipeline) -> list[Path]:
+    """Publishes every dbt-engine stage's models/<name>.sql + a generated
+    schema.yml into the dbt pack's own real project - `dbt run` only ever
+    looks inside its own --project-dir, never at a pipeline's own
+    directory (pipeline.root has no dbt_project.yml and never did;
+    runtime.run_transform's dbt branch failed against it the first time it
+    actually ran for real).
+
+    Also ensures the project's generate_schema_name macro returns a
+    model's own `schema` config verbatim: dbt's own default instead
+    concatenates it with the target's default schema
+    (`<target_schema>_<custom_schema>`), so a model declaring
+    `schema: demo` would materialise into a schema dpagent's own gates
+    (which read pipeline.yaml's warehouse.schema literally) would never
+    find anything in. Written once, only if the project does not already
+    have one - a real project might already carry its own override this
+    must not silently replace.
+
+    Lands under the dbt project's own dbtread-group default ACL
+    (packs/dbt/steps/30-project.sh already applies one to the whole
+    project directory), so no chmod/chgrp of its own is needed here -
+    unlike install_pipeline_files()/install_dag(), which publish into
+    locations with no such default in place.
+
+    Requires root: /opt/dbt/project is not writable otherwise.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "publishing dbt models needs root (writing into the dbt pack's "
+            "own project directory) - re-run as sudo -E dpagent pipeline deploy ...")
+
+    project_dir = _dbt_project_dir()
+    macro_path = project_dir / "macros" / "generate_schema_name.sql"
+    if not macro_path.exists():
+        macro_path.parent.mkdir(parents=True, exist_ok=True)
+        macro_path.write_text(_DBT_SCHEMA_NAME_MACRO)
+
+    written = []
+    dest_dir = project_dir / "models" / pipeline.name
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for stage in pipeline.stages[1:]:
+        if stage.engine != "dbt":
+            continue
+        for model in stage.models:
+            src = pipeline.root / "models" / f"{model}.sql"
+            if not src.exists():
+                raise DeployError(
+                    f"stage {stage.name!r} declares dbt model {model!r}, but "
+                    f"{src} does not exist")
+            dest = dest_dir / f"{model}.sql"
+            dest.write_text(src.read_text())
+            written.append(dest)
+        schema_dest = dest_dir / f"schema_{stage.name}.yml"
+        schema_dest.write_text(render_dbt_schema(pipeline, stage))
+        written.append(schema_dest)
+    return written
+
+
 def deploy(pipeline: Pipeline, *, apply_db: bool = True,
           install_dag_to_airflow: bool = True) -> DeployResult:
     result = DeployResult()
     result.written = write_artifacts(pipeline)
     if apply_db:
         result.procedures_applied = apply_procedures(pipeline)
+        result.dbt_models_published = install_dbt_models(pipeline)
     if install_dag_to_airflow:
         result.pipeline_files_published = install_pipeline_files(pipeline)
         result.dag_installed = install_dag(pipeline)

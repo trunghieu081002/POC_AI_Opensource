@@ -114,28 +114,33 @@ def plan_cmd(name):
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True)
 @click.option("--no-db", is_flag=True,
-              help="Write the DAG/schema files only - skip applying procedure migrations.")
+              help="Write the DAG/schema files only - skip applying procedure "
+                   "migrations and publishing dbt models.")
 @click.option("--no-airflow", is_flag=True,
               help="Skip installing the DAG into Airflow's real DAGS_FOLDER.")
 def deploy_cmd(name, yes, no_db, no_airflow):
-    """Write the DAG + dbt schema, apply procedure migrations, install the DAG.
+    """Write the DAG + dbt schema, apply procedures, publish dbt models, install the DAG.
 
     Writing files under pipelines/<name>/build/ is always safe to repeat
-    (each run overwrites the last). Two other things happen here, each a
-    real action against a real system, so both ask first unless --yes:
-    applying a procedure runs `CREATE OR REPLACE PROCEDURE` against
-    `warehouse:` (idempotent by construction), and installing the DAG
-    copies it into Airflow's DAGS_FOLDER as the airflow OS user (needs
-    root) so `dpagent pipeline run` has something real to trigger.
+    (each run overwrites the last). The rest happens against a real
+    system, so it asks first unless --yes: applying a procedure runs
+    `CREATE OR REPLACE PROCEDURE` against `warehouse:` (idempotent by
+    construction) and a dbt-engine stage's models are copied into the dbt
+    pack's own real project (needs root; `dbt run` only ever looks inside
+    its own project, never at this pipeline's directory) - both under
+    --no-db; and installing the DAG copies it into Airflow's DAGS_FOLDER
+    as the airflow OS user (needs root) so `dpagent pipeline run` has
+    something real to trigger - under --no-airflow.
     """
     pipeline = _load_or_fail(name)
 
     if not no_db and not yes and not confirm(
             f"Apply {name}'s procedure migration(s) against "
             f"{pipeline.warehouse.host}:{pipeline.warehouse.port}/"
-            f"{pipeline.warehouse.database}?", default=True):
+            f"{pipeline.warehouse.database}, and publish its dbt models (needs root)?",
+            default=True):
         no_db = True
-        console.print("[yellow]skipping procedure migrations - files only[/yellow]")
+        console.print("[yellow]skipping procedure migrations/dbt models - files only[/yellow]")
 
     if not no_airflow and not yes and not confirm(
             f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR} and install "
@@ -156,6 +161,10 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     if result.procedures_applied:
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
+    if result.dbt_models_published:
+        console.print("[bold]dbt models published:[/bold]")
+        for path in result.dbt_models_published:
+            console.print(f"  {path}")
     if result.pipeline_files_published:
         console.print(f"[bold]pipeline files published:[/bold] "
                      f"{result.pipeline_files_published}")
