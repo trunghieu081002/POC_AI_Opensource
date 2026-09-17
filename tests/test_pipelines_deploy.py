@@ -468,3 +468,94 @@ def test_apply_procedures_against_a_real_database(tmp_path, throwaway_warehouse,
     )
     assert check.stdout.strip() == "1", (
         f"procedure was not actually created in the database: {check.stderr}")
+
+
+def _query(warehouse: dict, sql: str) -> str:
+    check = subprocess.run(
+        ["psql", "-h", "localhost", "-U", warehouse["user"],
+         "-d", warehouse["database"], "-tAc", sql],
+        env={**os.environ, "PGPASSWORD": warehouse["password"]},
+        capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr
+    return check.stdout.strip()
+
+
+@requires_psql
+def test_ensure_warehouse_schema_creates_a_schema_that_does_not_exist_yet(
+        tmp_path, throwaway_warehouse, monkeypatch):
+    for key, value in throwaway_warehouse.items():
+        monkeypatch.setenv(f"WH_{key.upper()}", value)
+    root = tmp_path / "pipelines"
+    data = {
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}},
+        "warehouse": {"host": "${WH_HOST}", "port": "${WH_PORT}",
+                     "database": "${WH_DATABASE}", "user": "${WH_USER}",
+                     "password": "${WH_PASSWORD}", "schema": "dpagent_test_custom_schema"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "schema_contract", "tables": {"t": {"id": "bigint"}}}]}],
+    }
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    pipeline = loader.load("demo", root)
+
+    before = _query(throwaway_warehouse,
+                    "select count(*) from information_schema.schemata "
+                    "where schema_name = 'dpagent_test_custom_schema'")
+    assert before == "0"
+
+    result = deploy.ensure_warehouse_schema(pipeline)
+    assert result == "dpagent_test_custom_schema"
+
+    after = _query(throwaway_warehouse,
+                   "select count(*) from information_schema.schemata "
+                   "where schema_name = 'dpagent_test_custom_schema'")
+    assert after == "1"
+
+
+@requires_psql
+def test_apply_procedures_lands_in_the_declared_schema_not_public_when_it_did_not_exist_yet(
+        tmp_path, throwaway_warehouse, monkeypatch):
+    """The real regression found deploying pipelines/quickstart (a
+    procedure-only pipeline, no dbt stage to create the schema as a side
+    effect first): before ensure_warehouse_schema() existed, an unqualified
+    `CREATE OR REPLACE PROCEDURE` against a search_path whose first entry
+    (warehouse.schema) did not exist yet landed silently in `public`
+    instead - proven here by actually querying pg_proc.pronamespace, not
+    just that apply_procedures() reported success."""
+    for key, value in throwaway_warehouse.items():
+        monkeypatch.setenv(f"WH_{key.upper()}", value)
+    root = tmp_path / "pipelines"
+    data = {
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}},
+        "warehouse": {"host": "${WH_HOST}", "port": "${WH_PORT}",
+                     "database": "${WH_DATABASE}", "user": "${WH_USER}",
+                     "password": "${WH_PASSWORD}", "schema": "dpagent_test_custom_schema"},
+        "stages": [
+            {"name": "landing", "gates": [
+                {"type": "schema_contract", "tables": {"t": {"id": "bigint"}}}]},
+            {"name": "curated", "engine": "procedure", "depends_on": "landing",
+             "procedure": "procedures/convert.sql", "gates": [
+                {"type": "not_null", "table": "fct", "columns": ["id"]}]},
+        ],
+    }
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    (d / "procedures").mkdir()
+    (d / "procedures" / "convert.sql").write_text(
+        "CREATE OR REPLACE PROCEDURE dpagent_test_proc_2() LANGUAGE plpgsql "
+        "AS $$ BEGIN NULL; END; $$;\n")
+    pipeline = loader.load("demo", root)
+
+    deploy.ensure_warehouse_schema(pipeline)
+    deploy.apply_procedures(pipeline)
+
+    namespace = _query(throwaway_warehouse,
+                       "select n.nspname from pg_proc p "
+                       "join pg_namespace n on n.oid = p.pronamespace "
+                       "where p.proname = 'dpagent_test_proc_2'")
+    assert namespace == "dpagent_test_custom_schema", (
+        f"procedure landed in schema {namespace!r} instead of the declared one")

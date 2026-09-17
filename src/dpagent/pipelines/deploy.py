@@ -41,6 +41,7 @@ class DeployError(Exception):
 @dataclass
 class DeployResult:
     written: list[Path] = field(default_factory=list)
+    schema_ensured: str = ""
     procedures_applied: list[str] = field(default_factory=list)
     dbt_models_published: list[Path] = field(default_factory=list)
     pipeline_files_published: Path | None = None
@@ -247,6 +248,28 @@ def _psql_command(pipeline: Pipeline, *extra: str) -> tuple[list[str], dict[str,
     return cmd, env
 
 
+def ensure_warehouse_schema(pipeline: Pipeline) -> str:
+    """`CREATE SCHEMA IF NOT EXISTS <warehouse.schema>` - found for real
+    deploying pipelines/quickstart (a procedure-only pipeline, no dbt stage
+    to fall back on): every generated query is unqualified against
+    PGOPTIONS's search_path (`_psql_command`'s own comment), and Postgres
+    silently resolves an unqualified `CREATE TABLE`/`CREATE PROCEDURE` into
+    the *next* schema in search_path that actually exists when the first
+    one does not - here, `public` - rather than erroring. A dbt-engine
+    stage's own `dbt run` already creates its target schema itself, so this
+    is a no-op there (and for warehouse.schema's own "public" default,
+    which always exists); it is required for a procedure-engine stage's
+    schema to ever be more than an unenforced label.
+    """
+    cmd, env = _psql_command(pipeline, "-c",
+                             f"CREATE SCHEMA IF NOT EXISTS {pipeline.warehouse.schema}")
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        raise DeployError(f"creating schema {pipeline.warehouse.schema!r} failed:\n"
+                          f"{proc.stderr.strip()}")
+    return pipeline.warehouse.schema
+
+
 def apply_procedures(pipeline: Pipeline) -> list[str]:
     """`CREATE OR REPLACE PROCEDURE` for every procedure-engine stage -
     idempotent by construction (docs/layer2.md, Concepts #3), so re-running
@@ -389,6 +412,7 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
     result = DeployResult()
     result.written = write_artifacts(pipeline)
     if apply_db:
+        result.schema_ensured = ensure_warehouse_schema(pipeline)
         result.procedures_applied = apply_procedures(pipeline)
         result.dbt_models_published = install_dbt_models(pipeline)
     if install_dag_to_airflow:

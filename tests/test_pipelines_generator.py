@@ -151,12 +151,13 @@ def test_gate_task_names_the_quarantine_table_when_one_exists(pipeline):
 
 # ---------------------------------------------------------------- artifacts
 
-def test_artifacts_list_the_dag_plus_one_entry_per_transform_stage(pipeline):
+def test_artifacts_list_the_dag_plus_schema_plus_one_entry_per_transform_stage(pipeline):
     paths = {a.path: a.kind for a in generator.artifacts(pipeline)}
     assert paths["dags/demo.py"] == "dag"
+    assert paths["schema:public"] == "schema"
     assert paths["models/demo/raw/schema.yml"] == "dbt_schema"
     assert paths["procedures/convert.sql"] == "procedure_migration"
-    assert len(paths) == 3   # landing produces no artifact of its own - it is dlt's output
+    assert len(paths) == 4   # landing produces no artifact of its own - it is dlt's output
 
 
 # ---------------------------------------------------------------- plan()

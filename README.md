@@ -329,12 +329,21 @@ recorded in [docs/deploy-log.md](docs/deploy-log.md).
 
 Layer 2 has been run end to end through a real Airflow deployment: extract,
 gate, transform, gate, transform, gate; rejected data was quarantined, every
-stage verdict was recorded, and the final curated data was checked. Deploying
-it on a new host still has explicit operational prerequisites: dpagent must be
-available in Airflow's venv, deployed pipeline and dbt files must be readable
-by the Airflow user, and that user must be able to write dpagent's SQLite
-journal. See [docs/layer2.md](docs/layer2.md) for the verified setup and the
-remaining deployment details.
+stage verdict was recorded, and the final curated data was checked. The three
+host preconditions a real Airflow run needs — dpagent available in Airflow's
+own venv, deployed pipeline/dbt files readable by the Airflow user, that user
+able to write dpagent's SQLite journal — are made true automatically and
+idempotently by `dpagent pipeline deploy`
+(`deploy.ensure_airflow_can_run_pipelines`), same as the target schema itself
+(`deploy.ensure_warehouse_schema`) and forcing Airflow to notice a freshly
+deployed DAG immediately rather than waiting on its own scan interval; none of
+this is a manual step to remember on the next host. A deploy/run also refuses
+early, with a specific list, if `dlt`/`dbt`/`airflow` are not installed yet,
+rather than failing deep inside whichever task needs one of them first. See
+[docs/layer2.md](docs/layer2.md) for the verified setup, the CSV quickstart
+pipeline (`pipelines/quickstart/` — no Odoo, no external service, proves the
+whole loop including quarantine on nothing but this repo), and the remaining
+deployment details.
 
 Run `pytest` and `dpagent lint` on every checkout before deployment; historical
 results are evidence for the tested revisions, not a substitute for verifying

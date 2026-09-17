@@ -181,7 +181,12 @@ def dag_tasks(pipeline: Pipeline) -> list[Task]:
 
 def artifacts(pipeline: Pipeline) -> list[Artifact]:
     out = [Artifact(path=f"dags/{pipeline.name}.py", kind="dag",
-                    description="generated Airflow DAG - the task graph from dag_tasks()")]
+                    description="generated Airflow DAG - the task graph from dag_tasks()"),
+           Artifact(path=f"schema:{pipeline.warehouse.schema}", kind="schema",
+                    description="CREATE SCHEMA IF NOT EXISTS - before any procedure "
+                               "migration or dbt model runs, so an unqualified CREATE "
+                               "in a procedure-only pipeline cannot silently fall back "
+                               "to public")]
     for stage in pipeline.stages[1:]:
         if stage.engine == "dbt":
             out.append(Artifact(

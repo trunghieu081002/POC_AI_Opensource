@@ -192,6 +192,8 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     console.print("[bold]written:[/bold]")
     for path in result.written:
         console.print(f"  {path}")
+    if result.schema_ensured:
+        console.print(f"[bold]schema ensured:[/bold] {result.schema_ensured}")
     if result.procedures_applied:
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
