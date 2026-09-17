@@ -1,36 +1,57 @@
 # Layer 2 — staged ingestion with a gate between every stage
 
-Status: **in progress.** The manifest schema/generator/deploy/runtime, the
-`dlt` pack, both MVP connectors (odoo_postgres, csv), and the pipeline
-machinery's own acceptance test (tests/test_pipeline_acceptance.py - the
-negative case: a file with known-bad rows lands in quarantine and never
-reaches `curated`, proven against a real throwaway database) are built and
-verified against real systems.
+Status: **MVP machinery complete and verified end to end against a real
+Airflow.** The manifest schema/generator/deploy/runtime, the `dlt` pack,
+both MVP connectors (odoo_postgres, csv), the pipeline machinery's own
+acceptance test (tests/test_pipeline_acceptance.py - the negative case: a
+file with known-bad rows lands in quarantine and never reaches `curated`),
+and `dpagent pipeline run` triggering a real deployed DAG through a real
+Airflow install - a full extract → gate → transform → gate → transform →
+gate run, every stage `passed`, correct data in the final table, a
+complete `dpagent audit <run>` trail - are all built and proven against
+real systems, not just unit-tested.
 
-Still missing:
+Getting `run` to complete end to end surfaced three real deployment
+preconditions, each found by watching a real task fail rather than
+guessed, each now fixed and documented in code:
 
-- **`dpagent pipeline run` triggering a real DAG to completion.** Attempted
-  for real against this host's actual Airflow install and got partway:
-  `install_dag()` correctly writes and chowns the DAG file, and
-  `trigger_dag()`'s command is right, but Airflow's scheduler could not
-  import it. Root cause, confirmed step by step rather than guessed: (1)
-  dpagent was not pip-installed into Airflow's own venv - fixed by a real
-  `pip install` there, which also exposed and fixed a real bug
-  (`find_content_dir` crashed on `PermissionError` instead of trying the
-  next candidate, `d7dbbae`); (2) even with dpagent importable, a
-  pipeline's own `pipeline.yaml`/`procedures/*.sql` live under
-  `pipelines/`, which on this host sits inside a developer's home
-  directory (mode 700) - the `airflow` OS user cannot read it, same as it
-  could not read dpagent's source before the pip install. This is a
-  deployment-topology question (where `pipelines/` lives so both the CLI
-  and Airflow's execution user can reach it - this project's own
-  `_INSTALL_PREFIX = /opt/dpagent` convention already anticipates exactly
-  this), not a Layer 2 logic gap, and needs an explicit decision rather
-  than a quick patch - left open on purpose.
-- The Odoo/CSV reference pipeline's own dbt models (`pipelines/demo`'s
-  `raw` stage declares dbt models that do not exist as files yet - the
-  acceptance test above proves the machinery with a procedure-only
-  pipeline instead, since gates/quarantine are engine-agnostic).
+1. **dpagent must be pip-installed into Airflow's own venv** - it is not
+   there by default, and a `sys.path.insert` looked like a lighter fix but
+   does not work: source living under a developer's home directory (mode
+   700) is unreachable by the `airflow` OS user regardless of sys.path.
+   Also exposed and fixed a real bug this uncovered: `find_content_dir`
+   crashed on `PermissionError` instead of trying the next candidate
+   (`d7dbbae`).
+2. **A pipeline's own files need the same fix, one layer up** -
+   `pipeline.yaml`/`procedures/*.sql` living under the same unreadable
+   home directory. Fixed by `deploy.install_pipeline_files()` publishing
+   each deployed pipeline to `/opt/dpagent/pipelines/<name>` (world-
+   readable), with the generated DAG pointing `DPAGENT_PIPELINES` there
+   before importing `runtime` (`4ac1eb7`).
+3. **The `airflow` OS user needs write access to dpagent's own SQLite
+   journal** (`/var/lib/dpagent/dpagent.db`) to record stage_runs/
+   gate_runs/events - it only had read access. Fixed operationally (not
+   in code): a shared `dpagent` group, the journal directory made
+   group-writable, `airflow` added to that group. Also fixed in code:
+   `runtime._dlt_python()` was calling `packs_mod.load("dlt")` to find the
+   dlt pack's own default install_dir - needing `PACKS_DIR`, which cannot
+   resolve correctly inside a DAG task's own process for the identical
+   reason `PIPELINES_DIR` could not; replaced with a plain constant
+   (`4ac1eb7`).
+
+**Whoever stands this up on a new host needs to know**: dpagent must be
+pip-installed into Airflow's own venv (re-run after every dpagent code
+change - a *regular* install does not track source edits the way an
+editable one does), `dpagent pipeline deploy` publishes each pipeline to
+`/opt/dpagent/pipelines/<name>` and the DAG to Airflow's real DAGS_FOLDER
+(both need root), and the `airflow` OS user needs write access to
+dpagent's own journal (a shared group, as above, or an equivalent).
+
+Remaining, not blocking the MVP claim above: the Odoo/CSV reference
+pipeline's own dbt models (`pipelines/demo`'s `raw` stage declares dbt
+models that do not exist as files yet - the acceptance test above proves
+the machinery with a procedure-only pipeline instead, since gates/
+quarantine are engine-agnostic).
 
 Layer 1 (install) is done and proven; see `README.md`'s status list and
 `docs/deploy-log.md` for what that took.
