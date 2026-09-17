@@ -30,32 +30,41 @@ guessed, each now fixed and documented in code:
    before importing `runtime` (`4ac1eb7`).
 3. **The `airflow` OS user needs write access to dpagent's own SQLite
    journal** (`/var/lib/dpagent/dpagent.db`) to record stage_runs/
-   gate_runs/events - it only had read access. Fixed operationally (not
-   in code): a shared `dpagent` group, the journal directory made
-   group-writable, `airflow` added to that group. Also fixed in code:
-   `runtime._dlt_python()` was calling `packs_mod.load("dlt")` to find the
-   dlt pack's own default install_dir - needing `PACKS_DIR`, which cannot
-   resolve correctly inside a DAG task's own process for the identical
-   reason `PIPELINES_DIR` could not; replaced with a plain constant
-   (`4ac1eb7`).
+   gate_runs/events - it only had read access. Also fixed in code the same
+   round: `runtime._dlt_python()` was calling `packs_mod.load("dlt")` to
+   find the dlt pack's own default install_dir - needing `PACKS_DIR`,
+   which cannot resolve correctly inside a DAG task's own process for the
+   identical reason `PIPELINES_DIR` could not; replaced with a plain
+   constant (`4ac1eb7`).
 
 A *regular* `pip install` also means dpagent code changes never take
 effect in Airflow's venv until reinstalled there again - real friction,
 hit repeatedly getting the above working. Fixed properly rather than
-worked around: a narrow ACL (`setfacl -m u:airflow:x /home/oracle`,
-traverse only - `ls` there as `airflow` still fails, only a known subpath
-works) lets `airflow` reach the checkout at all, which makes an *editable*
-install (`pip install -e`) actually work, so code edits take effect
-immediately, same as they already do for dpagent's own CLI.
+worked around: a narrow ACL (traverse only - `ls` there as `airflow` still
+fails, only a known subpath works) lets `airflow` reach the checkout at
+all, which makes an *editable* install (`pip install -e`) actually work,
+so code edits take effect immediately, same as they already do for
+dpagent's own CLI.
 
-**Whoever stands this up on a new host needs to know**: dpagent needs an
-editable pip install into Airflow's own venv, reachable via a narrow ACL
-grant on whatever directory holds the checkout if it is not already
-world-traversable; `dpagent pipeline deploy` publishes each pipeline to
-`/opt/dpagent/pipelines/<name>`, its dbt-engine stages' models into the
-dbt pack's own real project, and the DAG to Airflow's real DAGS_FOLDER
-(all three need root); and the `airflow` OS user needs write access to
-dpagent's own journal (a shared group, as above, or an equivalent).
+All three of the above started out as commands run by hand while
+debugging - exactly the kind of fix that quietly becomes "a step someone
+remembers to do on the next host" if it stays that way. They are now
+`deploy.ensure_airflow_can_run_pipelines()`, called automatically by
+`dpagent pipeline deploy` before installing a DAG: idempotent (each of the
+three checks its own precondition first and does nothing if already true -
+confirmed for real: a redeploy on the host all this was found on reported
+zero actions needed), and needing nothing beyond the root `dpagent pipeline
+deploy` already requires for `install_dag()`/`install_pipeline_files()`.
+
+**Whoever stands this up on a new host needs to know**: none of this needs
+doing by hand - `dpagent pipeline deploy` (as root) creates the shared
+group, grants the ACL, and does the editable install the first time it
+runs, alongside publishing each pipeline to `/opt/dpagent/pipelines/<name>`,
+its dbt-engine stages' models into the dbt pack's own real project, and
+the DAG to Airflow's real DAGS_FOLDER. The one thing it cannot do for you:
+if it just added `airflow` to the shared group, `airflow-scheduler`/
+`airflow-webserver` need restarting for that membership to take effect in
+their already-running processes (reported explicitly when it happens).
 
 The Odoo/CSV reference pipeline's own dbt models
 (`pipelines/demo/models/*.sql`) are written and verified for real too: a

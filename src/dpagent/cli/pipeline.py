@@ -143,9 +143,11 @@ def deploy_cmd(name, yes, no_db, no_airflow):
         console.print("[yellow]skipping procedure migrations/dbt models - files only[/yellow]")
 
     if not no_airflow and not yes and not confirm(
-            f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR} and install "
-            f"its DAG into Airflow's real DAGS_FOLDER (runs as the airflow OS user, "
-            f"needs root)?", default=True):
+            f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR}, make sure "
+            f"Airflow can actually run pipelines (a shared group, an ACL grant, an "
+            f"editable dpagent install into its venv - only what is not already true), "
+            f"and install its DAG into Airflow's real DAGS_FOLDER (needs root)?",
+            default=True):
         no_airflow = True
         console.print("[yellow]skipping Airflow install - files only[/yellow]")
 
@@ -168,6 +170,10 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     if result.pipeline_files_published:
         console.print(f"[bold]pipeline files published:[/bold] "
                      f"{result.pipeline_files_published}")
+    if result.airflow_bridge_actions:
+        console.print("[bold]airflow bridge:[/bold]")
+        for action in result.airflow_bridge_actions:
+            console.print(f"  {action}")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
     console.print("[green]deployed[/green]")

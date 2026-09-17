@@ -147,6 +147,76 @@ def test_trigger_dag_command_honours_a_recorded_install_dir_override(isolated_db
     assert "/srv/af/.venv/bin/airflow" in inner
 
 
+# ---------------------------------------------------------------- ensure_airflow_can_run_pipelines
+
+def test_dpagent_checkout_root_is_four_levels_above_this_file():
+    # src/dpagent/pipelines/deploy.py -> src/dpagent -> src -> repo root
+    root = deploy._dpagent_checkout_root()
+    assert (root / "src" / "dpagent" / "pipelines" / "deploy.py").exists()
+    assert (root / "pyproject.toml").exists()
+
+
+def test_ensure_airflow_can_run_pipelines_refuses_to_run_without_root(monkeypatch):
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.ensure_airflow_can_run_pipelines()
+
+
+def test_run_root_command_wraps_a_failure_as_deploy_error(monkeypatch):
+    monkeypatch.setattr(
+        deploy.subprocess, "run",
+        lambda *a, **k: subprocess.CompletedProcess([], 1, stdout="", stderr="boom"))
+    with pytest.raises(deploy.DeployError, match="boom"):
+        deploy._run_root_command(["false"], what="doing the thing")
+
+
+def test_ensure_airflow_can_run_pipelines_does_nothing_when_already_correct(
+        monkeypatch, tmp_path):
+    """Every check reports "already fine" - the real, common case once a
+    host has been set up once (see docs/layer2.md) - so no action command
+    may run and the returned list must be empty."""
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+
+    journal_dir = tmp_path / "var_lib_dpagent"
+    journal_dir.mkdir()
+    (journal_dir / "dpagent.db").write_text("x")
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", journal_dir / "dpagent.db")
+
+    monkeypatch.setattr(deploy.grp, "getgrgid",
+                        lambda gid: type("G", (), {"gr_name": deploy._SHARED_GROUP})())
+    # Force the group-permission bits so the "already correct" branch is taken.
+    os.chmod(journal_dir, 0o2770)
+
+    checkout_root = tmp_path / "checkout"
+    (checkout_root / "src").mkdir(parents=True)
+    monkeypatch.setattr(deploy, "_dpagent_checkout_root", lambda: checkout_root)
+    os.chmod(checkout_root, 0o755)   # already world-traversable - no ACL needed
+
+    monkeypatch.setattr(deploy, "_airflow_paths", lambda: (tmp_path / "venvbin", tmp_path / "env"))
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:2] == ["getent", "group"]:
+            return subprocess.CompletedProcess(cmd, 0)
+        if cmd[:2] == ["id", "-nG"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="airflow dpagent\n")
+        if cmd[-1] == "import dpagent":
+            return subprocess.CompletedProcess(cmd, 0)
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr(deploy.subprocess, "run", fake_run)
+
+    done = deploy.ensure_airflow_can_run_pipelines()
+
+    assert done == []
+    # Only read-only checks ran - no groupadd/usermod/chgrp/chmod/setfacl/pip.
+    action_verbs = {"groupadd", "usermod", "chgrp", "chmod", "setfacl", "pip"}
+    assert not any(cmd[0].split("/")[-1] in action_verbs for cmd in calls)
+
+
 # ---------------------------------------------------------------- install_dag
 
 def test_install_dag_refuses_to_run_without_root(isolated_db, pipeline, monkeypatch):

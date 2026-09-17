@@ -9,9 +9,11 @@ rather than adding psycopg2 as a new dependency for one feature.
 """
 from __future__ import annotations
 
+import grp
 import json
 import os
 import shutil
+import stat
 import subprocess
 import textwrap
 from dataclasses import dataclass, field
@@ -42,6 +44,7 @@ class DeployResult:
     procedures_applied: list[str] = field(default_factory=list)
     dbt_models_published: list[Path] = field(default_factory=list)
     pipeline_files_published: Path | None = None
+    airflow_bridge_actions: list[str] = field(default_factory=list)
     dag_installed: Path | None = None
 
 
@@ -359,6 +362,7 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
         result.dbt_models_published = install_dbt_models(pipeline)
     if install_dag_to_airflow:
         result.pipeline_files_published = install_pipeline_files(pipeline)
+        result.airflow_bridge_actions = ensure_airflow_can_run_pipelines()
         result.dag_installed = install_dag(pipeline)
     return result
 
@@ -385,6 +389,101 @@ def _airflow_paths() -> tuple[Path, Path]:
     convention `packs/airflow/af-lib.sh`'s af_venv/af_env_file use."""
     install_dir = _airflow_install_dir()
     return install_dir / ".venv" / "bin", install_dir / "home" / "airflow.env"
+
+
+_SHARED_GROUP = "dpagent"   # airflow joins this to write dpagent's own journal
+
+
+def _dpagent_checkout_root() -> Path:
+    """This checkout's own root - src/dpagent/pipelines/deploy.py -> src/dpagent
+    -> src -> repo root. Where an editable install into Airflow's venv
+    (ensure_airflow_can_run_pipelines) actually points."""
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _run_root_command(cmd: list[str], *, what: str) -> None:
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise DeployError(f"{what} failed:\n{proc.stderr.strip() or proc.stdout.strip()}")
+
+
+def ensure_airflow_can_run_pipelines() -> list[str]:
+    """Makes true, idempotently, the three host preconditions a real
+    Airflow run needs that were done by hand at least once getting `dpagent
+    pipeline run` to actually work end to end (docs/layer2.md): exactly the
+    kind of thing that must not stay "a step someone remembers on the next
+    host." Returns what it actually changed - an empty list means a
+    previous deploy (or manual setup) already left the host correct, which
+    is the common case, not an error.
+
+    Requires root, same reason install_dag()/install_pipeline_files() do:
+    every action here (chgrp, usermod, an ACL grant, a pip install into
+    another venv) needs it.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "preparing Airflow to run pipelines needs root (group/ACL/venv "
+            "changes) - re-run as sudo -E dpagent pipeline deploy ...")
+
+    from ..engine import state
+
+    done: list[str] = []
+
+    # 1. A shared group so the `airflow` OS user can write dpagent's own
+    # SQLite journal (stage_runs/gate_runs/events) - it only ever needed
+    # read access before a DAG task existed that must record its own
+    # results. Same shape as packs/dbt's own dbtread group (which
+    # packs/airflow/steps/10-user.sh already joins airflow to, for the
+    # analogous dbt-project-sharing reason) - just for a group dpagent
+    # itself owns, since dbtread is dbt's own concept, not dpagent's.
+    if subprocess.run(["getent", "group", _SHARED_GROUP], capture_output=True).returncode != 0:
+        _run_root_command(["groupadd", _SHARED_GROUP], what=f"creating group {_SHARED_GROUP!r}")
+        done.append(f"created group {_SHARED_GROUP!r}")
+
+    members = subprocess.run(["id", "-nG", "airflow"], capture_output=True, text=True).stdout.split()
+    if _SHARED_GROUP not in members:
+        _run_root_command(["usermod", "-aG", _SHARED_GROUP, "airflow"],
+                          what=f"adding airflow to group {_SHARED_GROUP!r}")
+        done.append(f"added the airflow OS user to group {_SHARED_GROUP!r} - "
+                    f"restart airflow-scheduler/airflow-webserver for this to take effect")
+
+    journal_dir = state.DB_PATH.parent
+    journal_dir.mkdir(parents=True, exist_ok=True)
+    dir_stat = journal_dir.stat()
+    if (grp.getgrgid(dir_stat.st_gid).gr_name != _SHARED_GROUP
+            or not (dir_stat.st_mode & stat.S_IRWXG)):
+        _run_root_command(["chgrp", "-R", _SHARED_GROUP, str(journal_dir)],
+                          what="chgrp-ing dpagent's own journal directory")
+        _run_root_command(["chmod", "-R", "g+rwX", str(journal_dir)],
+                          what="making dpagent's own journal directory group-writable")
+        done.append(f"{journal_dir} is now group-writable by {_SHARED_GROUP!r}")
+
+    # 2. A narrow ACL so the `airflow` OS user can traverse to wherever this
+    # checkout actually lives - the first ancestor directory not already
+    # traversable by anyone (a developer's own home directory at mode 700,
+    # on the host this was first found on). Execute-only: `ls` there as
+    # airflow still fails, only a known subpath works.
+    checkout_root = _dpagent_checkout_root()
+    for ancestor in [checkout_root, *checkout_root.parents]:
+        if ancestor.stat().st_mode & stat.S_IXOTH:
+            break   # already traversable by anyone from here up
+        _run_root_command(["setfacl", "-m", "u:airflow:x", str(ancestor)],
+                          what=f"granting airflow traverse access to {ancestor}")
+        done.append(f"granted airflow traverse (execute-only) ACL on {ancestor}")
+
+    # 3. dpagent importable from Airflow's own venv - editable, so a code
+    # change takes effect immediately (a *regular* pip install does not -
+    # it freezes a copy that silently goes stale, found the hard way).
+    venv_bin, _ = _airflow_paths()
+    already_importable = subprocess.run(
+        [str(venv_bin / "python"), "-c", "import dpagent"], capture_output=True).returncode == 0
+    if not already_importable:
+        _run_root_command(
+            [str(venv_bin / "pip"), "install", "-e", str(checkout_root), "--no-deps"],
+            what="installing dpagent (editable) into Airflow's venv")
+        done.append(f"installed dpagent (editable) into {venv_bin}")
+
+    return done
 
 
 def install_dag(pipeline: Pipeline) -> Path:
