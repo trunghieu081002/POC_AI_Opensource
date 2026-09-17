@@ -2305,3 +2305,79 @@ No code changed - four confirmations, not four fixes. `dpagent`'s own
 configuration choices (default `max_connections`, unmodified worker
 count) hold up under real concurrent load, and its own verification
 tooling remains correct when run against a system that is not idle.
+
+### 2026-09-17 — Layer 2 E2E hardening: audit, fixes, and a real quickstart run
+
+Full audit of every Layer 2 claim in README/docs against actual code and
+`git show`, per the standing rule above (Hieu types every privileged
+command; Claude supplies and interprets) - all work on branch
+`fix/e2e-hardening`, never pushed to `main` directly. Eight commits fixed
+real, verified issues (fresh-tarball bootstrap defaulting to a placeholder
+git clone; a pipeline run with no terminal status; unsupported connectors
+passing lint; a freshly deployed DAG waiting on Airflow's own scan
+interval; deploy/run failing deep inside a task instead of up front when
+dlt/dbt/airflow are missing; no consistent LLM-extras install story and a
+fragile `.env` loading pattern; the new self-contained
+`pipelines/quickstart/`).
+
+Two more real bugs surfaced only by actually deploying and running
+`quickstart` against this host's already-installed stack, not by review:
+
+1. **A pipeline's warehouse schema was never created.** `pipelines/demo`
+   never surfaced this because its `raw` stage is dbt-engine, and dbt
+   creates its own target schema before `curated`'s procedure ever runs -
+   `quickstart` has no dbt stage to do that for it. An unqualified
+   `CREATE TABLE`/`CREATE PROCEDURE` against a `search_path` whose first
+   entry does not exist silently lands in `public` instead of erroring.
+   Fixed: `deploy.ensure_warehouse_schema()` runs `CREATE SCHEMA IF NOT
+   EXISTS` before any procedure/dbt migration.
+2. **A pipeline's `${VAR}` secrets never reached the process that actually
+   runs its tasks.** `dpagent pipeline run` only calls `airflow dags
+   trigger` - the DagRun is created and the command returns immediately;
+   the DAG's own tasks execute later, as LocalExecutor workers forked from
+   the *already running* `airflow-scheduler` process, whose environment
+   was fixed at systemd start time. `WAREHOUSE_DB_USER`/`PASSWORD`
+   exported in the operator's own shell never reached that process -
+   confirmed on run 51: `extract.start` was recorded, `extract.failed`
+   never was, because `resolve_refs()` raised a bare `ParamError` before
+   `run_extract`'s own error handling was ever reached. Fixed:
+   `deploy.ensure_pipeline_secrets_available()` syncs every required
+   `${VAR}` into a second file (`pipelines.env`, merged not overwritten)
+   the scheduler's systemd unit now also loads, restarting it only when
+   the content actually changed. Existing hosts need one `sudo -E dpagent
+   install airflow` (or the one-line `sed` this session used instead, to
+   avoid needing the forgotten Airflow admin password) to pick up the
+   unit's new optional `EnvironmentFile=` line. A second bug in the fix
+   itself was caught by the very next real run: the scan for referenced
+   `${VAR}`s ignored `${VAR:-default}` defaults, so `WAREHOUSE_DB_HOST`/
+   `PORT`/`NAME` (all defaulted in `quickstart`'s own manifest) were
+   wrongly treated as required - fixed to match `resolve_refs()`'s own
+   defaulting exactly.
+
+**Real, end-to-end proof, this host, this exact `warehouse` Postgres and
+`airflow-scheduler`:**
+
+- Happy path (run 52, then reproduced identically on run 56 after a second
+  full deploy+run): `landing` 10 rows, `raw` quarantines the one
+  deliberately duplicated `order_id` (2/10, 20%, under the 25% threshold),
+  `curated` reaches 8 rows - `select * from quickstart.orders_raw_quarantine`
+  showed exactly the 2 expected rows; `select count(*) from
+  quickstart.fct_orders` was 8 both times, never 16.
+- Negative path (run 54, `data/orders_negative_example.csv` swapped in - 4
+  of 5 rows duplicated, 80%): `landing` passed (5 rows), `raw` failed
+  (exceeds the 25% threshold), run reached terminal **failed**, not stuck
+  at `running`; `curated` never ran, `fct_orders` stayed at 8.
+- Lesson recorded in docs/layer2.md: swapping `data/orders.csv` alone does
+  nothing until `dpagent pipeline deploy` re-publishes it -
+  `install_pipeline_files()` copies the whole pipeline directory to a
+  shared, world-readable location Airflow's own tasks read from, not the
+  operator's live working copy. The first negative-path attempt (run 53)
+  silently re-ran the *previous* deploy's clean data for exactly this
+  reason before the redeploy step was added back into the instructions.
+
+`pytest` (full suite, including the real-throwaway-Postgres tests this
+session added), `dpagent lint`, and every touched shell script's syntax
+were all re-checked clean after each commit. Branch pushed to
+`origin/fix/e2e-hardening`; merge to `main` deferred until this entry's
+evidence was in hand, per Hieu's own instruction earlier in the same
+session.

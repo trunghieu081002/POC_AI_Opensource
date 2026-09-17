@@ -251,6 +251,29 @@ hop is not a choice, it is what dlt is for.
 6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
    they already do for installs, whichever engine ran.
+7. **Secrets reach the task's own process, not the operator's shell.**
+   `dpagent pipeline run` only calls `airflow dags trigger` - it creates a
+   DagRun row and returns immediately. The DAG's own tasks
+   (`runtime.run_extract`/`run_gate`/`run_transform`) execute later, as
+   LocalExecutor workers forked from the *already running*
+   `airflow-scheduler` process, whose environment was fixed when systemd
+   started it. A `${VAR}` the operator exported in their own shell before
+   running `deploy`/`run` never reaches that process on its own.
+   `dpagent pipeline deploy` closes this gap itself
+   (`deploy.ensure_pipeline_secrets_available`): every `${VAR}` a pipeline's
+   `source`/`warehouse` sections reference is resolved from the *deploying*
+   operator's environment (who must already have it exported - the schema/
+   procedure steps earlier in the same `deploy` need it too) and written to
+   `<airflow install_dir>/home/pipelines.env`, a second file kept separate
+   from the airflow pack's own `airflow.env` (which `dpagent install
+   airflow` rewrites wholesale, and would otherwise wipe on every
+   reinstall) and merged, never overwritten, so deploying one pipeline
+   never drops another's already-synced secrets. `airflow-scheduler` is
+   restarted only when the file's content actually changed. A host whose
+   airflow was installed before this existed needs one `sudo -E dpagent
+   install airflow` to pick up the new (optional) `EnvironmentFile=` line
+   in the scheduler's systemd unit before its first pipeline deploy can
+   sync anything into it.
 
 ### Failure semantics
 
@@ -325,3 +348,75 @@ dpagent test pipeline            # acceptance suite passes, negative included
 
 As everywhere else in this project: a green run is not evidence. The recorded
 verdict is.
+
+## CSV quickstart (no external source)
+
+Run for real on 2026-09-17 (docs/deploy-log.md has the full account): happy
+path, negative path, and the idempotent re-run all produced exactly the
+verdicts described below, through a real Airflow deployment - not merely
+unit-tested.
+
+`demo` needs a real Odoo Postgres to run against. `pipelines/quickstart/`
+needs nothing but this repo: a committed sample CSV
+(`pipelines/quickstart/data/orders.csv`) through
+`landing -> raw -> curated`, gated at every hop, both transform hops on the
+`procedure` engine (no dbt project to stand up first). It is the fastest way
+to prove the whole loop - extract, a gate, a transform, another gate,
+quarantine - on a fresh host before ever touching a real upstream database.
+
+It still needs the same warehouse Postgres every pipeline needs (`dlt`/`dbt`/
+`airflow` installed, `WAREHOUSE_DB_USER`/`WAREHOUSE_DB_PASSWORD` set - see
+`examples/layer2-stack.yaml`); "no external source" means no Odoo, no other
+upstream service, not no database at all.
+
+```bash
+sudo -E dpagent pipeline lint quickstart      # clean
+sudo -E dpagent pipeline plan quickstart      # prints every artifact and command, changes nothing
+sudo -E dpagent pipeline deploy quickstart --yes   # DAG installed, quickstart schema
+                                                    # created (or reused), both
+                                                    # procedures applied
+sudo -E dpagent pipeline run quickstart --yes
+dpagent pipeline status quickstart            # ok
+```
+
+**Happy path.** `data/orders.csv` ships with one deliberately duplicated
+`order_id` (1002, twice - 2 of 10 rows, 20%) - under the raw stage's 25%
+quarantine threshold, so this run quarantines that pair into
+`orders_raw_quarantine` and still reaches `curated` (`fct_orders` ends up
+with 8 rows, not 10 - the duplicate never counted twice and the quarantined
+pair never arrived at all):
+
+```bash
+dpagent pipeline audit <run>                  # shows the "2/10 (20.0%) ... quarantined" verdict
+sudo -u postgres psql -d warehouse -c "select * from quickstart.orders_raw_quarantine"
+sudo -u postgres psql -d warehouse -c "select count(*) from quickstart.fct_orders"   # 8
+```
+
+**Negative path.** `data/orders_negative_example.csv` is the same shape with
+4 of 5 rows sharing one `order_id` (80%) - swapped in for `orders.csv`, it
+exceeds the same 25% threshold, so the raw stage's gate fails the run instead
+of quarantining through it. The DAG's `on_failure_callback` (docs/layer2.md's
+own MVP - see `deploy.render_dag`) closes the run out as `failed`, not stuck
+at `running`, and `curated` never runs at all for that run:
+
+```bash
+cp pipelines/quickstart/data/orders.csv /tmp/orders_happy_backup.csv
+cp pipelines/quickstart/data/orders_negative_example.csv pipelines/quickstart/data/orders.csv
+
+# deploy re-publishes pipelines/quickstart/ (data/ included) to the shared,
+# world-readable copy Airflow's own tasks actually read from
+# (deploy.install_pipeline_files) - skipping this re-run re-triggers the
+# *previous* deploy's data, not the file just swapped in above.
+sudo -E dpagent pipeline deploy quickstart --yes
+sudo -E dpagent pipeline run quickstart --yes
+dpagent pipeline status quickstart            # failed - not "running" forever
+dpagent pipeline audit <run>                  # "4/5 (80.0%) ... exceeding the 25% threshold"
+
+cp /tmp/orders_happy_backup.csv pipelines/quickstart/data/orders.csv   # restore
+```
+
+**Idempotency.** Re-running the happy path a second time (`deploy` then `run`
+again against the restored `orders.csv`) must land at the same `fct_orders`
+row count (8), never an accumulating duplicate - every procedure here is
+`TRUNCATE` + `INSERT` for exactly that reason (see
+`procedures/build_raw_orders.sql`/`build_curated_orders.sql`'s own comments).

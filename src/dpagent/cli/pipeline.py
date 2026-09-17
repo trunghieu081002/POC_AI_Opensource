@@ -28,6 +28,37 @@ def _load_or_fail(name):
         fail(str(exc))
 
 
+def _pack_installed(name: str) -> bool:
+    record = state.get_install(name)
+    return bool(record and record["status"] == "installed")
+
+
+def _missing_layer2_prerequisites(pipeline) -> list[str]:
+    """What must already be installed for `deploy`/`run` to actually work -
+    checked here so a missing pack fails with one clear, consolidated
+    message up front, not as a raw PackError/DeployError deep inside
+    whichever step happens to need it first (install_dbt_models() reaching
+    for a dbt pack that was never installed, e.g.)."""
+    missing = []
+    if not _pack_installed("dlt"):
+        missing.append("dlt (sudo -E dpagent install dlt) - every pipeline's "
+                       "landing stage needs it to extract")
+    if any(s.engine == "dbt" for s in pipeline.stages) and not _pack_installed("dbt"):
+        missing.append("dbt (sudo -E dpagent install dbt) - this pipeline has "
+                       "a dbt-engine stage")
+    if not _pack_installed("airflow"):
+        missing.append("airflow (sudo -E dpagent install airflow) - deploy "
+                       "installs the DAG there; run triggers it")
+    return missing
+
+
+def _require_layer2_prerequisites(pipeline) -> None:
+    missing = _missing_layer2_prerequisites(pipeline)
+    if missing:
+        fail("this pipeline cannot be deployed/run yet - missing:\n  "
+             + "\n  ".join(missing))
+
+
 @click.group("pipeline")
 def pipeline_group():
     """Staged-ingestion pipelines (Layer 2) - see docs/layer2.md."""
@@ -133,6 +164,7 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     something real to trigger - under --no-airflow.
     """
     pipeline = _load_or_fail(name)
+    _require_layer2_prerequisites(pipeline)
 
     if not no_db and not yes and not confirm(
             f"Apply {name}'s procedure migration(s) against "
@@ -146,7 +178,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
             f"Publish {name}'s files to {deploy_mod.SHARED_PIPELINES_DIR}, make sure "
             f"Airflow can actually run pipelines (a shared group, an ACL grant, an "
             f"editable dpagent install into its venv - only what is not already true), "
-            f"and install its DAG into Airflow's real DAGS_FOLDER (needs root)?",
+            f"sync this pipeline's secrets into Airflow's own environment (restarting "
+            f"airflow-scheduler if that changed anything), and install its DAG into "
+            f"Airflow's real DAGS_FOLDER (needs root)?",
             default=True):
         no_airflow = True
         console.print("[yellow]skipping Airflow install - files only[/yellow]")
@@ -160,6 +194,8 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     console.print("[bold]written:[/bold]")
     for path in result.written:
         console.print(f"  {path}")
+    if result.schema_ensured:
+        console.print(f"[bold]schema ensured:[/bold] {result.schema_ensured}")
     if result.procedures_applied:
         console.print("[bold]procedures applied:[/bold] "
                      + ", ".join(result.procedures_applied))
@@ -174,6 +210,9 @@ def deploy_cmd(name, yes, no_db, no_airflow):
         console.print("[bold]airflow bridge:[/bold]")
         for action in result.airflow_bridge_actions:
             console.print(f"  {action}")
+    if result.pipeline_secrets_synced:
+        console.print("[bold]pipeline secrets:[/bold] synced to Airflow's "
+                     "own environment, airflow-scheduler restarted")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
     console.print("[green]deployed[/green]")
@@ -193,7 +232,8 @@ def run_cmd(name, yes):
     host's real Airflow, so it asks first unless --yes. dpagent does not
     wait for the DAG to finish - Airflow runs it asynchronously.
     """
-    _load_or_fail(name)   # fail before touching state if the manifest itself is broken
+    pipeline = _load_or_fail(name)   # fail before touching state if the manifest itself is broken
+    _require_layer2_prerequisites(pipeline)
 
     if not yes and not confirm(
             f"Trigger the deployed {name!r} DAG now (runs as the airflow OS user)?",

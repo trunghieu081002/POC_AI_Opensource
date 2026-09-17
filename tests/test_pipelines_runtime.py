@@ -61,6 +61,56 @@ def test_dlt_python_honours_a_recorded_install_dir_override(monkeypatch, tmp_pat
     assert runtime._dlt_python() == "/srv/dlt/.venv/bin/python"
 
 
+def test_finish_pipeline_run_moves_the_run_past_running(tmp_path, monkeypatch):
+    """The P0 regression this guards: nothing previously called
+    state.finish_run() when a DAG actually completed - dpagent pipeline
+    run() itself only triggers and returns. runtime.finish_pipeline_run()
+    is what deploy.render_dag()'s on_success_callback/on_failure_callback
+    call once Airflow says the run is done."""
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    run_id = state.start_run("data", "demo")
+    assert state.get_run(run_id)["status"] == "running"
+
+    runtime.finish_pipeline_run(run_id, "ok")
+
+    row = state.get_run(run_id)
+    assert row["status"] == "ok"
+    assert row["finished_at"] is not None
+    events = [e["kind"] for e in state.events_for(run_id)]
+    assert "pipeline.ok" in events
+
+
+def test_finish_pipeline_run_records_failed_status_and_an_error_level_event(tmp_path, monkeypatch):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    run_id = state.start_run("data", "demo")
+    runtime.finish_pipeline_run(run_id, "failed")
+
+    assert state.get_run(run_id)["status"] == "failed"
+    events = {e["kind"]: e for e in state.events_for(run_id)}
+    assert events["pipeline.failed"]["level"] == "error"
+
+
+def test_finish_pipeline_run_is_idempotent(tmp_path, monkeypatch):
+    """A retried or backfilled callback firing twice for the same run_id
+    must not error and must not leave the run in a worse state than the
+    first call already established."""
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    run_id = state.start_run("data", "demo")
+    runtime.finish_pipeline_run(run_id, "ok")
+    runtime.finish_pipeline_run(run_id, "ok")   # must not raise
+
+    assert state.get_run(run_id)["status"] == "ok"
+
+
 def test_warehouse_conn_sets_search_path_to_the_declared_schema():
     """The regression this guards: warehouse.schema was declared in the
     manifest schema but never once read anywhere - every generated query
@@ -213,7 +263,7 @@ def _pipeline(root, throwaway_warehouse, monkeypatch, *, quarantine_pct):
         monkeypatch.setenv(f"RT_{key.upper()}", throwaway_warehouse[key])
     data = {
         "name": "rt", "summary": "t",
-        "source": {"connector": "x", "connection": {"host": "x"}},
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}},
         "warehouse": {"host": "${RT_HOST}", "port": "${RT_PORT}", "database": "${RT_DATABASE}",
                      "user": "${RT_USER}", "password": "${RT_PASSWORD}"},
         "stages": [
@@ -302,7 +352,7 @@ def test_run_transform_calls_a_deployed_procedure(tmp_path, throwaway_warehouse,
         monkeypatch.setenv(f"RT_{key.upper()}", throwaway_warehouse[key])
     data = {
         "name": "rt", "summary": "t",
-        "source": {"connector": "x", "connection": {"host": "x"}},
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}},
         "warehouse": {"host": "${RT_HOST}", "port": "${RT_PORT}", "database": "${RT_DATABASE}",
                      "user": "${RT_USER}", "password": "${RT_PASSWORD}"},
         "stages": [

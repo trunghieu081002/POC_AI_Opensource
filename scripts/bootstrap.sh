@@ -12,12 +12,43 @@
 # Assumes almost nothing. A minimal cloud image has no python3, no git, often no
 # curl and no CA bundle. The one thing that must already exist is a working
 # package manager — everything else is installed from here.
+#
+# Where the source comes from - exactly one of three, in this priority order:
+#   1. DPAGENT_SOURCE_DIR   a local directory that already holds a checkout
+#                           (pyproject.toml at its root) - copied into PREFIX.
+#                           This is what scripts/setup.sh sets automatically:
+#                           when you have already extracted a release tarball
+#                           and are running this from inside it, that
+#                           extracted directory *is* the source, and nothing
+#                           should be fetched over the network at all.
+#                           Auto-detected the same way if unset: if this
+#                           script's own parent directory has a
+#                           pyproject.toml next to it, that is the source.
+#   2. DPAGENT_TARBALL      a URL to a release tarball (e.g. an internal
+#                           artifact server) - downloaded and extracted.
+#   3. DPAGENT_REPO         a git repository URL - cloned. No default: a
+#                           placeholder URL here would silently try to clone
+#                           the wrong (or a nonexistent) repository instead
+#                           of failing loudly, which is worse than asking.
 set -euo pipefail
 
-REPO="${DPAGENT_REPO:-https://github.com/CHANGEME/dpagent.git}"
-TARBALL="${DPAGENT_TARBALL:-}"        # alternative to git, e.g. an internal URL
-REF="${DPAGENT_REF:-main}"
 PREFIX="${DPAGENT_PREFIX:-/opt/dpagent}"
+
+# Auto-detect DPAGENT_SOURCE_DIR only when no source was named explicitly:
+# an operator who set DPAGENT_TARBALL or DPAGENT_REPO on purpose (a real
+# release, a pinned ref) must not have that silently overridden just because
+# this script happens to sit next to a checkout.
+SOURCE_DIR="${DPAGENT_SOURCE_DIR:-}"
+if [ -z "$SOURCE_DIR" ] && [ -z "${DPAGENT_TARBALL:-}" ] && [ -z "${DPAGENT_REPO:-}" ]; then
+  CANDIDATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [ -f "${CANDIDATE}/pyproject.toml" ]; then
+    SOURCE_DIR="$CANDIDATE"
+  fi
+fi
+
+TARBALL="${DPAGENT_TARBALL:-}"
+REPO="${DPAGENT_REPO:-}"
+REF="${DPAGENT_REF:-main}"
 
 say()  { printf '\033[36m::\033[0m %s\n' "$*" >&2; }
 ok()   { printf '\033[32mok\033[0m %s\n' "$*" >&2; }
@@ -113,29 +144,92 @@ fetch() {  # fetch <url> <dest>
   fi
 }
 
-if [ -n "$TARBALL" ]; then
+if [ -n "$SOURCE_DIR" ]; then
+  [ -f "${SOURCE_DIR}/pyproject.toml" ] || \
+    die "DPAGENT_SOURCE_DIR=${SOURCE_DIR} does not look like a dpagent checkout (no pyproject.toml)"
+  say "installing from the local source at ${SOURCE_DIR} (no network fetch)"
+  mkdir -p "$PREFIX"
+  # tar-pipe rather than cp -a: portable excludes (this box is guaranteed to
+  # have tar by now - installed above - but not necessarily rsync), and it
+  # only ever adds/overwrites into PREFIX, never deletes anything already
+  # there that is not in SOURCE_DIR - the same "never silently discard
+  # something that might be someone's own change" rule the git path below
+  # follows. Running this twice is a no-op beyond re-copying identical bytes.
+  tar -C "$SOURCE_DIR" \
+    --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
+    --exclude='.pytest_cache' --exclude='dist' --exclude='.env' \
+    --exclude='*.pyc' -cf - . | tar -C "$PREFIX" -xf -
+elif [ -n "$TARBALL" ]; then
   say "fetching the release tarball"
   mkdir -p "$PREFIX"
   fetch "$TARBALL" /tmp/dpagent.tar.gz || die "could not download ${TARBALL}"
   tar xzf /tmp/dpagent.tar.gz -C "$PREFIX" --strip-components=1
   rm -f /tmp/dpagent.tar.gz
-else
+elif [ -n "$REPO" ]; then
   command -v git >/dev/null 2>&1 || { say "installing git"; pkg_install git; }
   command -v git >/dev/null 2>&1 || \
     die "git is unavailable. Set DPAGENT_TARBALL to a release tarball URL instead."
   if [ -d "${PREFIX}/.git" ]; then
     say "updating the existing checkout at ${PREFIX}"
+    # No -f: a checkout that would discard uncommitted changes must fail
+    # loudly, not silently throw away whatever is sitting in PREFIX. Refuse
+    # explicitly first, with a clear reason, rather than letting a plain
+    # `git checkout` fail with a generic "would be overwritten" error.
+    if ! git -C "$PREFIX" diff --quiet HEAD -- 2>/dev/null; then
+      die "${PREFIX} has uncommitted local changes - refusing to overwrite them.
+Inspect with: git -C ${PREFIX} status
+Commit, stash, or move them aside, then re-run this script."
+    fi
     git -C "$PREFIX" fetch --depth 1 origin "$REF"
-    git -C "$PREFIX" checkout -f FETCH_HEAD
+    git -C "$PREFIX" checkout FETCH_HEAD
   else
     say "cloning ${REPO} (${REF}) into ${PREFIX}"
     git clone --depth 1 --branch "$REF" "$REPO" "$PREFIX"
   fi
+else
+  die "no source to install from. Set one of (in priority order):
+  DPAGENT_SOURCE_DIR=<path>   a local checkout - set this automatically by
+                              scripts/setup.sh, or when running bootstrap.sh
+                              from inside an already-extracted release
+  DPAGENT_TARBALL=<url>       a release tarball to download
+  DPAGENT_REPO=<git-url>      a git repository to clone"
 fi
 
 [ -f "${PREFIX}/pyproject.toml" ] || die "${PREFIX} does not look like a dpagent checkout"
 
+# Test-only: source resolution is the thing regression tests
+# (tests/test_bootstrap_fetch.py) need to check quickly and offline: venv
+# creation and `pip install` further down do real, possibly slow network
+# work that is not what those tests are about. Never set by a real install.
+if [ -n "${DPAGENT_BOOTSTRAP_STOP_AFTER_FETCH:-}" ]; then
+  ok "fetch stage complete (DPAGENT_BOOTSTRAP_STOP_AFTER_FETCH set - stopping here)"
+  exit 0
+fi
+
 # ---------------------------------------------------------------- install
+
+# DPAGENT_WITH_LLM=1 pulls in litellm (pyproject.toml's [llm] extra) at
+# install time, for the three commands that use a model (dpagent do/synth,
+# and proposing a catalog entry) - everything else (install/verify/rollback/
+# status) needs none of it either way. Without this flag, those three
+# commands fail with a clear "pip install -e '.[llm]'" LLMError
+# (src/dpagent/llm/client.py) rather than silently doing nothing. Resolved
+# before any pip call so the test-only stop hook right below can check it
+# without triggering real network work.
+EXTRA=""
+if [ -n "${DPAGENT_WITH_LLM:-}" ]; then
+  EXTRA="[llm]"
+fi
+
+# Test-only, same reasoning as DPAGENT_BOOTSTRAP_STOP_AFTER_FETCH above: lets
+# tests/test_bootstrap_fetch.py check DPAGENT_WITH_LLM's effect on EXTRA
+# without waiting on the real, possibly slow, network-dependent pip calls
+# further down (the upgrade included - this must come before that too).
+# Never set by a real install.
+if [ -n "${DPAGENT_BOOTSTRAP_STOP_BEFORE_PIP_INSTALL:-}" ]; then
+  ok "resolved extra=${EXTRA:-<none>} (DPAGENT_BOOTSTRAP_STOP_BEFORE_PIP_INSTALL set - stopping here)"
+  exit 0
+fi
 
 say "creating the virtualenv"
 "$PYTHON" -m venv "${PREFIX}/.venv" 2>/dev/null || {
@@ -154,7 +248,7 @@ say "creating the virtualenv"
 }
 
 "${PREFIX}/.venv/bin/pip" install --quiet --upgrade pip setuptools wheel
-"${PREFIX}/.venv/bin/pip" install --quiet -e "${PREFIX}"
+"${PREFIX}/.venv/bin/pip" install --quiet -e "${PREFIX}${EXTRA}"
 
 ln -sf "${PREFIX}/.venv/bin/dpagent" /usr/local/bin/dpagent
 install -d -m 0750 /var/lib/dpagent /var/log/dpagent
@@ -184,10 +278,22 @@ An install is not reported as successful until its acceptance suite passes.
 Installing needs no API key. A model is only involved in three places: routing a
 plain-language request (dpagent do), drafting a pack for a tool with no pack yet
 (dpagent synth), and proposing a catalog entry for a failure nothing matched:
+EOF
+
+if [ -z "$EXTRA" ]; then
+  cat <<EOF
+  sudo ${PREFIX}/.venv/bin/pip install -e '${PREFIX}[llm]'   # litellm - once
+EOF
+else
+  echo "  (litellm already installed - DPAGENT_WITH_LLM was set)"
+fi
+
+cat <<EOF
 
   cp ${PREFIX}/.env.example ${PREFIX}/.env
-  \$EDITOR ${PREFIX}/.env                        # GEMINI_API_KEY is free
-  export \$(grep -v '^#' ${PREFIX}/.env | xargs)
+  \$EDITOR ${PREFIX}/.env                        # GEMINI_API_KEY is free; quote
+                                                 # any value with spaces or \$/*
+  set -a; source ${PREFIX}/.env; set +a
 
 Note the -E in 'sudo -E': it keeps your environment, which is how \${SECRETS}
 referenced by a project.yaml and any http_proxy settings reach the agent.

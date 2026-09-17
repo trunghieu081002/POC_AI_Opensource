@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from ..engine.params import resolve_refs
+from ..engine.params import ENV_REF, resolve_refs
 from .generator import dag_tasks
 from .loader import Pipeline, Stage
 
@@ -41,10 +41,12 @@ class DeployError(Exception):
 @dataclass
 class DeployResult:
     written: list[Path] = field(default_factory=list)
+    schema_ensured: str = ""
     procedures_applied: list[str] = field(default_factory=list)
     dbt_models_published: list[Path] = field(default_factory=list)
     pipeline_files_published: Path | None = None
     airflow_bridge_actions: list[str] = field(default_factory=list)
+    pipeline_secrets_synced: bool = False
     dag_installed: Path | None = None
 
 
@@ -76,6 +78,13 @@ def render_dag(pipeline: Pipeline) -> str:
        at that import) - `setdefault` rather than a plain assignment so an
        operator's own explicit `DPAGENT_PIPELINES` (set some other way)
        still wins.
+
+    The DAG's own `on_success_callback`/`on_failure_callback` (Airflow
+    calls exactly one, once the run reaches a terminal state) call
+    `runtime.finish_pipeline_run()` - the only place `runs.status` for a
+    `dpagent pipeline run` ever moves past "running". `dpagent pipeline
+    run` itself only triggers and returns (docs/layer2.md's own "does not
+    wait"); without this callback nothing else ever finished that row.
     """
     tasks = dag_tasks(pipeline)
     lines = [
@@ -98,12 +107,36 @@ def render_dag(pipeline: Pipeline) -> str:
         "from dpagent.pipelines import runtime",
         "",
         "",
+        "def _dpagent_finish_run(context, status):",
+        "    # Airflow itself calls this once the DAG run reaches a terminal",
+        "    # state - the only place that actually knows that, since",
+        '    # `dpagent pipeline run` only triggers and returns immediately',
+        "    # (docs/layer2.md). Without this, runs.status stayed 'running'",
+        "    # forever regardless of what the DAG actually did - found for real,",
+        "    # not guessed: every prior demo run had to call finish_run() by",
+        "    # hand in a throwaway verification script because nothing else did.",
+        "    dag_run = context.get(\"dag_run\")",
+        '    run_id = (dag_run.conf or {}).get("dpagent_run_id") if dag_run else None',
+        "    if run_id is not None:",
+        "        runtime.finish_pipeline_run(run_id, status)",
+        "",
+        "",
+        "def _on_dag_success(context, **_):",
+        '    _dpagent_finish_run(context, "ok")',
+        "",
+        "",
+        "def _on_dag_failure(context, **_):",
+        '    _dpagent_finish_run(context, "failed")',
+        "",
+        "",
         "with DAG(",
         f'    dag_id="{pipeline.name}",',
         "    schedule_interval=None,",
         "    start_date=datetime(2026, 1, 1),",
         "    catchup=False,",
         '    tags=["dpagent-pipeline"],',
+        "    on_success_callback=_on_dag_success,",
+        "    on_failure_callback=_on_dag_failure,",
         ") as dag:",
     ]
 
@@ -214,6 +247,28 @@ def _psql_command(pipeline: Pipeline, *extra: str) -> tuple[list[str], dict[str,
     # session it runs the migration against.
     env["PGOPTIONS"] = f"-c search_path={pipeline.warehouse.schema},public"
     return cmd, env
+
+
+def ensure_warehouse_schema(pipeline: Pipeline) -> str:
+    """`CREATE SCHEMA IF NOT EXISTS <warehouse.schema>` - found for real
+    deploying pipelines/quickstart (a procedure-only pipeline, no dbt stage
+    to fall back on): every generated query is unqualified against
+    PGOPTIONS's search_path (`_psql_command`'s own comment), and Postgres
+    silently resolves an unqualified `CREATE TABLE`/`CREATE PROCEDURE` into
+    the *next* schema in search_path that actually exists when the first
+    one does not - here, `public` - rather than erroring. A dbt-engine
+    stage's own `dbt run` already creates its target schema itself, so this
+    is a no-op there (and for warehouse.schema's own "public" default,
+    which always exists); it is required for a procedure-engine stage's
+    schema to ever be more than an unenforced label.
+    """
+    cmd, env = _psql_command(pipeline, "-c",
+                             f"CREATE SCHEMA IF NOT EXISTS {pipeline.warehouse.schema}")
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        raise DeployError(f"creating schema {pipeline.warehouse.schema!r} failed:\n"
+                          f"{proc.stderr.strip()}")
+    return pipeline.warehouse.schema
 
 
 def apply_procedures(pipeline: Pipeline) -> list[str]:
@@ -358,11 +413,18 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
     result = DeployResult()
     result.written = write_artifacts(pipeline)
     if apply_db:
+        result.schema_ensured = ensure_warehouse_schema(pipeline)
         result.procedures_applied = apply_procedures(pipeline)
         result.dbt_models_published = install_dbt_models(pipeline)
     if install_dag_to_airflow:
         result.pipeline_files_published = install_pipeline_files(pipeline)
         result.airflow_bridge_actions = ensure_airflow_can_run_pipelines()
+        if apply_db:
+            # Only makes sense once the operator's own environment has
+            # already been required to carry these values (apply_db's own
+            # ensure_warehouse_schema/apply_procedures above) - under
+            # --no-db there is nothing to resolve from yet.
+            result.pipeline_secrets_synced = ensure_pipeline_secrets_available(pipeline)
         result.dag_installed = install_dag(pipeline)
     return result
 
@@ -486,6 +548,127 @@ def ensure_airflow_can_run_pipelines() -> list[str]:
     return done
 
 
+def _pipeline_env_refs(pipeline: Pipeline) -> dict[str, str | None]:
+    """Every ${VAR} (or ${VAR:-default}) this pipeline's own manifest
+    references, across its source connection and warehouse fields, mapped
+    to its default text (None if the reference has none) - still literal
+    `${...}` text at this point, since loader.load() validates structure
+    but never calls resolve_refs() itself (deploy.py/runtime.py each do,
+    right where a value is actually used). Mirrors resolve_refs()'s own
+    ENV_REF parsing exactly, including its defaulting: a ref with a
+    default is never "missing" just because the operator's shell does not
+    have it - the manifest's own literal default already covers it at
+    runtime, in the same process, regardless of this file."""
+    refs: dict[str, str | None] = {}
+
+    def scan(value: object) -> None:
+        if isinstance(value, str):
+            for m in ENV_REF.finditer(value):
+                name, default = m.group(1), m.group(2)
+                if refs.get(name) is None:
+                    refs[name] = default
+        elif isinstance(value, dict):
+            for v in value.values():
+                scan(v)
+
+    scan(pipeline.source.connection)
+    scan({"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
+         "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
+         "password": pipeline.warehouse.password})
+    return refs
+
+
+def _pipeline_secrets_file() -> Path:
+    return _airflow_install_dir() / "home" / "pipelines.env"
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    result: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        result[key] = value.strip('"')
+    return result
+
+
+def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
+    """Writes/refreshes `<airflow install_dir>/home/pipelines.env` with every
+    ${VAR} this pipeline's manifest references, resolved from *this
+    process's own* environment - the operator must already have them
+    exported for apply_procedures()/ensure_warehouse_schema() above to have
+    worked at all - and restarts airflow-scheduler if the content actually
+    changed. Returns whether anything changed (false is the common case on
+    a repeat deploy, not an error).
+
+    Found for real deploying pipelines/quickstart: `dpagent pipeline run`
+    only ever calls `airflow dags trigger`, which creates a DagRun row and
+    returns immediately - the DAG's own tasks (runtime.run_extract, e.g.)
+    execute later, as LocalExecutor workers forked from the *already
+    running* airflow-scheduler process, whose environment was fixed at
+    systemd start time from the airflow pack's own airflow.env (Airflow's
+    config - AIRFLOW__*, never a pipeline's warehouse/source secrets) alone.
+    A pipeline secret exported in the operator's shell at deploy/run time
+    never reaches that process: runtime.py's resolve_refs() raises a bare
+    ParamError before run_extract's own try/except around the dlt
+    subprocess is ever reached, so the task just shows up "failed" in
+    Airflow with no dpagent event to explain why - confirmed against a
+    real deploy, not guessed at.
+
+    A second, dpagent-pipeline-owned file rather than folding into
+    airflow.env itself: that file is fully rewritten by `dpagent install
+    airflow` (packs/airflow/steps/40-config.sh) - appending pipeline
+    secrets into it would silently wipe them on the next airflow
+    reinstall/upgrade. Read-merge-write (never a wholesale overwrite) so
+    deploying one pipeline never drops another's already-synced secrets.
+
+    Requires root, same as install_dag()/ensure_airflow_can_run_pipelines():
+    the file must end up root:airflow, and restarting a systemd unit always
+    needs it.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError(
+            "syncing pipeline secrets to Airflow needs root (the file must "
+            "be root:airflow, and picking up a change needs a service "
+            "restart) - re-run as sudo -E dpagent pipeline deploy ...")
+
+    refs = _pipeline_env_refs(pipeline)
+    missing = [name for name, default in refs.items()
+              if default is None and os.environ.get(name) is None]
+    if missing:
+        raise DeployError(
+            f"{pipeline.name}: cannot sync these secrets to Airflow - not set "
+            f"in this shell either (export them, same as apply_procedures/"
+            f"ensure_warehouse_schema above already needed): {', '.join(missing)}")
+
+    secrets_file = _pipeline_secrets_file()
+    existing = _parse_env_file(secrets_file)
+    merged = dict(existing)
+    for name in refs:
+        # A ref with a default that the operator never overrode needs
+        # nothing written here - resolve_refs() falls back to that same
+        # literal default at runtime regardless of this file's content.
+        value = os.environ.get(name)
+        if value is not None:
+            merged[name] = value
+
+    if merged == existing:
+        return False
+
+    content = "".join(f'{key}="{value}"\n' for key, value in sorted(merged.items()))
+    secrets_file.parent.mkdir(parents=True, exist_ok=True)
+    secrets_file.write_text(content)
+    os.chmod(secrets_file, 0o600)
+    shutil.chown(secrets_file, user="airflow", group="airflow")
+
+    _run_root_command(["systemctl", "restart", "airflow-scheduler"],
+                      what="restarting airflow-scheduler to pick up pipeline secrets")
+    return True
+
+
 def install_dag(pipeline: Pipeline) -> Path:
     """Copies the rendered DAG into Airflow's real DAGS_FOLDER
     (`<install_dir>/home/dags/<name>.py`, the same path `af_home()/dags`
@@ -510,25 +693,50 @@ def install_dag(pipeline: Pipeline) -> Path:
     dag_path.write_text(render_dag(pipeline))
     dag_path.chmod(0o644)
     shutil.chown(dag_path, user="airflow", group="airflow")
+    reserialize_dags()
     return dag_path
+
+
+def _airflow_cli_command(*args: str) -> list[str]:
+    """Same shape as `af_run` in af-lib.sh: run the airflow CLI as the
+    `airflow` OS user with its env file sourced and its venv on PATH, since
+    it must run as the user the webserver/scheduler/metadata DB were set
+    up for. Shared by trigger_dag_command and reserialize_dags_command so
+    both stay in sync with how that user/env/venv is actually resolved."""
+    venv_bin, env_file = _airflow_paths()
+    inner = (
+        f'set -a; source "{env_file}"; set +a; '
+        f'export PATH="{venv_bin}:$PATH"; '
+        f'exec "{venv_bin}/airflow" ' + " ".join(args)
+    )
+    return ["sudo", "-u", "airflow", "bash", "-c", inner]
+
+
+def reserialize_dags_command() -> list[str]:
+    return _airflow_cli_command("dags", "reserialize")
+
+
+def reserialize_dags() -> subprocess.CompletedProcess:
+    """Forces the scheduler to notice a new/changed DAG file immediately,
+    rather than waiting for its own periodic directory scan
+    (dag_dir_list_interval, 300s by default) - a real gap found by hand,
+    repeatedly: a freshly `install_dag()`-ed file sat there un-imported,
+    and `dpagent pipeline run` failed with "Dag id ... not found" for
+    several minutes until `airflow dags reserialize` was run manually.
+    Best-effort: a failure here (e.g. Airflow not actually running yet)
+    does not fail install_dag() itself - the scheduler's own scan will
+    still pick the file up eventually, just not immediately.
+    """
+    return subprocess.run(reserialize_dags_command(), capture_output=True,
+                          text=True, timeout=120)
 
 
 def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
     """The exact command `dpagent pipeline run` shells out to - built here,
     separately from the subprocess call, so it can be printed/tested without
-    actually running it (mirrors `_psql_command`).
-
-    Same shape as `af_run` in af-lib.sh: run as the `airflow` OS user with
-    its env file sourced and its venv on PATH, since the airflow CLI must
-    run as the user the webserver/scheduler/metadata DB were set up for."""
-    venv_bin, env_file = _airflow_paths()
+    actually running it (mirrors `_psql_command`)."""
     conf = json.dumps({"dpagent_run_id": dpagent_run_id})
-    inner = (
-        f'set -a; source "{env_file}"; set +a; '
-        f'export PATH="{venv_bin}:$PATH"; '
-        f'exec "{venv_bin}/airflow" dags trigger "{pipeline_name}" --conf {conf!r}'
-    )
-    return ["sudo", "-u", "airflow", "bash", "-c", inner]
+    return _airflow_cli_command("dags", "trigger", f'"{pipeline_name}"', f"--conf {conf!r}")
 
 
 def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.CompletedProcess:

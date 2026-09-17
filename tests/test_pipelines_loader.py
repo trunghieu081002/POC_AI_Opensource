@@ -232,6 +232,27 @@ def test_source_needs_a_connector(root):
         loader.load("demo", root)
 
 
+def test_lint_rejects_a_connector_runtime_does_not_support(root):
+    """The P1 regression this guards: before this, a manifest naming an
+    unsupported connector (sql_server, e.g. - not wired up yet) linted
+    clean, planned clean, deployed clean, and only failed deep inside a
+    real Airflow task's run_extract(), as a raw ValueError with no
+    indication the mistake was catchable this early."""
+    data = _minimal()
+    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="sql_server.*not supported"):
+        loader.load("demo", root)
+
+
+def test_lint_error_for_an_unsupported_connector_lists_the_valid_ones(root):
+    data = _minimal()
+    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="odoo_postgres"):
+        loader.load("demo", root)
+
+
 def test_warehouse_needs_a_host(root):
     data = _minimal()
     data["warehouse"] = {"database": "warehouse"}
@@ -283,3 +304,17 @@ def test_directory_name_must_match_the_declared_name(root):
 def test_missing_pipeline_is_a_clean_error_not_a_traceback(root):
     with pytest.raises(loader.PipelineError, match="no pipeline for"):
         loader.load("nonexistent", root)
+
+
+# ------------------------------------------------ real, committed pipelines
+
+def test_every_real_pipeline_under_pipelines_dir_loads_cleanly():
+    """No tmp_path fixture here on purpose - this walks the actual
+    `pipelines/` this repo ships (demo, quickstart, ...), the same directory
+    `dpagent pipeline lint` reads by default. A typo in a committed
+    manifest must fail this test, not wait to be found by `lint` on
+    whatever host someone next runs it on."""
+    names = loader.available()
+    assert "demo" in names and "quickstart" in names
+    for name in names:
+        loader.load(name)   # raises PipelineError on any bad manifest

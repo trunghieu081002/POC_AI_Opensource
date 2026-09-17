@@ -11,6 +11,7 @@ source "${DP_PACK_ROOT:?}/af-lib.sh"
 
 dp_require_root
 ENV_FILE="$(af_env_file)"
+PIPELINE_SECRETS_FILE="$(af_pipeline_secrets_file)"
 AIRFLOW_BIN="$(af_bin)"
 
 dp_write /etc/systemd/system/airflow-webserver.service 0644 <<EOF
@@ -39,6 +40,7 @@ After=network.target postgresql.service
 User=airflow
 Group=airflow
 EnvironmentFile=${ENV_FILE}
+EnvironmentFile=-${PIPELINE_SECRETS_FILE}
 ExecStart=${AIRFLOW_BIN} scheduler
 Restart=on-failure
 RestartSec=5

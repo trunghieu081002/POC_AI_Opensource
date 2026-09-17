@@ -411,3 +411,20 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         raise GateFailed(f"extract failed for {pipeline_name!r}:\n{proc.stderr}")
 
     state.event("extract.done", f"{pipeline_name} extract complete", run_id=run_id)
+
+
+def finish_pipeline_run(run_id: int, status: str) -> None:
+    """Called from the generated DAG's own on_success_callback/
+    on_failure_callback (deploy.render_dag) - the only place that actually
+    knows a DAG run reached a terminal state, since `dpagent pipeline run`
+    itself only triggers Airflow and returns (docs/layer2.md). Before this
+    existed, `runs.status` stayed "running" forever regardless of what the
+    DAG actually did.
+
+    Idempotent: state.finish_run() is a plain UPDATE, so a retried/backfilled
+    callback firing twice for the same run_id just rewrites the same
+    terminal status - never an error, never a second row.
+    """
+    state.finish_run(run_id, status)
+    state.event(f"pipeline.{status}", f"DAG run {run_id} reached terminal state: {status}",
+               run_id=run_id, level="info" if status == "ok" else "error")

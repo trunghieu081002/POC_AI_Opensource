@@ -29,6 +29,14 @@ def _runner():
     return CliRunner()
 
 
+def _mark_layer2_prerequisites_installed():
+    """The demo pipeline has a dbt-engine stage, so all three
+    (dlt/dbt/airflow) are required - see
+    cli.pipeline._missing_layer2_prerequisites()."""
+    for pack in ("dlt", "dbt", "airflow"):
+        state.record_install(pack, "1.0.0", {}, "hash", "rhel", "installed")
+
+
 def test_status_with_no_runs_says_so_and_suggests_run(db):
     result = _runner().invoke(pipeline_group, ["status", "demo"])
     assert result.exit_code == 0
@@ -129,13 +137,52 @@ def _fake_trigger(returncode, stderr=""):
 
 
 def test_run_declined_creates_no_run_row(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
     monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _fake_trigger(0))
     result = _runner().invoke(pipeline_group, ["run", "demo"], input="n\n")
     assert result.exit_code != 0
     assert state.latest_run(kind="data", target="demo") is None
 
 
+def test_missing_layer2_prerequisites_lists_only_dbt_when_pipeline_has_no_dbt_stage(db):
+    """A procedure-only pipeline must not be told it needs dbt - only
+    dlt (every pipeline extracts) and airflow (every deploy/run needs it)."""
+    from dpagent.pipelines import loader as pipelines_mod
+    pipeline = pipelines_mod.Pipeline(
+        name="p", summary="", root=Path("."),
+        source=pipelines_mod.Source(connector="csv", files={"path": "/tmp/x.csv"}),
+        warehouse=pipelines_mod.Warehouse(host="h", database="d"),
+        stages=[pipelines_mod.Stage(name="landing")])
+    missing = pipeline_cli._missing_layer2_prerequisites(pipeline)
+    assert any("dlt" in m for m in missing)
+    assert any("airflow" in m for m in missing)
+    assert not any("dbt" in m for m in missing)
+
+
+def test_missing_layer2_prerequisites_empty_once_everything_is_installed(db):
+    _mark_layer2_prerequisites_installed()
+    from dpagent.pipelines import loader as pipelines_mod
+    pipeline = pipelines_mod.Pipeline(
+        name="p", summary="", root=Path("."),
+        source=pipelines_mod.Source(connector="csv", files={"path": "/tmp/x.csv"}),
+        warehouse=pipelines_mod.Warehouse(host="h", database="d"),
+        stages=[pipelines_mod.Stage(name="landing")])
+    assert pipeline_cli._missing_layer2_prerequisites(pipeline) == []
+
+
+def test_run_refuses_when_a_required_pack_is_not_installed(db):
+    """The P1 regression this guards: before this, a missing dlt/dbt/
+    airflow install surfaced as a raw PackError/DeployError deep inside
+    whichever step needed it first, not one clear message up front."""
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes"])
+    assert result.exit_code != 0
+    assert "dlt" in result.output
+    assert "dbt" in result.output
+    assert "airflow" in result.output
+
+
 def test_run_yes_records_a_running_run_and_triggers_with_its_id(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
     calls = []
     def trigger(pipeline_name, dpagent_run_id):
         calls.append((pipeline_name, dpagent_run_id))
@@ -154,6 +201,7 @@ def test_run_yes_records_a_running_run_and_triggers_with_its_id(db, monkeypatch)
 
 
 def test_run_marks_the_run_failed_when_triggering_fails(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
     monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag",
                         _fake_trigger(1, stderr="sudo: a password is required"))
 
