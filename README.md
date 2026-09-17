@@ -291,14 +291,13 @@ pytest
 
 ## Status
 
-Layer 1 (install) is built, including a first full ETL stack. Layers 2 and 3
-are not:
+Layer 1 (install) and Layer 2 (staged ingestion) are built. Layer 3 is not:
 
 - [x] Pack engine, resolver, error catalog, preflight/verify/rollback, audit
 - [x] Acceptance suites, wired into install so success means proven
 - [x] `dpagent doctor` — machine/version checks before anything installs
 - [x] `dpagent do` / `spec` / `install` / `scripts/setup.sh` — the one-command path
-- [x] Packs: `base`, `python-modern`, `postgres`, `dbt`, `airflow`
+- [x] Packs: `base`, `python-modern`, `postgres`, `dbt`, `airflow`, `dlt`
 - [x] Every pack has a suite — negative checks throughout (bad password,
       off-host reachability, a dbt test that must fail, a DAG task that must
       be reported as failed, TLS validation that must reject an untrusted
@@ -309,8 +308,12 @@ are not:
 - [x] An automated dry-run integration test (`tests/test_dry_run_integration.py`)
       executes every pack's steps under `--dry-run` through real bash, not
       just the static lint check
+- [x] Layer 2 — staged ingestion with a gate between every stage: manifest
+      schema, generator, deploy, runtime, both MVP connectors, a real
+      Odoo-shaped reference pipeline (dbt + procedure engines together),
+      and `dpagent pipeline run` triggering a real deployed DAG through a
+      real Airflow install, end to end — see `docs/layer2.md`
 - [ ] Packs: clickhouse, minio, trino, spark, iceberg, hive-metastore
-- [ ] Layer 2 — staged ingestion with a gate between every stage
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 
 **Not yet executed on a real host.** The engine's Python tests

@@ -39,19 +39,34 @@ guessed, each now fixed and documented in code:
    reason `PIPELINES_DIR` could not; replaced with a plain constant
    (`4ac1eb7`).
 
-**Whoever stands this up on a new host needs to know**: dpagent must be
-pip-installed into Airflow's own venv (re-run after every dpagent code
-change - a *regular* install does not track source edits the way an
-editable one does), `dpagent pipeline deploy` publishes each pipeline to
-`/opt/dpagent/pipelines/<name>` and the DAG to Airflow's real DAGS_FOLDER
-(both need root), and the `airflow` OS user needs write access to
+A *regular* `pip install` also means dpagent code changes never take
+effect in Airflow's venv until reinstalled there again - real friction,
+hit repeatedly getting the above working. Fixed properly rather than
+worked around: a narrow ACL (`setfacl -m u:airflow:x /home/oracle`,
+traverse only - `ls` there as `airflow` still fails, only a known subpath
+works) lets `airflow` reach the checkout at all, which makes an *editable*
+install (`pip install -e`) actually work, so code edits take effect
+immediately, same as they already do for dpagent's own CLI.
+
+**Whoever stands this up on a new host needs to know**: dpagent needs an
+editable pip install into Airflow's own venv, reachable via a narrow ACL
+grant on whatever directory holds the checkout if it is not already
+world-traversable; `dpagent pipeline deploy` publishes each pipeline to
+`/opt/dpagent/pipelines/<name>`, its dbt-engine stages' models into the
+dbt pack's own real project, and the DAG to Airflow's real DAGS_FOLDER
+(all three need root); and the `airflow` OS user needs write access to
 dpagent's own journal (a shared group, as above, or an equivalent).
 
-Remaining, not blocking the MVP claim above: the Odoo/CSV reference
-pipeline's own dbt models (`pipelines/demo`'s `raw` stage declares dbt
-models that do not exist as files yet - the acceptance test above proves
-the machinery with a procedure-only pipeline instead, since gates/
-quarantine are engine-agnostic).
+The Odoo/CSV reference pipeline's own dbt models
+(`pipelines/demo/models/*.sql`) are written and verified for real too: a
+real `dbt run` against a throwaway database built all four (with the
+project's `generate_schema_name` macro override - `deploy.
+install_dbt_models()` - actually landing them in schema `demo`, matching
+what `pipeline.yaml` declares, not dbt's own default `<target>_demo`
+concatenation), a retroactive-write_date duplicate deduped to the latest
+row exactly as intended, and every gate on every stage (`landing` through
+`curated`) passed against the dbt-produced + procedure-produced data, with
+`fct_sales` holding the correctly currency-converted result.
 
 Layer 1 (install) is done and proven; see `README.md`'s status list and
 `docs/deploy-log.md` for what that took.
