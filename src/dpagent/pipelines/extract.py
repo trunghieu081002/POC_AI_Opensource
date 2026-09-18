@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .loader import Pipeline
 
-CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch"}
+CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch", "google_sheets"}
 
 
 def landing_dataset(pipeline: Pipeline) -> str:
@@ -159,6 +159,60 @@ def render_extract_script(pipeline: Pipeline) -> str:
                         yield row
 
                 return read_docs()
+
+
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run([_resource_for(name) for name in {resources!r}])
+            print(info)
+        ''')
+
+    if connector == "google_sheets":
+        # No built-in dlt source for Google Sheets either - hand-rolled,
+        # same shape as elasticsearch/csv: one dlt.resource per sheet
+        # (tab), the Sheets API v4 values.get() call doing the read.
+        # Auth is always a service account (never an interactive OAuth
+        # flow, which cannot run unattended inside an Airflow task) - the
+        # whole service-account JSON key is the secret, held only in
+        # SRC_GOOGLE_SERVICE_ACCOUNT_JSON, parsed at run time, never a
+        # literal in this file.
+        spreadsheet_id = pipeline.source.connection["spreadsheet_id"]
+        resources = list(pipeline.source.resources)
+        return header + textwrap.dedent(f'''\
+            import json
+            import os
+
+            import dlt
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(os.environ["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"]),
+                scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+            )
+            service = build("sheets", "v4", credentials=credentials)
+
+
+            def _resource_for(sheet_name):
+                @dlt.resource(name=sheet_name, write_disposition="replace")
+                def read_rows():
+                    result = service.spreadsheets().values().get(
+                        spreadsheetId={spreadsheet_id!r}, range=sheet_name).execute()
+                    values = result.get("values", [])
+                    if not values:
+                        return
+                    header_row, *rows = values
+                    # The Sheets API drops trailing empty cells per row, so a
+                    # short row here is missing its trailing columns
+                    # entirely (not present as None) - zip() stops at the
+                    # shorter side, which is exactly that behaviour.
+                    for row in rows:
+                        yield dict(zip(header_row, row))
+
+                return read_rows()
 
 
             pipeline = dlt.pipeline(

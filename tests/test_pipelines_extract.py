@@ -199,6 +199,41 @@ def test_elasticsearch_script_reads_api_key_only_from_env(root):
     assert "${ES_API_KEY}" not in script
 
 
+def test_google_sheets_script_is_valid_python(root):
+    data = _base(source={"connector": "google_sheets",
+                         "connection": {"spreadsheet_id": "1AbCDeF",
+                                       "service_account_json": "${GOOGLE_SA_JSON}"},
+                         "resources": ["Orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    ast.parse(script)
+
+
+def test_google_sheets_script_names_the_spreadsheet_and_every_sheet(root):
+    data = _base(source={"connector": "google_sheets",
+                         "connection": {"spreadsheet_id": "1AbCDeF",
+                                       "service_account_json": "${GOOGLE_SA_JSON}"},
+                         "resources": ["Orders", "Customers"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "spreadsheetId='1AbCDeF'" in script
+    assert "'Orders'" in script and "'Customers'" in script
+
+
+def test_google_sheets_script_reads_the_service_account_key_only_from_env(root):
+    data = _base(source={"connector": "google_sheets",
+                         "connection": {"spreadsheet_id": "1AbCDeF",
+                                       "service_account_json": "${GOOGLE_SA_JSON}"},
+                         "resources": ["Orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert 'os.environ["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"]' in script
+    assert "${GOOGLE_SA_JSON}" not in script
+
+
 def test_csv_script_is_valid_python(root):
     data = _base(source={"connector": "csv", "files": {"path": "/data/*.csv"}})
     _write(root, "demo", data)
@@ -325,9 +360,14 @@ def test_rest_api_script_reads_a_bearer_token_only_from_env(root):
 
 
 def test_unknown_connector_is_refused():
+    """A deliberately fictional connector name, not a real one this module
+    might grow support for later - the last few times a real connector
+    (sql_server, then elasticsearch, then google_sheets) was used here as
+    "the unsupported one," adding that connector for real broke this test.
+    "not_a_real_connector" can never suffer that fate."""
     wh = loader.Warehouse(host="h", database="d")
     pipeline = loader.Pipeline(
         name="demo", summary="", root=pathlib.Path("."),
-        source=loader.Source(connector="google_sheets"), warehouse=wh, stages=[])
-    with pytest.raises(ValueError, match="google_sheets"):
+        source=loader.Source(connector="not_a_real_connector"), warehouse=wh, stages=[])
+    with pytest.raises(ValueError, match="not_a_real_connector"):
         extract.render_extract_script(pipeline)

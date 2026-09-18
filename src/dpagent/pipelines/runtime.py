@@ -431,6 +431,14 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
                 env["SRC_ES_PASSWORD"] = src["password"]
             else:
                 env["SRC_ES_API_KEY"] = src["api_key"]
+    elif pipeline.source.connector == "google_sheets":
+        # Always a service account (never an interactive OAuth flow, which
+        # cannot run unattended inside an Airflow task) - the whole JSON
+        # key is the secret, resolved as one opaque string like any other
+        # ${VAR}, parsed back into a dict only inside the generated script.
+        src = resolve_refs(pipeline.source.connection,
+                           path=f"{pipeline_name}.source.connection")
+        env["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"] = src["service_account_json"]
 
     proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
                           capture_output=True, text=True, timeout=600)

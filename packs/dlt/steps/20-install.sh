@@ -32,5 +32,13 @@ dp_run "$PIP" install --quiet "pymssql>=2.3,<3"
 # directly, the same shape the csv connector already uses.
 dp_run "$PIP" install --quiet "elasticsearch>=8,<10"
 
+# google-api-python-client/google-auth: the google_sheets connector's own
+# client - no built-in dlt source for it either, hand-rolled the same way
+# as elasticsearch: one dlt.resource per sheet, the Sheets API v4's own
+# values.get() call reading it. Service-account auth only (never an
+# interactive OAuth flow, which cannot run unattended inside an Airflow
+# task).
+dp_run "$PIP" install --quiet "google-api-python-client>=2,<3" "google-auth>=2,<3"
+
 INSTALLED="$("${INSTALL_DIR}/.venv/bin/dlt" --version 2>/dev/null | head -1 || true)"
 dp_ok "installed: ${INSTALLED:-dlt (version string unavailable)}"

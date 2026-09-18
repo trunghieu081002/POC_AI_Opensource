@@ -193,10 +193,10 @@ def _validate_source(raw: dict, where: str) -> Source:
     # Lazy import: extract.py imports Pipeline/Stage from this module, so a
     # top-level import here would be circular. Checked against the same set
     # run_extract actually compiles against (extract.CONNECTORS) - found for
-    # real: a manifest naming an unsupported connector (e.g. "google_sheets",
-    # not wired up yet) used to lint clean, plan clean, deploy clean, and
-    # only fail deep inside a real Airflow task's run_extract(), as a raw
-    # ValueError with no indication the mistake was catchable at lint time.
+    # real: a manifest naming a connector not (yet) wired up in extract.py
+    # used to lint clean, plan clean, deploy clean, and only fail deep
+    # inside a real Airflow task's run_extract(), as a raw ValueError with
+    # no indication the mistake was catchable at lint time.
     from .extract import CONNECTORS
     if connector not in CONNECTORS:
         raise PipelineError(
@@ -227,6 +227,15 @@ def _validate_source(raw: dict, where: str) -> Source:
             raise PipelineError(
                 f"{where}: source {connector!r} has no resources - "
                 f"at least one index name is needed to extract anything")
+    if connector == "google_sheets":
+        if not connection.get("spreadsheet_id"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.spreadsheet_id - "
+                f"the Sheets API needs one to know which spreadsheet to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one sheet (tab) name is needed to extract anything")
     return Source(
         connector=connector,
         connection=connection,
