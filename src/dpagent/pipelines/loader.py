@@ -193,7 +193,7 @@ def _validate_source(raw: dict, where: str) -> Source:
     # Lazy import: extract.py imports Pipeline/Stage from this module, so a
     # top-level import here would be circular. Checked against the same set
     # run_extract actually compiles against (extract.CONNECTORS) - found for
-    # real: a manifest naming an unsupported connector (e.g. "sql_server",
+    # real: a manifest naming an unsupported connector (e.g. "google_sheets",
     # not wired up yet) used to lint clean, plan clean, deploy clean, and
     # only fail deep inside a real Airflow task's run_extract(), as a raw
     # ValueError with no indication the mistake was catchable at lint time.
@@ -218,6 +218,15 @@ def _validate_source(raw: dict, where: str) -> Source:
             raise PipelineError(
                 f"{where}: source {connector!r} has no resources - "
                 f"at least one endpoint name is needed to extract anything")
+    if connector == "elasticsearch":
+        if not connection.get("hosts"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.hosts - "
+                f"the Elasticsearch client needs at least one to know where to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one index name is needed to extract anything")
     return Source(
         connector=connector,
         connection=connection,

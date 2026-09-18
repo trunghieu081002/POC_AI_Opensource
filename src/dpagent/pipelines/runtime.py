@@ -421,6 +421,16 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
         env["SRC_AUTH_TOKEN"] = src["token"]
+    elif pipeline.source.connector == "elasticsearch":
+        auth_type = pipeline.source.connection.get("auth_type", "none")
+        if auth_type in ("basic", "api_key"):
+            src = resolve_refs(pipeline.source.connection,
+                               path=f"{pipeline_name}.source.connection")
+            if auth_type == "basic":
+                env["SRC_ES_USER"] = src["user"]
+                env["SRC_ES_PASSWORD"] = src["password"]
+            else:
+                env["SRC_ES_API_KEY"] = src["api_key"]
 
     proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
                           capture_output=True, text=True, timeout=600)

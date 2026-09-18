@@ -299,20 +299,29 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
-- Four connectors: **Odoo PostgreSQL** and **SQL Server** (both DB, both via
-  `dlt.sources.sql_database` - only the SQLAlchemy scheme differs:
-  `postgresql` vs `mssql+pymssql`, the latter a prebuilt-wheel driver so the
-  dlt pack never needs the Microsoft ODBC Driver system package), **CSV**
-  (file), and **REST API** (via `dlt.sources.rest_api` - `base_url`,
-  optional bearer auth, an optional explicit `paginator` for an API whose
-  pagination dlt cannot auto-detect, confirmed for real against a live
-  public API: an undetectable API otherwise silently falls back to reading
-  only its first page). SQL Server's own real-database verification is
-  still pending (needs a real instance - see docs/deploy-log.md); the code
-  path is identical to odoo_postgres's own already-real-verified one bar
-  the connection scheme. Elasticsearch / Google Sheets remain linear
-  extensions of the same pattern (`extract.CONNECTORS`,
-  `loader._validate_source`, a `render_extract_script` branch each).
+- Five connectors:
+  - **Odoo PostgreSQL** and **SQL Server** - both DB, both via
+    `dlt.sources.sql_database`; only the SQLAlchemy scheme differs
+    (`postgresql` vs `mssql+pymssql`, the latter a prebuilt-wheel driver so
+    the dlt pack never needs the Microsoft ODBC Driver system package)
+  - **CSV** (file)
+  - **REST API** - via `dlt.sources.rest_api`: `base_url`, optional bearer
+    auth, an optional explicit `paginator` for an API whose pagination dlt
+    cannot auto-detect, confirmed for real against a live public API - an
+    undetectable API otherwise silently falls back to reading only its
+    first page
+  - **Elasticsearch** - no built-in dlt source for it, hand-rolled the same
+    way csv already is: one `dlt.resource` per index, elasticsearch-py's
+    own `scan()` scroll-API helper doing the actual pagination; `hosts` +
+    optional `basic` or `api_key` auth
+
+  Real-database verification is still pending for SQL Server and
+  Elasticsearch (both need a real instance this sandbox cannot stand up
+  itself - no passwordless sudo, no Docker group membership; see
+  docs/deploy-log.md) - REST API and CSV are both already real-verified.
+  Google Sheets remains a linear extension of the same pattern
+  (`extract.CONNECTORS`, `loader._validate_source`, a
+  `render_extract_script` branch).
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
   Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
   The manifest names a transform engine (`dbt` or `procedure`) per hop; the
@@ -335,8 +344,8 @@ procedure lands whenever a genuinely procedural transform actually shows up.
 
 ## Out of scope (MVP)
 
-Google Sheets / Elasticsearch connectors (same pattern, added after) · CDC
-and streaming · incremental merge strategies
+Google Sheets connector (same pattern, added after) · CDC and streaming ·
+incremental merge strategies
 beyond append/full-refresh · warehouses other than Postgres · Superset and
 dashboards (Layer 3) · a model drafting pipelines (Layer 3)
 

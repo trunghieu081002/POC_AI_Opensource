@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .loader import Pipeline
 
-CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server"}
+CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch"}
 
 
 def landing_dataset(pipeline: Pipeline) -> str:
@@ -117,6 +117,56 @@ def render_extract_script(pipeline: Pipeline) -> str:
                 dataset_name={dataset!r},
             )
             info = pipeline.run(source)
+            print(info)
+        ''')
+
+    if connector == "elasticsearch":
+        # No built-in dlt source for Elasticsearch (unlike sql_database/
+        # rest_api) - hand-rolled the same way the csv connector already is:
+        # one dlt.resource per index, scan() (elasticsearch-py's own
+        # scroll-API helper) doing the actual pagination so this never
+        # loads a whole index into memory at once.
+        hosts = list(pipeline.source.connection.get("hosts") or [])
+        auth_type = pipeline.source.connection.get("auth_type", "none")
+        resources = list(pipeline.source.resources)
+        if auth_type == "basic":
+            client_literal = (
+                'Elasticsearch(hosts, basic_auth=(os.environ["SRC_ES_USER"], '
+                'os.environ["SRC_ES_PASSWORD"]))'
+            )
+        elif auth_type == "api_key":
+            client_literal = 'Elasticsearch(hosts, api_key=os.environ["SRC_ES_API_KEY"])'
+        else:
+            client_literal = "Elasticsearch(hosts)"
+        return header + textwrap.dedent(f'''\
+            import os
+
+            import dlt
+            from elasticsearch import Elasticsearch
+            from elasticsearch.helpers import scan
+
+            hosts = {hosts!r}
+            client = {client_literal}
+
+
+            def _resource_for(index_name):
+                @dlt.resource(name=index_name, write_disposition="replace")
+                def read_docs():
+                    for doc in scan(client, index=index_name,
+                                    query={{"query": {{"match_all": {{}}}}}}):
+                        row = dict(doc["_source"])
+                        row["_id"] = doc["_id"]
+                        yield row
+
+                return read_docs()
+
+
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run([_resource_for(name) for name in {resources!r}])
             print(info)
         ''')
 

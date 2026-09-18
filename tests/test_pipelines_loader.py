@@ -234,20 +234,20 @@ def test_source_needs_a_connector(root):
 
 def test_lint_rejects_a_connector_runtime_does_not_support(root):
     """The P1 regression this guards: before this, a manifest naming an
-    unsupported connector (elasticsearch, e.g. - not wired up yet) linted
+    unsupported connector (google_sheets, e.g. - not wired up yet) linted
     clean, planned clean, deployed clean, and only failed deep inside a
     real Airflow task's run_extract(), as a raw ValueError with no
     indication the mistake was catchable this early."""
     data = _minimal()
-    data["source"] = {"connector": "elasticsearch", "connection": {"host": "x"}}
+    data["source"] = {"connector": "google_sheets", "connection": {"host": "x"}}
     _write(root, "demo", data)
-    with pytest.raises(loader.PipelineError, match="elasticsearch.*not supported"):
+    with pytest.raises(loader.PipelineError, match="google_sheets.*not supported"):
         loader.load("demo", root)
 
 
 def test_lint_error_for_an_unsupported_connector_lists_the_valid_ones(root):
     data = _minimal()
-    data["source"] = {"connector": "elasticsearch", "connection": {"host": "x"}}
+    data["source"] = {"connector": "google_sheets", "connection": {"host": "x"}}
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="odoo_postgres"):
         loader.load("demo", root)
@@ -321,6 +321,35 @@ def test_rest_api_source_loads_cleanly_with_base_url_and_resources(root):
     pipeline = loader.load("demo", root)
     assert pipeline.source.connection["base_url"] == "https://api.example.com"
     assert pipeline.source.resources == ["users", "posts"]
+
+
+def test_elasticsearch_source_needs_at_least_one_host(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"auth_type": "none"}, "resources": ["orders"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="hosts"):
+        loader.load("demo", root)
+
+
+def test_elasticsearch_source_needs_at_least_one_resource(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"hosts": ["https://es.example.com:9200"]}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="no resources"):
+        loader.load("demo", root)
+
+
+def test_elasticsearch_source_loads_cleanly_with_hosts_and_resources(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"hosts": ["https://es.example.com:9200"]},
+                      "resources": ["orders", "customers"]}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.source.connection["hosts"] == ["https://es.example.com:9200"]
+    assert pipeline.source.resources == ["orders", "customers"]
 
 
 def test_directory_name_must_match_the_declared_name(root):

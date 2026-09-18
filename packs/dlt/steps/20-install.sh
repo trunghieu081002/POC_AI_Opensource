@@ -26,5 +26,11 @@ dp_run "$PIP" install --quiet "dlt[postgres,sql_database]==${DLT_VERSION}"
 # this pack installs on. Pinned loosely, same convention as DLT_VERSION.
 dp_run "$PIP" install --quiet "pymssql>=2.3,<3"
 
+# elasticsearch: the elasticsearch connector's own client - no built-in dlt
+# source for it (unlike sql_database/rest_api), so extract.py hand-rolls a
+# dlt.resource per index using this client's own scan() scroll-API helper
+# directly, the same shape the csv connector already uses.
+dp_run "$PIP" install --quiet "elasticsearch>=8,<10"
+
 INSTALLED="$("${INSTALL_DIR}/.venv/bin/dlt" --version 2>/dev/null | head -1 || true)"
 dp_ok "installed: ${INSTALLED:-dlt (version string unavailable)}"

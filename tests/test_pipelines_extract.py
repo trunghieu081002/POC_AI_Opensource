@@ -141,6 +141,64 @@ def test_sql_server_script_honours_a_declared_source_schema(root):
     assert "schema='sales'" in script
 
 
+def test_elasticsearch_script_is_valid_python(root):
+    data = _base(source={"connector": "elasticsearch",
+                         "connection": {"hosts": ["https://es.example.com:9200"]},
+                         "resources": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    ast.parse(script)
+
+
+def test_elasticsearch_script_names_every_host_and_index(root):
+    data = _base(source={"connector": "elasticsearch",
+                         "connection": {"hosts": ["https://es1:9200", "https://es2:9200"]},
+                         "resources": ["orders", "customers"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "'https://es1:9200'" in script and "'https://es2:9200'" in script
+    assert "'orders'" in script and "'customers'" in script
+
+
+def test_elasticsearch_script_defaults_to_no_auth(root):
+    data = _base(source={"connector": "elasticsearch",
+                         "connection": {"hosts": ["https://es.example.com:9200"]},
+                         "resources": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "Elasticsearch(hosts)" in script
+    assert "SRC_ES_USER" not in script and "SRC_ES_API_KEY" not in script
+
+
+def test_elasticsearch_script_reads_basic_auth_only_from_env(root):
+    data = _base(source={"connector": "elasticsearch",
+                         "connection": {"hosts": ["https://es.example.com:9200"],
+                                       "auth_type": "basic", "user": "${ES_USER}",
+                                       "password": "${ES_PASSWORD}"},
+                         "resources": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert 'os.environ["SRC_ES_USER"]' in script
+    assert 'os.environ["SRC_ES_PASSWORD"]' in script
+    assert "${ES_USER}" not in script and "${ES_PASSWORD}" not in script
+
+
+def test_elasticsearch_script_reads_api_key_only_from_env(root):
+    data = _base(source={"connector": "elasticsearch",
+                         "connection": {"hosts": ["https://es.example.com:9200"],
+                                       "auth_type": "api_key", "api_key": "${ES_API_KEY}"},
+                         "resources": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert 'os.environ["SRC_ES_API_KEY"]' in script
+    assert "${ES_API_KEY}" not in script
+
+
 def test_csv_script_is_valid_python(root):
     data = _base(source={"connector": "csv", "files": {"path": "/data/*.csv"}})
     _write(root, "demo", data)
@@ -270,6 +328,6 @@ def test_unknown_connector_is_refused():
     wh = loader.Warehouse(host="h", database="d")
     pipeline = loader.Pipeline(
         name="demo", summary="", root=pathlib.Path("."),
-        source=loader.Source(connector="elasticsearch"), warehouse=wh, stages=[])
-    with pytest.raises(ValueError, match="elasticsearch"):
+        source=loader.Source(connector="google_sheets"), warehouse=wh, stages=[])
+    with pytest.raises(ValueError, match="google_sheets"):
         extract.render_extract_script(pipeline)
