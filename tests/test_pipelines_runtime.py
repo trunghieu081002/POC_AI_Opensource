@@ -38,6 +38,65 @@ def test_sql_literal_escapes_single_quotes():
     assert runtime._sql_literal("it's a test") == "it''s a test"
 
 
+def test_connection_url_defaults_to_postgresql_scheme():
+    url = runtime._connection_url(
+        {"host": "h", "port": "5432", "database": "d", "user": "u", "password": "p"})
+    assert url == "postgresql://u:p@h:5432/d"
+
+
+def test_connection_url_honours_an_explicit_scheme():
+    """sql_server's own SRC_URL needs mssql+pymssql, not postgresql - the
+    only thing distinguishing it from odoo_postgres in run_extract()."""
+    url = runtime._connection_url(
+        {"host": "h", "port": "1433", "database": "d", "user": "u", "password": "p"},
+        scheme="mssql+pymssql")
+    assert url == "mssql+pymssql://u:p@h:1433/d"
+
+
+def test_connection_url_percent_encodes_special_characters_in_credentials():
+    url = runtime._connection_url(
+        {"host": "h", "port": "5432", "database": "d", "user": "u@x", "password": "p/ss"})
+    assert url == "postgresql://u%40x:p%2Fss@h:5432/d"
+
+
+def test_run_extract_builds_a_pymssql_src_url_for_sql_server(monkeypatch, tmp_path):
+    """Wires the full run_extract() path, not just _connection_url() in
+    isolation: a sql_server pipeline's SRC_URL must actually come out
+    mssql+pymssql, not postgresql (odoo_postgres's own scheme, and
+    _connection_url's own default)."""
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+
+    for name, value in [("MSSQL_HOST", "h"), ("MSSQL_USER", "u"), ("MSSQL_PASSWORD", "p"),
+                        ("WH_HOST", "wh"), ("WH_USER", "wu"), ("WH_PASSWORD", "wp")]:
+        monkeypatch.setenv(name, value)
+
+    pipeline = loader.Pipeline(
+        name="mssql_demo", summary="", root=tmp_path,
+        source=loader.Source(
+            connector="sql_server",
+            connection={"host": "${MSSQL_HOST}", "port": "1433", "user": "${MSSQL_USER}",
+                       "password": "${MSSQL_PASSWORD}", "database": "d"},
+            tables=["orders"]),
+        warehouse=loader.Warehouse(host="${WH_HOST}", user="${WH_USER}",
+                                   password="${WH_PASSWORD}", database="warehouse"),
+        stages=[loader.Stage(name="landing")])
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+
+    captured = {}
+
+    def fake_run(cmd, *, input, env, capture_output, text, timeout):
+        captured["env"] = env
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    runtime.run_extract(pipeline_name="mssql_demo")
+
+    assert captured["env"]["SRC_URL"] == "mssql+pymssql://u:p@h:1433/d"
+
+
 def test_dlt_python_does_not_need_the_packs_library_at_all(monkeypatch, tmp_path):
     """The regression this guards: found for real inside a DAG task
     actually executed by Airflow (the `airflow` OS user), not by reading

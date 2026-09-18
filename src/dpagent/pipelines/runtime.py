@@ -374,12 +374,17 @@ def _dlt_python() -> str:
     return f"{install_dir}/.venv/bin/python"
 
 
-def _connection_url(values: dict) -> str:
+def _connection_url(values: dict, scheme: str = "postgresql") -> str:
+    """`scheme` defaults to postgresql - the warehouse (DEST_URL) is always
+    Postgres by design, and it was the only source dialect (odoo_postgres)
+    until sql_server needed `mssql+pymssql` instead - same SQLAlchemy-style
+    URL shape either way, dlt's sql_database source only cares that the
+    scheme names a dialect+driver it can load."""
     host, port = values.get("host", ""), values.get("port", "")
     database = values.get("database", "")
     user, password = values.get("user", ""), values.get("password", "")
     auth = f"{quote(str(user), safe='')}:{quote(str(password), safe='')}@" if user else ""
-    return f"postgresql://{auth}{host}:{port}/{database}"
+    return f"{scheme}://{auth}{host}:{port}/{database}"
 
 
 def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
@@ -402,6 +407,15 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
         env["SRC_URL"] = _connection_url(src)
+    elif pipeline.source.connector == "sql_server":
+        # pymssql (packs/dlt/steps/20-install.sh), not pyodbc: a pure/
+        # prebuilt-wheel driver dlt's own sql_database source can use
+        # through the exact same SQLAlchemy-URL shape as odoo_postgres,
+        # without needing the Microsoft ODBC Driver system package
+        # pyodbc would add to every host the dlt pack installs on.
+        src = resolve_refs(pipeline.source.connection,
+                           path=f"{pipeline_name}.source.connection")
+        env["SRC_URL"] = _connection_url(src, scheme="mssql+pymssql")
     elif pipeline.source.connector == "rest_api" and \
             pipeline.source.connection.get("auth_type") == "bearer":
         src = resolve_refs(pipeline.source.connection,

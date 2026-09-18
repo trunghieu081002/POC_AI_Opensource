@@ -60,7 +60,7 @@ steps:
 
   - id: install
     script: steps/20-install.sh
-    description: Install dlt (with the postgres destination and sql_database source extras) into the venv
+    description: Install dlt (postgres destination, sql_database source extras, pymssql driver) into the venv
     timeout: 900
     guard: 'test -x "$DP_PARAM_INSTALL_DIR/.venv/bin/dlt"'
 

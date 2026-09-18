@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .loader import Pipeline
 
-CONNECTORS = {"odoo_postgres", "csv", "rest_api"}
+CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server"}
 
 
 def landing_dataset(pipeline: Pipeline) -> str:
@@ -120,10 +120,15 @@ def render_extract_script(pipeline: Pipeline) -> str:
             print(info)
         ''')
 
-    # odoo_postgres: a source schema is optional in the manifest (Odoo's own
-    # tables live in "public"); any other sql_database-shaped source can
-    # still declare one via source.connection.schema.
-    source_schema = pipeline.source.connection.get("schema", "public")
+    # odoo_postgres/sql_server: both are dlt.sources.sql_database-shaped -
+    # the connector-specific part (which SQLAlchemy dialect/driver SRC_URL
+    # uses) lives entirely in runtime.py's _connection_url() call, not here.
+    # A source schema is optional in the manifest: Odoo's own tables live in
+    # "public" (Postgres's default); SQL Server's equivalent default is
+    # "dbo", never "public" - any other sql_database-shaped source can still
+    # declare one explicitly via source.connection.schema regardless.
+    default_schema = "dbo" if connector == "sql_server" else "public"
+    source_schema = pipeline.source.connection.get("schema", default_schema)
     return header + textwrap.dedent(f'''\
         import os
 

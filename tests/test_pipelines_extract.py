@@ -100,6 +100,47 @@ def test_odoo_postgres_script_lands_at_the_fixed_landing_dataset(root):
     assert "dataset_name='demo_landing'" in script
 
 
+def test_sql_server_script_is_valid_python(root):
+    data = _base(source={"connector": "sql_server",
+                         "connection": {"host": "${MSSQL_HOST}"}, "tables": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    ast.parse(script)
+
+
+def test_sql_server_script_reads_credentials_only_from_env(root):
+    data = _base(source={"connector": "sql_server",
+                         "connection": {"host": "${MSSQL_HOST}"}, "tables": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert 'os.environ["SRC_URL"]' in script
+    assert "${MSSQL_HOST}" not in script
+
+
+def test_sql_server_script_defaults_source_schema_to_dbo_not_public(root):
+    """SQL Server's default schema is "dbo" - Postgres's "public" default
+    (used for odoo_postgres) would be a real, silent mistake here since
+    dbo is what a SQL Server table actually lives in by default."""
+    data = _base(source={"connector": "sql_server",
+                         "connection": {"host": "${MSSQL_HOST}"}, "tables": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "schema='dbo'" in script
+
+
+def test_sql_server_script_honours_a_declared_source_schema(root):
+    data = _base(source={"connector": "sql_server",
+                         "connection": {"host": "${MSSQL_HOST}", "schema": "sales"},
+                         "tables": ["orders"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "schema='sales'" in script
+
+
 def test_csv_script_is_valid_python(root):
     data = _base(source={"connector": "csv", "files": {"path": "/data/*.csv"}})
     _write(root, "demo", data)
@@ -229,6 +270,6 @@ def test_unknown_connector_is_refused():
     wh = loader.Warehouse(host="h", database="d")
     pipeline = loader.Pipeline(
         name="demo", summary="", root=pathlib.Path("."),
-        source=loader.Source(connector="sql_server"), warehouse=wh, stages=[])
-    with pytest.raises(ValueError, match="sql_server"):
+        source=loader.Source(connector="elasticsearch"), warehouse=wh, stages=[])
+    with pytest.raises(ValueError, match="elasticsearch"):
         extract.render_extract_script(pipeline)
