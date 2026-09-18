@@ -294,6 +294,35 @@ def test_a_csv_file_source_does_not_need_a_connection(root):
     assert pipeline.source.files == {"path": "/data/*.csv"}
 
 
+def test_rest_api_source_needs_a_base_url(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"auth_type": "none"}, "resources": ["users"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="base_url"):
+        loader.load("demo", root)
+
+
+def test_rest_api_source_needs_at_least_one_resource(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"base_url": "https://api.example.com"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="no resources"):
+        loader.load("demo", root)
+
+
+def test_rest_api_source_loads_cleanly_with_base_url_and_resources(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"base_url": "https://api.example.com"},
+                      "resources": ["users", "posts"]}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.source.connection["base_url"] == "https://api.example.com"
+    assert pipeline.source.resources == ["users", "posts"]
+
+
 def test_directory_name_must_match_the_declared_name(root):
     data = _minimal(name="not-demo")
     _write(root, "demo", data)

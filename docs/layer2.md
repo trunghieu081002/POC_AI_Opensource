@@ -299,8 +299,14 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
-- Two connectors, proving both mechanisms: **Odoo PostgreSQL** (DB) and **CSV**
-  (file). The remaining four are linear extensions of the same pattern.
+- Three connectors: **Odoo PostgreSQL** (DB, via `dlt.sources.sql_database`),
+  **CSV** (file), and **REST API** (via `dlt.sources.rest_api` - `base_url`,
+  optional bearer auth, an optional explicit `paginator` for an API whose
+  pagination dlt cannot auto-detect, confirmed for real against a live
+  public API: an undetectable API otherwise silently falls back to reading
+  only its first page). SQL Server / Elasticsearch / Google Sheets remain
+  linear extensions of the same pattern (`extract.CONNECTORS`,
+  `loader._validate_source`, a `render_extract_script` branch each).
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
   Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
   The manifest names a transform engine (`dbt` or `procedure`) per hop; the
@@ -323,8 +329,8 @@ procedure lands whenever a genuinely procedural transform actually shows up.
 
 ## Out of scope (MVP)
 
-SQL Server / Google Sheets / internal API / Elasticsearch connectors (same
-pattern, added after) · CDC and streaming · incremental merge strategies
+SQL Server / Google Sheets / Elasticsearch connectors (same pattern, added
+after) · CDC and streaming · incremental merge strategies
 beyond append/full-refresh · warehouses other than Postgres · Superset and
 dashboards (Layer 3) · a model drafting pipelines (Layer 3)
 

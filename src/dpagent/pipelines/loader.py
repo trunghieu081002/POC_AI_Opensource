@@ -85,6 +85,7 @@ class Source:
     connection: dict[str, str] = field(default_factory=dict)
     tables: list[str] = field(default_factory=list)
     files: dict = field(default_factory=dict)   # a file-based source (CSV) uses this instead
+    resources: list[str] = field(default_factory=list)   # rest_api's own endpoint list
 
 
 @dataclass
@@ -207,11 +208,22 @@ def _validate_source(raw: dict, where: str) -> Source:
         raise PipelineError(
             f"{where}: source {connector!r} has neither connection (DB) nor files "
             f"(file source) - dlt needs one of the two to know where to read from")
+    resources = list(raw.get("resources") or [])
+    if connector == "rest_api":
+        if not connection.get("base_url"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.base_url - "
+                f"dlt's rest_api_source needs one to know where to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one endpoint name is needed to extract anything")
     return Source(
         connector=connector,
         connection=connection,
         tables=list(raw.get("tables") or []),
         files=files,
+        resources=resources,
     )
 
 

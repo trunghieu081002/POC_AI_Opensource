@@ -150,6 +150,81 @@ def test_csv_script_leaves_an_absolute_path_unchanged(root):
     assert "glob.glob('/data/*.csv')" in script
 
 
+def test_rest_api_script_is_valid_python(root):
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com"},
+                         "resources": ["users"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    ast.parse(script)
+
+
+def test_rest_api_script_names_base_url_and_every_resource(root):
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com"},
+                         "resources": ["users", "posts"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "'https://api.example.com'" in script
+    assert "'users'" in script and "'posts'" in script
+
+
+def test_rest_api_script_defaults_to_no_auth(root):
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com"},
+                         "resources": ["users"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert '"auth": None' in script
+    assert "SRC_AUTH_TOKEN" not in script
+
+
+def test_rest_api_script_omits_paginator_by_default(root):
+    """No explicit paginator declared - dlt's own auto-detection runs, same
+    as leaving the key out of client config entirely lets rest_api_source
+    do."""
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com"},
+                         "resources": ["users"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "paginator" not in script
+
+
+def test_rest_api_script_honours_a_declared_paginator(root):
+    """A real API whose pagination dlt cannot auto-detect otherwise falls
+    back to SinglePagePaginator - confirmed against a live public API - and
+    silently reads only the first page. A manifest can name dlt's own
+    paginator type explicitly to avoid that."""
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com",
+                                       "paginator": "json_link"},
+                         "resources": ["users"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert "'paginator': 'json_link'" in script
+
+
+def test_rest_api_script_reads_a_bearer_token_only_from_env(root):
+    """Same discipline as odoo_postgres's own SRC_URL: no secret is ever a
+    literal in the generated file - only the SRC_AUTH_TOKEN env var name,
+    set by runtime.run_extract after it resolves ${ENV_VAR} refs."""
+    data = _base(source={"connector": "rest_api",
+                         "connection": {"base_url": "https://api.example.com",
+                                       "auth_type": "bearer", "token": "${API_TOKEN}"},
+                         "resources": ["users"]})
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    script = extract.render_extract_script(pipeline)
+    assert 'os.environ["SRC_AUTH_TOKEN"]' in script
+    assert "${API_TOKEN}" not in script
+
+
 def test_unknown_connector_is_refused():
     wh = loader.Warehouse(host="h", database="d")
     pipeline = loader.Pipeline(

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .loader import Pipeline
 
-CONNECTORS = {"odoo_postgres", "csv"}
+CONNECTORS = {"odoo_postgres", "csv", "rest_api"}
 
 
 def landing_dataset(pipeline: Pipeline) -> str:
@@ -73,6 +73,50 @@ def render_extract_script(pipeline: Pipeline) -> str:
                 dataset_name={dataset!r},
             )
             info = pipeline.run([_resource_for(p) for p in paths])
+            print(info)
+        ''')
+
+    if connector == "rest_api":
+        # dlt's own rest_api_source tries to auto-detect a paginator from the
+        # first response's shape (Link header, a "next" field, ...) - real,
+        # confirmed against a live public API: an API whose pagination it
+        # cannot detect falls back to SinglePagePaginator, which silently
+        # reads only the first page rather than erroring. A manifest can
+        # name one of dlt's own paginator types explicitly
+        # (connection.paginator: json_link / header_link / page_number /
+        # offset / cursor, ...) to avoid relying on that guess for any real
+        # API with more data than fits on one page.
+        base_url = pipeline.source.connection["base_url"]
+        auth_type = pipeline.source.connection.get("auth_type", "none")
+        paginator = pipeline.source.connection.get("paginator")
+        resources = list(pipeline.source.resources)
+        auth_literal = (
+            '{"type": "bearer", "token": os.environ["SRC_AUTH_TOKEN"]}'
+            if auth_type == "bearer" else "None"
+        )
+        client_config = {"base_url": base_url}
+        if paginator:
+            client_config["paginator"] = paginator
+        client_items = ", ".join(f"{k!r}: {v!r}" for k, v in client_config.items())
+        return header + textwrap.dedent(f'''\
+            import os
+
+            import dlt
+            from dlt.sources.rest_api import rest_api_source
+
+            source = rest_api_source(
+                {{
+                    "client": {{{client_items}, "auth": {auth_literal}}},
+                    "resources": {resources!r},
+                }},
+                name={pipeline.name + "_extract"!r},
+            )
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run(source)
             print(info)
         ''')
 

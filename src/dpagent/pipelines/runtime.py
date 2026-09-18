@@ -402,6 +402,11 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
         env["SRC_URL"] = _connection_url(src)
+    elif pipeline.source.connector == "rest_api" and \
+            pipeline.source.connection.get("auth_type") == "bearer":
+        src = resolve_refs(pipeline.source.connection,
+                           path=f"{pipeline_name}.source.connection")
+        env["SRC_AUTH_TOKEN"] = src["token"]
 
     proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
                           capture_output=True, text=True, timeout=600)
