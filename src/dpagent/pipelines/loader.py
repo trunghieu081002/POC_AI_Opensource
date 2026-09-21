@@ -85,6 +85,7 @@ class Source:
     connection: dict[str, str] = field(default_factory=dict)
     tables: list[str] = field(default_factory=list)
     files: dict = field(default_factory=dict)   # a file-based source (CSV) uses this instead
+    resources: list[str] = field(default_factory=list)   # rest_api's own endpoint list
 
 
 @dataclass
@@ -192,10 +193,10 @@ def _validate_source(raw: dict, where: str) -> Source:
     # Lazy import: extract.py imports Pipeline/Stage from this module, so a
     # top-level import here would be circular. Checked against the same set
     # run_extract actually compiles against (extract.CONNECTORS) - found for
-    # real: a manifest naming an unsupported connector (e.g. "sql_server",
-    # not wired up yet) used to lint clean, plan clean, deploy clean, and
-    # only fail deep inside a real Airflow task's run_extract(), as a raw
-    # ValueError with no indication the mistake was catchable at lint time.
+    # real: a manifest naming a connector not (yet) wired up in extract.py
+    # used to lint clean, plan clean, deploy clean, and only fail deep
+    # inside a real Airflow task's run_extract(), as a raw ValueError with
+    # no indication the mistake was catchable at lint time.
     from .extract import CONNECTORS
     if connector not in CONNECTORS:
         raise PipelineError(
@@ -207,11 +208,40 @@ def _validate_source(raw: dict, where: str) -> Source:
         raise PipelineError(
             f"{where}: source {connector!r} has neither connection (DB) nor files "
             f"(file source) - dlt needs one of the two to know where to read from")
+    resources = list(raw.get("resources") or [])
+    if connector == "rest_api":
+        if not connection.get("base_url"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.base_url - "
+                f"dlt's rest_api_source needs one to know where to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one endpoint name is needed to extract anything")
+    if connector == "elasticsearch":
+        if not connection.get("hosts"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.hosts - "
+                f"the Elasticsearch client needs at least one to know where to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one index name is needed to extract anything")
+    if connector == "google_sheets":
+        if not connection.get("spreadsheet_id"):
+            raise PipelineError(
+                f"{where}: source {connector!r} has no connection.spreadsheet_id - "
+                f"the Sheets API needs one to know which spreadsheet to read from")
+        if not resources:
+            raise PipelineError(
+                f"{where}: source {connector!r} has no resources - "
+                f"at least one sheet (tab) name is needed to extract anything")
     return Source(
         connector=connector,
         connection=connection,
         tables=list(raw.get("tables") or []),
         files=files,
+        resources=resources,
     )
 
 

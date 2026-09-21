@@ -234,20 +234,22 @@ def test_source_needs_a_connector(root):
 
 def test_lint_rejects_a_connector_runtime_does_not_support(root):
     """The P1 regression this guards: before this, a manifest naming an
-    unsupported connector (sql_server, e.g. - not wired up yet) linted
-    clean, planned clean, deployed clean, and only failed deep inside a
-    real Airflow task's run_extract(), as a raw ValueError with no
-    indication the mistake was catchable this early."""
+    unsupported connector linted clean, planned clean, deployed clean, and
+    only failed deep inside a real Airflow task's run_extract(), as a raw
+    ValueError with no indication the mistake was catchable this early.
+    A deliberately fictional connector name, not a real one this module
+    might grow support for later - see test_unknown_connector_is_refused
+    in test_pipelines_extract.py for why that matters here."""
     data = _minimal()
-    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    data["source"] = {"connector": "not_a_real_connector", "connection": {"host": "x"}}
     _write(root, "demo", data)
-    with pytest.raises(loader.PipelineError, match="sql_server.*not supported"):
+    with pytest.raises(loader.PipelineError, match="not_a_real_connector.*not supported"):
         loader.load("demo", root)
 
 
 def test_lint_error_for_an_unsupported_connector_lists_the_valid_ones(root):
     data = _minimal()
-    data["source"] = {"connector": "sql_server", "connection": {"host": "x"}}
+    data["source"] = {"connector": "not_a_real_connector", "connection": {"host": "x"}}
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="odoo_postgres"):
         loader.load("demo", root)
@@ -292,6 +294,94 @@ def test_a_csv_file_source_does_not_need_a_connection(root):
     _write(root, "demo", data)
     pipeline = loader.load("demo", root)
     assert pipeline.source.files == {"path": "/data/*.csv"}
+
+
+def test_rest_api_source_needs_a_base_url(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"auth_type": "none"}, "resources": ["users"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="base_url"):
+        loader.load("demo", root)
+
+
+def test_rest_api_source_needs_at_least_one_resource(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"base_url": "https://api.example.com"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="no resources"):
+        loader.load("demo", root)
+
+
+def test_rest_api_source_loads_cleanly_with_base_url_and_resources(root):
+    data = _minimal()
+    data["source"] = {"connector": "rest_api",
+                      "connection": {"base_url": "https://api.example.com"},
+                      "resources": ["users", "posts"]}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.source.connection["base_url"] == "https://api.example.com"
+    assert pipeline.source.resources == ["users", "posts"]
+
+
+def test_elasticsearch_source_needs_at_least_one_host(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"auth_type": "none"}, "resources": ["orders"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="hosts"):
+        loader.load("demo", root)
+
+
+def test_elasticsearch_source_needs_at_least_one_resource(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"hosts": ["https://es.example.com:9200"]}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="no resources"):
+        loader.load("demo", root)
+
+
+def test_elasticsearch_source_loads_cleanly_with_hosts_and_resources(root):
+    data = _minimal()
+    data["source"] = {"connector": "elasticsearch",
+                      "connection": {"hosts": ["https://es.example.com:9200"]},
+                      "resources": ["orders", "customers"]}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.source.connection["hosts"] == ["https://es.example.com:9200"]
+    assert pipeline.source.resources == ["orders", "customers"]
+
+
+def test_google_sheets_source_needs_a_spreadsheet_id(root):
+    data = _minimal()
+    data["source"] = {"connector": "google_sheets",
+                      "connection": {"service_account_json": "x"}, "resources": ["Orders"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="spreadsheet_id"):
+        loader.load("demo", root)
+
+
+def test_google_sheets_source_needs_at_least_one_resource(root):
+    data = _minimal()
+    data["source"] = {"connector": "google_sheets",
+                      "connection": {"spreadsheet_id": "1AbCDeF"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="no resources"):
+        loader.load("demo", root)
+
+
+def test_google_sheets_source_loads_cleanly_with_spreadsheet_id_and_resources(root):
+    data = _minimal()
+    data["source"] = {"connector": "google_sheets",
+                      "connection": {"spreadsheet_id": "1AbCDeF",
+                                    "service_account_json": "${GOOGLE_SA_JSON}"},
+                      "resources": ["Orders", "Customers"]}
+    _write(root, "demo", data)
+    pipeline = loader.load("demo", root)
+    assert pipeline.source.connection["spreadsheet_id"] == "1AbCDeF"
+    assert pipeline.source.resources == ["Orders", "Customers"]
 
 
 def test_directory_name_must_match_the_declared_name(root):

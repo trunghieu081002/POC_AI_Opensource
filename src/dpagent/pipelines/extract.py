@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .loader import Pipeline
 
-CONNECTORS = {"odoo_postgres", "csv"}
+CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch", "google_sheets"}
 
 
 def landing_dataset(pipeline: Pipeline) -> str:
@@ -76,10 +76,163 @@ def render_extract_script(pipeline: Pipeline) -> str:
             print(info)
         ''')
 
-    # odoo_postgres: a source schema is optional in the manifest (Odoo's own
-    # tables live in "public"); any other sql_database-shaped source can
-    # still declare one via source.connection.schema.
-    source_schema = pipeline.source.connection.get("schema", "public")
+    if connector == "rest_api":
+        # dlt's own rest_api_source tries to auto-detect a paginator from the
+        # first response's shape (Link header, a "next" field, ...) - real,
+        # confirmed against a live public API: an API whose pagination it
+        # cannot detect falls back to SinglePagePaginator, which silently
+        # reads only the first page rather than erroring. A manifest can
+        # name one of dlt's own paginator types explicitly
+        # (connection.paginator: json_link / header_link / page_number /
+        # offset / cursor, ...) to avoid relying on that guess for any real
+        # API with more data than fits on one page.
+        base_url = pipeline.source.connection["base_url"]
+        auth_type = pipeline.source.connection.get("auth_type", "none")
+        paginator = pipeline.source.connection.get("paginator")
+        resources = list(pipeline.source.resources)
+        auth_literal = (
+            '{"type": "bearer", "token": os.environ["SRC_AUTH_TOKEN"]}'
+            if auth_type == "bearer" else "None"
+        )
+        client_config = {"base_url": base_url}
+        if paginator:
+            client_config["paginator"] = paginator
+        client_items = ", ".join(f"{k!r}: {v!r}" for k, v in client_config.items())
+        return header + textwrap.dedent(f'''\
+            import os
+
+            import dlt
+            from dlt.sources.rest_api import rest_api_source
+
+            source = rest_api_source(
+                {{
+                    "client": {{{client_items}, "auth": {auth_literal}}},
+                    "resources": {resources!r},
+                }},
+                name={pipeline.name + "_extract"!r},
+            )
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run(source)
+            print(info)
+        ''')
+
+    if connector == "elasticsearch":
+        # No built-in dlt source for Elasticsearch (unlike sql_database/
+        # rest_api) - hand-rolled the same way the csv connector already is:
+        # one dlt.resource per index, scan() (elasticsearch-py's own
+        # scroll-API helper) doing the actual pagination so this never
+        # loads a whole index into memory at once.
+        hosts = list(pipeline.source.connection.get("hosts") or [])
+        auth_type = pipeline.source.connection.get("auth_type", "none")
+        resources = list(pipeline.source.resources)
+        if auth_type == "basic":
+            client_literal = (
+                'Elasticsearch(hosts, basic_auth=(os.environ["SRC_ES_USER"], '
+                'os.environ["SRC_ES_PASSWORD"]))'
+            )
+        elif auth_type == "api_key":
+            client_literal = 'Elasticsearch(hosts, api_key=os.environ["SRC_ES_API_KEY"])'
+        else:
+            client_literal = "Elasticsearch(hosts)"
+        return header + textwrap.dedent(f'''\
+            import os
+
+            import dlt
+            from elasticsearch import Elasticsearch
+            from elasticsearch.helpers import scan
+
+            hosts = {hosts!r}
+            client = {client_literal}
+
+
+            def _resource_for(index_name):
+                @dlt.resource(name=index_name, write_disposition="replace")
+                def read_docs():
+                    for doc in scan(client, index=index_name,
+                                    query={{"query": {{"match_all": {{}}}}}}):
+                        row = dict(doc["_source"])
+                        row["_id"] = doc["_id"]
+                        yield row
+
+                return read_docs()
+
+
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run([_resource_for(name) for name in {resources!r}])
+            print(info)
+        ''')
+
+    if connector == "google_sheets":
+        # No built-in dlt source for Google Sheets either - hand-rolled,
+        # same shape as elasticsearch/csv: one dlt.resource per sheet
+        # (tab), the Sheets API v4 values.get() call doing the read.
+        # Auth is always a service account (never an interactive OAuth
+        # flow, which cannot run unattended inside an Airflow task) - the
+        # whole service-account JSON key is the secret, held only in
+        # SRC_GOOGLE_SERVICE_ACCOUNT_JSON, parsed at run time, never a
+        # literal in this file.
+        spreadsheet_id = pipeline.source.connection["spreadsheet_id"]
+        resources = list(pipeline.source.resources)
+        return header + textwrap.dedent(f'''\
+            import json
+            import os
+
+            import dlt
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(os.environ["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"]),
+                scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+            )
+            service = build("sheets", "v4", credentials=credentials)
+
+
+            def _resource_for(sheet_name):
+                @dlt.resource(name=sheet_name, write_disposition="replace")
+                def read_rows():
+                    result = service.spreadsheets().values().get(
+                        spreadsheetId={spreadsheet_id!r}, range=sheet_name).execute()
+                    values = result.get("values", [])
+                    if not values:
+                        return
+                    header_row, *rows = values
+                    # The Sheets API drops trailing empty cells per row, so a
+                    # short row here is missing its trailing columns
+                    # entirely (not present as None) - zip() stops at the
+                    # shorter side, which is exactly that behaviour.
+                    for row in rows:
+                        yield dict(zip(header_row, row))
+
+                return read_rows()
+
+
+            pipeline = dlt.pipeline(
+                pipeline_name={pipeline.name + "_extract"!r},
+                destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
+                dataset_name={dataset!r},
+            )
+            info = pipeline.run([_resource_for(name) for name in {resources!r}])
+            print(info)
+        ''')
+
+    # odoo_postgres/sql_server: both are dlt.sources.sql_database-shaped -
+    # the connector-specific part (which SQLAlchemy dialect/driver SRC_URL
+    # uses) lives entirely in runtime.py's _connection_url() call, not here.
+    # A source schema is optional in the manifest: Odoo's own tables live in
+    # "public" (Postgres's default); SQL Server's equivalent default is
+    # "dbo", never "public" - any other sql_database-shaped source can still
+    # declare one explicitly via source.connection.schema regardless.
+    default_schema = "dbo" if connector == "sql_server" else "public"
+    source_schema = pipeline.source.connection.get("schema", default_schema)
     return header + textwrap.dedent(f'''\
         import os
 
