@@ -2455,3 +2455,22 @@ Evidence after the fixes (runs 62-64):
 
 `--wait` behaved as specified in every case: exit 0 on ok, 1 on failed, and
 3 on timeout without marking the run failed (runs 59/60, before the fixes).
+
+### 2026-09-25 (later) — quarantine run marker, real masking test, Elasticsearch 9
+
+- **Elasticsearch 9.0.0 (real container):** the pinned client 8.19.3 read all
+  3 documents through `scan()`; client 9.5.1 did as well (control). The `<9`
+  pin therefore serves both ES 8 (verified earlier) and ES 9 by evidence,
+  replacing the "per Elastic's documentation" claim.
+- **Quarantine run marker (real Postgres 16 container):** a quarantine table
+  ending `reason, dpagent_run_id` is stamped by the real `run_gate` - two runs
+  (ids 99 and 100) left two rows each, distinguishable; a table without the
+  column kept the original `SELECT *, reason` contract and worked unchanged.
+  Opt-in, so no existing procedure/dbt author is affected.
+- **Secret masking through a real child process:** a stand-in for dlt whose
+  failure output prints the whole connection URL, run through the real
+  `run_extract` (no mocked subprocess) - neither the event nor the exception
+  contains the raw or URL-encoded password. The earlier SQL Server run could
+  not test this because pymssql never echoes the password.
+- `dpagent pipeline undeploy` added (unit-tested; its first real use is
+  removing the `mssql_e2e` pipeline left on the host by the run above).
