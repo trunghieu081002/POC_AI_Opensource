@@ -544,3 +544,101 @@ def test_run_extract_raises_for_a_source_table_that_does_not_exist(
 
     with pytest.raises(runtime.GateFailed):
         runtime.run_extract(pipeline_name="rtx")
+
+
+# ---------------------------------------------------------------- failure detail in the audit trail
+
+def _state_in(tmp_path, monkeypatch):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    return state
+
+
+def _mssql_pipeline(tmp_path, password_ref="${MSSQL_PASSWORD}"):
+    return loader.Pipeline(
+        name="fd_demo", summary="", root=tmp_path,
+        source=loader.Source(
+            connector="sql_server",
+            connection={"host": "h", "port": "1433", "user": "u",
+                       "password": password_ref, "database": "d"},
+            tables=["orders"]),
+        warehouse=loader.Warehouse(host="wh", user="wu", password="${FD_WH_PASSWORD}",
+                                   database="warehouse"),
+        stages=[loader.Stage(name="landing")])
+
+
+def test_a_failed_extract_records_why_and_masks_every_secret(monkeypatch, tmp_path):
+    """Found on a real run: `extract.start`, then `pipeline.failed`, with
+    nothing in between to say why. The failure event (and the exception
+    Airflow's own task log gets) now carry the driver's stderr tail - with
+    the resolved source and warehouse passwords masked, in both the raw form
+    and the URL-encoded form a connection-string error prints."""
+    from urllib.parse import quote
+    state = _state_in(tmp_path, monkeypatch)
+    src_pw, wh_pw = "Src3cret/Pw+x", "Wh-s3cret-pw!"
+    monkeypatch.setenv("MSSQL_PASSWORD", src_pw)
+    monkeypatch.setenv("FD_WH_PASSWORD", wh_pw)
+    pipeline = _mssql_pipeline(tmp_path)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+
+    def fake_run(cmd, **kwargs):
+        stderr = (f"Login failed for mssql+pymssql://u:{quote(src_pw, safe='')}@h:1433/d\n"
+                  f"raw source pw {src_pw}, warehouse pw {wh_pw}")
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr=stderr)
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+    run_id = state.start_run("data", "fd_demo")
+
+    with pytest.raises(runtime.GateFailed) as exc_info:
+        runtime.run_extract(pipeline_name="fd_demo", run_id=run_id)
+
+    failed = [e for e in state.events_for(run_id) if e["kind"] == "extract.failed"]
+    assert len(failed) == 1
+    for text in (failed[0]["message"], str(exc_info.value)):
+        assert "Login failed" in text
+        for secret in (src_pw, quote(src_pw, safe=""), wh_pw):
+            assert secret not in text
+        assert "***REDACTED***" in text
+
+
+def test_an_extract_that_fails_before_dlt_runs_still_leaves_an_event(monkeypatch, tmp_path):
+    """An unset ${VAR} raises ParamError inside resolve_refs() - before the
+    dlt subprocess exists, so the old code never reached its own
+    extract.failed branch and only Airflow's task log knew why."""
+    state = _state_in(tmp_path, monkeypatch)
+    monkeypatch.delenv("MSSQL_PASSWORD", raising=False)
+    monkeypatch.setenv("FD_WH_PASSWORD", "wh-pw-1234")
+    pipeline = _mssql_pipeline(tmp_path)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    run_id = state.start_run("data", "fd_demo")
+
+    with pytest.raises(Exception, match="MSSQL_PASSWORD"):
+        runtime.run_extract(pipeline_name="fd_demo", run_id=run_id)
+
+    failed = [e for e in state.events_for(run_id) if e["kind"] == "extract.failed"]
+    assert len(failed) == 1
+    assert "MSSQL_PASSWORD" in failed[0]["message"]
+    assert "before dlt ran" in failed[0]["message"]
+
+
+def test_a_failed_procedure_transform_records_the_sql_error(monkeypatch, tmp_path):
+    state = _state_in(tmp_path, monkeypatch)
+    monkeypatch.setenv("FD_WH_PASSWORD", "wh-pw-1234")
+    pipeline = _mssql_pipeline(tmp_path)
+    pipeline.stages.append(loader.Stage(
+        name="raw", engine="procedure", depends_on="landing",
+        procedure="procedures/build_raw.sql"))
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    monkeypatch.setattr(
+        runtime.subprocess, "run",
+        lambda cmd, **kw: subprocess.CompletedProcess(
+            cmd, 1, stdout="", stderr='ERROR:  relation "nope" does not exist'))
+    run_id = state.start_run("data", "fd_demo")
+
+    with pytest.raises(runtime.GateFailed, match='relation "nope" does not exist'):
+        runtime.run_transform(pipeline_name="fd_demo", stage="raw", run_id=run_id)
+
+    failed = [e for e in state.events_for(run_id) if e["kind"] == "transform.failed"]
+    assert len(failed) == 1
+    assert 'relation "nope" does not exist' in failed[0]["message"]

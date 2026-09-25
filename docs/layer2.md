@@ -293,8 +293,12 @@ dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-form
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them
 dpagent pipeline run <name>      # trigger through Airflow, not around it
+                                 #   --wait blocks until the run is terminal: exit 0 ok,
+                                 #   1 failed, 3 if --timeout (default 1800s) passes first
 dpagent pipeline status <name>   # stages, last run, gate verdicts
-dpagent pipeline audit <run>     # every stage and gate decision, and who made it
+dpagent pipeline audit <run>     # every stage and gate decision, and who made it -
+                                 #   a failed extract/transform carries the driver's own
+                                 #   error (secrets masked), not just "failed"
 ```
 
 ## In scope (MVP)

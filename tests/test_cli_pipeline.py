@@ -212,3 +212,68 @@ def test_run_marks_the_run_failed_when_triggering_fails(db, monkeypatch):
     assert run["status"] == "failed"
     events = {e["kind"]: e for e in state.events_for(run["id"])}
     assert "pipeline.trigger_failed" in events
+
+
+# ---------------------------------------------------------------- run --wait
+
+def _trigger_then_finish(final_status):
+    """Stands in for `airflow dags trigger` + the DAG's own callback: the
+    real DAG moves the run past "running" via runtime.finish_pipeline_run."""
+    import subprocess
+
+    def trigger(pipeline_name, dpagent_run_id):
+        if final_status:
+            state.finish_run(dpagent_run_id, final_status)
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+    return trigger
+
+
+def test_run_wait_exits_zero_when_the_run_finishes_ok(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _trigger_then_finish("ok"))
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes", "--wait"])
+    assert result.exit_code == 0, result.output
+    assert "ok" in result.output
+
+
+def test_run_wait_exits_one_and_points_at_audit_when_the_run_fails(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _trigger_then_finish("failed"))
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes", "--wait"])
+    assert result.exit_code == 1
+    assert "dpagent pipeline audit" in result.output
+
+
+def test_run_wait_exits_three_on_timeout_without_touching_the_run(db, monkeypatch):
+    """A timed-out --wait must not mark the run failed: the DAG is still
+    running in Airflow, dpagent only stopped watching."""
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _trigger_then_finish(None))
+    result = _runner().invoke(pipeline_group,
+                              ["run", "demo", "--yes", "--wait", "--timeout", "0"])
+    assert result.exit_code == 3
+    assert state.latest_run(kind="data", target="demo")["status"] == "running"
+
+
+def test_run_without_wait_still_returns_immediately(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _trigger_then_finish(None))
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes"])
+    assert result.exit_code == 0
+    assert "--wait" in result.output
+
+
+def test_wait_for_run_polls_until_the_status_changes(db):
+    run_id = state.start_run("data", "demo")
+    polls = []
+
+    def fake_sleep(seconds):
+        polls.append(seconds)
+        if len(polls) == 2:                      # the DAG finishes during the 2nd wait
+            state.finish_run(run_id, "ok")
+
+    ticks = iter(range(1000))
+    final = pipeline_cli._wait_for_run(run_id, timeout=600, interval=3,
+                                       sleep=fake_sleep, clock=lambda: next(ticks))
+    assert final == "ok"
+    assert polls == [3, 3]
