@@ -137,7 +137,7 @@ def _sql_literal(text: str) -> str:
     return text.replace("'", "''")
 
 
-def _quarantine_sql(gate, stage: loader.Stage) -> str | None:
+def _quarantine_sql(gate, stage: loader.Stage, run_tail: str = "") -> str | None:
     """The INSERT that moves offending rows into `<gate.table>_quarantine`,
     or None if this gate type has nothing row-level to move (a structural
     gate - schema_contract/freshness/row_count_bounds - fails the whole
@@ -159,13 +159,13 @@ def _quarantine_sql(gate, stage: loader.Stage) -> str | None:
         compiled = generator.compile_gate(gate, stage)
         failing = next(q for q in compiled.queries if q.name == "failing_rows")
         reason = _sql_literal(f"not_null: one of {', '.join(gate['columns'])} is null")
-        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason "
+        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason{run_tail} "
                 f"FROM ({failing.sql}) AS dpagent_failing")
     if gate.type == "unique":
         compiled = generator.compile_gate(gate, stage)
         failing = next(q for q in compiled.queries if q.name == "failing_rows")
         reason = _sql_literal(f"unique: duplicate {', '.join(gate['columns'])}")
-        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason "
+        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason{run_tail} "
                 f"FROM ({failing.sql}) AS dpagent_failing")
     if gate.type == "referential_integrity":
         compiled = generator.compile_gate(gate, stage)
@@ -173,11 +173,11 @@ def _quarantine_sql(gate, stage: loader.Stage) -> str | None:
         ref = gate["references"]
         reason = _sql_literal(
             f"referential_integrity: {gate['column']} not found in {ref['table']}.{ref['column']}")
-        return f"INSERT INTO {q_table} SELECT t.*, '{reason}' AS reason FROM ({failing.sql}) AS t"
+        return f"INSERT INTO {q_table} SELECT t.*, '{reason}' AS reason{run_tail} FROM ({failing.sql}) AS t"
     if gate.type == "business_rule":
         table, id_col = gate["table"], gate["id_column"]
         reason = _sql_literal(f"business_rule: {gate.get('name', gate.type)}")
-        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason FROM {table} "
+        return (f"INSERT INTO {q_table} SELECT *, '{reason}' AS reason{run_tail} FROM {table} "
                 f"WHERE {id_col} IN ({gate['sql']})")
     return None
 
@@ -212,8 +212,32 @@ def _dequarantine_sql(gate) -> str | None:
     return None
 
 
-def _evaluate_gate(pipeline: loader.Pipeline, gate,
-                   stage: loader.Stage) -> tuple[bool, str, int | None, int | None]:
+RUN_COLUMN = "dpagent_run_id"
+
+
+def _quarantine_run_tail(pipeline: loader.Pipeline, schema: str, q_table: str,
+                         run_id: int | None) -> str:
+    """The extra `, <run id> AS dpagent_run_id` select item - only when the
+    quarantine table opts in by ending with the two columns
+    (..., reason, dpagent_run_id). A table without that column keeps the
+    original positional contract untouched (`SELECT *, reason`), so no
+    existing procedure/dbt author has to change anything; one that wants to
+    tell which run a quarantined row came from adds the column. Quarantine
+    tables accumulate across runs by design, and without it a row quarantined
+    by every run is indistinguishable from a data problem."""
+    rows = _query_rows(
+        pipeline, schema,
+        "select column_name from information_schema.columns "
+        f"where table_schema = current_schema() and table_name = '{q_table}' "
+        "order by ordinal_position")
+    names = [r["column_name"] for r in rows]
+    if names[-2:] != ["reason", RUN_COLUMN]:
+        return ""
+    return f", {int(run_id) if run_id is not None else 'NULL::bigint'} AS {RUN_COLUMN}"
+
+
+def _evaluate_gate(pipeline: loader.Pipeline, gate, stage: loader.Stage,
+                   run_id: int | None = None) -> tuple[bool, str, int | None, int | None]:
     """Returns (passed, detail, rows_checked, rows_rejected)."""
     compiled = generator.compile_gate(gate, stage)
     schema = _stage_schema(pipeline, stage)
@@ -266,7 +290,10 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate,
     if rejected == 0:
         return True, "", total, 0
 
-    quarantine_sql = _quarantine_sql(gate, stage)
+    run_tail = ""
+    if stage.quarantine:
+        run_tail = _quarantine_run_tail(pipeline, schema, quarantine_table_for(table), run_id)
+    quarantine_sql = _quarantine_sql(gate, stage, run_tail)
     if quarantine_sql:
         _execute(pipeline, schema, quarantine_sql)
         dequarantine_sql = _dequarantine_sql(gate)
@@ -302,7 +329,7 @@ def run_gate(*, pipeline_name: str, stage: str, run_id: int | None = None) -> No
     row_count = None
 
     for gate in target.gates:
-        passed, detail, checked, rejected = _evaluate_gate(pipeline, gate, target)
+        passed, detail, checked, rejected = _evaluate_gate(pipeline, gate, target, run_id)
         if gate.type == "row_count_bounds":
             row_count = checked
         state.record_gate(stage_row_id, gate.type, "passed" if passed else "failed",

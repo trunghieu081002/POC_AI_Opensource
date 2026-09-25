@@ -642,3 +642,90 @@ def test_a_failed_procedure_transform_records_the_sql_error(monkeypatch, tmp_pat
     failed = [e for e in state.events_for(run_id) if e["kind"] == "transform.failed"]
     assert len(failed) == 1
     assert 'relation "nope" does not exist' in failed[0]["message"]
+
+
+# ---------------------------------------------------------------- opt-in dpagent_run_id on quarantine
+
+_ALL_ROW_LEVEL_GATES = [
+    loader.Gate(type="not_null", params={"table": "t", "columns": ["id"]}),
+    loader.Gate(type="unique", params={"table": "t", "columns": ["id"]}),
+    loader.Gate(type="referential_integrity", params={
+        "table": "t", "column": "p", "references": {"table": "parent", "column": "id"}}),
+    loader.Gate(type="business_rule", params={
+        "name": "r", "sql": "select id from t where bad", "expect": "no_rows",
+        "table": "t", "id_column": "id"}),
+]
+
+
+@pytest.mark.parametrize("gate", _ALL_ROW_LEVEL_GATES, ids=lambda g: g.type)
+def test_quarantine_sql_appends_the_run_marker_after_reason_for_every_gate_type(gate):
+    sql = runtime._quarantine_sql(gate, _stage(), ", 7 AS dpagent_run_id")
+    assert "AS reason, 7 AS dpagent_run_id" in sql
+
+
+@pytest.mark.parametrize("gate", _ALL_ROW_LEVEL_GATES, ids=lambda g: g.type)
+def test_quarantine_sql_without_a_run_column_keeps_the_original_contract(gate):
+    """No existing procedure/dbt author's quarantine table changes shape."""
+    assert "dpagent_run_id" not in runtime._quarantine_sql(gate, _stage())
+
+
+def _columns(monkeypatch, names):
+    monkeypatch.setattr(runtime, "_query_rows",
+                        lambda pipeline, schema, sql: [{"column_name": n} for n in names])
+
+
+def test_run_tail_is_added_only_when_the_table_ends_with_reason_then_run_id(monkeypatch):
+    p = object()
+    _columns(monkeypatch, ["id", "reason", "dpagent_run_id"])
+    assert runtime._quarantine_run_tail(p, "s", "t_quarantine", 5) == ", 5 AS dpagent_run_id"
+    assert runtime._quarantine_run_tail(p, "s", "t_quarantine", None) == \
+        ", NULL::bigint AS dpagent_run_id"
+
+
+@pytest.mark.parametrize("names", [
+    ["id", "reason"],                          # the original shape
+    ["id", "dpagent_run_id", "reason"],        # marker not last: positional INSERT would misalign
+    ["id", "dpagent_run_id"],                  # marker but no reason
+    [],                                        # table not found
+])
+def test_run_tail_is_empty_for_any_other_table_shape(monkeypatch, names):
+    _columns(monkeypatch, names)
+    assert runtime._quarantine_run_tail(object(), "s", "t_quarantine", 5) == ""
+
+
+def test_run_id_is_an_integer_in_the_sql_never_interpolated_text(monkeypatch):
+    _columns(monkeypatch, ["id", "reason", "dpagent_run_id"])
+    with pytest.raises(ValueError):
+        runtime._quarantine_run_tail(object(), "s", "t_quarantine", "7; drop table x")
+
+
+def test_a_secret_a_real_subprocess_prints_never_reaches_the_event_or_the_exception(
+        monkeypatch, tmp_path):
+    """Unlike the mocked-subprocess masking test, this runs a real child
+    process through run_extract: a stand-in for dlt whose failure output
+    contains the whole connection URL, the exact shape a driver error can
+    take. (The real SQL Server run never echoed the password, so it could not
+    exercise the masking.)"""
+    state = _state_in(tmp_path, monkeypatch)
+    pw = "R3al/Sub+proc-pw"
+    monkeypatch.setenv("MSSQL_PASSWORD", pw)
+    monkeypatch.setenv("FD_WH_PASSWORD", "wh-pw-real-1")
+    fake_dlt = tmp_path / "fake_dlt_python"
+    fake_dlt.write_text('#!/bin/sh\ncat > /dev/null\n'
+                        'echo "connect failed for $SRC_URL and $DEST_URL" >&2\nexit 1\n')
+    fake_dlt.chmod(0o755)
+    monkeypatch.setattr(runtime, "_dlt_python", lambda: str(fake_dlt))
+    pipeline = _mssql_pipeline(tmp_path)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    run_id = state.start_run("data", "fd_demo")
+
+    with pytest.raises(runtime.GateFailed) as exc_info:
+        runtime.run_extract(pipeline_name="fd_demo", run_id=run_id)
+
+    from urllib.parse import quote
+    failed = [e for e in state.events_for(run_id) if e["kind"] == "extract.failed"][0]
+    for text in (failed["message"], str(exc_info.value)):
+        assert "connect failed for mssql+pymssql://u:" in text     # the child really ran
+        assert pw not in text and quote(pw, safe="") not in text
+        assert "wh-pw-real-1" not in text
+        assert "***REDACTED***" in text

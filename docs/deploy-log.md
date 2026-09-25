@@ -2455,3 +2455,46 @@ Evidence after the fixes (runs 62-64):
 
 `--wait` behaved as specified in every case: exit 0 on ok, 1 on failed, and
 3 on timeout without marking the run failed (runs 59/60, before the fixes).
+
+### 2026-09-25 (later) — quarantine run marker, real masking test, Elasticsearch 9
+
+- **Elasticsearch 9.0.0 (real container):** the pinned client 8.19.3 read all
+  3 documents through `scan()`; client 9.5.1 did as well (control). The `<9`
+  pin therefore serves both ES 8 (verified earlier) and ES 9 by evidence,
+  replacing the "per Elastic's documentation" claim.
+- **Quarantine run marker (real Postgres 16 container):** a quarantine table
+  ending `reason, dpagent_run_id` is stamped by the real `run_gate` - two runs
+  (ids 99 and 100) left two rows each, distinguishable; a table without the
+  column kept the original `SELECT *, reason` contract and worked unchanged.
+  Opt-in, so no existing procedure/dbt author is affected.
+- **Secret masking through a real child process:** a stand-in for dlt whose
+  failure output prints the whole connection URL, run through the real
+  `run_extract` (no mocked subprocess) - neither the event nor the exception
+  contains the raw or URL-encoded password. The earlier SQL Server run could
+  not test this because pymssql never echoes the password.
+- `dpagent pipeline undeploy` added (unit-tested; its first real use is
+  removing the `mssql_e2e` pipeline left on the host by the run above).
+
+- **First real `undeploy` (mssql_e2e, 2026-09-25):** removed the DAG file, its
+  Airflow registration and run history, the published copy, dlt's local state
+  and the now-unused `MSSQL_PASSWORD` (scheduler restarted); kept
+  `WAREHOUSE_DB_USER`/`WAREHOUSE_DB_PASSWORD` because `demo` and `quickstart`
+  still use them. Afterwards `/opt/dpagent/pipelines` held only `demo` and
+  `quickstart`, run 64 was still in `pipeline status`, and quickstart's own
+  status was untouched. Two details in its output led to fixes: it reported
+  "removed published dbt models" for a pipeline with no dbt stage
+  (`install_dbt_models` created an empty `models/<name>` directory and the
+  shared macro unconditionally - stray files under `/opt/dbt` on a host with
+  no dbt installed), and `pipeline status` told a run that had already failed
+  "Airflow may still be scheduling it".
+- **Second real `undeploy` (idempotence):** every line `absent`, no restart,
+  no error - the DAG-registration line had printed Airflow's whole
+  `DagNotFound` traceback for a DAG that was simply already gone; it is now
+  reported as absent, and a real failure shows only the exception's last
+  line with a retry hint. The same session found that `rm -rf` of the scratch
+  pipeline directory failed: `deploy` runs under sudo, so `build/` inside the
+  operator's own checkout was root-owned (`pipelines/demo/build` and
+  `pipelines/quickstart/build` still were). `write_artifacts` now hands
+  `build/` back to the pipeline directory's owner, repairing old files on the
+  next deploy. Added `dpagent pipeline list` (connector, deployed?, last run,
+  and deployed pipelines whose manifest is not in this checkout).

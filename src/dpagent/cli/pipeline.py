@@ -16,6 +16,7 @@ from rich.text import Text
 
 from ..engine import state
 from ..pipelines import deploy as deploy_mod
+from ..pipelines import extract as extract_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
 from ..pipelines.loader import quarantine_table_for
@@ -97,6 +98,47 @@ def lint_cmd(name):
     console.print(Panel(table, title=f"{pipeline.name} · {pipeline.source.connector}",
                         border_style="cyan", expand=False))
     console.print("[green]lint clean[/green]")
+
+
+@pipeline_group.command("list")
+def list_cmd():
+    """Every pipeline: its connector, whether it is deployed, and its last run.
+
+    Covers the manifests in this checkout plus any pipeline still deployed
+    whose manifest is no longer here (removable with `undeploy`).
+    """
+    deployed = set(deploy_mod.deployed_names())
+    table = Table(box=None)
+    for column in ("pipeline", "connector", "stages", "deployed", "last run"):
+        table.add_column(column, style="bold" if column == "pipeline" else "")
+
+    def last_run(name):
+        run = state.latest_run(kind="data", target=name)
+        if not run:
+            return "[dim]never[/dim]"
+        colour = {"ok": "green", "failed": "red"}.get(run["status"], "yellow")
+        return f"[{colour}]{run['status']}[/{colour}] [dim]#{run['id']} {run['started_at']}[/dim]"
+
+    in_checkout = pipelines_mod.available()
+    for name in in_checkout:
+        yes_no = "[green]yes[/green]" if name in deployed else "[dim]no[/dim]"
+        try:
+            p = pipelines_mod.load(name)
+        except pipelines_mod.PipelineError as exc:
+            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:60],
+                          yes_no, last_run(name))
+            continue
+        table.add_row(name, p.source.connector, " > ".join(s.name for s in p.stages),
+                      yes_no, last_run(name))
+    orphans = sorted(deployed - set(in_checkout))
+    if not (in_checkout or orphans):
+        console.print("[dim]no pipelines in this checkout and none deployed[/dim]")
+        return
+    if in_checkout:
+        console.print(table)
+    if orphans:
+        console.print(f"[yellow]deployed but not in this checkout:[/yellow] {', '.join(orphans)} "
+                      f"[dim](remove with: dpagent pipeline undeploy <name>)[/dim]")
 
 
 @pipeline_group.command("plan")
@@ -242,6 +284,76 @@ def _wait_for_run(run_id: int, *, timeout: float, interval: float = 3.0,
         sleep(interval)
 
 
+def _load_for_undeploy(name):
+    """The repo's manifest if it still exists, else the published copy under
+    the shared directory - a pipeline whose source was already deleted from
+    git must still be removable from Airflow."""
+    try:
+        return pipelines_mod.load(name)
+    except pipelines_mod.PipelineError as repo_exc:
+        try:
+            return pipelines_mod.load(name, deploy_mod.SHARED_PIPELINES_DIR)
+        except pipelines_mod.PipelineError:
+            fail(str(repo_exc))
+
+
+@pipeline_group.command("undeploy")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True)
+def undeploy_cmd(name, yes):
+    """Remove a deployed pipeline from Airflow and the shared locations.
+
+    Removes the DAG (file, then its Airflow registration and run history),
+    the published copy under /opt/dpagent/pipelines, its published dbt models
+    and dlt's local working state, and releases the ${VAR} secrets no other
+    deployed pipeline still uses (restarting airflow-scheduler if that changed
+    anything). It never touches the warehouse - schemas, tables, quarantine
+    tables and applied procedures are data and stay - nor dpagent's own run
+    journal, so `status`/`audit` history survives. Needs root.
+    """
+    pipeline = _load_for_undeploy(name)
+    landing = extract_mod.landing_dataset(pipeline)
+
+    if not yes and not confirm(
+            f"Remove {name!r} from Airflow (DAG + run history), "
+            f"{deploy_mod.SHARED_PIPELINES_DIR / name}, its dbt models and dlt state, "
+            f"and release its now-unused secrets? Warehouse data is NOT touched "
+            f"(schemas {pipeline.warehouse.schema!r} and {landing!r} stay).",
+            default=False):
+        console.print("[yellow]nothing removed[/yellow]")
+        sys.exit(1)
+
+    try:
+        result = deploy_mod.undeploy(pipeline)
+    except deploy_mod.DeployError as exc:
+        fail(str(exc))
+
+    def mark(done, what):
+        console.print(f"  {'[green]removed[/green]' if done else '[dim]absent [/dim]'}  {what}")
+
+    console.print(f"[bold]undeployed {name}[/bold]")
+    mark(result.dag_file_removed, "DAG file in Airflow's DAGS_FOLDER")
+    if result.dag_delete_failed:
+        console.print(f"  [red]failed [/red]  DAG registration and run history in Airflow: "
+                      f"{result.dag_delete_note}")
+        console.print(f"          [dim]retry once Airflow is reachable: dpagent pipeline "
+                      f"undeploy {name}[/dim]")
+    else:
+        mark(result.dag_deleted_from_airflow, "DAG registration and run history in Airflow")
+    mark(result.published_files_removed, f"published copy {deploy_mod.SHARED_PIPELINES_DIR / name}")
+    mark(result.dbt_models_removed, "published dbt models")
+    mark(result.dlt_state_removed, "dlt local working state")
+    if result.secrets_removed:
+        console.print(f"  [green]released[/green] secrets: {', '.join(result.secrets_removed)}"
+                      + ("  (airflow-scheduler restarted)" if result.scheduler_restarted else ""))
+    for var, users in result.secrets_kept.items():
+        console.print(f"  [dim]kept[/dim]     {var} - still used by: {', '.join(users)}")
+    if result.secrets_note:
+        console.print(f"  [yellow]{result.secrets_note}[/yellow]")
+    console.print(f"[dim]left in place: warehouse schemas {pipeline.warehouse.schema!r} and "
+                  f"{landing!r} with all their tables, and dpagent's run history[/dim]")
+
+
 @pipeline_group.command("run")
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True)
@@ -335,8 +447,13 @@ def _render_status(name, run) -> None:
         )
     console.print(table)
     if not stage_rows:
-        console.print("[dim]triggered but no stage has reported in yet - "
-                      "Airflow may still be scheduling it[/dim]")
+        if run["status"] == "running":
+            console.print("[dim]triggered but no stage has reported in yet - "
+                          "Airflow may still be scheduling it[/dim]")
+        else:
+            console.print(f"[yellow]run {run['status']} before any stage reported[/yellow] - "
+                          f"typically the extract itself failed; why: "
+                          f"dpagent pipeline audit {run['id']}")
 
 
 @pipeline_group.command("status")

@@ -292,6 +292,8 @@ way, so `tested`/`untested` has the same meaning here as it does for installs.
 Mirrors the install/verify/test verbs, for the same reasons:
 
 ```
+dpagent pipeline list             # every pipeline: connector, deployed?, last run - and any
+                                 #   deployed pipeline whose manifest is no longer in this checkout
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them
@@ -299,6 +301,8 @@ dpagent pipeline run <name>      # trigger through Airflow, not around it
                                  #   --wait blocks until the run is terminal: exit 0 ok,
                                  #   1 failed, 3 if --timeout (default 1800s) passes first
 dpagent pipeline status <name>   # stages, last run, gate verdicts
+dpagent pipeline undeploy <name> # remove the DAG, its Airflow history, published files and
+                                 #   secrets no other pipeline uses - never warehouse data
 dpagent pipeline audit <run>     # every stage and gate decision, and who made it -
                                  #   a failed extract/transform carries the driver's own
                                  #   error (secrets masked), not just "failed"
@@ -460,15 +464,17 @@ row count (8), never an accumulating duplicate - every procedure here is
 
 Stated from what real runs actually showed, not from the design:
 
-- **Quarantine tables accumulate across runs and carry no run marker.**
-  "Never deleted" (Concepts #5) is honoured literally: re-running a pipeline
-  whose source still holds the same bad rows inserts them into
-  `<table>_quarantine` again (a real pipeline showed 70 rows after several
-  runs over the same 10 source rows). Nothing yet says which run a row came
-  from, so repeated rows look like data problems. A `run_id` column on the
-  quarantine tables is the natural fix; it changes the positional
-  `INSERT ... SELECT *, reason` contract every procedure/dbt author writes
-  against, so it is deliberately not slipped in.
+- **Quarantine tables accumulate across runs.** "Never deleted" (Concepts
+  #5) is honoured literally: re-running a pipeline whose source still holds
+  the same bad rows inserts them into `<table>_quarantine` again (a real
+  pipeline showed 70 rows over several runs of the same 10 source rows).
+  To tell runs apart, end the quarantine table with the two columns
+  `reason text, dpagent_run_id bigint` - the runtime then stamps every
+  quarantined row with the `dpagent pipeline run` id (verified against a real
+  Postgres: two runs, two run ids, two rows each). It is opt-in: a table
+  without the column keeps the original positional
+  `INSERT ... SELECT *, reason` contract untouched, so no existing
+  procedure/dbt author has to change anything. `pipelines/quickstart` opts in.
 - **Landing is a full refresh.** Every connector lands with
   `write_disposition="replace"`; there is no incremental load or merge
   strategy (see "Out of scope").
