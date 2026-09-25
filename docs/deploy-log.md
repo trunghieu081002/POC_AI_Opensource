@@ -2412,3 +2412,46 @@ fresh venv with pip 22.x silently ignores the `sql_database` extra spelling
 (PEP 685), which the pack's own venv step avoids by upgrading pip first.
 
 Still unverified: Google Sheets (needs a real service account/spreadsheet).
+
+### 2026-09-25 — SQL Server through the real Airflow; three Layer 2 bugs found by re-running
+
+A real SQL Server 2022 (throwaway Docker container, source table of 10 rows
+with one duplicated `order_id`) driven through the *real* Airflow scheduler,
+the *real* `/opt/dlt` venv (drivers installed by the operator) and the real
+`warehouse` Postgres, via `dpagent pipeline deploy/run --wait`. Pipeline kept
+outside the repo (`DPAGENT_PIPELINES`); the source password travelled through
+`deploy.ensure_pipeline_secrets_available` into the scheduler's environment.
+
+Bugs, each visible only on a real, repeated run:
+
+1. **A new pipeline's first run never started.** Runs 59 and 60 showed only
+   `pipeline.trigger` for the full 30-minute `--wait`: Airflow registers an
+   unseen DAG *paused* and a manual run of a paused DAG stays `queued`. It is
+   what run 51 (quickstart) really was - misread at the time as scheduler
+   slowness. `deploy` now unpauses the (manual-only) DAG.
+2. **Concurrent runs corrupted each other.** Unpausing released the three
+   queued runs at once; they shared dlt's local working directory and run 60
+   failed with `FileNotFoundError` in dlt's `load_package.py`. The generated DAG
+   now sets `max_active_runs=1`.
+3. **Re-running was not idempotent.** dlt's `sql_database`/`rest_api` sources
+   default to *append*: landing held 40 rows from a 10-row table by run 61 and
+   raw's unique gate failed at 100%. Every connector now lands with `replace`.
+
+Evidence after the fixes (runs 62-64):
+
+- Run 62: `ok`, exit 0, landing 10 rows, raw passed (2/10 quarantined),
+  curated passed. Run 63 (immediately again): `ok`, exit 0.
+  After both: landing **10** (not 20), `fct_orders` **8**, quarantine **4**
+  (2 per run - see "Known limitations" in docs/layer2.md: quarantine tables
+  accumulate across runs and carry no run marker).
+- Run 64 (wrong source password): `failed`, `--wait` exit 1. The audit trail
+  now states the real cause (`Login failed for user 'sa'`, from pymssql) where
+  run 51 had shown nothing. The Airflow task log contains "Login failed"
+  (so the log exists) and the wrong password appears in **neither**
+  `/opt/airflow/home/logs` nor `/var/log/dpagent`.
+  Honest limit of that last check: pymssql does not echo the password in its
+  error, so this real failure never tempted a leak - the masking itself
+  (raw and URL-encoded forms) is proven by unit tests, not by this run.
+
+`--wait` behaved as specified in every case: exit 0 on ok, 1 on failed, and
+3 on timeout without marking the run failed (runs 59/60, before the fixes).
