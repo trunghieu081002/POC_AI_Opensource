@@ -252,6 +252,23 @@ def latest_run(kind: str | None = None, target: str | None = None) -> sqlite3.Ro
     return cur.fetchone()
 
 
+def find_data_run(target: str, airflow_run_id: str) -> int | None:
+    """The dpagent run row created for one Airflow DagRun (matched on the
+    airflow_run_id stored in its meta), newest first. Scheduled and
+    UI-triggered runs carry no dpagent_run_id in their conf, so this is how
+    every task and the completion callback of such a run find the same row."""
+    rows = conn().execute(
+        "SELECT id, meta_json FROM runs WHERE kind='data' AND target=? "
+        "AND meta_json IS NOT NULL ORDER BY id DESC LIMIT 500", (target,)).fetchall()
+    for row in rows:
+        try:
+            if json.loads(row["meta_json"]).get("airflow_run_id") == airflow_run_id:
+                return int(row["id"])
+        except (ValueError, AttributeError):
+            continue
+    return None
+
+
 def get_run(run_id: int) -> sqlite3.Row | None:
     return conn().execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
 

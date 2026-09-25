@@ -109,7 +109,7 @@ def list_cmd():
     """
     deployed = set(deploy_mod.deployed_names())
     table = Table(box=None)
-    for column in ("pipeline", "connector", "stages", "deployed", "last run"):
+    for column in ("pipeline", "connector", "schedule", "deployed", "last run"):
         table.add_column(column, style="bold" if column == "pipeline" else "")
 
     def last_run(name):
@@ -125,10 +125,10 @@ def list_cmd():
         try:
             p = pipelines_mod.load(name)
         except pipelines_mod.PipelineError as exc:
-            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:60],
+            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:40],
                           yes_no, last_run(name))
             continue
-        table.add_row(name, p.source.connector, " > ".join(s.name for s in p.stages),
+        table.add_row(name, p.source.connector, p.schedule or "[dim]manual[/dim]",
                       yes_no, last_run(name))
     orphans = sorted(deployed - set(in_checkout))
     if not (in_checkout or orphans):
@@ -152,6 +152,11 @@ def plan_cmd(name):
     """
     pipeline = _load_or_fail(name)
     result = generator_mod.plan(pipeline)
+
+    console.print(f"[bold]schedule:[/bold] "
+                  + (f"{pipeline.schedule} [dim](UTC; deploy unpauses the DAG, so it starts running "
+                     f"on this schedule)[/dim]" if pipeline.schedule
+                     else "manual-only [dim](runs only on `dpagent pipeline run`)[/dim]"))
 
     tasks = Table(box=None, title="DAG tasks")
     tasks.add_column("id", style="bold")
@@ -259,7 +264,10 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
         if result.dag_unpaused:
-            console.print("[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
+            console.print(
+                f"[bold]DAG unpaused:[/bold] runs on schedule {pipeline.schedule!r} (UTC)"
+                if pipeline.schedule else
+                "[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
         else:
             console.print(
                 f"[yellow]could not unpause the DAG[/yellow] - until it is unpaused a "
@@ -343,6 +351,9 @@ def undeploy_cmd(name, yes):
     mark(result.published_files_removed, f"published copy {deploy_mod.SHARED_PIPELINES_DIR / name}")
     mark(result.dbt_models_removed, "published dbt models")
     mark(result.dlt_state_removed, "dlt local working state")
+    if result.runs_cancelled:
+        console.print(f"  [yellow]cancelled[/yellow] run(s) still marked running: "
+                      + ", ".join(f"#{r}" for r in result.runs_cancelled))
     if result.secrets_removed:
         console.print(f"  [green]released[/green] secrets: {', '.join(result.secrets_removed)}"
                       + ("  (airflow-scheduler restarted)" if result.scheduler_restarted else ""))
@@ -357,12 +368,16 @@ def undeploy_cmd(name, yes):
 @pipeline_group.command("run")
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True)
+@click.option("--full-refresh", "full_refresh", is_flag=True,
+              help="Reload every table from scratch, dropping the landing tables and the "
+                   "saved incremental cursors of an incremental source (a backfill, or "
+                   "after the source's schema changed).")
 @click.option("--wait", is_flag=True,
               help="Block until the run reaches a terminal state; exit 0 if ok, "
                    "1 if failed, 3 if --timeout passes first.")
 @click.option("--timeout", type=int, default=1800, show_default=True,
               help="Seconds --wait gives up after (the run itself keeps going).")
-def run_cmd(name, yes, wait, timeout):
+def run_cmd(name, yes, full_refresh, wait, timeout):
     """Trigger this pipeline's deployed Airflow DAG - through Airflow, not around it.
 
     Records a `runs` row (kind='data') first and passes its id into the DAG
@@ -378,15 +393,19 @@ def run_cmd(name, yes, wait, timeout):
     _require_layer2_prerequisites(pipeline)
 
     if not yes and not confirm(
-            f"Trigger the deployed {name!r} DAG now (runs as the airflow OS user)?",
-            default=True):
+            f"Trigger the deployed {name!r} DAG now (runs as the airflow OS user)"
+            + (" as a FULL REFRESH - landing tables and incremental cursors are dropped "
+               "and everything is reloaded?" if full_refresh else "?"),
+            default=not full_refresh):
         sys.exit(1)
 
     run_id = state.start_run("data", name)
-    state.event("pipeline.trigger", f"triggering Airflow DAG {name!r}",
-               run_id=run_id, actor="user")
+    state.event("pipeline.trigger", f"triggering Airflow DAG {name!r}"
+                + (" (full refresh)" if full_refresh else ""),
+                run_id=run_id, actor="user")
 
-    result = deploy_mod.trigger_dag(name, run_id)
+    result = (deploy_mod.trigger_dag(name, run_id, full_refresh=True) if full_refresh
+              else deploy_mod.trigger_dag(name, run_id))
     if result.returncode != 0:
         state.finish_run(run_id, "failed")
         state.event("pipeline.trigger_failed", result.stderr.strip(),

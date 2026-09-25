@@ -113,12 +113,26 @@ def _warehouse_conn(pipeline: loader.Pipeline, schema: str) -> tuple[list[str], 
     return cmd, env
 
 
+def _run(cmd, *, pipeline: loader.Pipeline, kind: str, what: str, **kwargs):
+    """subprocess.run with the pipeline's own timeout for `kind`. On expiry the
+    child is killed by subprocess.run and this raises GateFailed naming exactly
+    which manifest key to raise - a bare TimeoutExpired would surface as
+    "failed before dlt ran" (extract) or an unexplained traceback."""
+    limit = pipeline.timeout(kind)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=limit, **kwargs)
+    except subprocess.TimeoutExpired:
+        raise GateFailed(f"{what} did not finish within {limit}s and was stopped - if it "
+                         f"is healthy, just large, raise `timeouts: {{{kind}: <seconds>}}` "
+                         f"in pipelines/{pipeline.name}/pipeline.yaml") from None
+
+
 def _query_rows(pipeline: loader.Pipeline, schema: str, sql: str) -> list[dict]:
     """Run a query, get its result set back as dicts - psql's own --csv
     output, parsed, rather than any DB driver."""
     cmd, env = _warehouse_conn(pipeline, schema)
-    proc = subprocess.run(cmd + ["--csv", "-c", sql], env=env,
-                          capture_output=True, text=True, timeout=120)
+    proc = _run(cmd + ["--csv", "-c", sql], pipeline=pipeline, kind="gate",
+                what="a gate query", env=env)
     if proc.returncode != 0:
         raise GateFailed(f"query failed: {proc.stderr.strip()}\n  sql: {sql}")
     return list(csv.DictReader(io.StringIO(proc.stdout)))
@@ -127,8 +141,8 @@ def _query_rows(pipeline: loader.Pipeline, schema: str, sql: str) -> list[dict]:
 def _execute(pipeline: loader.Pipeline, schema: str, sql: str) -> None:
     """Run a statement for its effect (an INSERT, e.g.) - no result set."""
     cmd, env = _warehouse_conn(pipeline, schema)
-    proc = subprocess.run(cmd + ["-c", sql], env=env,
-                          capture_output=True, text=True, timeout=120)
+    proc = _run(cmd + ["-c", sql], pipeline=pipeline, kind="gate",
+                what="a gate statement", env=env)
     if proc.returncode != 0:
         raise GateFailed(f"statement failed: {proc.stderr.strip()}\n  sql: {sql}")
 
@@ -236,6 +250,33 @@ def _quarantine_run_tail(pipeline: loader.Pipeline, schema: str, q_table: str,
     return f", {int(run_id) if run_id is not None else 'NULL::bigint'} AS {RUN_COLUMN}"
 
 
+def _ensure_quarantine_table(pipeline: loader.Pipeline, schema: str, table: str,
+                             q_table: str) -> None:
+    """Create `<table>_quarantine` if - and only if - nothing has yet.
+
+    A procedure-engine stage's author writes the quarantine table into the
+    procedure (pipelines/quickstart does), but a dbt-engine stage has nothing
+    that could: dbt materializes models, not their rejects. The first row a
+    gate rejected there died with "relation stg_x_quarantine does not exist"
+    (pipelines/demo declares two such tables and nothing ever created them).
+    The shape is the documented one - the gated table's columns plus a
+    trailing `reason`, plus the opt-in `dpagent_run_id` - built with CTAS
+    `WITH NO DATA`: plain columns only, since a quarantine table is a holding
+    area and has no use for the gated table's constraints or indexes. (Not
+    because `LIKE` would break anything: a quarantined row came from the gated
+    table, so it satisfies whatever NOT NULL that table carries.) A table
+    that already exists is never altered, whatever its shape.
+    """
+    exists = _query_rows(pipeline, schema,
+                         f"select to_regclass('{q_table}') is not null as e")[0]["e"]
+    if exists == "t":
+        return
+    _execute(pipeline, schema,
+             f"CREATE TABLE {q_table} AS SELECT * FROM {table} WITH NO DATA; "
+             f"ALTER TABLE {q_table} ADD COLUMN reason text, "
+             f"ADD COLUMN {RUN_COLUMN} bigint")
+
+
 def _evaluate_gate(pipeline: loader.Pipeline, gate, stage: loader.Stage,
                    run_id: int | None = None) -> tuple[bool, str, int | None, int | None]:
     """Returns (passed, detail, rows_checked, rows_rejected)."""
@@ -281,10 +322,18 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate, stage: loader.Stage,
     # Threshold is evaluated per gated table, not per stage: quarantine is
     # now one table per `gate['table']` (see `_quarantine_sql`), so "percent
     # rejected" only means something scoped to the table a given gate looks at.
-    failing_query = compiled.queries[-1]   # "failing_rows" or the rule itself
-    failing_rows = _query_rows(pipeline, schema, failing_query.sql)
-    rejected = len(failing_rows)
     table = gate["table"]
+    if stage.quarantine:
+        _ensure_quarantine_table(pipeline, schema, table, quarantine_table_for(table))
+    failing_query = compiled.queries[-1]   # "failing_rows" or the rule itself
+    # Counted in SQL. It used to fetch every violating row into Python just to
+    # take len() of them: measured against a real Postgres, 1.2 million
+    # violations cost 1.1 GB of RAM (linear in the violations - ten million
+    # would be killed by the OS) for a single number.
+    rejected = int(_query_rows(
+        pipeline, schema,
+        f"select count(*) as n from ({failing_query.sql.strip().rstrip(';')}) "
+        f"as dpagent_failing")[0]["n"])
     total = int(_query_rows(pipeline, schema, f"select count(*) as n from {table}")[0]["n"])
 
     if rejected == 0:
@@ -365,10 +414,9 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
         # project (deploy.py) - pipeline.root itself has no dbt_project.yml
         # and never did; `dbt run` from there always failed before this,
         # confirmed the first time this branch actually ran for real.
-        proc = subprocess.run(
-            ["dbt", "run", "--select", *target.models,
-             "--project-dir", _dbt_project_dir()],
-            capture_output=True, text=True, timeout=300)
+        proc = _run(["dbt", "run", "--select", *target.models,
+                     "--project-dir", _dbt_project_dir()],
+                    pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
         if proc.returncode != 0:
             detail = _detail(proc.stderr or proc.stdout)
             state.event("transform.failed", f"dbt run failed for {stage!r}: {detail}",
@@ -377,8 +425,8 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
     elif target.engine == "procedure":
         proc_name = pipeline.path(target.procedure).stem
         cmd, env = _warehouse_conn(pipeline, _stage_schema(pipeline, target))
-        proc = subprocess.run(cmd + ["-c", f"CALL {proc_name}();"], env=env,
-                              capture_output=True, text=True, timeout=300)
+        proc = _run(cmd + ["-c", f"CALL {proc_name}();"], pipeline=pipeline,
+                    kind="transform", what=f"CALL {proc_name}() for {stage!r}", env=env)
         if proc.returncode != 0:
             detail = _detail(proc.stderr)
             state.event("transform.failed",
@@ -442,12 +490,14 @@ def _connection_url(values: dict, scheme: str = "postgresql") -> str:
     return f"{scheme}://{auth}{host}:{port}/{database}"
 
 
-def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
+def run_extract(*, pipeline_name: str, run_id: int | None = None,
+                full_refresh: bool = False) -> None:
     pipeline = loader.load(pipeline_name)
-    state.event("extract.start", f"{pipeline_name} via {pipeline.source.connector}",
-                run_id=run_id)
+    state.event("extract.start",
+                f"{pipeline_name} via {pipeline.source.connector}"
+                + (" (full refresh)" if full_refresh else ""), run_id=run_id)
     try:
-        _run_extract(pipeline, pipeline_name, run_id)
+        _run_extract(pipeline, pipeline_name, run_id, full_refresh)
     except GateFailed:
         raise
     except Exception as exc:
@@ -461,9 +511,12 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         raise
 
 
-def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | None) -> None:
+def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | None,
+                 full_refresh: bool = False) -> None:
     script = extract.render_extract_script(pipeline)
     env = os.environ.copy()
+    if full_refresh:
+        env["DPAGENT_FULL_REFRESH"] = "1"
 
     dest = resolve_refs(
         {"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
@@ -516,15 +569,60 @@ def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | No
         _register_secrets(src)
         env["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"] = src["service_account_json"]
 
-    proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
-                          capture_output=True, text=True, timeout=600)
+    proc = _run([_dlt_python(), "-"], pipeline=pipeline, kind="extract",
+                what=f"the extract for {pipeline_name!r}", input=script, env=env)
     if proc.returncode != 0:
         detail = _detail(proc.stderr)
         state.event("extract.failed", f"{pipeline_name} extract failed: {detail}",
                     run_id=run_id, level="error")
         raise GateFailed(f"extract failed for {pipeline_name!r}:\n{detail}")
 
-    state.event("extract.done", f"{pipeline_name} extract complete", run_id=run_id)
+    state.event("extract.done", f"{pipeline_name} extract complete{_row_counts(proc.stdout)}",
+                run_id=run_id)
+
+
+def _row_counts(stdout: str) -> str:
+    """": orders +3, lookup +2" from the script's DPAGENT_ROW_COUNTS line, or ""
+    if it is absent or unreadable - the extract itself already succeeded."""
+    for line in (stdout or "").splitlines():
+        if line.startswith("DPAGENT_ROW_COUNTS "):
+            try:
+                counts = json.loads(line.split(" ", 1)[1])
+            except ValueError:
+                return ""
+            if not counts:
+                return ": no rows extracted"
+            return ": " + ", ".join(f"{t} +{n}" for t, n in sorted(counts.items()))
+    return ""
+
+
+def resolve_run_id(pipeline_name: str, dag_run) -> int | None:
+    """The dpagent `runs` row this Airflow DagRun belongs to.
+
+    `dpagent pipeline run` creates the row first and passes its id in the
+    DagRun's conf. A run nobody triggered through dpagent - one started by the
+    pipeline's own `schedule`, or from Airflow's UI - has no such id, and
+    without a row of its own `dpagent pipeline status`/`audit` (which read
+    `runs`) could not see it at all. The first task to ask creates the row,
+    keyed by Airflow's own run id; every later task, and the completion
+    callback, finds that same row.
+    """
+    if dag_run is None:
+        return None
+    conf_id = (dag_run.conf or {}).get("dpagent_run_id")
+    if conf_id is not None:
+        return int(conf_id)
+    existing = state.find_data_run(pipeline_name, dag_run.run_id)
+    if existing is not None:
+        return existing
+    trigger = str(getattr(dag_run, "run_type", "") or "airflow")
+    run_id = state.start_run("data", pipeline_name,
+                             meta={"airflow_run_id": dag_run.run_id, "trigger": trigger})
+    state.event("pipeline.started",
+                f"Airflow run {dag_run.run_id} started by {trigger}, not by "
+                f"`dpagent pipeline run`",
+                run_id=run_id, actor="airflow")
+    return run_id
 
 
 def finish_pipeline_run(run_id: int, status: str) -> None:

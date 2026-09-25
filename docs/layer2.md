@@ -252,9 +252,28 @@ hop is not a choice, it is what dlt is for.
    stage, since a stage's gates can touch more than one table (e.g. a
    referential-integrity check spanning two tables in the same stage) and
    each needs its own shape. Never deleted, never silently passed.
+   A procedure-engine stage's author writes the quarantine table into the
+   procedure; a dbt-engine stage has nothing that could, so the runtime
+   creates `<table>_quarantine` (the gated table's columns + `reason` +
+   `dpagent_run_id`) the first time a row-level gate needs it - and never
+   alters one that already exists, whatever its shape.
 6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
    they already do for installs, whichever engine ran.
+8. **Schedule** - an optional top-level `schedule:` in `pipeline.yaml`: a
+   5-field cron expression or `@hourly`/`@daily`/`@weekly`/`@monthly`/
+   `@yearly`, in UTC (the Airflow the airflow pack installs runs with
+   `default_timezone = utc`). Absent means manual-only: it runs only on
+   `dpagent pipeline run`. It is validated by `pipeline lint` - a bad schedule
+   would not be reported anywhere useful, the generated DAG would just fail
+   to import and the pipeline never appear. `deploy` unpauses the DAG, so a
+   scheduled pipeline starts running on its schedule the moment it is
+   deployed; the DAG never backfills (`catchup=False`) and never overlaps
+   itself (`max_active_runs=1`). A run the schedule (or Airflow's UI) starts
+   has no `dpagent pipeline run` behind it, so the first task creates its row
+   in dpagent's journal, keyed by Airflow's own run id
+   (`runtime.resolve_run_id`) - which is what makes it visible to
+   `status`/`audit`/`list` like any other run.
 7. **Secrets reach the task's own process, not the operator's shell.**
    `dpagent pipeline run` only calls `airflow dags trigger` - it creates a
    DagRun row and returns immediately. The DAG's own tasks
@@ -311,7 +330,8 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
-- Six connectors:
+- Six connectors (and two self-contained example pipelines,
+  `quickstart` on the procedure engine and `quickstart_dbt` on the dbt engine):
   - **Odoo PostgreSQL** and **SQL Server** - both DB, both via
     `dlt.sources.sql_database`; only the SQLAlchemy scheme differs
     (`postgresql` vs `mssql+pymssql`, the latter a prebuilt-wheel driver so
@@ -332,15 +352,24 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
     unattended inside an Airflow task)
 
   Verification status, stated plainly: REST API, CSV and Odoo PostgreSQL are
-  real-verified end to end. **SQL Server** (SQL Server 2022, password auth)
-  and **Elasticsearch** (8.15, no auth and `basic` auth, plus a wrong-password
+  real-verified end to end. **SQL Server** (SQL Server 2022) and
+  **Elasticsearch** (8.15 and 9.0.0, no auth and `basic`, plus a wrong-password
   negative that fails loudly with a 401) were real-verified on 2026-09-25
   through the repo's own `runtime.run_extract` + `run_gate` against throwaway
-  Docker containers landing into a real Postgres - see docs/deploy-log.md.
-  **Google Sheets** is unit-tested only: it needs a real Google Cloud
-  service account and spreadsheet, which cannot be provisioned from a
-  sandbox. Every connector's own code path (script generation, secret
-  handling, loader validation) is unit-tested regardless.
+  Docker containers landing into a real Postgres, SQL Server also through the
+  real Airflow - see docs/deploy-log.md. **Google Sheets** has been *executed*
+  - real google-api-python-client, real dlt, real Postgres - against a local
+  stand-in for the Sheets API (which enforces the documented A1-quoting rule),
+  and that run found and fixed a real bug (a sheet name with a space was sent
+  unquoted). It has **not** run against Google itself: that needs a service
+  account and spreadsheet, so authentication and Google's actual responses
+  remain unverified. Every connector's own code path (script generation,
+  secret handling, loader validation) is unit-tested regardless.
+
+  Google Sheets details that matter when writing gates: a sheet's first row is
+  the header; dlt normalizes resource names (`Sheet 1` lands as `sheet_1`,
+  `Orders` as `orders`), so a gate names the normalized table; a short row
+  lands with NULL in its trailing columns; an empty sheet creates no table.
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
   Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
   The manifest names a transform engine (`dbt` or `procedure`) per hop; the
@@ -475,10 +504,40 @@ Stated from what real runs actually showed, not from the design:
   without the column keeps the original positional
   `INSERT ... SELECT *, reason` contract untouched, so no existing
   procedure/dbt author has to change anything. `pipelines/quickstart` opts in.
-- **Landing is a full refresh.** Every connector lands with
-  `write_disposition="replace"`; there is no incremental load or merge
-  strategy (see "Out of scope").
+- **Landing is a full refresh unless a table opts into incremental.** Every
+  connector lands with `write_disposition="replace"`. For the database
+  connectors (`odoo_postgres`, `sql_server`) a table can instead be loaded
+  incrementally:
+
+  ```yaml
+  source:
+    tables: [orders, lookup]
+    incremental:
+      orders: {cursor: updated_at, primary_key: order_id}   # initial_value optional
+  ```
+
+  Only rows whose cursor is past the last run are extracted and merged on
+  `primary_key`. Verified against a real Postgres over six runs: 3 rows, then
+  a no-change run extracting 0 `orders` rows, then 2 new + 1 updated row (5
+  rows, no duplicates, the update visible), state recovered from the
+  destination after the local dlt state was deleted, and
+  `dpagent pipeline run --full-refresh` reloading all 6. Each run's
+  `extract.done` event records how many rows it moved per table.
+  Limits: **deletes at the source are not propagated** (a `--full-refresh`
+  fixes that), and the cursor column must be reliably bumped on every update
+  (see the `write_date` row in the risks table). Not verified against SQL
+  Server yet.
+- **Large data.** Violating rows are counted in SQL
+  (`select count(*) from (<gate sql>)`), not fetched into Python: on 3M rows
+  with 1.2M violations that took peak memory from 1.1 GB to 21 MB. Every
+  extract, transform and gate subprocess has a timeout (defaults 600/300/120 s,
+  override per pipeline with `timeouts: {extract: N, transform: N, gate: N}`);
+  hitting it fails the run with a message naming the limit.
+- **`undeploy` cancels in-flight runs** (their journal rows become
+  `cancelled`). The journal itself has no retention: a pipeline scheduled
+  every 2 minutes wrote 207 runs in 7 hours.
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
-- **Google Sheets is unit-tested only** (needs a real Google Cloud service
-  account and spreadsheet).
+- **Google Sheets has not run against Google** - only against a local
+  stand-in with the real client libraries (needs a real service account and
+  spreadsheet for the rest).

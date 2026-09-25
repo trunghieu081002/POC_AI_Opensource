@@ -2498,3 +2498,33 @@ Evidence after the fixes (runs 62-64):
   `build/` back to the pipeline directory's owner, repairing old files on the
   next deploy. Added `dpagent pipeline list` (connector, deployed?, last run,
   and deployed pipelines whose manifest is not in this checkout).
+
+### 2026-09-26 — Google Sheets executed for the first time (stand-in), and a leftover env var
+
+- The Google Sheets connector had only ever been `ast.parse`d. Its real
+  generated script now ran under the real google-api-python-client and dlt
+  (the `/opt/dlt` venv) into a real Postgres 16, with two seams replaced -
+  credentials and the API endpoint - pointing at a local stand-in that
+  enforces the documented A1-quoting rule. It found a real bug: a sheet named
+  `Sheet 1` was requested unquoted and rejected ("Unable to parse range").
+  Fixed by always quoting the range. After the fix two consecutive runs left
+  `orders` at 3 rows (replace, not append), a short row landed with a NULL, and
+  an empty sheet created no table. This is not verification against Google.
+- A `DPAGENT_PIPELINES` exported for the `mssql_e2e` scratch test stayed set in
+  the operator's shell and silently redirected `pipeline deploy quickstart_dbt`
+  to the scratch directory ("no pipeline for 'quickstart_dbt' (looked in
+  /home/oracle/dpagent-e2e/...)"). The missing-pipeline error now names the
+  override and how to unset it.
+- Incremental load, run for real (throwaway Postgres 16 as source and
+  destination, the repo's real `runtime.run_extract` through the dlt venv):
+  `extract.done` per run: first load `orders +3`; no change: no `orders` at all;
+  2 new + 1 updated: `orders +3`; local dlt state deleted + 1 new row:
+  `orders +1` (cursor restored from the destination); `--full-refresh`:
+  `orders +6`; a no-change run after it: none. Landing `orders` counts
+  3 -> 3 -> 5 -> 6 -> 6 -> 6 with distinct ids equal to the counts, order 2
+  showing `b-UPDATED`/99, and the non-incremental `lookup` staying at 2.
+  My first check queried `public.*` instead of `<pipeline>_landing.*` (harness
+  error, not a product bug). Not yet run through Airflow or against SQL Server.
+- Scale: gate violations are counted in SQL. 3M rows / 1.2M violations:
+  1.1 GB -> 21 MB peak. Subprocess timeouts (per-pipeline `timeouts:`) verified
+  with a 1 s gate limit. `undeploy` marks in-flight runs `cancelled`.

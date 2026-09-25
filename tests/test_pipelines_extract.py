@@ -383,15 +383,21 @@ def _script_for(root, source):
 @pytest.mark.parametrize("source", [
     {"connector": "odoo_postgres", "connection": {"host": "h"}, "tables": ["t"]},
     {"connector": "sql_server", "connection": {"host": "h"}, "tables": ["t"]},
-    {"connector": "rest_api", "connection": {"base_url": "https://api.example.com"},
-     "resources": ["users"]},
-], ids=["odoo_postgres", "sql_server", "rest_api"])
-def test_built_in_dlt_sources_land_with_replace_not_the_default_append(root, source):
-    """Found on a real host, not by review: dlt's sql_database/rest_api
-    sources default to append, so a SQL Server table of 10 rows landed 40
-    after the fourth run and raw's unique gate failed at 100%. Landing is an
-    as-received snapshot; a re-run must reproduce it."""
+], ids=["odoo_postgres", "sql_server"])
+def test_database_tables_without_an_incremental_block_land_with_replace(root, source):
+    """Found on a real host, not by review: dlt's sql_database source defaults
+    to append, so a SQL Server table of 10 rows landed 40 after the fourth run
+    and raw's unique gate failed at 100%. Landing is an as-received snapshot; a
+    re-run must reproduce it - applied as a hint on each table's resource."""
     script = _script_for(root, source)
+    assert 'resource.apply_hints(write_disposition="replace")' in script
+    assert "INCREMENTAL = {}" in script
+
+
+def test_rest_api_lands_with_replace_not_the_default_append(root):
+    script = _script_for(root, {"connector": "rest_api",
+                                "connection": {"base_url": "https://api.example.com"},
+                                "resources": ["users"]})
     assert 'pipeline.run(source, write_disposition="replace")' in script
 
 
@@ -405,3 +411,75 @@ def test_built_in_dlt_sources_land_with_replace_not_the_default_append(root, sou
 ], ids=["csv", "elasticsearch", "google_sheets"])
 def test_hand_rolled_connectors_also_replace(root, source):
     assert 'write_disposition="replace"' in _script_for(root, source)
+
+
+def test_google_sheets_quotes_every_sheet_name_as_a1_notation(root):
+    """Found by actually running the generated script (it had never been
+    executed): a sheet named "Sheet 1" was requested as range=Sheet 1, which
+    the Sheets API rejects as "Unable to parse range" - A1 notation needs a name
+    with a space in single quotes. Executes the generated _a1 helper itself."""
+    data = _base(source={"connector": "google_sheets",
+                         "connection": {"spreadsheet_id": "abc", "service_account_json": "${SA}"},
+                         "resources": ["Orders"]})
+    _write(root, "demo", data)
+    script = extract.render_extract_script(loader.load("demo", root))
+    tree = ast.parse(script)
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_a1")
+    namespace = {}
+    exec(compile(ast.Module([fn], []), "<a1>", "exec"), namespace)
+    assert namespace["_a1"]("Orders") == "'Orders'"
+    assert namespace["_a1"]("Sheet 1") == "'Sheet 1'"
+    assert namespace["_a1"]("O'Brien's") == "'O''Brien''s'"
+    assert "range=_a1(sheet_name)" in script
+
+
+# ---------------------------------------------------------------- incremental
+
+_INC_SOURCE = {
+    "connector": "sql_server", "connection": {"host": "h"}, "tables": ["orders", "lookup"],
+    "incremental": {"orders": {"cursor": "updated_at", "primary_key": "order_id"}},
+}
+
+
+def test_an_incremental_table_is_merged_on_its_key_and_the_rest_still_replace(root):
+    script = _script_for(root, _INC_SOURCE)
+    ast.parse(script)
+    assert "INCREMENTAL = {'orders': {'cursor': 'updated_at', 'primary_key': 'order_id', 'initial_value': None}}" in script
+    assert 'write_disposition="merge", primary_key=cfg["primary_key"]' in script
+    assert 'dlt.sources.incremental(cfg["cursor"], **kwargs)' in script
+    assert 'resource.apply_hints(write_disposition="replace")' in script      # lookup
+
+
+def test_an_iso_initial_value_is_parsed_into_a_datetime_by_the_script(root):
+    """A string initial_value against a timestamp cursor raises TypeError inside
+    dlt ('>' not supported between 'str' and 'datetime') - confirmed for real."""
+    source = dict(_INC_SOURCE, incremental={"orders": {
+        "cursor": "updated_at", "primary_key": ["a", "b"], "initial_value": "2026-01-05T00:00:00"}})
+    script = _script_for(root, source)
+    assert "'initial_value': '2026-01-05T00:00:00'" in script
+    assert "datetime.datetime.fromisoformat(initial)" in script
+    assert "'primary_key': ['a', 'b']" in script
+
+
+def test_full_refresh_is_driven_by_an_env_var_the_runtime_sets(root):
+    script = _script_for(root, _INC_SOURCE)
+    assert 'os.environ.get("DPAGENT_FULL_REFRESH")' in script
+    assert 'pipeline.run(source, refresh=refresh)' in script and '"drop_resources"' in script
+
+
+@pytest.mark.parametrize("source", [
+    {"connector": "csv", "files": {"path": "/data/*.csv"}},
+    {"connector": "rest_api", "connection": {"base_url": "https://a"}, "resources": ["u"]},
+    {"connector": "elasticsearch", "connection": {"hosts": ["http://h"]}, "resources": ["o"]},
+    {"connector": "google_sheets", "connection": {"spreadsheet_id": "a", "service_account_json": "x"},
+     "resources": ["S"]},
+    {"connector": "sql_server", "connection": {"host": "h"}, "tables": ["t"]},
+    {"connector": "odoo_postgres", "connection": {"host": "h"}, "tables": ["t"]},
+], ids=["csv", "rest_api", "elasticsearch", "google_sheets", "sql_server", "odoo_postgres"])
+def test_every_script_reports_rows_extracted_per_table(root, source):
+    """The audit trail says what a run actually moved - for an incremental
+    table, only the new and changed rows."""
+    script = _script_for(root, source)
+    assert 'print("DPAGENT_ROW_COUNTS "' in script
+    assert script.rstrip().endswith('.dumps(counts))')
+    ast.parse(script)

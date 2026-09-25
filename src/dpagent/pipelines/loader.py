@@ -8,6 +8,7 @@ validation rule below traces back to.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -86,6 +87,7 @@ class Source:
     tables: list[str] = field(default_factory=list)
     files: dict = field(default_factory=dict)   # a file-based source (CSV) uses this instead
     resources: list[str] = field(default_factory=list)   # rest_api's own endpoint list
+    incremental: dict = field(default_factory=dict)   # table -> {cursor, primary_key, initial_value}
 
 
 @dataclass
@@ -129,9 +131,14 @@ class Pipeline:
     source: Source
     warehouse: Warehouse
     stages: list[Stage]
+    schedule: str | None = None   # None = manual-only (`dpagent pipeline run`)
+    timeouts: dict = field(default_factory=dict)   # seconds, by kind; see DEFAULT_TIMEOUTS
 
     def path(self, relative: str) -> Path:
         return self.root / relative
+
+    def timeout(self, kind: str) -> int:
+        return self.timeouts.get(kind, DEFAULT_TIMEOUTS[kind])
 
     @property
     def landing(self) -> Stage:
@@ -182,6 +189,61 @@ def _validate_quarantine(raw: dict | None, where: str) -> Quarantine | None:
         raise PipelineError(
             f"{where}: quarantine's reject_threshold_pct {threshold!r} must be 0-100")
     return Quarantine(reject_threshold_pct=threshold)
+
+
+INCREMENTAL_CONNECTORS = {"odoo_postgres", "sql_server"}
+
+
+def _validate_incremental(raw, connector: str, tables: list, where: str) -> dict:
+    """`incremental:` maps a table to how it is loaded incrementally: a
+    monotonically increasing `cursor` column, and the `primary_key` a changed
+    row is merged on. Only the database connectors (dlt's sql_database source)
+    support it. initial_value is an integer, or an ISO-8601 date/datetime
+    string for a timestamp cursor (YAML turns an unquoted date into a date
+    object - normalized back to a string here so the generated script can
+    parse it into the datetime dlt compares against)."""
+    import datetime
+    if not raw:
+        return {}
+    if connector not in INCREMENTAL_CONNECTORS:
+        raise PipelineError(f"{where}: incremental is only supported for "
+                            f"{sorted(INCREMENTAL_CONNECTORS)}, not {connector!r}")
+    if not isinstance(raw, dict):
+        raise PipelineError(f"{where}: incremental must map table names to their settings")
+    out = {}
+    for table, cfg in raw.items():
+        at = f"{where}: incremental.{table}"
+        if table not in tables:
+            raise PipelineError(f"{at} names a table that is not in source.tables {tables}")
+        if not isinstance(cfg, dict):
+            raise PipelineError(f"{at} must be a mapping with cursor and primary_key")
+        unknown = sorted(set(cfg) - {"cursor", "primary_key", "initial_value"})
+        if unknown:
+            raise PipelineError(f"{at} has unknown key(s) {unknown}; expected cursor, "
+                                f"primary_key, initial_value")
+        cursor = cfg.get("cursor")
+        if not isinstance(cursor, str) or not cursor.strip():
+            raise PipelineError(f"{at}.cursor is required: the column whose value only "
+                                f"ever increases as rows are added or changed")
+        key = cfg.get("primary_key")
+        keys = key if isinstance(key, list) else [key]
+        if not keys or not all(isinstance(k, str) and k.strip() for k in keys):
+            raise PipelineError(f"{at}.primary_key is required (a column name, or a list "
+                                f"of them): changed rows are merged on it")
+        initial = cfg.get("initial_value")
+        if isinstance(initial, (datetime.datetime, datetime.date)):
+            initial = initial.isoformat()
+        elif isinstance(initial, bool) or not (initial is None or isinstance(initial, (int, float, str))):
+            raise PipelineError(f"{at}.initial_value must be an integer or an ISO-8601 "
+                                f"date/datetime string, got {initial!r}")
+        if isinstance(initial, str):
+            try:
+                datetime.datetime.fromisoformat(initial)
+            except ValueError:
+                raise PipelineError(f"{at}.initial_value {initial!r} is not an ISO-8601 "
+                                    f"date/datetime (e.g. 2026-01-05T00:00:00)") from None
+        out[table] = {"cursor": cursor.strip(), "primary_key": key, "initial_value": initial}
+    return out
 
 
 def _validate_source(raw: dict, where: str) -> Source:
@@ -236,12 +298,14 @@ def _validate_source(raw: dict, where: str) -> Source:
             raise PipelineError(
                 f"{where}: source {connector!r} has no resources - "
                 f"at least one sheet (tab) name is needed to extract anything")
+    tables = list(raw.get("tables") or [])
     return Source(
         connector=connector,
         connection=connection,
-        tables=list(raw.get("tables") or []),
+        tables=tables,
         files=files,
         resources=resources,
+        incremental=_validate_incremental(raw.get("incremental"), connector, tables, where),
     )
 
 
@@ -265,6 +329,92 @@ def _validate_warehouse(raw: dict, where: str) -> Warehouse:
         password=raw.get("password", ""),
         schema=raw.get("schema", "public"),
     )
+
+
+# Seconds a single subprocess may run before dpagent kills it. Fixed limits
+# were the first thing a large table would hit: a 600s extract cap fails any
+# load that simply takes longer, however healthy it is. A pipeline raises them
+# in its own manifest (`timeouts:`), reviewed like everything else in it.
+DEFAULT_TIMEOUTS = {"extract": 600, "transform": 300, "gate": 120}
+
+SCHEDULE_PRESETS = {"@hourly", "@daily", "@weekly", "@monthly", "@yearly"}
+
+# (name, low, high, allowed names) for the five cron fields, in order.
+_CRON_FIELDS = [
+    ("minute", 0, 59, {}),
+    ("hour", 0, 23, {}),
+    ("day of month", 1, 31, {}),
+    ("month", 1, 12, {n: i for i, n in enumerate(
+        "jan feb mar apr may jun jul aug sep oct nov dec".split(), start=1)}),
+    ("day of week", 0, 7, {n: i for i, n in enumerate(
+        "sun mon tue wed thu fri sat".split())}),
+]
+
+
+def _cron_value(text: str, low: int, high: int, names: dict) -> bool:
+    text = text.lower()
+    value = names.get(text, int(text) if text.isdigit() else None)
+    return value is not None and low <= value <= high
+
+
+def _cron_part(part: str, low: int, high: int, names: dict) -> bool:
+    """One comma-separated element: `*`, `*/n`, `a`, `a-b`, `a-b/n`, `a/n`."""
+    base, _, step = part.partition("/")
+    if step and not (step.isdigit() and int(step) > 0):
+        return False
+    if base == "*":
+        return True
+    lo_hi = base.split("-")
+    if len(lo_hi) > 2:
+        return False
+    return all(_cron_value(v, low, high, names) for v in lo_hi)
+
+
+def _validate_schedule(raw, where: str) -> str | None:
+    """Checked at lint time because a bad schedule is not an error Airflow
+    reports where anyone looks: the generated DAG fails to import and the
+    pipeline just never shows up. Times are UTC - the Airflow the airflow pack
+    installs runs with default_timezone = utc."""
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise PipelineError(f"{where}: schedule must be a cron string or one of "
+                            f"{sorted(SCHEDULE_PRESETS)}, got {raw!r}")
+    schedule = " ".join(raw.split())
+    if schedule.startswith("@"):
+        if schedule not in SCHEDULE_PRESETS:
+            raise PipelineError(f"{where}: schedule {schedule!r} is not one of "
+                                f"{sorted(SCHEDULE_PRESETS)} (or a 5-field cron expression)")
+        return schedule
+    fields = schedule.split(" ")
+    if len(fields) != 5:
+        raise PipelineError(
+            f"{where}: schedule {schedule!r} needs 5 cron fields "
+            f"(minute hour day-of-month month day-of-week), found {len(fields)}")
+    for text, (name, low, high, names) in zip(fields, _CRON_FIELDS):
+        if not all(_cron_part(part, low, high, names) for part in text.split(",")):
+            raise PipelineError(
+                f"{where}: schedule {schedule!r}: {name} field {text!r} is not valid "
+                f"({low}-{high}, *, */n, a-b, or a comma list)")
+    return schedule
+
+
+
+def _validate_timeouts(raw, where: str) -> dict:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise PipelineError(f"{where}: timeouts must be a mapping of "
+                            f"{sorted(DEFAULT_TIMEOUTS)} to seconds")
+    unknown = sorted(set(raw) - set(DEFAULT_TIMEOUTS))
+    if unknown:
+        raise PipelineError(f"{where}: timeouts has unknown key(s) {unknown}; "
+                            f"expected {sorted(DEFAULT_TIMEOUTS)}")
+    for key, value in raw.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise PipelineError(f"{where}: timeouts.{key} must be a positive whole "
+                                f"number of seconds, got {value!r}")
+    return dict(raw)
 
 
 def _validate_stage(raw: dict, index: int, is_first: bool,
@@ -341,7 +491,12 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
     root = (pipelines_dir or PIPELINES_DIR) / name
     manifest = root / "pipeline.yaml"
     if not manifest.exists():
-        raise PipelineError(f"no pipeline for {name!r} (looked in {root})")
+        hint = ""
+        if pipelines_dir is None and os.environ.get("DPAGENT_PIPELINES"):
+            hint = (" - DPAGENT_PIPELINES is set in this shell and overrides the "
+                    "default pipelines/ directory (`unset DPAGENT_PIPELINES` to use "
+                    "the repo's)")
+        raise PipelineError(f"no pipeline for {name!r} (looked in {root}){hint}")
 
     data = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {}
     where = str(manifest)
@@ -368,6 +523,8 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         source=_validate_source(data.get("source") or {}, where),
         warehouse=_validate_warehouse(data.get("warehouse") or {}, where),
         stages=stages,
+        schedule=_validate_schedule(data.get("schedule"), where),
+        timeouts=_validate_timeouts(data.get("timeouts"), where),
     )
 
     for stage in pipeline.stages:

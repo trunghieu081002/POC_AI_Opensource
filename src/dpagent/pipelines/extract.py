@@ -35,7 +35,7 @@ def landing_dataset(pipeline: Pipeline) -> str:
     return f"{pipeline.name}_landing"
 
 
-def render_extract_script(pipeline: Pipeline) -> str:
+def _render_extract_body(pipeline: Pipeline) -> str:
     connector = pipeline.source.connector
     if connector not in CONNECTORS:
         raise ValueError(
@@ -205,11 +205,19 @@ def render_extract_script(pipeline: Pipeline) -> str:
             service = build("sheets", "v4", credentials=credentials)
 
 
+            def _a1(sheet_name):
+                # A1 notation needs a sheet name with a space (or a quote) in
+                # single quotes, embedded quotes doubled; quoting a plain name
+                # is equally valid, so always quote. Unquoted, "Sheet 1" is
+                # rejected as "Unable to parse range".
+                return "'" + sheet_name.replace("'", "''") + "'"
+
+
             def _resource_for(sheet_name):
                 @dlt.resource(name=sheet_name, write_disposition="replace")
                 def read_rows():
                     result = service.spreadsheets().values().get(
-                        spreadsheetId={spreadsheet_id!r}, range=sheet_name).execute()
+                        spreadsheetId={spreadsheet_id!r}, range=_a1(sheet_name)).execute()
                     values = result.get("values", [])
                     if not values:
                         return
@@ -243,21 +251,57 @@ def render_extract_script(pipeline: Pipeline) -> str:
     default_schema = "dbo" if connector == "sql_server" else "public"
     source_schema = pipeline.source.connection.get("schema", default_schema)
     return header + textwrap.dedent(f'''\
+        import datetime
         import os
 
         import dlt
         from dlt.sources.sql_database import sql_database
+
+        # table -> {{cursor, primary_key, initial_value}}: loaded incrementally,
+        # merged on primary_key. Every other table is a full refresh (replace).
+        INCREMENTAL = {dict(pipeline.source.incremental)!r}
 
         source = sql_database(
             credentials=os.environ["SRC_URL"],
             schema={source_schema!r},
             table_names={list(pipeline.source.tables)!r},
         )
+        for name, resource in source.resources.items():
+            cfg = INCREMENTAL.get(name)
+            if cfg is None:
+                resource.apply_hints(write_disposition="replace")
+                continue
+            initial = cfg["initial_value"]
+            if isinstance(initial, str):
+                initial = datetime.datetime.fromisoformat(initial)
+            kwargs = {{}} if initial is None else {{"initial_value": initial}}
+            resource.apply_hints(
+                write_disposition="merge", primary_key=cfg["primary_key"],
+                incremental=dlt.sources.incremental(cfg["cursor"], **kwargs))
         pipeline = dlt.pipeline(
             pipeline_name={pipeline.name + "_extract"!r},
             destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
             dataset_name={dataset!r},
         )
-        info = pipeline.run(source, write_disposition="replace")
+        # `dpagent pipeline run --full-refresh`: drop the landing tables and their
+        # incremental state and reload everything.
+        refresh = "drop_resources" if os.environ.get("DPAGENT_FULL_REFRESH") else None
+        info = pipeline.run(source, refresh=refresh)
         print(info)
     ''')
+
+
+# Every generated script ends the same way: report how many rows this run
+# extracted per table (dlt's own normalize counts, its bookkeeping tables left
+# out). runtime.run_extract puts it in the extract.done event, so the audit
+# trail says what a run actually moved - for an incremental table, only the new
+# and changed rows.
+_ROW_COUNTS_TAIL = """
+counts = {k: v for k, v in pipeline.last_trace.last_normalize_info.row_counts.items()
+          if not k.startswith("_dlt")}
+print("DPAGENT_ROW_COUNTS " + __import__("json").dumps(counts))
+"""
+
+
+def render_extract_script(pipeline: Pipeline) -> str:
+    return _render_extract_body(pipeline) + _ROW_COUNTS_TAIL
