@@ -113,3 +113,12 @@ def test_airflow_secrets_are_required_not_defaulted():
     schema = packs.load("airflow").param_schema
     with pytest.raises(params_mod.ParamError):
         params_mod.resolve(schema, {}, pack="airflow")
+
+
+def test_dlt_pack_pins_the_elasticsearch_client_below_9():
+    """Found against a real Elasticsearch 8.15 server, not by review: the
+    9.x client sends `compatible-with=9` headers, which an 8.x server rejects
+    with a 400 media_type_header_exception. Nothing else can catch a bump of
+    this pin - it only fails against a live server - so pin it here."""
+    script = (packs.load("dlt").path("steps/20-install.sh")).read_text()
+    assert '"elasticsearch>=8,<9"' in script

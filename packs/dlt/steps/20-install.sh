@@ -30,7 +30,15 @@ dp_run "$PIP" install --quiet "pymssql>=2.3,<3"
 # source for it (unlike sql_database/rest_api), so extract.py hand-rolls a
 # dlt.resource per index using this client's own scan() scroll-API helper
 # directly, the same shape the csv connector already uses.
-dp_run "$PIP" install --quiet "elasticsearch>=8,<10"
+#
+# Pinned <9, not <10: found against a real Elasticsearch 8.15 server - the
+# 9.x client sends `compatible-with=9` headers, which an 8.x server rejects
+# outright (400 media_type_header_exception, "Accept version must be either
+# version 8 or 7, but found 9"). A client's major version must not exceed
+# the server's; the 8.x client is native to ES 8 and, per Elastic's
+# compatibility mode, also talks to ES 9. ES 7.x servers need a 7.x client
+# and are out of scope for this pack.
+dp_run "$PIP" install --quiet "elasticsearch>=8,<9"
 
 # google-api-python-client/google-auth: the google_sheets connector's own
 # client - no built-in dlt source for it either, hand-rolled the same way
