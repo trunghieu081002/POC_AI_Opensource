@@ -455,3 +455,24 @@ again against the restored `orders.csv`) must land at the same `fct_orders`
 row count (8), never an accumulating duplicate - every procedure here is
 `TRUNCATE` + `INSERT` for exactly that reason (see
 `procedures/build_raw_orders.sql`/`build_curated_orders.sql`'s own comments).
+
+## Known limitations
+
+Stated from what real runs actually showed, not from the design:
+
+- **Quarantine tables accumulate across runs and carry no run marker.**
+  "Never deleted" (Concepts #5) is honoured literally: re-running a pipeline
+  whose source still holds the same bad rows inserts them into
+  `<table>_quarantine` again (a real pipeline showed 70 rows after several
+  runs over the same 10 source rows). Nothing yet says which run a row came
+  from, so repeated rows look like data problems. A `run_id` column on the
+  quarantine tables is the natural fix; it changes the positional
+  `INSERT ... SELECT *, reason` contract every procedure/dbt author writes
+  against, so it is deliberately not slipped in.
+- **Landing is a full refresh.** Every connector lands with
+  `write_disposition="replace"`; there is no incremental load or merge
+  strategy (see "Out of scope").
+- **One run at a time per pipeline.** The generated DAG sets
+  `max_active_runs=1`; a second `pipeline run` queues behind the first.
+- **Google Sheets is unit-tested only** (needs a real Google Cloud service
+  account and spreadsheet).

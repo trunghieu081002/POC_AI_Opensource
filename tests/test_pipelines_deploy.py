@@ -127,6 +127,14 @@ def test_dag_wires_success_and_failure_callbacks_to_finish_the_run(pipeline):
     assert src.index("def _on_dag_failure") < src.index("on_failure_callback=_on_dag_failure")
 
 
+def test_dag_allows_only_one_active_run_at_a_time(pipeline):
+    """Found on a real host: three queued runs released at once shared dlt's
+    local working directory (/opt/airflow/home/.dlt/pipelines/<name>_extract)
+    and clobbered each other's load package (FileNotFoundError), and would
+    equally have TRUNCATE+INSERTed the same warehouse tables concurrently."""
+    assert "max_active_runs=1," in deploy.render_dag(pipeline)
+
+
 # ---------------------------------------------------------------- trigger_dag_command
 
 @pytest.fixture

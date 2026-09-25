@@ -17,6 +17,15 @@ from .loader import Pipeline
 CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch", "google_sheets"}
 
 
+# Every connector lands with write_disposition="replace": landing is an
+# as-received snapshot of the source (docs/layer2.md), and a re-run must give
+# the same result, not add to the last one. csv/elasticsearch/google_sheets set
+# it on their hand-rolled resources; the two built-in dlt sources
+# (sql_database, rest_api) default to *append* and are told so on
+# pipeline.run() - found the hard way: a second run of a SQL Server pipeline
+# landed 40 rows from a 10-row table, and raw's unique gate failed at 100%.
+
+
 def landing_dataset(pipeline: Pipeline) -> str:
     """dlt's own dataset_name for this pipeline's landing stage - fixed by
     convention (docs/layer2.md: "dlt writes each table as-received into
@@ -116,7 +125,7 @@ def render_extract_script(pipeline: Pipeline) -> str:
                 destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
                 dataset_name={dataset!r},
             )
-            info = pipeline.run(source)
+            info = pipeline.run(source, write_disposition="replace")
             print(info)
         ''')
 
@@ -249,6 +258,6 @@ def render_extract_script(pipeline: Pipeline) -> str:
             destination=dlt.destinations.postgres(credentials=os.environ["DEST_URL"]),
             dataset_name={dataset!r},
         )
-        info = pipeline.run(source)
+        info = pipeline.run(source, write_disposition="replace")
         print(info)
     ''')

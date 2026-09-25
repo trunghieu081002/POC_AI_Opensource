@@ -371,3 +371,37 @@ def test_unknown_connector_is_refused():
         source=loader.Source(connector="not_a_real_connector"), warehouse=wh, stages=[])
     with pytest.raises(ValueError, match="not_a_real_connector"):
         extract.render_extract_script(pipeline)
+
+
+# ---------------------------------------------------------------- re-runs must not accumulate
+
+def _script_for(root, source):
+    _write(root, "demo", _base(source=source))
+    return extract.render_extract_script(loader.load("demo", root))
+
+
+@pytest.mark.parametrize("source", [
+    {"connector": "odoo_postgres", "connection": {"host": "h"}, "tables": ["t"]},
+    {"connector": "sql_server", "connection": {"host": "h"}, "tables": ["t"]},
+    {"connector": "rest_api", "connection": {"base_url": "https://api.example.com"},
+     "resources": ["users"]},
+], ids=["odoo_postgres", "sql_server", "rest_api"])
+def test_built_in_dlt_sources_land_with_replace_not_the_default_append(root, source):
+    """Found on a real host, not by review: dlt's sql_database/rest_api
+    sources default to append, so a SQL Server table of 10 rows landed 40
+    after the fourth run and raw's unique gate failed at 100%. Landing is an
+    as-received snapshot; a re-run must reproduce it."""
+    script = _script_for(root, source)
+    assert 'pipeline.run(source, write_disposition="replace")' in script
+
+
+@pytest.mark.parametrize("source", [
+    {"connector": "csv", "files": {"path": "/data/*.csv"}},
+    {"connector": "elasticsearch", "connection": {"hosts": ["http://h:9200"]},
+     "resources": ["orders"]},
+    {"connector": "google_sheets",
+     "connection": {"spreadsheet_id": "abc", "service_account_json": "${SA}"},
+     "resources": ["Orders"]},
+], ids=["csv", "elasticsearch", "google_sheets"])
+def test_hand_rolled_connectors_also_replace(root, source):
+    assert 'write_disposition="replace"' in _script_for(root, source)
