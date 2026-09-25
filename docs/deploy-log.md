@@ -2381,3 +2381,34 @@ were all re-checked clean after each commit. Branch pushed to
 `origin/fix/e2e-hardening`; merge to `main` deferred until this entry's
 evidence was in hand, per Hieu's own instruction earlier in the same
 session.
+
+### 2026-09-25 — SQL Server and Elasticsearch connectors, real-verified
+
+Throwaway Docker containers only (`dpagent-verify-*`; the unrelated
+`hg-fullscope-*` containers already on this host were never touched), each
+connector driven through the repo's actual `runtime.run_extract` and
+`run_gate` - real secret resolution, real generated script, real dlt - into a
+real Postgres 16, in an isolated venv built in the dlt pack's own install
+order (pip upgrade first, then `dlt[postgres,sql_database]`, `pymssql`,
+`elasticsearch`), so `/opt/dlt` was not modified.
+
+- **SQL Server 2022** (`mssql+pymssql`): 3/3 rows landed with correct values
+  and types; landing gate passed.
+- **Elasticsearch 8.15, no auth**: 3/3 documents landed; landing gate passed.
+- **Elasticsearch 8.15, security enabled, `basic` auth**: 4/4 documents
+  landed; the same run with a wrong password failed loudly
+  (`AuthenticationException(401)`), never silently.
+
+**Real bug found only by running it:** the pack pinned
+`elasticsearch>=8,<10`, which resolves to client 9.x; its requests carry
+`compatible-with=9`, which an 8.x server rejects (400
+`media_type_header_exception`). Pin is now `>=8,<9`, locked by a test in
+tests/test_packs.py since only a live server can otherwise reveal a bump.
+
+Environment notes, not product bugs: ES refused to allocate shards until its
+disk watermark was disabled on the throwaway node - this host's `/` is ~91%
+full (87G free), worth attention for the real Postgres/Airflow services; a
+fresh venv with pip 22.x silently ignores the `sql_database` extra spelling
+(PEP 685), which the pack's own venv step avoids by upgrading pip first.
+
+Still unverified: Google Sheets (needs a real service account/spreadsheet).

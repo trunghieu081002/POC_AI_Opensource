@@ -2,7 +2,8 @@
 
 Status: **MVP machinery complete and verified end to end against a real
 Airflow.** The manifest schema/generator/deploy/runtime, the `dlt` pack,
-both MVP connectors (odoo_postgres, csv), the pipeline machinery's own
+the MVP connectors (odoo_postgres, csv - REST API, SQL Server,
+Elasticsearch and Google Sheets were added afterwards, see "In scope"), the pipeline machinery's own
 acceptance test (tests/test_pipeline_acceptance.py - the negative case: a
 file with known-bad rows lands in quarantine and never reaches `curated`),
 and `dpagent pipeline run` triggering a real deployed DAG through a real
@@ -319,13 +320,16 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
     service-account auth only, never an interactive OAuth flow (cannot run
     unattended inside an Airflow task)
 
-  Real-database/service verification is still pending for SQL Server,
-  Elasticsearch, and Google Sheets (each needs a real instance/account this
-  sandbox cannot stand up or provision itself - no passwordless sudo, no
-  Docker group membership, no Google Cloud project; see
-  docs/deploy-log.md) - REST API and CSV are both already real-verified.
-  Every connector's own code path (script generation, secret handling,
-  loader validation) is covered by unit tests regardless.
+  Verification status, stated plainly: REST API, CSV and Odoo PostgreSQL are
+  real-verified end to end. **SQL Server** (SQL Server 2022, password auth)
+  and **Elasticsearch** (8.15, no auth and `basic` auth, plus a wrong-password
+  negative that fails loudly with a 401) were real-verified on 2026-09-25
+  through the repo's own `runtime.run_extract` + `run_gate` against throwaway
+  Docker containers landing into a real Postgres - see docs/deploy-log.md.
+  **Google Sheets** is unit-tested only: it needs a real Google Cloud
+  service account and spreadsheet, which cannot be provisioned from a
+  sandbox. Every connector's own code path (script generation, secret
+  handling, loader validation) is unit-tested regardless.
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
   Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
   The manifest names a transform engine (`dbt` or `procedure`) per hop; the
