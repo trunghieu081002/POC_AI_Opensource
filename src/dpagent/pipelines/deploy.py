@@ -148,7 +148,9 @@ def render_dag(pipeline: Pipeline) -> str:
 
     for task in tasks:
         if task.kind == "extract":
-            call = f'runtime.run_extract(pipeline_name="{pipeline.name}", run_id=run_id)'
+            call = (f'runtime.run_extract(pipeline_name="{pipeline.name}", run_id=run_id, '
+                    f'full_refresh=bool((dag_run.conf or {{}}).get("full_refresh")) '
+                    f'if dag_run else False)')
         elif task.kind == "gate":
             stage_name = task.id[len("gate_"):]
             call = (f'runtime.run_gate(pipeline_name="{pipeline.name}", '
@@ -785,16 +787,21 @@ def unpause_dag(pipeline_name: str) -> subprocess.CompletedProcess:
                           text=True, timeout=120)
 
 
-def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
+def trigger_dag_command(pipeline_name: str, dpagent_run_id: int,
+                        full_refresh: bool = False) -> list[str]:
     """The exact command `dpagent pipeline run` shells out to - built here,
     separately from the subprocess call, so it can be printed/tested without
     actually running it (mirrors `_psql_command`)."""
-    conf = json.dumps({"dpagent_run_id": dpagent_run_id})
+    conf_data = {"dpagent_run_id": dpagent_run_id}
+    if full_refresh:
+        conf_data["full_refresh"] = True
+    conf = json.dumps(conf_data)
     return _airflow_cli_command("dags", "trigger", f'"{pipeline_name}"', f"--conf {conf!r}")
 
 
-def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.CompletedProcess:
-    cmd = trigger_dag_command(pipeline_name, dpagent_run_id)
+def trigger_dag(pipeline_name: str, dpagent_run_id: int,
+                full_refresh: bool = False) -> subprocess.CompletedProcess:
+    cmd = trigger_dag_command(pipeline_name, dpagent_run_id, full_refresh)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
@@ -813,6 +820,7 @@ class UndeployResult:
     secrets_kept: dict[str, list[str]] = field(default_factory=dict)
     secrets_note: str = ""
     scheduler_restarted: bool = False
+    runs_cancelled: list[int] = field(default_factory=list)
 
 
 def _last_line(text: str) -> str:
@@ -902,6 +910,20 @@ def undeploy(pipeline: Pipeline) -> UndeployResult:
     if dlt_state.exists():
         shutil.rmtree(dlt_state)
         result.dlt_state_removed = True
+
+    # A run still `running` when its DAG is deleted never gets its completion
+    # callback (the DAG it would fire from is gone), so its journal row would
+    # stay `running` forever - found on a real host: the scheduled test
+    # pipeline's run #272, in flight at undeploy, was still "running" days on.
+    from ..engine import state
+    for row in state.conn().execute(
+            "SELECT id FROM runs WHERE kind='data' AND target=? AND status='running'",
+            (name,)).fetchall():
+        state.finish_run(row["id"], "cancelled")
+        state.event("pipeline.cancelled",
+                    f"{name} was undeployed while this run was still running",
+                    run_id=row["id"], level="warn", actor="user")
+        result.runs_cancelled.append(int(row["id"]))
 
     removed, kept, note = _release_pipeline_secrets(pipeline)
     result.secrets_removed, result.secrets_kept, result.secrets_note = removed, kept, note

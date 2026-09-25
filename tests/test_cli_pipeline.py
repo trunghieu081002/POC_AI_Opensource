@@ -436,3 +436,44 @@ def test_list_shows_manual_or_the_declared_schedule(db, tmp_path, monkeypatch):
         "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
     result = _runner().invoke(pipeline_group, ["list"])
     assert "0 2 * * *" in result.output and "manual" in result.output
+
+
+def test_undeploy_reports_the_runs_it_cancelled(db, monkeypatch):
+    from dpagent.pipelines.deploy import UndeployResult
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy",
+                        lambda p: UndeployResult(dag_file_removed=True, runs_cancelled=[272]))
+    result = _runner().invoke(pipeline_group, ["undeploy", "demo", "--yes"])
+    assert "cancelled" in result.output and "#272" in result.output
+
+
+def test_run_full_refresh_passes_the_flag_to_the_trigger_and_says_so_in_the_audit(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    import subprocess
+    calls = []
+
+    def trigger(pipeline_name, dpagent_run_id, full_refresh=False):
+        calls.append(full_refresh)
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", trigger)
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes", "--full-refresh"])
+    assert result.exit_code == 0, result.output
+    assert calls == [True]
+    run = state.latest_run(kind="data", target="demo")
+    assert "(full refresh)" in [e["message"] for e in state.events_for(run["id"])
+                                if e["kind"] == "pipeline.trigger"][0]
+
+
+def test_a_plain_run_does_not_pass_full_refresh(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _fake_trigger(0))   # 2-arg fake
+    result = _runner().invoke(pipeline_group, ["run", "demo", "--yes"])
+    assert result.exit_code == 0, result.output
+
+
+def test_full_refresh_asks_for_a_real_confirmation_that_says_what_it_drops(db, monkeypatch):
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _fake_trigger(0))
+    declined = _runner().invoke(pipeline_group, ["run", "demo", "--full-refresh"], input="\n")
+    assert declined.exit_code != 0                     # default answer is NO for a destructive run
+    assert "FULL REFRESH" in declined.output and "dropped" in declined.output

@@ -486,3 +486,106 @@ def test_no_override_hint_when_a_directory_was_passed_explicitly(root, monkeypat
     with pytest.raises(loader.PipelineError) as exc:
         loader.load("nonexistent", root)
     assert "DPAGENT_PIPELINES" not in str(exc.value)
+
+
+# ---------------------------------------------------------------- timeouts
+
+def test_timeouts_default_to_the_documented_limits(root):
+    _write(root, "demo", _minimal())
+    p = loader.load("demo", root)
+    assert p.timeouts == {}
+    assert (p.timeout("extract"), p.timeout("transform"), p.timeout("gate")) == (600, 300, 120)
+
+
+def test_a_manifest_can_raise_individual_timeouts(root):
+    data = _minimal()
+    data["timeouts"] = {"extract": 7200}
+    _write(root, "demo", data)
+    p = loader.load("demo", root)
+    assert p.timeout("extract") == 7200 and p.timeout("gate") == 120   # others keep defaults
+
+
+@pytest.mark.parametrize("bad,expect", [
+    ({"extract": 0}, "positive"),
+    ({"extract": -5}, "positive"),
+    ({"extract": "600"}, "positive"),
+    ({"extract": 1.5}, "positive"),
+    ({"extract": True}, "positive"),
+    ({"load": 100}, "unknown key"),
+    (["extract"], "mapping"),
+    ("600", "mapping"),
+])
+def test_invalid_timeouts_fail_at_lint(root, bad, expect):
+    data = _minimal()
+    data["timeouts"] = bad
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match=expect):
+        loader.load("demo", root)
+
+
+# ---------------------------------------------------------------- incremental
+
+def _inc(root, incremental, connector="sql_server", tables=("orders", "lookup")):
+    data = _minimal()
+    data["source"] = {"connector": connector, "connection": {"host": "h"},
+                      "tables": list(tables), "incremental": incremental}
+    _write(root, "demo", data)
+    return loader.load("demo", root)
+
+
+def test_a_valid_incremental_block_is_kept_normalized(root):
+    p = _inc(root, {"orders": {"cursor": " updated_at ", "primary_key": "order_id"}})
+    assert p.source.incremental == {
+        "orders": {"cursor": "updated_at", "primary_key": "order_id", "initial_value": None}}
+
+
+def test_a_composite_key_and_an_integer_initial_value_are_accepted(root):
+    p = _inc(root, {"orders": {"cursor": "version", "primary_key": ["a", "b"], "initial_value": 100}})
+    assert p.source.incremental["orders"]["primary_key"] == ["a", "b"]
+    assert p.source.incremental["orders"]["initial_value"] == 100
+
+
+def test_a_yaml_date_initial_value_becomes_an_iso_string(root):
+    """YAML parses an unquoted 2026-01-05 into a date object; the generated
+    script needs text it can hand to datetime.fromisoformat."""
+    import datetime
+    p = _inc(root, {"orders": {"cursor": "c", "primary_key": "k",
+                               "initial_value": datetime.date(2026, 1, 5)}})
+    assert p.source.incremental["orders"]["initial_value"] == "2026-01-05"
+
+
+def test_a_yaml_datetime_initial_value_becomes_an_iso_string(root):
+    import datetime
+    p = _inc(root, {"orders": {"cursor": "c", "primary_key": "k",
+                               "initial_value": datetime.datetime(2026, 1, 5, 8, 30)}})
+    assert p.source.incremental["orders"]["initial_value"] == "2026-01-05T08:30:00"
+
+
+@pytest.mark.parametrize("incremental,expect", [
+    ({"orders": {"primary_key": "k"}}, "cursor is required"),
+    ({"orders": {"cursor": "c"}}, "primary_key is required"),
+    ({"orders": {"cursor": "c", "primary_key": []}}, "primary_key is required"),
+    ({"orders": {"cursor": "c", "primary_key": ["a", ""]}}, "primary_key is required"),
+    ({"orders": {"cursor": "  ", "primary_key": "k"}}, "cursor is required"),
+    ({"nope": {"cursor": "c", "primary_key": "k"}}, "not in source.tables"),
+    ({"orders": {"cursor": "c", "primary_key": "k", "mode": "x"}}, "unknown key"),
+    ({"orders": {"cursor": "c", "primary_key": "k", "initial_value": "not a date"}}, "ISO-8601"),
+    ({"orders": {"cursor": "c", "primary_key": "k", "initial_value": True}}, "initial_value"),
+    ({"orders": {"cursor": "c", "primary_key": "k", "initial_value": [1]}}, "initial_value"),
+    ({"orders": "updated_at"}, "must be a mapping"),
+    (["orders"], "must map table names"),
+])
+def test_invalid_incremental_blocks_fail_at_lint(root, incremental, expect):
+    with pytest.raises(loader.PipelineError, match=expect):
+        _inc(root, incremental)
+
+
+@pytest.mark.parametrize("connector", ["csv", "rest_api", "elasticsearch", "google_sheets"])
+def test_incremental_is_refused_for_connectors_that_cannot_do_it(root, connector):
+    data = _minimal()
+    data["source"] = {"connector": connector, "connection": {"base_url": "x", "hosts": ["h"],
+                      "spreadsheet_id": "s"}, "files": {"path": "x"}, "resources": ["r"],
+                      "incremental": {"r": {"cursor": "c", "primary_key": "k"}}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="only supported for"):
+        loader.load("demo", root)

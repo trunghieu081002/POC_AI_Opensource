@@ -829,3 +829,121 @@ def test_the_auto_created_shape_is_exactly_what_the_run_marker_detection_expects
     monkeypatch.setattr(runtime, "_query_rows", lambda p, s, sql: [
         {"column_name": c} for c in ("order_id", "customer", "reason", "dpagent_run_id")])
     assert runtime._quarantine_run_tail(object(), "s", "t", 3) == ", 3 AS dpagent_run_id"
+
+
+# ---------------------------------------------------------------- large data: timeouts and counting
+
+def _pipeline_with(timeouts=None):
+    stage = _stage(engine="procedure", depends_on="landing", procedure="p.sql")
+    return loader.Pipeline(
+        name="big", summary="", root=__import__("pathlib").Path("."),
+        source=loader.Source(connector="csv", files={"path": "x"}),
+        warehouse=loader.Warehouse(host="h", database="d", schema="big"),
+        stages=[loader.Stage(name="landing"), stage], timeouts=timeouts or {})
+
+
+def test_run_uses_the_pipelines_own_timeout_for_its_kind(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["timeout"] = kw["timeout"]
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+    runtime._run(["x"], pipeline=_pipeline_with({"extract": 7200}), kind="extract", what="w")
+    assert seen["timeout"] == 7200
+    runtime._run(["x"], pipeline=_pipeline_with(), kind="gate", what="w")
+    assert seen["timeout"] == 120
+
+
+def test_a_timeout_names_exactly_the_manifest_key_to_raise(monkeypatch):
+    """A healthy but large load that simply takes longer than a fixed cap used to
+    surface as a bare TimeoutExpired ("failed before dlt ran", for an extract)."""
+    def boom(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+
+    monkeypatch.setattr(runtime.subprocess, "run", boom)
+    with pytest.raises(runtime.GateFailed) as exc:
+        runtime._run(["x"], pipeline=_pipeline_with(), kind="transform",
+                     what="CALL build_raw() for 'raw'")
+    text = str(exc.value)
+    assert "did not finish within 300s" in text
+    assert "timeouts: {transform: <seconds>}" in text
+    assert "pipelines/big/pipeline.yaml" in text
+
+
+def test_violations_are_counted_in_sql_and_never_fetched(monkeypatch):
+    """Measured on a real Postgres: fetching every violating row into Python to
+    take len() of it cost 1.1 GB for 1.2 million violations (linear - ten
+    million would be OOM-killed). The count runs inside the database."""
+    queries = []
+
+    def fake_query(pipeline, schema, sql):
+        queries.append(sql)
+        return [{"n": "0"}]
+
+    monkeypatch.setattr(runtime, "_query_rows", fake_query)
+    monkeypatch.setattr(runtime, "_ensure_quarantine_table", lambda *a: None)
+    gate = loader.Gate(type="business_rule", params={
+        "name": "r", "sql": "select id from t where bad;", "expect": "no_rows",
+        "table": "t", "id_column": "id"})
+    pipeline = _pipeline_with()
+
+    passed, *_ = runtime._evaluate_gate(pipeline, gate, pipeline.stages[1])
+
+    assert passed
+    assert queries[0] == ("select count(*) as n from (select id from t where bad) "
+                          "as dpagent_failing")
+
+
+# ---------------------------------------------------------------- rows extracted, full refresh
+
+def test_extract_done_names_the_rows_each_table_extracted(monkeypatch, tmp_path):
+    """For an incremental table this is only the new and changed rows - the
+    number that shows the audit trail what a run really moved."""
+    state = _state_in(tmp_path, monkeypatch)
+    monkeypatch.setenv("MSSQL_PASSWORD", "some-password-1")
+    monkeypatch.setenv("FD_WH_PASSWORD", "wh-pw-1234")
+    pipeline = _mssql_pipeline(tmp_path)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    monkeypatch.setattr(runtime.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
+        cmd, 0, stdout='noise\nDPAGENT_ROW_COUNTS {"orders": 3, "lookup": 2}\n', stderr=""))
+    run_id = state.start_run("data", "fd_demo")
+
+    runtime.run_extract(pipeline_name="fd_demo", run_id=run_id)
+
+    done = [e for e in state.events_for(run_id) if e["kind"] == "extract.done"][0]
+    assert done["message"] == "fd_demo extract complete: lookup +2, orders +3"
+
+
+@pytest.mark.parametrize("stdout,expected", [
+    ('DPAGENT_ROW_COUNTS {}\n', ": no rows extracted"),
+    ('', ""),
+    ('DPAGENT_ROW_COUNTS not-json\n', ""),
+    ('something else\n', ""),
+])
+def test_row_counts_degrade_quietly(stdout, expected):
+    """The extract already succeeded - an unreadable count must never fail it."""
+    assert runtime._row_counts(stdout) == expected
+
+
+def test_full_refresh_sets_the_env_var_for_the_child_and_is_visible_in_the_audit(
+        monkeypatch, tmp_path):
+    state = _state_in(tmp_path, monkeypatch)
+    monkeypatch.setenv("MSSQL_PASSWORD", "some-password-1")
+    monkeypatch.setenv("FD_WH_PASSWORD", "wh-pw-1234")
+    monkeypatch.delenv("DPAGENT_FULL_REFRESH", raising=False)
+    pipeline = _mssql_pipeline(tmp_path)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+    seen = []
+    monkeypatch.setattr(runtime.subprocess, "run", lambda cmd, **kw: (
+        seen.append(kw["env"].get("DPAGENT_FULL_REFRESH")),
+        subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))[1])
+    run_id = state.start_run("data", "fd_demo")
+
+    runtime.run_extract(pipeline_name="fd_demo", run_id=run_id)
+    runtime.run_extract(pipeline_name="fd_demo", run_id=run_id, full_refresh=True)
+
+    assert seen == [None, "1"]
+    starts = [e["message"] for e in state.events_for(run_id) if e["kind"] == "extract.start"]
+    assert starts == ["fd_demo via sql_server", "fd_demo via sql_server (full refresh)"]

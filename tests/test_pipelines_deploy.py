@@ -1062,3 +1062,42 @@ def test_dag_carries_the_declared_schedule_and_stays_valid_python(tmp_path):
     assert "schedule_interval='0 2 * * *'," in src
     # a scheduled DAG must still never backfill or overlap itself
     assert "catchup=False," in src and "max_active_runs=1," in src
+
+
+def test_undeploy_cancels_a_run_still_marked_running(deployed, tmp_path):
+    """Found on a real host: undeploy of a scheduled pipeline while a run was in
+    flight left that run `running` forever - its DAG, and with it the
+    completion callback, was gone."""
+    monkeypatch = deployed["monkeypatch"]
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "journal.db")
+    state.close()
+    in_flight = state.start_run("data", "demo")
+    finished = state.start_run("data", "demo")
+    state.finish_run(finished, "ok")
+    other_pipeline = state.start_run("data", "someone_else")
+
+    result = deploy.undeploy(deployed["pipeline"])
+
+    assert result.runs_cancelled == [in_flight]
+    assert state.get_run(in_flight)["status"] == "cancelled"
+    assert state.get_run(finished)["status"] == "ok"                 # untouched
+    assert state.get_run(other_pipeline)["status"] == "running"      # not this pipeline's
+    assert [e["kind"] for e in state.events_for(in_flight)] == ["pipeline.cancelled"]
+    state.close()
+
+
+# ---------------------------------------------------------------- full refresh plumbing
+
+def test_trigger_conf_carries_full_refresh_only_when_asked(isolated_db):
+    plain = deploy.trigger_dag_command("demo", 42)[-1]
+    assert '{"dpagent_run_id": 42}' in plain and "full_refresh" not in plain
+    full = deploy.trigger_dag_command("demo", 42, full_refresh=True)[-1]
+    assert '"full_refresh": true' in full and '"dpagent_run_id": 42' in full
+
+
+def test_dag_extract_task_reads_full_refresh_from_the_run_conf_and_no_other_task_does(pipeline):
+    src = deploy.render_dag(pipeline)
+    extract_call = [l for l in src.splitlines() if "runtime.run_extract(" in l][0]
+    assert 'full_refresh=bool((dag_run.conf or {}).get("full_refresh"))' in extract_call
+    assert sum("full_refresh" in line for line in src.splitlines()) == 1   # only that one line
+    ast.parse(src)

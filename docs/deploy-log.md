@@ -2515,3 +2515,16 @@ Evidence after the fixes (runs 62-64):
   to the scratch directory ("no pipeline for 'quickstart_dbt' (looked in
   /home/oracle/dpagent-e2e/...)"). The missing-pipeline error now names the
   override and how to unset it.
+- Incremental load, run for real (throwaway Postgres 16 as source and
+  destination, the repo's real `runtime.run_extract` through the dlt venv):
+  `extract.done` per run: first load `orders +3`; no change: no `orders` at all;
+  2 new + 1 updated: `orders +3`; local dlt state deleted + 1 new row:
+  `orders +1` (cursor restored from the destination); `--full-refresh`:
+  `orders +6`; a no-change run after it: none. Landing `orders` counts
+  3 -> 3 -> 5 -> 6 -> 6 -> 6 with distinct ids equal to the counts, order 2
+  showing `b-UPDATED`/99, and the non-incremental `lookup` staying at 2.
+  My first check queried `public.*` instead of `<pipeline>_landing.*` (harness
+  error, not a product bug). Not yet run through Airflow or against SQL Server.
+- Scale: gate violations are counted in SQL. 3M rows / 1.2M violations:
+  1.1 GB -> 21 MB peak. Subprocess timeouts (per-pipeline `timeouts:`) verified
+  with a 1 s gate limit. `undeploy` marks in-flight runs `cancelled`.
