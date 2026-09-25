@@ -343,3 +343,20 @@ def test_undeploy_works_from_the_published_copy_when_the_repo_manifest_is_gone(
     result = _runner().invoke(pipeline_group, ["undeploy", "ghost", "--yes"])
     assert result.exit_code == 0, result.output
     assert seen == ["ghost"]
+
+
+def test_status_of_a_failed_run_with_no_stage_points_at_audit_not_at_airflow_scheduling(db):
+    """A run whose extract failed has no stage rows either - "Airflow may still
+    be scheduling it" is wrong for a run that already ended."""
+    run_id = state.start_run("data", "demo")
+    state.finish_run(run_id, "failed")
+    result = _runner().invoke(pipeline_group, ["status", "demo"])
+    assert result.exit_code == 0
+    assert "scheduling" not in result.output
+    assert f"dpagent pipeline audit {run_id}" in result.output
+
+
+def test_status_of_a_running_run_with_no_stage_still_says_it_may_be_scheduling(db):
+    state.start_run("data", "demo")
+    result = _runner().invoke(pipeline_group, ["status", "demo"])
+    assert "scheduling" in result.output

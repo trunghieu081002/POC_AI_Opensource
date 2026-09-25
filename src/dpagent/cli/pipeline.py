@@ -402,8 +402,13 @@ def _render_status(name, run) -> None:
         )
     console.print(table)
     if not stage_rows:
-        console.print("[dim]triggered but no stage has reported in yet - "
-                      "Airflow may still be scheduling it[/dim]")
+        if run["status"] == "running":
+            console.print("[dim]triggered but no stage has reported in yet - "
+                          "Airflow may still be scheduling it[/dim]")
+        else:
+            console.print(f"[yellow]run {run['status']} before any stage reported[/yellow] - "
+                          f"typically the extract itself failed; why: "
+                          f"dpagent pipeline audit {run['id']}")
 
 
 @pipeline_group.command("status")

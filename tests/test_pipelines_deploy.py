@@ -953,3 +953,18 @@ def test_undeploy_refuses_to_run_without_root(deployed):
     with pytest.raises(deploy.DeployError, match="root"):
         deploy.undeploy(deployed["pipeline"])
     assert (deployed["home"] / "dags" / "demo.py").exists()   # nothing was touched
+
+
+def test_install_dbt_models_touches_nothing_for_a_pipeline_without_a_dbt_stage(
+        isolated_db, tmp_path, monkeypatch):
+    """Found on a real host: undeploy of a procedure-only pipeline reported
+    "removed published dbt models" - install_dbt_models had created an empty
+    models/<name> directory (and the shared macro) for a pipeline that has no
+    dbt stage, and would have done so on a host where dbt was never installed."""
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")    # landing stage only
+    project = tmp_path / "dbt_not_installed"
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: project)
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)   # not even root
+
+    assert deploy.install_dbt_models(pipeline) == []
+    assert not project.exists()

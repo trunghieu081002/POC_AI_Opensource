@@ -2474,3 +2474,16 @@ Evidence after the fixes (runs 62-64):
   not test this because pymssql never echoes the password.
 - `dpagent pipeline undeploy` added (unit-tested; its first real use is
   removing the `mssql_e2e` pipeline left on the host by the run above).
+
+- **First real `undeploy` (mssql_e2e, 2026-09-25):** removed the DAG file, its
+  Airflow registration and run history, the published copy, dlt's local state
+  and the now-unused `MSSQL_PASSWORD` (scheduler restarted); kept
+  `WAREHOUSE_DB_USER`/`WAREHOUSE_DB_PASSWORD` because `demo` and `quickstart`
+  still use them. Afterwards `/opt/dpagent/pipelines` held only `demo` and
+  `quickstart`, run 64 was still in `pipeline status`, and quickstart's own
+  status was untouched. Two details in its output led to fixes: it reported
+  "removed published dbt models" for a pipeline with no dbt stage
+  (`install_dbt_models` created an empty `models/<name>` directory and the
+  shared macro unconditionally - stray files under `/opt/dbt` on a host with
+  no dbt installed), and `pipeline status` told a run that had already failed
+  "Airflow may still be scheduling it".

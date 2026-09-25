@@ -380,8 +380,14 @@ def install_dbt_models(pipeline: Pipeline) -> list[Path]:
     unlike install_pipeline_files()/install_dag(), which publish into
     locations with no such default in place.
 
-    Requires root: /opt/dbt/project is not writable otherwise.
+    Requires root: /opt/dbt/project is not writable otherwise - but only when
+    there is something to publish: a pipeline with no dbt-engine stage returns
+    at once and touches nothing (it used to create an empty models/<name>
+    directory and the shared macro regardless, i.e. stray files under
+    /opt/dbt on a host where dbt was never even installed).
     """
+    if not any(stage.engine == "dbt" for stage in pipeline.stages[1:]):
+        return []
     if hasattr(os, "geteuid") and os.geteuid() != 0:
         raise DeployError(
             "publishing dbt models needs root (writing into the dbt pack's "
