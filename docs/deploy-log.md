@@ -2487,3 +2487,14 @@ Evidence after the fixes (runs 62-64):
   shared macro unconditionally - stray files under `/opt/dbt` on a host with
   no dbt installed), and `pipeline status` told a run that had already failed
   "Airflow may still be scheduling it".
+- **Second real `undeploy` (idempotence):** every line `absent`, no restart,
+  no error - the DAG-registration line had printed Airflow's whole
+  `DagNotFound` traceback for a DAG that was simply already gone; it is now
+  reported as absent, and a real failure shows only the exception's last
+  line with a retry hint. The same session found that `rm -rf` of the scratch
+  pipeline directory failed: `deploy` runs under sudo, so `build/` inside the
+  operator's own checkout was root-owned (`pipelines/demo/build` and
+  `pipelines/quickstart/build` still were). `write_artifacts` now hands
+  `build/` back to the pipeline directory's owner, repairing old files on the
+  next deploy. Added `dpagent pipeline list` (connector, deployed?, last run,
+  and deployed pipelines whose manifest is not in this checkout).

@@ -360,3 +360,61 @@ def test_status_of_a_running_run_with_no_stage_still_says_it_may_be_scheduling(d
     state.start_run("data", "demo")
     result = _runner().invoke(pipeline_group, ["status", "demo"])
     assert "scheduling" in result.output
+
+
+# ---------------------------------------------------------------- list, undeploy failure display
+
+def _two_pipelines(tmp_path, monkeypatch):
+    root = tmp_path / "repo_pipelines"
+    (root / "good").mkdir(parents=True)
+    (root / "good" / "pipeline.yaml").write_text(
+        "name: good\nsummary: t\nsource: {connector: csv, files: {path: /tmp/x.csv}}\n"
+        "warehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    (root / "bad").mkdir()
+    (root / "bad" / "pipeline.yaml").write_text("name: bad\nstages: []\n")
+    shared = tmp_path / "shared"
+    for name in ("good", "orphan"):
+        (shared / name).mkdir(parents=True)
+        (shared / name / "pipeline.yaml").write_text("x")
+    monkeypatch.setattr(pipeline_cli.pipelines_mod, "PIPELINES_DIR", root)
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "SHARED_PIPELINES_DIR", shared)
+
+
+def test_list_shows_connector_deployed_state_and_last_run(db, tmp_path, monkeypatch):
+    _two_pipelines(tmp_path, monkeypatch)
+    run_id = state.start_run("data", "good")
+    state.finish_run(run_id, "ok")
+
+    result = _runner().invoke(pipeline_group, ["list"])
+
+    assert result.exit_code == 0, result.output
+    assert "good" in result.output and "csv" in result.output
+    assert "ok" in result.output and f"#{run_id}" in result.output
+    assert "never" not in result.output.split("good")[1].split("\n")[0]
+
+
+def test_list_flags_an_invalid_manifest_instead_of_crashing(db, tmp_path, monkeypatch):
+    _two_pipelines(tmp_path, monkeypatch)
+    result = _runner().invoke(pipeline_group, ["list"])
+    assert result.exit_code == 0
+    assert "bad" in result.output and "invalid" in result.output
+
+
+def test_list_shows_a_deployed_pipeline_whose_manifest_is_gone(db, tmp_path, monkeypatch):
+    """Otherwise there is no way to discover that something can be undeployed."""
+    _two_pipelines(tmp_path, monkeypatch)
+    result = _runner().invoke(pipeline_group, ["list"])
+    assert "orphan" in result.output and "not in this checkout" in result.output
+    assert "undeploy" in result.output
+
+
+def test_undeploy_shows_a_real_airflow_failure_and_how_to_retry(db, monkeypatch):
+    from dpagent.pipelines.deploy import UndeployResult
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy", lambda p: UndeployResult(
+        dag_file_removed=True, dag_delete_failed=True,
+        dag_delete_note="sqlalchemy.exc.OperationalError: could not connect"))
+    result = _runner().invoke(pipeline_group, ["undeploy", "demo", "--yes"])
+    assert result.exit_code == 0
+    assert "failed" in result.output and "could not connect" in result.output
+    assert "retry" in result.output

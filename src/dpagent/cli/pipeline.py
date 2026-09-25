@@ -100,6 +100,47 @@ def lint_cmd(name):
     console.print("[green]lint clean[/green]")
 
 
+@pipeline_group.command("list")
+def list_cmd():
+    """Every pipeline: its connector, whether it is deployed, and its last run.
+
+    Covers the manifests in this checkout plus any pipeline still deployed
+    whose manifest is no longer here (removable with `undeploy`).
+    """
+    deployed = set(deploy_mod.deployed_names())
+    table = Table(box=None)
+    for column in ("pipeline", "connector", "stages", "deployed", "last run"):
+        table.add_column(column, style="bold" if column == "pipeline" else "")
+
+    def last_run(name):
+        run = state.latest_run(kind="data", target=name)
+        if not run:
+            return "[dim]never[/dim]"
+        colour = {"ok": "green", "failed": "red"}.get(run["status"], "yellow")
+        return f"[{colour}]{run['status']}[/{colour}] [dim]#{run['id']} {run['started_at']}[/dim]"
+
+    in_checkout = pipelines_mod.available()
+    for name in in_checkout:
+        yes_no = "[green]yes[/green]" if name in deployed else "[dim]no[/dim]"
+        try:
+            p = pipelines_mod.load(name)
+        except pipelines_mod.PipelineError as exc:
+            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:60],
+                          yes_no, last_run(name))
+            continue
+        table.add_row(name, p.source.connector, " > ".join(s.name for s in p.stages),
+                      yes_no, last_run(name))
+    orphans = sorted(deployed - set(in_checkout))
+    if not (in_checkout or orphans):
+        console.print("[dim]no pipelines in this checkout and none deployed[/dim]")
+        return
+    if in_checkout:
+        console.print(table)
+    if orphans:
+        console.print(f"[yellow]deployed but not in this checkout:[/yellow] {', '.join(orphans)} "
+                      f"[dim](remove with: dpagent pipeline undeploy <name>)[/dim]")
+
+
 @pipeline_group.command("plan")
 @click.argument("name")
 def plan_cmd(name):
@@ -292,9 +333,13 @@ def undeploy_cmd(name, yes):
 
     console.print(f"[bold]undeployed {name}[/bold]")
     mark(result.dag_file_removed, "DAG file in Airflow's DAGS_FOLDER")
-    mark(result.dag_deleted_from_airflow, "DAG registration and run history in Airflow")
-    if result.dag_delete_note and not result.dag_deleted_from_airflow:
-        console.print(f"          [dim]{result.dag_delete_note}[/dim]")
+    if result.dag_delete_failed:
+        console.print(f"  [red]failed [/red]  DAG registration and run history in Airflow: "
+                      f"{result.dag_delete_note}")
+        console.print(f"          [dim]retry once Airflow is reachable: dpagent pipeline "
+                      f"undeploy {name}[/dim]")
+    else:
+        mark(result.dag_deleted_from_airflow, "DAG registration and run history in Airflow")
     mark(result.published_files_removed, f"published copy {deploy_mod.SHARED_PIPELINES_DIR / name}")
     mark(result.dbt_models_removed, "published dbt models")
     mark(result.dlt_state_removed, "dlt local working state")

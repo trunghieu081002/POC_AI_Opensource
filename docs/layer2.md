@@ -292,6 +292,8 @@ way, so `tested`/`untested` has the same meaning here as it does for installs.
 Mirrors the install/verify/test verbs, for the same reasons:
 
 ```
+dpagent pipeline list             # every pipeline: connector, deployed?, last run - and any
+                                 #   deployed pipeline whose manifest is no longer in this checkout
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them

@@ -229,7 +229,26 @@ def write_artifacts(pipeline: Pipeline) -> list[Path]:
         schema_path.write_text(render_dbt_schema(pipeline, stage))
         written.append(schema_path)
 
+    _hand_build_dir_back(pipeline)
     return written
+
+
+def _hand_build_dir_back(pipeline: Pipeline) -> None:
+    """`deploy` runs under sudo, so everything it writes into
+    pipelines/<name>/build/ - inside the operator's own checkout - was
+    root-owned: found on a real host when `rm -rf` of a scratch pipeline
+    directory failed on build/dags/<name>.py, and again when a non-root
+    files-only deploy could not overwrite it. Give build/ back to whoever
+    owns the pipeline directory itself. Also repairs files an older deploy
+    left behind, since every path under build/ is visited."""
+    if not (hasattr(os, "geteuid") and os.geteuid() == 0):
+        return
+    build = pipeline.root / "build"
+    if not build.exists():
+        return
+    owner = pipeline.root.stat()
+    for path in [build, *build.rglob("*")]:
+        os.chown(path, owner.st_uid, owner.st_gid)
 
 
 def _psql_command(pipeline: Pipeline, *extra: str) -> tuple[list[str], dict[str, str]]:
@@ -786,6 +805,7 @@ def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.Completed
 class UndeployResult:
     dag_file_removed: bool = False
     dag_deleted_from_airflow: bool = False
+    dag_delete_failed: bool = False
     dag_delete_note: str = ""
     published_files_removed: bool = False
     dbt_models_removed: bool = False
@@ -794,6 +814,13 @@ class UndeployResult:
     secrets_kept: dict[str, list[str]] = field(default_factory=dict)
     secrets_note: str = ""
     scheduler_restarted: bool = False
+
+
+def _last_line(text: str) -> str:
+    """A traceback's last non-empty line is the exception itself; the rest is
+    a screenful of internals."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[-1] if lines else ""
 
 
 def _release_pipeline_secrets(pipeline: Pipeline) -> tuple[list[str], dict[str, list[str]], str]:
@@ -854,7 +881,13 @@ def undeploy(pipeline: Pipeline) -> UndeployResult:
         capture_output=True, text=True, timeout=120)
     result.dag_deleted_from_airflow = deleted.returncode == 0
     if not result.dag_deleted_from_airflow:
-        result.dag_delete_note = (deleted.stderr or deleted.stdout).strip()
+        output = (deleted.stderr or deleted.stdout).strip()
+        # "Dag id X not found" is the normal answer for a DAG that is already
+        # gone (a second undeploy, or one that never registered) - not a
+        # failure, and not worth a traceback on screen.
+        if "DagNotFound" not in output and "not found" not in output.lower():
+            result.dag_delete_failed = True
+            result.dag_delete_note = _last_line(output)
 
     published = SHARED_PIPELINES_DIR / name
     if published.exists():
@@ -878,3 +911,14 @@ def undeploy(pipeline: Pipeline) -> UndeployResult:
                           what="restarting airflow-scheduler to drop released secrets")
         result.scheduler_restarted = True
     return result
+
+
+def deployed_names() -> list[str]:
+    """Pipelines currently published under SHARED_PIPELINES_DIR - i.e.
+    deployed - whether or not this checkout still has their manifest. The
+    directory is world-readable (install_pipeline_files), so this needs no
+    root."""
+    if not SHARED_PIPELINES_DIR.exists():
+        return []
+    return sorted(d.name for d in SHARED_PIPELINES_DIR.iterdir()
+                  if d.is_dir() and (d / "pipeline.yaml").exists())

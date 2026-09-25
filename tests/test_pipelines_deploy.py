@@ -936,15 +936,40 @@ def test_undeploy_is_idempotent(deployed):
     assert second.secrets_removed == [] and deployed["restarts"] == []
 
 
-def test_undeploy_reports_an_airflow_delete_failure_without_raising(deployed):
-    """The DAG was never registered (or Airflow is down): the files are
-    already gone, the rest of the cleanup must still happen."""
+_DAG_NOT_FOUND_TRACEBACK = """/opt/airflow/.venv/lib64/python3.11/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz.
+Traceback (most recent call last):
+  File "/opt/airflow/.venv/bin/airflow", line 6, in <module>
+    sys.exit(main())
+  File "/opt/airflow/.venv/lib64/python3.11/site-packages/airflow/api/common/delete_dag.py", line 64, in delete_dag
+    raise DagNotFound(f"Dag id {dag_id} not found")
+airflow.exceptions.DagNotFound: Dag id demo not found
+"""
+
+
+def test_undeploy_treats_an_already_deleted_dag_as_absent_not_as_a_failure(deployed):
+    """Found on a real host: the second undeploy printed Airflow's whole
+    DagNotFound traceback for what is simply "already gone"."""
     deployed["monkeypatch"].setattr(
         deploy.subprocess, "run",
-        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="DAG not found"))
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="",
+                                                      stderr=_DAG_NOT_FOUND_TRACEBACK))
     result = deploy.undeploy(deployed["pipeline"])
     assert result.dag_deleted_from_airflow is False
-    assert "DAG not found" in result.dag_delete_note
+    assert result.dag_delete_failed is False
+    assert result.dag_delete_note == ""
+
+
+def test_undeploy_reports_a_real_airflow_failure_as_its_last_line_only(deployed):
+    """Airflow down (or any other real error): the rest of the cleanup still
+    happens, and the operator sees the exception, not a screenful of stack."""
+    trace = ("Traceback (most recent call last):\n  File \"x.py\", line 1, in <module>\n"
+             "    connect()\nsqlalchemy.exc.OperationalError: could not connect to server\n")
+    deployed["monkeypatch"].setattr(
+        deploy.subprocess, "run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr=trace))
+    result = deploy.undeploy(deployed["pipeline"])
+    assert result.dag_delete_failed is True
+    assert result.dag_delete_note == "sqlalchemy.exc.OperationalError: could not connect to server"
     assert result.dag_file_removed and result.published_files_removed
 
 
@@ -968,3 +993,47 @@ def test_install_dbt_models_touches_nothing_for_a_pipeline_without_a_dbt_stage(
 
     assert deploy.install_dbt_models(pipeline) == []
     assert not project.exists()
+
+
+# ---------------------------------------------------------------- build/ ownership, deployed_names
+
+def test_write_artifacts_hands_build_back_to_the_pipeline_directorys_owner(
+        pipeline, monkeypatch):
+    """`deploy` runs under sudo; without this, build/ inside the operator's own
+    checkout ends up root-owned (rm -rf and non-root deploys then fail)."""
+    calls = []
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(os, "chown", lambda path, uid, gid: calls.append((path, uid, gid)))
+
+    written = deploy.write_artifacts(pipeline)
+
+    owner = pipeline.root.stat()
+    chowned = {c[0] for c in calls}
+    assert pipeline.root / "build" in chowned
+    for path in written:
+        assert path in chowned
+    assert all((uid, gid) == (owner.st_uid, owner.st_gid) for _, uid, gid in calls)
+
+
+def test_write_artifacts_does_not_chown_when_not_root(pipeline, monkeypatch):
+    calls = []
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    monkeypatch.setattr(os, "chown", lambda *a: calls.append(a))
+    deploy.write_artifacts(pipeline)
+    assert calls == []
+
+
+def test_deployed_names_lists_published_pipelines_that_have_a_manifest(tmp_path, monkeypatch):
+    shared = tmp_path / "shared"
+    for name, has_manifest in [("b", True), ("a", True), ("stray", False)]:
+        (shared / name).mkdir(parents=True)
+        if has_manifest:
+            (shared / name / "pipeline.yaml").write_text("x")
+    (shared / "a_file").write_text("not a dir")
+    monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", shared)
+    assert deploy.deployed_names() == ["a", "b"]
+
+
+def test_deployed_names_is_empty_when_nothing_was_ever_deployed(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", tmp_path / "does_not_exist")
+    assert deploy.deployed_names() == []
