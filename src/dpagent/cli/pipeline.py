@@ -7,6 +7,7 @@ before anything is generated or run against a real warehouse.
 from __future__ import annotations
 
 import sys
+import time
 
 import click
 from rich.panel import Panel
@@ -215,13 +216,41 @@ def deploy_cmd(name, yes, no_db, no_airflow):
                      "own environment, airflow-scheduler restarted")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
+        if result.dag_unpaused:
+            console.print("[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
+        else:
+            console.print(
+                f"[yellow]could not unpause the DAG[/yellow] - until it is unpaused a "
+                f"`pipeline run` is created but never starts. Do it by hand: "
+                f"airflow dags unpause {name}\n  {result.dag_unpause_error}")
     console.print("[green]deployed[/green]")
+
+
+def _wait_for_run(run_id: int, *, timeout: float, interval: float = 3.0,
+                  sleep=time.sleep, clock=time.monotonic) -> str:
+    """Polls dpagent's own journal until the run leaves "running" (the DAG's
+    own success/failure callback is what moves it - runtime.finish_pipeline_run)
+    or `timeout` seconds pass. Returns the final status, or "running" if it
+    timed out. Reads the journal, not Airflow: same source `status` uses."""
+    deadline = clock() + timeout
+    while True:
+        row = state.get_run(run_id)
+        if row is not None and row["status"] != "running":
+            return row["status"]
+        if clock() >= deadline:
+            return "running"
+        sleep(interval)
 
 
 @pipeline_group.command("run")
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True)
-def run_cmd(name, yes):
+@click.option("--wait", is_flag=True,
+              help="Block until the run reaches a terminal state; exit 0 if ok, "
+                   "1 if failed, 3 if --timeout passes first.")
+@click.option("--timeout", type=int, default=1800, show_default=True,
+              help="Seconds --wait gives up after (the run itself keeps going).")
+def run_cmd(name, yes, wait, timeout):
     """Trigger this pipeline's deployed Airflow DAG - through Airflow, not around it.
 
     Records a `runs` row (kind='data') first and passes its id into the DAG
@@ -230,7 +259,8 @@ def run_cmd(name, yes):
     dpagent executes itself. Triggering runs the CLI as the `airflow` OS
     user (same as `packs/airflow`'s own af_run), a real command against this
     host's real Airflow, so it asks first unless --yes. dpagent does not
-    wait for the DAG to finish - Airflow runs it asynchronously.
+    wait for the DAG to finish unless --wait is given - Airflow runs it
+    asynchronously.
     """
     pipeline = _load_or_fail(name)   # fail before touching state if the manifest itself is broken
     _require_layer2_prerequisites(pipeline)
@@ -253,21 +283,32 @@ def run_cmd(name, yes):
              f"{result.stderr.strip()}")
 
     console.print(f"[green]triggered[/green] — dpagent run {run_id}")
-    console.print(f"[dim]dpagent does not wait for Airflow to finish this run. "
-                 f"Check progress with: dpagent pipeline status {name}[/dim]")
-
-
-@pipeline_group.command("status")
-@click.argument("name")
-def status_cmd(name):
-    """Stages, last run, gate verdicts - from dpagent's own journal, not a live Airflow query."""
-    _load_or_fail(name)
-    run = state.latest_run(kind="data", target=name)
-    if not run:
-        console.print(f"[dim]no runs recorded for {name!r} yet[/dim]")
-        console.print(f"[dim]run: dpagent pipeline run {name}[/dim]")
+    if not wait:
+        console.print(f"[dim]dpagent does not wait for Airflow to finish this run. "
+                     f"Check progress with: dpagent pipeline status {name} "
+                     f"(or re-run with --wait)[/dim]")
         return
 
+    console.print(f"[dim]waiting up to {timeout}s for run {run_id} to finish...[/dim]")
+    final = _wait_for_run(run_id, timeout=timeout)
+    _render_status(name, state.get_run(run_id))
+    if final == "ok":
+        return
+    if final == "running":
+        console.print(f"[yellow]still running after {timeout}s[/yellow] - it was not "
+                      f"stopped; check: dpagent pipeline status {name}")
+        if not state.stages_for_run(run_id):
+            console.print(
+                "[yellow]no stage ever reported in[/yellow] - the DAG's tasks never "
+                "started. Usual causes: the DAG is paused (airflow dags unpause "
+                f"{name}) or airflow-scheduler is not running "
+                "(systemctl status airflow-scheduler).")
+        sys.exit(3)
+    console.print(f"[red]run {run_id} {final}[/red] - why: dpagent pipeline audit {run_id}")
+    sys.exit(1)
+
+
+def _render_status(name, run) -> None:
     stage_rows = state.stages_for_run(run["id"])
     colour = {"ok": "green", "failed": "red"}.get(run["status"], "yellow")
     table = Table(box=None,
@@ -296,6 +337,19 @@ def status_cmd(name):
     if not stage_rows:
         console.print("[dim]triggered but no stage has reported in yet - "
                       "Airflow may still be scheduling it[/dim]")
+
+
+@pipeline_group.command("status")
+@click.argument("name")
+def status_cmd(name):
+    """Stages, last run, gate verdicts - from dpagent's own journal, not a live Airflow query."""
+    _load_or_fail(name)
+    run = state.latest_run(kind="data", target=name)
+    if not run:
+        console.print(f"[dim]no runs recorded for {name!r} yet[/dim]")
+        console.print(f"[dim]run: dpagent pipeline run {name}[/dim]")
+        return
+    _render_status(name, run)
 
 
 @pipeline_group.command("audit")

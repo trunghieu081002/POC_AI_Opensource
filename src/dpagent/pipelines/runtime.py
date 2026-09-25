@@ -14,7 +14,7 @@ import subprocess
 from urllib.parse import quote
 
 from ..engine import state
-from ..engine.params import resolve_refs
+from ..engine.params import redact, register_secret, resolve_refs
 from . import extract, generator, loader
 from .loader import quarantine_table_for
 
@@ -45,6 +45,30 @@ class GateFailed(Exception):
     semantics"), not a bug in the runtime."""
 
 
+# Keys whose resolved values are secrets. resolve_refs() does not register
+# anything with params.redact() on its own (only pack params do), so a
+# pipeline's own resolved password/token would otherwise reach the audit
+# trail and Airflow's task log verbatim inside a driver's error text.
+_SECRET_KEYS = ("password", "token", "api_key", "service_account_json")
+_DETAIL_CHARS = 1500
+
+
+def _register_secrets(values: dict) -> None:
+    for key, value in values.items():
+        if key in _SECRET_KEYS and isinstance(value, str):
+            register_secret(value)
+            register_secret(quote(value, safe=""))   # the form a URL error prints
+
+
+def _detail(text: str) -> str:
+    """The last _DETAIL_CHARS of `text`, secrets masked - what a failure
+    event/exception carries so `dpagent pipeline audit` says *why*, not only
+    that something failed (found on a real run: extract.start, then
+    pipeline.failed, with nothing in between to explain it)."""
+    text = redact((text or "").strip())
+    return text if len(text) <= _DETAIL_CHARS else "..." + text[-_DETAIL_CHARS:]
+
+
 def _normalize_type(t: str) -> str:
     return _TYPE_ALIASES.get(t.strip().lower(), t.strip().lower())
 
@@ -69,6 +93,7 @@ def _warehouse_conn(pipeline: loader.Pipeline, schema: str) -> tuple[list[str], 
          "password": pipeline.warehouse.password},
         path=f"{pipeline.name}.warehouse",
     )
+    _register_secrets(resolved)
     cmd = ["psql", "-h", resolved["host"], "-p", str(resolved["port"]),
            "-d", resolved["database"], "-v", "ON_ERROR_STOP=1"]
     if resolved.get("user"):
@@ -318,18 +343,21 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
              "--project-dir", _dbt_project_dir()],
             capture_output=True, text=True, timeout=300)
         if proc.returncode != 0:
-            state.event("transform.failed", f"dbt run failed for {stage!r}", run_id=run_id,
-                        level="error")
-            raise GateFailed(f"dbt run failed for {stage!r}:\n{proc.stderr}")
+            detail = _detail(proc.stderr or proc.stdout)
+            state.event("transform.failed", f"dbt run failed for {stage!r}: {detail}",
+                        run_id=run_id, level="error")
+            raise GateFailed(f"dbt run failed for {stage!r}:\n{detail}")
     elif target.engine == "procedure":
         proc_name = pipeline.path(target.procedure).stem
         cmd, env = _warehouse_conn(pipeline, _stage_schema(pipeline, target))
         proc = subprocess.run(cmd + ["-c", f"CALL {proc_name}();"], env=env,
                               capture_output=True, text=True, timeout=300)
         if proc.returncode != 0:
-            state.event("transform.failed", f"CALL {proc_name}() failed for {stage!r}",
+            detail = _detail(proc.stderr)
+            state.event("transform.failed",
+                        f"CALL {proc_name}() failed for {stage!r}: {detail}",
                         run_id=run_id, level="error")
-            raise GateFailed(f"CALL {proc_name}() failed for {stage!r}:\n{proc.stderr}")
+            raise GateFailed(f"CALL {proc_name}() failed for {stage!r}:\n{detail}")
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
 
 
@@ -391,7 +419,22 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
     pipeline = loader.load(pipeline_name)
     state.event("extract.start", f"{pipeline_name} via {pipeline.source.connector}",
                 run_id=run_id)
+    try:
+        _run_extract(pipeline, pipeline_name, run_id)
+    except GateFailed:
+        raise
+    except Exception as exc:
+        # Anything raised *before* dlt's own subprocess exists (an unset
+        # ${VAR}, a bad manifest value) used to leave no extract.failed
+        # event at all - only Airflow's own task log knew why.
+        state.event("extract.failed",
+                    f"{pipeline_name} extract failed before dlt ran: "
+                    f"{type(exc).__name__}: {_detail(str(exc))}",
+                    run_id=run_id, level="error")
+        raise
 
+
+def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | None) -> None:
     script = extract.render_extract_script(pipeline)
     env = os.environ.copy()
 
@@ -401,11 +444,13 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
          "password": pipeline.warehouse.password},
         path=f"{pipeline_name}.warehouse",
     )
+    _register_secrets(dest)
     env["DEST_URL"] = _connection_url(dest)
 
     if pipeline.source.connector == "odoo_postgres":
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
+        _register_secrets(src)
         env["SRC_URL"] = _connection_url(src)
     elif pipeline.source.connector == "sql_server":
         # pymssql (packs/dlt/steps/20-install.sh), not pyodbc: a pure/
@@ -415,17 +460,20 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         # pyodbc would add to every host the dlt pack installs on.
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
+        _register_secrets(src)
         env["SRC_URL"] = _connection_url(src, scheme="mssql+pymssql")
     elif pipeline.source.connector == "rest_api" and \
             pipeline.source.connection.get("auth_type") == "bearer":
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
+        _register_secrets(src)
         env["SRC_AUTH_TOKEN"] = src["token"]
     elif pipeline.source.connector == "elasticsearch":
         auth_type = pipeline.source.connection.get("auth_type", "none")
         if auth_type in ("basic", "api_key"):
             src = resolve_refs(pipeline.source.connection,
                                path=f"{pipeline_name}.source.connection")
+            _register_secrets(src)
             if auth_type == "basic":
                 env["SRC_ES_USER"] = src["user"]
                 env["SRC_ES_PASSWORD"] = src["password"]
@@ -438,14 +486,16 @@ def run_extract(*, pipeline_name: str, run_id: int | None = None) -> None:
         # ${VAR}, parsed back into a dict only inside the generated script.
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
+        _register_secrets(src)
         env["SRC_GOOGLE_SERVICE_ACCOUNT_JSON"] = src["service_account_json"]
 
     proc = subprocess.run([_dlt_python(), "-"], input=script, env=env,
                           capture_output=True, text=True, timeout=600)
     if proc.returncode != 0:
-        state.event("extract.failed", f"{pipeline_name} extract failed", run_id=run_id,
-                    level="error")
-        raise GateFailed(f"extract failed for {pipeline_name!r}:\n{proc.stderr}")
+        detail = _detail(proc.stderr)
+        state.event("extract.failed", f"{pipeline_name} extract failed: {detail}",
+                    run_id=run_id, level="error")
+        raise GateFailed(f"extract failed for {pipeline_name!r}:\n{detail}")
 
     state.event("extract.done", f"{pipeline_name} extract complete", run_id=run_id)
 

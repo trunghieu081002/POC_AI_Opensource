@@ -62,7 +62,10 @@ doing by hand - `dpagent pipeline deploy` (as root) creates the shared
 group, grants the ACL, and does the editable install the first time it
 runs, alongside publishing each pipeline to `/opt/dpagent/pipelines/<name>`,
 its dbt-engine stages' models into the dbt pack's own real project, and
-the DAG to Airflow's real DAGS_FOLDER. The one thing it cannot do for you:
+the DAG to Airflow's real DAGS_FOLDER - then unpauses it: Airflow registers a
+new DAG paused, and a manual run of a paused DAG is created `queued` and
+never starts (the generated DAG is manual-only, so unpausing cannot cause a
+scheduled run). The one thing it cannot do for you:
 if it just added `airflow` to the shared group, `airflow-scheduler`/
 `airflow-webserver` need restarting for that membership to take effect in
 their already-running processes (reported explicitly when it happens).
@@ -293,8 +296,12 @@ dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-form
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them
 dpagent pipeline run <name>      # trigger through Airflow, not around it
+                                 #   --wait blocks until the run is terminal: exit 0 ok,
+                                 #   1 failed, 3 if --timeout (default 1800s) passes first
 dpagent pipeline status <name>   # stages, last run, gate verdicts
-dpagent pipeline audit <run>     # every stage and gate decision, and who made it
+dpagent pipeline audit <run>     # every stage and gate decision, and who made it -
+                                 #   a failed extract/transform carries the driver's own
+                                 #   error (secrets masked), not just "failed"
 ```
 
 ## In scope (MVP)
@@ -448,3 +455,24 @@ again against the restored `orders.csv`) must land at the same `fct_orders`
 row count (8), never an accumulating duplicate - every procedure here is
 `TRUNCATE` + `INSERT` for exactly that reason (see
 `procedures/build_raw_orders.sql`/`build_curated_orders.sql`'s own comments).
+
+## Known limitations
+
+Stated from what real runs actually showed, not from the design:
+
+- **Quarantine tables accumulate across runs and carry no run marker.**
+  "Never deleted" (Concepts #5) is honoured literally: re-running a pipeline
+  whose source still holds the same bad rows inserts them into
+  `<table>_quarantine` again (a real pipeline showed 70 rows after several
+  runs over the same 10 source rows). Nothing yet says which run a row came
+  from, so repeated rows look like data problems. A `run_id` column on the
+  quarantine tables is the natural fix; it changes the positional
+  `INSERT ... SELECT *, reason` contract every procedure/dbt author writes
+  against, so it is deliberately not slipped in.
+- **Landing is a full refresh.** Every connector lands with
+  `write_disposition="replace"`; there is no incremental load or merge
+  strategy (see "Out of scope").
+- **One run at a time per pipeline.** The generated DAG sets
+  `max_active_runs=1`; a second `pipeline run` queues behind the first.
+- **Google Sheets is unit-tested only** (needs a real Google Cloud service
+  account and spreadsheet).
