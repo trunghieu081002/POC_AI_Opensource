@@ -289,3 +289,57 @@ def test_run_wait_timeout_with_no_stage_explains_the_usual_causes(db, monkeypatc
     assert result.exit_code == 3
     assert "never" in result.output and "unpause" in result.output
     assert "airflow-scheduler" in result.output
+
+
+# ---------------------------------------------------------------- undeploy
+
+def test_undeploy_declined_removes_nothing(db, monkeypatch):
+    called = []
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy", lambda p: called.append(p))
+    result = _runner().invoke(pipeline_group, ["undeploy", "demo"], input="n\n")
+    assert result.exit_code == 1
+    assert called == []
+    assert "nothing removed" in result.output
+
+
+def test_undeploy_yes_reports_what_went_and_what_was_left_in_place(db, monkeypatch):
+    from dpagent.pipelines.deploy import UndeployResult
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy", lambda p: UndeployResult(
+        dag_file_removed=True, dag_deleted_from_airflow=True, published_files_removed=True,
+        secrets_removed=["ODOO_DB_PASSWORD"], scheduler_restarted=True,
+        secrets_kept={"WAREHOUSE_DB_USER": ["quickstart"]}))
+    result = _runner().invoke(pipeline_group, ["undeploy", "demo", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "ODOO_DB_PASSWORD" in result.output and "airflow-scheduler restarted" in result.output
+    assert "WAREHOUSE_DB_USER" in result.output and "quickstart" in result.output
+    assert "left in place" in result.output and "run history" in result.output
+
+
+def test_undeploy_surfaces_the_root_requirement_as_a_clean_error(db, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    def boom(p):
+        raise deploy_mod.DeployError("re-run as sudo")
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy", boom)
+    result = _runner().invoke(pipeline_group, ["undeploy", "demo", "--yes"])
+    assert result.exit_code != 0 and "sudo" in result.output
+
+
+def test_undeploy_works_from_the_published_copy_when_the_repo_manifest_is_gone(
+        db, monkeypatch, tmp_path):
+    """A pipeline deleted from git must still be removable from Airflow."""
+    from dpagent.pipelines import loader as pipelines_mod
+    shared = tmp_path / "shared"
+    d = shared / "ghost"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(
+        "name: ghost\nsummary: t\nsource: {connector: csv, files: {path: /tmp/x.csv}}\n"
+        "warehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "SHARED_PIPELINES_DIR", shared)
+    seen = []
+    from dpagent.pipelines.deploy import UndeployResult
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "undeploy",
+                        lambda p: (seen.append(p.name), UndeployResult())[1])
+    result = _runner().invoke(pipeline_group, ["undeploy", "ghost", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert seen == ["ghost"]
