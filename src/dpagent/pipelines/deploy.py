@@ -23,6 +23,7 @@ import yaml
 
 from ..engine.params import ENV_REF, resolve_refs
 from .generator import dag_tasks
+from . import loader as loader_mod
 from .loader import Pipeline, Stage
 
 # Same convention as library.loader's own _INSTALL_PREFIX (/opt/dpagent) -
@@ -604,6 +605,14 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return result
 
 
+def _write_env_file(path: Path, values: dict[str, str]) -> None:
+    content = "".join(f'{key}="{value}"\n' for key, value in sorted(values.items()))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    os.chmod(path, 0o600)
+    shutil.chown(path, user="airflow", group="airflow")
+
+
 def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
     """Writes/refreshes `<airflow install_dir>/home/pipelines.env` with every
     ${VAR} this pipeline's manifest references, resolved from *this
@@ -667,11 +676,7 @@ def ensure_pipeline_secrets_available(pipeline: Pipeline) -> bool:
     if merged == existing:
         return False
 
-    content = "".join(f'{key}="{value}"\n' for key, value in sorted(merged.items()))
-    secrets_file.parent.mkdir(parents=True, exist_ok=True)
-    secrets_file.write_text(content)
-    os.chmod(secrets_file, 0o600)
-    shutil.chown(secrets_file, user="airflow", group="airflow")
+    _write_env_file(secrets_file, merged)
 
     _run_root_command(["systemctl", "restart", "airflow-scheduler"],
                       what="restarting airflow-scheduler to pick up pipeline secrets")
@@ -767,3 +772,103 @@ def trigger_dag_command(pipeline_name: str, dpagent_run_id: int) -> list[str]:
 def trigger_dag(pipeline_name: str, dpagent_run_id: int) -> subprocess.CompletedProcess:
     cmd = trigger_dag_command(pipeline_name, dpagent_run_id)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+
+# ---------------------------------------------------------------- undeploy
+
+@dataclass
+class UndeployResult:
+    dag_file_removed: bool = False
+    dag_deleted_from_airflow: bool = False
+    dag_delete_note: str = ""
+    published_files_removed: bool = False
+    dbt_models_removed: bool = False
+    dlt_state_removed: bool = False
+    secrets_removed: list[str] = field(default_factory=list)
+    secrets_kept: dict[str, list[str]] = field(default_factory=dict)
+    secrets_note: str = ""
+    scheduler_restarted: bool = False
+
+
+def _release_pipeline_secrets(pipeline: Pipeline) -> tuple[list[str], dict[str, list[str]], str]:
+    """(removed, kept, note): the ${VAR}s only *this* pipeline references are
+    dropped from pipelines.env; one another still-published pipeline uses stays.
+    If any other published manifest cannot be read, nothing is removed - not
+    knowing who else needs a secret is a reason to keep it."""
+    used_by_others: dict[str, list[str]] = {}
+    if SHARED_PIPELINES_DIR.exists():
+        for entry in sorted(SHARED_PIPELINES_DIR.iterdir()):
+            if not entry.is_dir() or entry.name == pipeline.name:
+                continue
+            try:
+                other = loader_mod.load(entry.name, SHARED_PIPELINES_DIR)
+            except Exception as exc:                       # any unreadable manifest
+                return [], {}, (f"kept every secret: could not read the published "
+                                f"pipeline {entry.name!r} ({exc}) to tell whether it "
+                                f"still needs them")
+            for var in _pipeline_env_refs(other):
+                used_by_others.setdefault(var, []).append(entry.name)
+
+    secrets_file = _pipeline_secrets_file()
+    existing = _parse_env_file(secrets_file)
+    mine = _pipeline_env_refs(pipeline)
+    removable = sorted(v for v in mine if v in existing and v not in used_by_others)
+    kept = {v: used_by_others[v] for v in sorted(mine) if v in used_by_others and v in existing}
+    if removable:
+        _write_env_file(secrets_file, {k: v for k, v in existing.items() if k not in removable})
+    return removable, kept, ""
+
+
+def undeploy(pipeline: Pipeline) -> UndeployResult:
+    """Reverses `deploy`'s Airflow-side and shared-location effects, and
+    nothing in the warehouse: schemas, landing/raw/curated tables, quarantine
+    tables and applied procedures are data and stay (dropping them is a
+    decision for whoever owns that data, not a side effect of un-deploying),
+    as does dpagent's own run journal.
+
+    The DAG *file* goes first, then `airflow dags delete`: the other way round
+    the scheduler's next scan re-registers the still-present file. Every step
+    tolerates "already gone", so running it twice is a no-op, not an error.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise DeployError("undeploying needs root (it removes files under Airflow's and "
+                          "dpagent's shared directories and edits its environment "
+                          "file) - re-run as sudo -E dpagent pipeline undeploy ...")
+    name = pipeline.name
+    result = UndeployResult()
+    airflow_home = _airflow_install_dir() / "home"
+
+    dag_file = airflow_home / "dags" / f"{name}.py"
+    if dag_file.exists():
+        dag_file.unlink()
+        result.dag_file_removed = True
+
+    deleted = subprocess.run(
+        _airflow_cli_command("dags", "delete", f'"{name}"', "--yes"),
+        capture_output=True, text=True, timeout=120)
+    result.dag_deleted_from_airflow = deleted.returncode == 0
+    if not result.dag_deleted_from_airflow:
+        result.dag_delete_note = (deleted.stderr or deleted.stdout).strip()
+
+    published = SHARED_PIPELINES_DIR / name
+    if published.exists():
+        shutil.rmtree(published)
+        result.published_files_removed = True
+
+    models = _dbt_project_dir() / "models" / name
+    if models.exists():
+        shutil.rmtree(models)
+        result.dbt_models_removed = True
+
+    dlt_state = airflow_home / ".dlt" / "pipelines" / f"{name}_extract"
+    if dlt_state.exists():
+        shutil.rmtree(dlt_state)
+        result.dlt_state_removed = True
+
+    removed, kept, note = _release_pipeline_secrets(pipeline)
+    result.secrets_removed, result.secrets_kept, result.secrets_note = removed, kept, note
+    if removed:
+        _run_root_command(["systemctl", "restart", "airflow-scheduler"],
+                          what="restarting airflow-scheduler to drop released secrets")
+        result.scheduler_restarted = True
+    return result

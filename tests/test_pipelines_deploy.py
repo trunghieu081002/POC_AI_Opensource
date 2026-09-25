@@ -805,3 +805,151 @@ def test_deploy_does_not_touch_airflow_at_all_under_no_airflow(isolated_db, pipe
     monkeypatch.setattr(deploy, "unpause_dag", lambda name: called.append(name))
     deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False)
     assert called == []
+
+
+# ---------------------------------------------------------------- undeploy
+
+def _write_published(shared, name, refs):
+    """A published pipeline under the shared directory that references `refs`
+    (env var names) in its warehouse section."""
+    data = {
+        "name": name, "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "/tmp/x.csv"}},
+        "warehouse": {"host": "localhost", "database": "warehouse",
+                     "user": "${%s}" % refs[0], "password": "${%s}" % refs[1]},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "x", "min": 1}]}],
+    }
+    d = shared / name
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+
+
+@pytest.fixture
+def deployed(tmp_path, monkeypatch):
+    """A host where `demo` (the pipeline with ${ODOO_DB_*}/${WAREHOUSE_DB_*}
+    refs) is fully deployed, laid out exactly where deploy() puts things."""
+    install_dir = tmp_path / "airflow"
+    home = install_dir / "home"
+    (home / "dags").mkdir(parents=True)
+    (home / "dags" / "demo.py").write_text("# dag")
+    (home / ".dlt" / "pipelines" / "demo_extract").mkdir(parents=True)
+    shared = tmp_path / "shared"
+    (shared / "demo").mkdir(parents=True)
+    (shared / "demo" / "pipeline.yaml").write_text("x")
+    dbt = tmp_path / "dbt"
+    (dbt / "models" / "demo").mkdir(parents=True)
+    (dbt / "macros").mkdir()
+    (dbt / "macros" / "generate_schema_name.sql").write_text("-- shared macro")
+
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(shutil, "chown", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_airflow_install_dir", lambda: install_dir)
+    monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", shared)
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: dbt)
+    restarts, airflow_calls = [], []
+    monkeypatch.setattr(deploy, "_run_root_command",
+                        lambda cmd, what: restarts.append(cmd))
+
+    def fake_run(cmd, **kwargs):
+        airflow_calls.append({"cmd": cmd,
+                              "dag_file_existed": (home / "dags" / "demo.py").exists()})
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(deploy.subprocess, "run", fake_run)
+
+    pipeline = _pipeline_with_env_refs(tmp_path / "pipelines")
+    return {"pipeline": pipeline, "home": home, "shared": shared, "dbt": dbt,
+            "restarts": restarts, "airflow_calls": airflow_calls,
+            "env_file": home / "pipelines.env", "monkeypatch": monkeypatch}
+
+
+def test_undeploy_removes_everything_deploy_put_in_place(deployed):
+    result = deploy.undeploy(deployed["pipeline"])
+
+    assert not (deployed["home"] / "dags" / "demo.py").exists()
+    assert not (deployed["shared"] / "demo").exists()
+    assert not (deployed["dbt"] / "models" / "demo").exists()
+    assert not (deployed["home"] / ".dlt" / "pipelines" / "demo_extract").exists()
+    assert (result.dag_file_removed and result.published_files_removed
+            and result.dbt_models_removed and result.dlt_state_removed
+            and result.dag_deleted_from_airflow)
+    # the dbt project's shared macro belongs to every pipeline - never removed
+    assert (deployed["dbt"] / "macros" / "generate_schema_name.sql").exists()
+
+
+def test_undeploy_removes_the_dag_file_before_deleting_it_from_airflow(deployed):
+    """The other way round, the scheduler's next scan re-registers the file
+    that is still on disk and `dags delete` achieves nothing."""
+    deploy.undeploy(deployed["pipeline"])
+    call = deployed["airflow_calls"][0]
+    assert 'dags delete "demo" --yes' in call["cmd"][-1]
+    assert call["dag_file_existed"] is False
+
+
+def test_undeploy_releases_only_secrets_no_other_pipeline_still_uses(deployed):
+    deploy._write_env_file(deployed["env_file"], {
+        "ODOO_DB_HOST": "h", "ODOO_DB_PASSWORD": "p",
+        "WAREHOUSE_DB_USER": "u", "WAREHOUSE_DB_PASSWORD": "w", "UNRELATED": "keep"})
+    _write_published(deployed["shared"], "other", ["WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD"])
+
+    result = deploy.undeploy(deployed["pipeline"])
+
+    assert result.secrets_removed == ["ODOO_DB_HOST", "ODOO_DB_PASSWORD"]
+    assert result.secrets_kept == {"WAREHOUSE_DB_PASSWORD": ["other"],
+                                   "WAREHOUSE_DB_USER": ["other"]}
+    assert set(deploy._parse_env_file(deployed["env_file"])) == {
+        "WAREHOUSE_DB_USER", "WAREHOUSE_DB_PASSWORD", "UNRELATED"}
+    assert deployed["restarts"] == [["systemctl", "restart", "airflow-scheduler"]]
+    assert result.scheduler_restarted is True
+
+
+def test_undeploy_does_not_restart_the_scheduler_when_no_secret_was_released(deployed):
+    deploy._write_env_file(deployed["env_file"], {"UNRELATED": "keep"})
+    result = deploy.undeploy(deployed["pipeline"])
+    assert result.secrets_removed == []
+    assert deployed["restarts"] == []
+
+
+def test_undeploy_keeps_every_secret_when_another_published_manifest_is_unreadable(deployed):
+    """Not knowing who else needs a secret is a reason to keep it."""
+    deploy._write_env_file(deployed["env_file"], {"ODOO_DB_HOST": "h", "ODOO_DB_PASSWORD": "p"})
+    broken = deployed["shared"] / "broken"
+    broken.mkdir()
+    (broken / "pipeline.yaml").write_text("name: [not, a, valid, manifest")
+
+    result = deploy.undeploy(deployed["pipeline"])
+
+    assert result.secrets_removed == []
+    assert "broken" in result.secrets_note
+    assert set(deploy._parse_env_file(deployed["env_file"])) == {"ODOO_DB_HOST", "ODOO_DB_PASSWORD"}
+
+
+def test_undeploy_is_idempotent(deployed):
+    deploy._write_env_file(deployed["env_file"], {"ODOO_DB_HOST": "h"})
+    deploy.undeploy(deployed["pipeline"])
+    deployed["restarts"].clear()
+
+    second = deploy.undeploy(deployed["pipeline"])   # must not raise
+
+    assert not (second.dag_file_removed or second.published_files_removed
+                or second.dbt_models_removed or second.dlt_state_removed)
+    assert second.secrets_removed == [] and deployed["restarts"] == []
+
+
+def test_undeploy_reports_an_airflow_delete_failure_without_raising(deployed):
+    """The DAG was never registered (or Airflow is down): the files are
+    already gone, the rest of the cleanup must still happen."""
+    deployed["monkeypatch"].setattr(
+        deploy.subprocess, "run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="DAG not found"))
+    result = deploy.undeploy(deployed["pipeline"])
+    assert result.dag_deleted_from_airflow is False
+    assert "DAG not found" in result.dag_delete_note
+    assert result.dag_file_removed and result.published_files_removed
+
+
+def test_undeploy_refuses_to_run_without_root(deployed):
+    deployed["monkeypatch"].setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(deploy.DeployError, match="root"):
+        deploy.undeploy(deployed["pipeline"])
+    assert (deployed["home"] / "dags" / "demo.py").exists()   # nothing was touched

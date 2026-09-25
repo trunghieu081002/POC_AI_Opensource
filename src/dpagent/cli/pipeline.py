@@ -16,6 +16,7 @@ from rich.text import Text
 
 from ..engine import state
 from ..pipelines import deploy as deploy_mod
+from ..pipelines import extract as extract_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
 from ..pipelines.loader import quarantine_table_for
@@ -240,6 +241,72 @@ def _wait_for_run(run_id: int, *, timeout: float, interval: float = 3.0,
         if clock() >= deadline:
             return "running"
         sleep(interval)
+
+
+def _load_for_undeploy(name):
+    """The repo's manifest if it still exists, else the published copy under
+    the shared directory - a pipeline whose source was already deleted from
+    git must still be removable from Airflow."""
+    try:
+        return pipelines_mod.load(name)
+    except pipelines_mod.PipelineError as repo_exc:
+        try:
+            return pipelines_mod.load(name, deploy_mod.SHARED_PIPELINES_DIR)
+        except pipelines_mod.PipelineError:
+            fail(str(repo_exc))
+
+
+@pipeline_group.command("undeploy")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True)
+def undeploy_cmd(name, yes):
+    """Remove a deployed pipeline from Airflow and the shared locations.
+
+    Removes the DAG (file, then its Airflow registration and run history),
+    the published copy under /opt/dpagent/pipelines, its published dbt models
+    and dlt's local working state, and releases the ${VAR} secrets no other
+    deployed pipeline still uses (restarting airflow-scheduler if that changed
+    anything). It never touches the warehouse - schemas, tables, quarantine
+    tables and applied procedures are data and stay - nor dpagent's own run
+    journal, so `status`/`audit` history survives. Needs root.
+    """
+    pipeline = _load_for_undeploy(name)
+    landing = extract_mod.landing_dataset(pipeline)
+
+    if not yes and not confirm(
+            f"Remove {name!r} from Airflow (DAG + run history), "
+            f"{deploy_mod.SHARED_PIPELINES_DIR / name}, its dbt models and dlt state, "
+            f"and release its now-unused secrets? Warehouse data is NOT touched "
+            f"(schemas {pipeline.warehouse.schema!r} and {landing!r} stay).",
+            default=False):
+        console.print("[yellow]nothing removed[/yellow]")
+        sys.exit(1)
+
+    try:
+        result = deploy_mod.undeploy(pipeline)
+    except deploy_mod.DeployError as exc:
+        fail(str(exc))
+
+    def mark(done, what):
+        console.print(f"  {'[green]removed[/green]' if done else '[dim]absent [/dim]'}  {what}")
+
+    console.print(f"[bold]undeployed {name}[/bold]")
+    mark(result.dag_file_removed, "DAG file in Airflow's DAGS_FOLDER")
+    mark(result.dag_deleted_from_airflow, "DAG registration and run history in Airflow")
+    if result.dag_delete_note and not result.dag_deleted_from_airflow:
+        console.print(f"          [dim]{result.dag_delete_note}[/dim]")
+    mark(result.published_files_removed, f"published copy {deploy_mod.SHARED_PIPELINES_DIR / name}")
+    mark(result.dbt_models_removed, "published dbt models")
+    mark(result.dlt_state_removed, "dlt local working state")
+    if result.secrets_removed:
+        console.print(f"  [green]released[/green] secrets: {', '.join(result.secrets_removed)}"
+                      + ("  (airflow-scheduler restarted)" if result.scheduler_restarted else ""))
+    for var, users in result.secrets_kept.items():
+        console.print(f"  [dim]kept[/dim]     {var} - still used by: {', '.join(users)}")
+    if result.secrets_note:
+        console.print(f"  [yellow]{result.secrets_note}[/yellow]")
+    console.print(f"[dim]left in place: warehouse schemas {pipeline.warehouse.schema!r} and "
+                  f"{landing!r} with all their tables, and dpagent's run history[/dim]")
 
 
 @pipeline_group.command("run")

@@ -8,7 +8,9 @@
 -- orders_raw_quarantine has to be exactly orders_raw's own columns plus a
 -- trailing `reason` (runtime._quarantine_sql's own INSERT is a positional
 -- `SELECT *, '<reason>'` against orders_raw) - kept in lockstep by hand,
--- same as pipelines/demo's fct_sales_quarantine.
+-- same as pipelines/demo's fct_sales_quarantine. The optional trailing
+-- `dpagent_run_id` opts in to the runtime stamping which run quarantined a
+-- row (quarantine accumulates across runs; without it repeats are ambiguous).
 --
 -- TRUNCATE + INSERT makes a re-run of the same landing data produce the
 -- same orders_raw, never an accumulating duplicate (docs/layer2.md,
@@ -29,8 +31,12 @@ BEGIN
         customer text,
         amount numeric,
         order_date date,
-        reason text
+        reason text,
+        dpagent_run_id bigint
     );
+    -- A table created before this column existed gets it appended (after
+    -- `reason`, which is exactly the trailing pair the runtime looks for).
+    ALTER TABLE orders_raw_quarantine ADD COLUMN IF NOT EXISTS dpagent_run_id bigint;
 
     TRUNCATE TABLE orders_raw;
 
