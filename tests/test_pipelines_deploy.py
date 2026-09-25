@@ -734,3 +734,66 @@ def test_apply_procedures_lands_in_the_declared_schema_not_public_when_it_did_no
                        "where p.proname = 'dpagent_test_proc_2'")
     assert namespace == "dpagent_test_custom_schema", (
         f"procedure landed in schema {namespace!r} instead of the declared one")
+
+
+# ---------------------------------------------------------------- unpause (a paused DAG's run never starts)
+
+def test_unpause_dag_command_runs_as_the_airflow_os_user(isolated_db):
+    cmd = deploy.unpause_dag_command("demo")
+    assert cmd[:3] == ["sudo", "-u", "airflow"]
+    assert 'dags unpause "demo"' in cmd[-1]
+
+
+def _stub_deploy_airflow_steps(monkeypatch, pipeline, order):
+    monkeypatch.setattr(deploy, "write_artifacts", lambda p: [])
+    monkeypatch.setattr(deploy, "install_pipeline_files", lambda p: "/opt/dpagent/pipelines/demo")
+    monkeypatch.setattr(deploy, "ensure_airflow_can_run_pipelines", lambda: [])
+    monkeypatch.setattr(deploy, "ensure_pipeline_secrets_available", lambda p: False)
+
+    def fake_install(p):
+        order.append("install_dag")
+        return deploy.Path("/opt/airflow/home/dags/demo.py")
+    monkeypatch.setattr(deploy, "install_dag", fake_install)
+
+
+def test_deploy_unpauses_the_dag_after_installing_it(isolated_db, pipeline, monkeypatch):
+    """The regression this guards, found on a real host: a first `pipeline
+    run` of a newly deployed pipeline sat `queued` with no task ever
+    starting, because Airflow registers a DAG it has never seen paused."""
+    order = []
+    _stub_deploy_airflow_steps(monkeypatch, pipeline, order)
+
+    def fake_unpause(name):
+        order.append(f"unpause:{name}")
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+    monkeypatch.setattr(deploy, "unpause_dag", fake_unpause)
+
+    result = deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=True)
+
+    assert order == ["install_dag", "unpause:demo"]
+    assert result.dag_unpaused is True
+    assert result.dag_unpause_error == ""
+
+
+def test_deploy_reports_an_unpause_failure_instead_of_failing_the_whole_deploy(
+        isolated_db, pipeline, monkeypatch):
+    """The DAG file is already installed by then - a failed unpause must be
+    surfaced with the manual fix, not turn a completed deploy into an error."""
+    _stub_deploy_airflow_steps(monkeypatch, pipeline, [])
+    monkeypatch.setattr(
+        deploy, "unpause_dag",
+        lambda name: subprocess.CompletedProcess([], 1, stdout="", stderr="DAG not found"))
+
+    result = deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=True)
+
+    assert result.dag_installed is not None
+    assert result.dag_unpaused is False
+    assert "DAG not found" in result.dag_unpause_error
+
+
+def test_deploy_does_not_touch_airflow_at_all_under_no_airflow(isolated_db, pipeline, monkeypatch):
+    called = []
+    monkeypatch.setattr(deploy, "write_artifacts", lambda p: [])
+    monkeypatch.setattr(deploy, "unpause_dag", lambda name: called.append(name))
+    deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False)
+    assert called == []

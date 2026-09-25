@@ -277,3 +277,15 @@ def test_wait_for_run_polls_until_the_status_changes(db):
                                        sleep=fake_sleep, clock=lambda: next(ticks))
     assert final == "ok"
     assert polls == [3, 3]
+
+
+def test_run_wait_timeout_with_no_stage_explains_the_usual_causes(db, monkeypatch):
+    """A run whose tasks never started (a paused DAG, a stopped scheduler)
+    used to just say "still running" - 30 real minutes of it, once."""
+    _mark_layer2_prerequisites_installed()
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "trigger_dag", _trigger_then_finish(None))
+    result = _runner().invoke(pipeline_group,
+                              ["run", "demo", "--yes", "--wait", "--timeout", "0"])
+    assert result.exit_code == 3
+    assert "never" in result.output and "unpause" in result.output
+    assert "airflow-scheduler" in result.output

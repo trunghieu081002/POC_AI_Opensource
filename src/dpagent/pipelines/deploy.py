@@ -48,6 +48,8 @@ class DeployResult:
     airflow_bridge_actions: list[str] = field(default_factory=list)
     pipeline_secrets_synced: bool = False
     dag_installed: Path | None = None
+    dag_unpaused: bool = False
+    dag_unpause_error: str = ""
 
 
 def render_dag(pipeline: Pipeline) -> str:
@@ -426,6 +428,10 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
             # --no-db there is nothing to resolve from yet.
             result.pipeline_secrets_synced = ensure_pipeline_secrets_available(pipeline)
         result.dag_installed = install_dag(pipeline)
+        unpaused = unpause_dag(pipeline.name)
+        result.dag_unpaused = unpaused.returncode == 0
+        if not result.dag_unpaused:
+            result.dag_unpause_error = (unpaused.stderr or unpaused.stdout).strip()
     return result
 
 
@@ -728,6 +734,22 @@ def reserialize_dags() -> subprocess.CompletedProcess:
     still pick the file up eventually, just not immediately.
     """
     return subprocess.run(reserialize_dags_command(), capture_output=True,
+                          text=True, timeout=120)
+
+
+def unpause_dag_command(pipeline_name: str) -> list[str]:
+    return _airflow_cli_command("dags", "unpause", f'"{pipeline_name}"')
+
+
+def unpause_dag(pipeline_name: str) -> subprocess.CompletedProcess:
+    """Airflow registers a DAG it has never seen *paused*, and a manual run
+    of a paused DAG is created `queued` and never started - found for real:
+    a first `dpagent pipeline run` of a new pipeline sat with no stage ever
+    reporting (no extract.start, nothing) for 30 minutes, and had once been
+    misread as scheduler slowness. The generated DAG is manual-only
+    (schedule_interval=None, catchup=False), so unpausing it only makes
+    `pipeline run` able to start - it cannot cause a scheduled run."""
+    return subprocess.run(unpause_dag_command(pipeline_name), capture_output=True,
                           text=True, timeout=120)
 
 

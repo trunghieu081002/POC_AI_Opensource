@@ -216,6 +216,13 @@ def deploy_cmd(name, yes, no_db, no_airflow):
                      "own environment, airflow-scheduler restarted")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
+        if result.dag_unpaused:
+            console.print("[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
+        else:
+            console.print(
+                f"[yellow]could not unpause the DAG[/yellow] - until it is unpaused a "
+                f"`pipeline run` is created but never starts. Do it by hand: "
+                f"airflow dags unpause {name}\n  {result.dag_unpause_error}")
     console.print("[green]deployed[/green]")
 
 
@@ -290,6 +297,12 @@ def run_cmd(name, yes, wait, timeout):
     if final == "running":
         console.print(f"[yellow]still running after {timeout}s[/yellow] - it was not "
                       f"stopped; check: dpagent pipeline status {name}")
+        if not state.stages_for_run(run_id):
+            console.print(
+                "[yellow]no stage ever reported in[/yellow] - the DAG's tasks never "
+                "started. Usual causes: the DAG is paused (airflow dags unpause "
+                f"{name}) or airflow-scheduler is not running "
+                "(systemctl status airflow-scheduler).")
         sys.exit(3)
     console.print(f"[red]run {run_id} {final}[/red] - why: dpagent pipeline audit {run_id}")
     sys.exit(1)

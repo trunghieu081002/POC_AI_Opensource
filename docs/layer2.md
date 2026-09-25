@@ -62,7 +62,10 @@ doing by hand - `dpagent pipeline deploy` (as root) creates the shared
 group, grants the ACL, and does the editable install the first time it
 runs, alongside publishing each pipeline to `/opt/dpagent/pipelines/<name>`,
 its dbt-engine stages' models into the dbt pack's own real project, and
-the DAG to Airflow's real DAGS_FOLDER. The one thing it cannot do for you:
+the DAG to Airflow's real DAGS_FOLDER - then unpauses it: Airflow registers a
+new DAG paused, and a manual run of a paused DAG is created `queued` and
+never starts (the generated DAG is manual-only, so unpausing cannot cause a
+scheduled run). The one thing it cannot do for you:
 if it just added `airflow` to the shared group, `airflow-scheduler`/
 `airflow-webserver` need restarting for that membership to take effect in
 their already-running processes (reported explicitly when it happens).
