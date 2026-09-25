@@ -2498,3 +2498,20 @@ Evidence after the fixes (runs 62-64):
   `build/` back to the pipeline directory's owner, repairing old files on the
   next deploy. Added `dpagent pipeline list` (connector, deployed?, last run,
   and deployed pipelines whose manifest is not in this checkout).
+
+### 2026-09-26 — Google Sheets executed for the first time (stand-in), and a leftover env var
+
+- The Google Sheets connector had only ever been `ast.parse`d. Its real
+  generated script now ran under the real google-api-python-client and dlt
+  (the `/opt/dlt` venv) into a real Postgres 16, with two seams replaced -
+  credentials and the API endpoint - pointing at a local stand-in that
+  enforces the documented A1-quoting rule. It found a real bug: a sheet named
+  `Sheet 1` was requested unquoted and rejected ("Unable to parse range").
+  Fixed by always quoting the range. After the fix two consecutive runs left
+  `orders` at 3 rows (replace, not append), a short row landed with a NULL, and
+  an empty sheet created no table. This is not verification against Google.
+- A `DPAGENT_PIPELINES` exported for the `mssql_e2e` scratch test stayed set in
+  the operator's shell and silently redirected `pipeline deploy quickstart_dbt`
+  to the scratch directory ("no pipeline for 'quickstart_dbt' (looked in
+  /home/oracle/dpagent-e2e/...)"). The missing-pipeline error now names the
+  override and how to unset it.

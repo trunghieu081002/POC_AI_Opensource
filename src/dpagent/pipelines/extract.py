@@ -205,11 +205,19 @@ def render_extract_script(pipeline: Pipeline) -> str:
             service = build("sheets", "v4", credentials=credentials)
 
 
+            def _a1(sheet_name):
+                # A1 notation needs a sheet name with a space (or a quote) in
+                # single quotes, embedded quotes doubled; quoting a plain name
+                # is equally valid, so always quote. Unquoted, "Sheet 1" is
+                # rejected as "Unable to parse range".
+                return "'" + sheet_name.replace("'", "''") + "'"
+
+
             def _resource_for(sheet_name):
                 @dlt.resource(name=sheet_name, write_disposition="replace")
                 def read_rows():
                     result = service.spreadsheets().values().get(
-                        spreadsheetId={spreadsheet_id!r}, range=sheet_name).execute()
+                        spreadsheetId={spreadsheet_id!r}, range=_a1(sheet_name)).execute()
                     values = result.get("values", [])
                     if not values:
                         return

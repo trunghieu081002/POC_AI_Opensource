@@ -405,3 +405,23 @@ def test_built_in_dlt_sources_land_with_replace_not_the_default_append(root, sou
 ], ids=["csv", "elasticsearch", "google_sheets"])
 def test_hand_rolled_connectors_also_replace(root, source):
     assert 'write_disposition="replace"' in _script_for(root, source)
+
+
+def test_google_sheets_quotes_every_sheet_name_as_a1_notation(root):
+    """Found by actually running the generated script (it had never been
+    executed): a sheet named "Sheet 1" was requested as range=Sheet 1, which
+    the Sheets API rejects as "Unable to parse range" - A1 notation needs a name
+    with a space in single quotes. Executes the generated _a1 helper itself."""
+    data = _base(source={"connector": "google_sheets",
+                         "connection": {"spreadsheet_id": "abc", "service_account_json": "${SA}"},
+                         "resources": ["Orders"]})
+    _write(root, "demo", data)
+    script = extract.render_extract_script(loader.load("demo", root))
+    tree = ast.parse(script)
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_a1")
+    namespace = {}
+    exec(compile(ast.Module([fn], []), "<a1>", "exec"), namespace)
+    assert namespace["_a1"]("Orders") == "'Orders'"
+    assert namespace["_a1"]("Sheet 1") == "'Sheet 1'"
+    assert namespace["_a1"]("O'Brien's") == "'O''Brien''s'"
+    assert "range=_a1(sheet_name)" in script

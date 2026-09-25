@@ -459,3 +459,30 @@ def test_invalid_schedules_fail_at_lint_naming_the_field(root, schedule, expect)
     the generated DAG fails to import and the pipeline just never appears."""
     with pytest.raises(loader.PipelineError, match=expect):
         _with_schedule(root, schedule)
+
+
+# ---------------------------------------------------------------- DPAGENT_PIPELINES hint
+
+def test_a_missing_pipeline_names_a_leftover_dpagent_pipelines_override(root, monkeypatch):
+    """Found on a real host: a DPAGENT_PIPELINES exported for a scratch test and
+    never unset silently redirected every later command to that directory, and
+    the error only said where it had looked."""
+    monkeypatch.setattr(loader, "PIPELINES_DIR", root)
+    monkeypatch.setenv("DPAGENT_PIPELINES", str(root))
+    with pytest.raises(loader.PipelineError, match="DPAGENT_PIPELINES is set.*unset"):
+        loader.load("nonexistent")
+
+
+def test_no_override_hint_when_the_variable_is_not_set(root, monkeypatch):
+    monkeypatch.setattr(loader, "PIPELINES_DIR", root)
+    monkeypatch.delenv("DPAGENT_PIPELINES", raising=False)
+    with pytest.raises(loader.PipelineError) as exc:
+        loader.load("nonexistent")
+    assert "DPAGENT_PIPELINES" not in str(exc.value)
+
+
+def test_no_override_hint_when_a_directory_was_passed_explicitly(root, monkeypatch):
+    monkeypatch.setenv("DPAGENT_PIPELINES", "/somewhere/else")
+    with pytest.raises(loader.PipelineError) as exc:
+        loader.load("nonexistent", root)
+    assert "DPAGENT_PIPELINES" not in str(exc.value)

@@ -352,15 +352,24 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
     unattended inside an Airflow task)
 
   Verification status, stated plainly: REST API, CSV and Odoo PostgreSQL are
-  real-verified end to end. **SQL Server** (SQL Server 2022, password auth)
-  and **Elasticsearch** (8.15, no auth and `basic` auth, plus a wrong-password
+  real-verified end to end. **SQL Server** (SQL Server 2022) and
+  **Elasticsearch** (8.15 and 9.0.0, no auth and `basic`, plus a wrong-password
   negative that fails loudly with a 401) were real-verified on 2026-09-25
   through the repo's own `runtime.run_extract` + `run_gate` against throwaway
-  Docker containers landing into a real Postgres - see docs/deploy-log.md.
-  **Google Sheets** is unit-tested only: it needs a real Google Cloud
-  service account and spreadsheet, which cannot be provisioned from a
-  sandbox. Every connector's own code path (script generation, secret
-  handling, loader validation) is unit-tested regardless.
+  Docker containers landing into a real Postgres, SQL Server also through the
+  real Airflow - see docs/deploy-log.md. **Google Sheets** has been *executed*
+  - real google-api-python-client, real dlt, real Postgres - against a local
+  stand-in for the Sheets API (which enforces the documented A1-quoting rule),
+  and that run found and fixed a real bug (a sheet name with a space was sent
+  unquoted). It has **not** run against Google itself: that needs a service
+  account and spreadsheet, so authentication and Google's actual responses
+  remain unverified. Every connector's own code path (script generation,
+  secret handling, loader validation) is unit-tested regardless.
+
+  Google Sheets details that matter when writing gates: a sheet's first row is
+  the header; dlt normalizes resource names (`Sheet 1` lands as `sheet_1`,
+  `Orders` as `orders`), so a gate names the normalized table; a short row
+  lands with NULL in its trailing columns; an empty sheet creates no table.
 - `pipelines/<name>/pipeline.yaml` and the generator that turns it into an
   Airflow DAG plus dbt schema/test YAML — deterministic, no model involved.
   The manifest names a transform engine (`dbt` or `procedure`) per hop; the
@@ -500,5 +509,6 @@ Stated from what real runs actually showed, not from the design:
   strategy (see "Out of scope").
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
-- **Google Sheets is unit-tested only** (needs a real Google Cloud service
-  account and spreadsheet).
+- **Google Sheets has not run against Google** - only against a local
+  stand-in with the real client libraries (needs a real service account and
+  spreadsheet for the rest).

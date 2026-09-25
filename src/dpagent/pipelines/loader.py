@@ -8,6 +8,7 @@ validation rule below traces back to.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -404,7 +405,12 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
     root = (pipelines_dir or PIPELINES_DIR) / name
     manifest = root / "pipeline.yaml"
     if not manifest.exists():
-        raise PipelineError(f"no pipeline for {name!r} (looked in {root})")
+        hint = ""
+        if pipelines_dir is None and os.environ.get("DPAGENT_PIPELINES"):
+            hint = (" - DPAGENT_PIPELINES is set in this shell and overrides the "
+                    "default pipelines/ directory (`unset DPAGENT_PIPELINES` to use "
+                    "the repo's)")
+        raise PipelineError(f"no pipeline for {name!r} (looked in {root}){hint}")
 
     data = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {}
     where = str(manifest)
