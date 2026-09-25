@@ -418,3 +418,21 @@ def test_undeploy_shows_a_real_airflow_failure_and_how_to_retry(db, monkeypatch)
     assert result.exit_code == 0
     assert "failed" in result.output and "could not connect" in result.output
     assert "retry" in result.output
+
+
+def test_plan_states_the_schedule_or_that_the_pipeline_is_manual_only(db):
+    result = _runner().invoke(pipeline_group, ["plan", "quickstart"])
+    assert result.exit_code == 0
+    assert "manual-only" in result.output
+
+
+def test_list_shows_manual_or_the_declared_schedule(db, tmp_path, monkeypatch):
+    _two_pipelines(tmp_path, monkeypatch)
+    root = pipeline_cli.pipelines_mod.PIPELINES_DIR
+    (root / "cron").mkdir()
+    (root / "cron" / "pipeline.yaml").write_text(
+        "name: cron\nsummary: t\nschedule: '0 2 * * *'\n"
+        "source: {connector: csv, files: {path: /tmp/x.csv}}\nwarehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    result = _runner().invoke(pipeline_group, ["list"])
+    assert "0 2 * * *" in result.output and "manual" in result.output

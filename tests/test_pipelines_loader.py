@@ -408,3 +408,54 @@ def test_every_real_pipeline_under_pipelines_dir_loads_cleanly():
     assert "demo" in names and "quickstart" in names
     for name in names:
         loader.load(name)   # raises PipelineError on any bad manifest
+
+
+# ---------------------------------------------------------------- schedule
+
+def _with_schedule(root, schedule):
+    data = _minimal()
+    if schedule is not _ABSENT:
+        data["schedule"] = schedule
+    _write(root, "demo", data)
+    return loader.load("demo", root)
+
+
+_ABSENT = object()
+
+
+def test_a_manifest_without_a_schedule_is_manual_only(root):
+    assert _with_schedule(root, _ABSENT).schedule is None
+
+
+@pytest.mark.parametrize("schedule", [
+    "@hourly", "@daily", "@weekly", "@monthly", "@yearly",
+    "0 2 * * *", "*/15 * * * *", "30 6 1,15 * *", "0 8 * * mon-fri",
+    "0 0 1 jan *", "5-10/2 * * * *", "0 0 * * 7", "  0   2 * * *  ",
+])
+def test_valid_schedules_load(root, schedule):
+    assert _with_schedule(root, schedule).schedule == " ".join(schedule.split())
+
+
+@pytest.mark.parametrize("schedule,expect", [
+    ("61 * * * *", "minute"),
+    ("0 25 * * *", "hour"),
+    ("0 0 32 * *", "day of month"),
+    ("0 0 0 * *", "day of month"),
+    ("0 0 * 13 *", "month"),
+    ("0 0 * * 8", "day of week"),
+    ("* * * *", "5 cron fields"),
+    ("* * * * * *", "5 cron fields"),
+    ("@sometimes", "not one of"),
+    ("@once", "not one of"),
+    ("*/0 * * * *", "minute"),
+    ("a-b-c * * * *", "minute"),
+    ("0 0 * * funday", "day of week"),
+    ("", "cron string"),
+    (5, "cron string"),
+    (["0 2 * * *"], "cron string"),
+])
+def test_invalid_schedules_fail_at_lint_naming_the_field(root, schedule, expect):
+    """A bad schedule is not something Airflow reports where anyone looks:
+    the generated DAG fails to import and the pipeline just never appears."""
+    with pytest.raises(loader.PipelineError, match=expect):
+        _with_schedule(root, schedule)

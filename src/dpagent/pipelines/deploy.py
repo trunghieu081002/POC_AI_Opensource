@@ -119,7 +119,7 @@ def render_dag(pipeline: Pipeline) -> str:
         "    # not guessed: every prior demo run had to call finish_run() by",
         "    # hand in a throwaway verification script because nothing else did.",
         "    dag_run = context.get(\"dag_run\")",
-        '    run_id = (dag_run.conf or {}).get("dpagent_run_id") if dag_run else None',
+        f'    run_id = runtime.resolve_run_id("{pipeline.name}", dag_run)',
         "    if run_id is not None:",
         "        runtime.finish_pipeline_run(run_id, status)",
         "",
@@ -134,7 +134,7 @@ def render_dag(pipeline: Pipeline) -> str:
         "",
         "with DAG(",
         f'    dag_id="{pipeline.name}",',
-        "    schedule_interval=None,",
+        f"    schedule_interval={pipeline.schedule!r},",
         "    start_date=datetime(2026, 1, 1),",
         "    catchup=False,",
         "    # One run at a time: two runs of the same pipeline share dlt's local",
@@ -162,8 +162,7 @@ def render_dag(pipeline: Pipeline) -> str:
         # dag_run.conf so every task's stage_runs/gate_runs/events row ties
         # back to that one run, the same run `dpagent audit <run>` reads.
         lines.append(f'    def _{task.id}(dag_run=None, **_):')
-        lines.append(f'        run_id = (dag_run.conf or {{}}).get("dpagent_run_id") '
-                     f'if dag_run else None')
+        lines.append(f'        run_id = runtime.resolve_run_id("{pipeline.name}", dag_run)')
         lines.append(f'        {call}')
         lines.append(f'')
         lines.append(f'    {task.id} = PythonOperator(')

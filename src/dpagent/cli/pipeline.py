@@ -109,7 +109,7 @@ def list_cmd():
     """
     deployed = set(deploy_mod.deployed_names())
     table = Table(box=None)
-    for column in ("pipeline", "connector", "stages", "deployed", "last run"):
+    for column in ("pipeline", "connector", "schedule", "deployed", "last run"):
         table.add_column(column, style="bold" if column == "pipeline" else "")
 
     def last_run(name):
@@ -125,10 +125,10 @@ def list_cmd():
         try:
             p = pipelines_mod.load(name)
         except pipelines_mod.PipelineError as exc:
-            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:60],
+            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:40],
                           yes_no, last_run(name))
             continue
-        table.add_row(name, p.source.connector, " > ".join(s.name for s in p.stages),
+        table.add_row(name, p.source.connector, p.schedule or "[dim]manual[/dim]",
                       yes_no, last_run(name))
     orphans = sorted(deployed - set(in_checkout))
     if not (in_checkout or orphans):
@@ -152,6 +152,11 @@ def plan_cmd(name):
     """
     pipeline = _load_or_fail(name)
     result = generator_mod.plan(pipeline)
+
+    console.print(f"[bold]schedule:[/bold] "
+                  + (f"{pipeline.schedule} [dim](UTC; deploy unpauses the DAG, so it starts running "
+                     f"on this schedule)[/dim]" if pipeline.schedule
+                     else "manual-only [dim](runs only on `dpagent pipeline run`)[/dim]"))
 
     tasks = Table(box=None, title="DAG tasks")
     tasks.add_column("id", style="bold")
@@ -259,7 +264,10 @@ def deploy_cmd(name, yes, no_db, no_airflow):
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
         if result.dag_unpaused:
-            console.print("[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
+            console.print(
+                f"[bold]DAG unpaused:[/bold] runs on schedule {pipeline.schedule!r} (UTC)"
+                if pipeline.schedule else
+                "[bold]DAG unpaused:[/bold] a run can start (manual-only DAG)")
         else:
             console.print(
                 f"[yellow]could not unpause the DAG[/yellow] - until it is unpaused a "

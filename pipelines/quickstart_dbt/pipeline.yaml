@@ -1,0 +1,54 @@
+# The dbt-engine counterpart of pipelines/quickstart: same sample CSV, same
+# deliberately duplicated order_id, but the raw hop is a dbt model instead of a
+# stored procedure - the documented common shape (docs/layer2.md, Concepts #3:
+# "dbt for 1:1-shaped mapping, a procedure for genuinely procedural logic").
+# Self-contained like quickstart (no Odoo, no external service), so it proves
+# the dbt engine - the recommended default - end to end on any host that has
+# the dbt pack installed.
+name: quickstart_dbt
+summary: CSV -> landing -> raw (dbt) -> curated (procedure), with quarantine, no external source
+
+source:
+  connector: csv
+  files:
+    path: data/orders.csv
+
+warehouse:
+  host: "${WAREHOUSE_DB_HOST:-localhost}"
+  port: "${WAREHOUSE_DB_PORT:-5432}"
+  database: "${WAREHOUSE_DB_NAME:-warehouse}"
+  user: "${WAREHOUSE_DB_USER}"
+  password: "${WAREHOUSE_DB_PASSWORD}"
+  schema: quickstart_dbt
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: orders
+        min: 1
+
+  - name: raw
+    engine: dbt
+    depends_on: landing
+    models: [stg_orders]
+    gates:
+      - type: unique
+        table: stg_orders
+        columns: [order_id]
+        # 2 of the 10 rows share order_id 1002 = 20%, under the 25% threshold:
+        # quarantined, the run continues. There is no quarantine table declared
+        # anywhere here on purpose - a dbt stage has nothing that could create
+        # one, so the runtime creates stg_orders_quarantine (the gated table's
+        # columns + reason + dpagent_run_id) the first time it is needed.
+    quarantine:
+      reject_threshold_pct: 25
+
+  - name: curated
+    engine: procedure
+    depends_on: raw
+    procedure: procedures/build_curated_orders.sql
+    gates:
+      - type: not_null
+        table: fct_orders
+        columns: [order_id, amount]

@@ -98,13 +98,14 @@ def test_dag_names_the_source_pipeline_yaml_for_regeneration(pipeline):
     assert "do not" in src.lower() and "hand-edit" in src.lower()
 
 
-def test_dag_threads_dpagent_run_id_from_dag_run_conf_into_every_task(pipeline):
-    """The regression this guards: without this, every stage_runs/gate_runs
-    row a real DAG run produces would have run_id=NULL, and `dpagent
-    pipeline status`/`audit` (which group stages by run_id) would never be
-    able to find them."""
+def test_dag_resolves_dpagent_run_id_through_the_runtime_in_every_task(pipeline):
+    """The regression this guards: without a run id every stage_runs/gate_runs
+    row a real DAG run produces would have run_id=NULL, and `dpagent pipeline
+    status`/`audit` (which group stages by run_id) could never find them.
+    resolve_run_id reads it from dag_run.conf when `dpagent pipeline run`
+    passed one, and otherwise (a scheduled or UI-triggered run) creates the row."""
     src = deploy.render_dag(pipeline)
-    assert 'dag_run.conf or {}).get("dpagent_run_id")' in src
+    assert 'runtime.resolve_run_id("demo", dag_run)' in src
     assert "run_id=run_id" in src
 
 
@@ -1037,3 +1038,27 @@ def test_deployed_names_lists_published_pipelines_that_have_a_manifest(tmp_path,
 def test_deployed_names_is_empty_when_nothing_was_ever_deployed(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", tmp_path / "does_not_exist")
     assert deploy.deployed_names() == []
+
+
+# ---------------------------------------------------------------- schedule in the generated DAG
+
+def test_dag_without_a_schedule_is_manual_only(pipeline):
+    assert "schedule_interval=None," in deploy.render_dag(pipeline)
+
+
+def test_dag_carries_the_declared_schedule_and_stays_valid_python(tmp_path):
+    data = {
+        "name": "demo", "summary": "t", "schedule": "0 2 * * *",
+        "source": {"connector": "csv", "files": {"path": "/tmp/x.csv"}},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "x", "min": 1}]}],
+    }
+    d = tmp_path / "pipelines" / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    src = deploy.render_dag(loader.load("demo", tmp_path / "pipelines"))
+    ast.parse(src)
+    assert "schedule_interval='0 2 * * *'," in src
+    # a scheduled DAG must still never backfill or overlap itself
+    assert "catchup=False," in src and "max_active_runs=1," in src

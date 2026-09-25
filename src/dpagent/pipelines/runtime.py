@@ -236,6 +236,33 @@ def _quarantine_run_tail(pipeline: loader.Pipeline, schema: str, q_table: str,
     return f", {int(run_id) if run_id is not None else 'NULL::bigint'} AS {RUN_COLUMN}"
 
 
+def _ensure_quarantine_table(pipeline: loader.Pipeline, schema: str, table: str,
+                             q_table: str) -> None:
+    """Create `<table>_quarantine` if - and only if - nothing has yet.
+
+    A procedure-engine stage's author writes the quarantine table into the
+    procedure (pipelines/quickstart does), but a dbt-engine stage has nothing
+    that could: dbt materializes models, not their rejects. The first row a
+    gate rejected there died with "relation stg_x_quarantine does not exist"
+    (pipelines/demo declares two such tables and nothing ever created them).
+    The shape is the documented one - the gated table's columns plus a
+    trailing `reason`, plus the opt-in `dpagent_run_id` - built with CTAS
+    `WITH NO DATA`: plain columns only, since a quarantine table is a holding
+    area and has no use for the gated table's constraints or indexes. (Not
+    because `LIKE` would break anything: a quarantined row came from the gated
+    table, so it satisfies whatever NOT NULL that table carries.) A table
+    that already exists is never altered, whatever its shape.
+    """
+    exists = _query_rows(pipeline, schema,
+                         f"select to_regclass('{q_table}') is not null as e")[0]["e"]
+    if exists == "t":
+        return
+    _execute(pipeline, schema,
+             f"CREATE TABLE {q_table} AS SELECT * FROM {table} WITH NO DATA; "
+             f"ALTER TABLE {q_table} ADD COLUMN reason text, "
+             f"ADD COLUMN {RUN_COLUMN} bigint")
+
+
 def _evaluate_gate(pipeline: loader.Pipeline, gate, stage: loader.Stage,
                    run_id: int | None = None) -> tuple[bool, str, int | None, int | None]:
     """Returns (passed, detail, rows_checked, rows_rejected)."""
@@ -281,10 +308,12 @@ def _evaluate_gate(pipeline: loader.Pipeline, gate, stage: loader.Stage,
     # Threshold is evaluated per gated table, not per stage: quarantine is
     # now one table per `gate['table']` (see `_quarantine_sql`), so "percent
     # rejected" only means something scoped to the table a given gate looks at.
+    table = gate["table"]
+    if stage.quarantine:
+        _ensure_quarantine_table(pipeline, schema, table, quarantine_table_for(table))
     failing_query = compiled.queries[-1]   # "failing_rows" or the rule itself
     failing_rows = _query_rows(pipeline, schema, failing_query.sql)
     rejected = len(failing_rows)
-    table = gate["table"]
     total = int(_query_rows(pipeline, schema, f"select count(*) as n from {table}")[0]["n"])
 
     if rejected == 0:
@@ -525,6 +554,35 @@ def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | No
         raise GateFailed(f"extract failed for {pipeline_name!r}:\n{detail}")
 
     state.event("extract.done", f"{pipeline_name} extract complete", run_id=run_id)
+
+
+def resolve_run_id(pipeline_name: str, dag_run) -> int | None:
+    """The dpagent `runs` row this Airflow DagRun belongs to.
+
+    `dpagent pipeline run` creates the row first and passes its id in the
+    DagRun's conf. A run nobody triggered through dpagent - one started by the
+    pipeline's own `schedule`, or from Airflow's UI - has no such id, and
+    without a row of its own `dpagent pipeline status`/`audit` (which read
+    `runs`) could not see it at all. The first task to ask creates the row,
+    keyed by Airflow's own run id; every later task, and the completion
+    callback, finds that same row.
+    """
+    if dag_run is None:
+        return None
+    conf_id = (dag_run.conf or {}).get("dpagent_run_id")
+    if conf_id is not None:
+        return int(conf_id)
+    existing = state.find_data_run(pipeline_name, dag_run.run_id)
+    if existing is not None:
+        return existing
+    trigger = str(getattr(dag_run, "run_type", "") or "airflow")
+    run_id = state.start_run("data", pipeline_name,
+                             meta={"airflow_run_id": dag_run.run_id, "trigger": trigger})
+    state.event("pipeline.started",
+                f"Airflow run {dag_run.run_id} started by {trigger}, not by "
+                f"`dpagent pipeline run`",
+                run_id=run_id, actor="airflow")
+    return run_id
 
 
 def finish_pipeline_run(run_id: int, status: str) -> None:

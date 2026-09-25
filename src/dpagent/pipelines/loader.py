@@ -129,6 +129,7 @@ class Pipeline:
     source: Source
     warehouse: Warehouse
     stages: list[Stage]
+    schedule: str | None = None   # None = manual-only (`dpagent pipeline run`)
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -267,6 +268,68 @@ def _validate_warehouse(raw: dict, where: str) -> Warehouse:
     )
 
 
+SCHEDULE_PRESETS = {"@hourly", "@daily", "@weekly", "@monthly", "@yearly"}
+
+# (name, low, high, allowed names) for the five cron fields, in order.
+_CRON_FIELDS = [
+    ("minute", 0, 59, {}),
+    ("hour", 0, 23, {}),
+    ("day of month", 1, 31, {}),
+    ("month", 1, 12, {n: i for i, n in enumerate(
+        "jan feb mar apr may jun jul aug sep oct nov dec".split(), start=1)}),
+    ("day of week", 0, 7, {n: i for i, n in enumerate(
+        "sun mon tue wed thu fri sat".split())}),
+]
+
+
+def _cron_value(text: str, low: int, high: int, names: dict) -> bool:
+    text = text.lower()
+    value = names.get(text, int(text) if text.isdigit() else None)
+    return value is not None and low <= value <= high
+
+
+def _cron_part(part: str, low: int, high: int, names: dict) -> bool:
+    """One comma-separated element: `*`, `*/n`, `a`, `a-b`, `a-b/n`, `a/n`."""
+    base, _, step = part.partition("/")
+    if step and not (step.isdigit() and int(step) > 0):
+        return False
+    if base == "*":
+        return True
+    lo_hi = base.split("-")
+    if len(lo_hi) > 2:
+        return False
+    return all(_cron_value(v, low, high, names) for v in lo_hi)
+
+
+def _validate_schedule(raw, where: str) -> str | None:
+    """Checked at lint time because a bad schedule is not an error Airflow
+    reports where anyone looks: the generated DAG fails to import and the
+    pipeline just never shows up. Times are UTC - the Airflow the airflow pack
+    installs runs with default_timezone = utc."""
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise PipelineError(f"{where}: schedule must be a cron string or one of "
+                            f"{sorted(SCHEDULE_PRESETS)}, got {raw!r}")
+    schedule = " ".join(raw.split())
+    if schedule.startswith("@"):
+        if schedule not in SCHEDULE_PRESETS:
+            raise PipelineError(f"{where}: schedule {schedule!r} is not one of "
+                                f"{sorted(SCHEDULE_PRESETS)} (or a 5-field cron expression)")
+        return schedule
+    fields = schedule.split(" ")
+    if len(fields) != 5:
+        raise PipelineError(
+            f"{where}: schedule {schedule!r} needs 5 cron fields "
+            f"(minute hour day-of-month month day-of-week), found {len(fields)}")
+    for text, (name, low, high, names) in zip(fields, _CRON_FIELDS):
+        if not all(_cron_part(part, low, high, names) for part in text.split(",")):
+            raise PipelineError(
+                f"{where}: schedule {schedule!r}: {name} field {text!r} is not valid "
+                f"({low}-{high}, *, */n, a-b, or a comma list)")
+    return schedule
+
+
 def _validate_stage(raw: dict, index: int, is_first: bool,
                     known_names: set[str], where_pipeline: str) -> Stage:
     where = f"{where_pipeline} stages[{index}]"
@@ -368,6 +431,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         source=_validate_source(data.get("source") or {}, where),
         warehouse=_validate_warehouse(data.get("warehouse") or {}, where),
         stages=stages,
+        schedule=_validate_schedule(data.get("schedule"), where),
     )
 
     for stage in pipeline.stages:

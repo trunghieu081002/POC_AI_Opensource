@@ -252,9 +252,28 @@ hop is not a choice, it is what dlt is for.
    stage, since a stage's gates can touch more than one table (e.g. a
    referential-integrity check spanning two tables in the same stage) and
    each needs its own shape. Never deleted, never silently passed.
+   A procedure-engine stage's author writes the quarantine table into the
+   procedure; a dbt-engine stage has nothing that could, so the runtime
+   creates `<table>_quarantine` (the gated table's columns + `reason` +
+   `dpagent_run_id`) the first time a row-level gate needs it - and never
+   alters one that already exists, whatever its shape.
 6. **Run ledger** — every stage run and gate verdict is recorded in dpagent's
    SQLite (`stage_runs`, `gate_runs`), so `status` and `audit` work exactly as
    they already do for installs, whichever engine ran.
+8. **Schedule** - an optional top-level `schedule:` in `pipeline.yaml`: a
+   5-field cron expression or `@hourly`/`@daily`/`@weekly`/`@monthly`/
+   `@yearly`, in UTC (the Airflow the airflow pack installs runs with
+   `default_timezone = utc`). Absent means manual-only: it runs only on
+   `dpagent pipeline run`. It is validated by `pipeline lint` - a bad schedule
+   would not be reported anywhere useful, the generated DAG would just fail
+   to import and the pipeline never appear. `deploy` unpauses the DAG, so a
+   scheduled pipeline starts running on its schedule the moment it is
+   deployed; the DAG never backfills (`catchup=False`) and never overlaps
+   itself (`max_active_runs=1`). A run the schedule (or Airflow's UI) starts
+   has no `dpagent pipeline run` behind it, so the first task creates its row
+   in dpagent's journal, keyed by Airflow's own run id
+   (`runtime.resolve_run_id`) - which is what makes it visible to
+   `status`/`audit`/`list` like any other run.
 7. **Secrets reach the task's own process, not the operator's shell.**
    `dpagent pipeline run` only calls `airflow dags trigger` - it creates a
    DagRun row and returns immediately. The DAG's own tasks
@@ -311,7 +330,8 @@ dpagent pipeline audit <run>     # every stage and gate decision, and who made i
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
-- Six connectors:
+- Six connectors (and two self-contained example pipelines,
+  `quickstart` on the procedure engine and `quickstart_dbt` on the dbt engine):
   - **Odoo PostgreSQL** and **SQL Server** - both DB, both via
     `dlt.sources.sql_database`; only the SQLAlchemy scheme differs
     (`postgresql` vs `mssql+pymssql`, the latter a prebuilt-wheel driver so

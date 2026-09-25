@@ -729,3 +729,103 @@ def test_a_secret_a_real_subprocess_prints_never_reaches_the_event_or_the_except
         assert pw not in text and quote(pw, safe="") not in text
         assert "wh-pw-real-1" not in text
         assert "***REDACTED***" in text
+
+
+# ---------------------------------------------------------------- runs started by a schedule
+
+class _DagRun:
+    def __init__(self, run_id, conf=None, run_type="scheduled"):
+        self.run_id, self.conf, self.run_type = run_id, conf, run_type
+
+
+def test_resolve_run_id_uses_the_id_dpagent_pipeline_run_passed_in_conf(monkeypatch, tmp_path):
+    state = _state_in(tmp_path, monkeypatch)
+    before = state.conn().execute("select count(*) n from runs").fetchone()["n"]
+    assert runtime.resolve_run_id("p", _DagRun("manual__x", {"dpagent_run_id": 42})) == 42
+    assert state.conn().execute("select count(*) n from runs").fetchone()["n"] == before
+
+
+def test_resolve_run_id_creates_a_run_row_for_a_scheduled_run_once(monkeypatch, tmp_path):
+    """Without this a scheduled run is invisible to `pipeline status`/`audit`,
+    which read the runs table. Every task of the run, and its completion
+    callback, must land on the same row."""
+    state = _state_in(tmp_path, monkeypatch)
+    dag_run = _DagRun("scheduled__2026-09-26T02:00:00+00:00")
+
+    first = runtime.resolve_run_id("p", dag_run)
+    second = runtime.resolve_run_id("p", dag_run)          # a later task
+    callback = runtime.resolve_run_id("p", dag_run)        # the completion callback
+
+    assert first == second == callback
+    row = state.get_run(first)
+    assert (row["kind"], row["target"], row["status"]) == ("data", "p", "running")
+    assert [e["kind"] for e in state.events_for(first)] == ["pipeline.started"]
+    assert "scheduled" in state.events_for(first)[0]["message"]
+
+
+def test_a_scheduled_run_completes_through_the_same_callback_as_a_manual_one(monkeypatch, tmp_path):
+    state = _state_in(tmp_path, monkeypatch)
+    dag_run = _DagRun("scheduled__2026-09-26T02:00:00+00:00")
+    run_id = runtime.resolve_run_id("p", dag_run)
+
+    runtime.finish_pipeline_run(runtime.resolve_run_id("p", dag_run), "ok")
+
+    assert state.get_run(run_id)["status"] == "ok"
+    assert state.conn().execute("select count(*) n from runs").fetchone()["n"] == 1
+
+
+def test_two_scheduled_runs_and_two_pipelines_never_share_a_row(monkeypatch, tmp_path):
+    _state_in(tmp_path, monkeypatch)
+    a1 = runtime.resolve_run_id("p", _DagRun("scheduled__1"))
+    a2 = runtime.resolve_run_id("p", _DagRun("scheduled__2"))
+    b1 = runtime.resolve_run_id("q", _DagRun("scheduled__1"))   # same Airflow id, other pipeline
+    assert len({a1, a2, b1}) == 3
+
+
+def test_resolve_run_id_records_a_ui_triggered_run_as_such(monkeypatch, tmp_path):
+    state = _state_in(tmp_path, monkeypatch)
+    run_id = runtime.resolve_run_id("p", _DagRun("manual__2026", conf={}, run_type="manual"))
+    assert "manual" in state.events_for(run_id)[0]["message"]
+
+
+def test_resolve_run_id_without_a_dag_run_is_none():
+    assert runtime.resolve_run_id("p", None) is None
+
+
+# ---------------------------------------------------------------- quarantine table auto-creation
+
+def _spy_db(monkeypatch, exists):
+    executed = []
+    monkeypatch.setattr(runtime, "_query_rows",
+                        lambda pipeline, schema, sql: [{"e": "t" if exists else "f"}])
+    monkeypatch.setattr(runtime, "_execute",
+                        lambda pipeline, schema, sql: executed.append(sql))
+    return executed
+
+
+def test_a_missing_quarantine_table_is_created_in_the_documented_shape(monkeypatch):
+    """A dbt-engine stage has nothing that could create it (dbt materializes
+    models, not their rejects): the first rejected row used to die with
+    'relation stg_x_quarantine does not exist'."""
+    executed = _spy_db(monkeypatch, exists=False)
+    runtime._ensure_quarantine_table(object(), "s", "stg_orders", "stg_orders_quarantine")
+    assert len(executed) == 1
+    sql = executed[0]
+    assert "CREATE TABLE stg_orders_quarantine AS SELECT * FROM stg_orders WITH NO DATA" in sql
+    assert "ADD COLUMN reason text, ADD COLUMN dpagent_run_id bigint" in sql
+
+
+def test_an_existing_quarantine_table_is_never_touched(monkeypatch):
+    """Whatever shape its author gave it - including the original one with no
+    run column, which must not be silently altered."""
+    executed = _spy_db(monkeypatch, exists=True)
+    runtime._ensure_quarantine_table(object(), "s", "orders_raw", "orders_raw_quarantine")
+    assert executed == []
+
+
+def test_the_auto_created_shape_is_exactly_what_the_run_marker_detection_expects(monkeypatch):
+    """Created tables end with (reason, dpagent_run_id), so they opt in to run
+    stamping without any author doing anything."""
+    monkeypatch.setattr(runtime, "_query_rows", lambda p, s, sql: [
+        {"column_name": c} for c in ("order_id", "customer", "reason", "dpagent_run_id")])
+    assert runtime._quarantine_run_tail(object(), "s", "t", 3) == ", 3 AS dpagent_run_id"
