@@ -1,0 +1,55 @@
+# MinIO-specific failures. Generic ones (DNS, disk, apt locks) live in
+# packs/_lib/errors.yaml and are checked after these.
+#
+# Every entry earns its place by having actually happened. When a failure
+# gets past this file, `dpagent diagnose` drafts a new entry into
+# errors.proposed.yaml for review - move it here and this pack never needs a
+# human for it again.
+
+- id: minio-port-busy
+  match:
+    output: "Specified port .* is already in use|bind: address already in use"
+  cause: Another process already holds the S3 API or console port.
+  autofix: []
+  ask_user: >
+    The port is occupied. Stop the other service, or re-run with a different
+    port/console_port param, e.g. `dpagent install minio --set port=9010`.
+  retry: false
+
+- id: minio-volume-not-empty-conflicting-format
+  match:
+    output: "Unable to initialize backend|Drive is not the same format as the rest|Disk hostname mismatch"
+  cause: >
+    data_dir holds files from a differently-configured MinIO instance (a
+    different node topology, or a leftover from a failed earlier install).
+    MinIO refuses to start rather than guess.
+  autofix: []
+  ask_user: >
+    The data directory does not match a fresh single-node layout. If it
+    holds nothing you need, run `dpagent rollback minio` (this removes
+    data_dir) then install again. dpagent will not delete a data directory
+    on its own outside of rollback.
+  retry: false
+
+- id: minio-root-credentials-too-short
+  match:
+    output: "MINIO_ROOT_PASSWORD.*length should be|Root password length"
+  cause: >
+    MinIO requires the root password to be at least 8 characters; the
+    root_password param is shorter than that.
+  autofix: []
+  ask_user: "Set a root_password of at least 8 characters and re-run."
+  retry: false
+
+- id: minio-download-404
+  match:
+    output: "404 Not Found|The specified key does not exist"
+  cause: >
+    The `release` param names a RELEASE.<timestamp> tag that dl.min.io does
+    not have (a typo, or a tag that predates MinIO's own retention window).
+  autofix: []
+  ask_user: >
+    That release tag was not found on dl.min.io. Leave `release` unset for
+    the current stable build, or check https://dl.min.io/server/minio/release/linux-amd64/archive/
+    for a valid RELEASE.* tag.
+  retry: false
