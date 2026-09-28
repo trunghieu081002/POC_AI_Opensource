@@ -522,7 +522,14 @@ Stated from what real runs actually showed, not from the design:
   rows, no duplicates, the update visible), state recovered from the
   destination after the local dlt state was deleted, and
   `dpagent pipeline run --full-refresh` reloading all 6. Each run's
-  `extract.done` event records how many rows it moved per table.
+  `extract.done` event records how many rows it moved per table. Verified a
+  second time through a real, scheduled Airflow DAG (`schedule: "*/2 * * * *"`,
+  not `dpagent pipeline run` triggering it by hand): six scheduled ticks in a
+  row, `extract.done` correctly alternating between `orders +3` (initial
+  load), "no rows extracted" (no change) and `orders +3` again (2 new + 1
+  updated row, landing going 3 -> 3 -> 3 -> 5 -> 5 -> 5) - a source mutation
+  made between ticks was picked up by the very next scheduled run, not lost
+  or double-counted.
   Limits: **deletes at the source are not propagated** (a `--full-refresh`
   fixes that), and the cursor column must be reliably bumped on every update
   (see the `write_date` row in the risks table). Not verified against SQL
