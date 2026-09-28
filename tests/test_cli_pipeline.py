@@ -477,3 +477,62 @@ def test_full_refresh_asks_for_a_real_confirmation_that_says_what_it_drops(db, m
     declined = _runner().invoke(pipeline_group, ["run", "demo", "--full-refresh"], input="\n")
     assert declined.exit_code != 0                     # default answer is NO for a destructive run
     assert "FULL REFRESH" in declined.output and "dropped" in declined.output
+
+
+# ---------------------------------------------------------------- prune
+
+def _old_run(target, days_old, status="ok"):
+    from datetime import datetime, timedelta, timezone
+    run_id = state.start_run("data", target)
+    state.finish_run(run_id, status)
+    ts = (datetime.now(timezone.utc) - timedelta(days=days_old)).isoformat(timespec="seconds")
+    state.conn().execute("UPDATE runs SET finished_at=? WHERE id=?", (ts, run_id))
+    state.conn().commit()
+    return run_id
+
+
+def test_prune_reports_nothing_to_do_when_everything_is_recent(db):
+    _old_run("demo", days_old=1)
+    result = _runner().invoke(pipeline_group, ["prune", "demo", "--older-than-days", "30"])
+    assert result.exit_code == 0
+    assert "nothing" in result.output
+
+
+def test_prune_dry_run_reports_without_asking_or_deleting(db):
+    run_id = _old_run("demo", days_old=40)
+    result = _runner().invoke(pipeline_group,
+                              ["prune", "demo", "--older-than-days", "30", "--dry-run"])
+    assert result.exit_code == 0
+    assert "would delete 1 run" in result.output
+    assert state.get_run(run_id) is not None
+
+
+def test_prune_asks_for_confirmation_and_declining_deletes_nothing(db):
+    run_id = _old_run("demo", days_old=40)
+    result = _runner().invoke(pipeline_group, ["prune", "demo", "--older-than-days", "30"],
+                              input="\n")
+    assert result.exit_code != 0
+    assert state.get_run(run_id) is not None
+
+
+def test_prune_yes_deletes_without_asking(db):
+    run_id = _old_run("demo", days_old=40)
+    result = _runner().invoke(pipeline_group,
+                              ["prune", "demo", "--older-than-days", "30", "--yes"])
+    assert result.exit_code == 0
+    assert "deleted 1 run" in result.output
+    assert state.get_run(run_id) is None
+
+
+def test_prune_without_a_name_applies_to_every_pipeline(db):
+    demo_run = _old_run("demo", days_old=40)
+    other_run = _old_run("quickstart", days_old=40)
+    result = _runner().invoke(pipeline_group, ["prune", "--older-than-days", "30", "--yes"])
+    assert result.exit_code == 0
+    assert state.get_run(demo_run) is None
+    assert state.get_run(other_run) is None
+
+
+def test_prune_rejects_a_nonpositive_older_than_days(db):
+    result = _runner().invoke(pipeline_group, ["prune", "demo", "--older-than-days", "0"])
+    assert result.exit_code != 0

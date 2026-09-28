@@ -2588,3 +2588,50 @@ all `ok`:
 
 Confirms the script-level result holds under Airflow's own scheduler and
 process lifecycle, not just when driven directly.
+
+### 2026-09-28 — incremental load verified against a real SQL Server too
+
+Same six-run script as the Postgres verification (initial load, no-change,
+2 new + 1 updated row, local dlt state deleted + 1 new row, `--full-refresh`,
+no-change again), this time against a throwaway SQL Server 2022 container
+(`mcr.microsoft.com/mssql/server:2022-latest`) as the source, through the
+real `mssql+pymssql` connection string `runtime._connection_url` builds for
+the `sql_server` connector. Identical results to Postgres: `orders` in
+landing went 3 -> 3 -> 5 -> 6 -> 6 -> 6, no duplicates, the updated row
+visible, state correctly recovered from the destination after deleting the
+local dlt state. First real run hit stale data from an earlier attempt whose
+Python driver had crashed (`ModuleNotFoundError: dpagent` - ran the driver
+script through the wrong venv, `/opt/dlt/.venv` instead of the repo's own
+`.venv`, where `dpagent` isn't installed) but whose `sqlcmd` mutations
+against the container had already applied regardless of the crash - a
+reminder that a failed driver doesn't roll back side effects made before it
+failed. Reset the source table and re-ran clean.
+
+### 2026-09-28 — journal retention: `dpagent pipeline prune`
+
+The journal's own `events` table is documented append-only ("Nothing is
+ever updated or deleted here", `state.py`'s schema comment) - deliberate,
+not an oversight. Asked the operator how to reconcile that with the real
+growth problem (a pipeline scheduled every 2 minutes wrote 207 runs in 7
+hours, with nothing to ever bound it): an explicit, operator-called prune
+command, not silent automatic deletion and not an archive-then-delete step.
+
+Added `dpagent pipeline prune [NAME] --older-than-days N [--dry-run] [--yes]`:
+deletes finished `data`-kind runs (and their stage_runs/gate_runs/events)
+past the given age, for one pipeline or, with no NAME, across every
+pipeline's history - deployed or not, same reach as the journal itself. A
+`running` run is never a candidate regardless of age. `--dry-run` reports
+counts without deleting. This is the one place the "never deleted" rule is
+allowed to bend, and only because an operator explicitly asked for it - the
+same reasoning `undeploy` already applies to *not* touching this journal at
+all.
+
+Sanity-checked against the real, accumulated journal on this host with
+`--dry-run` (never executed for real): correctly found 225 of 242 real
+`data` runs older than 1 day, cascading to 645 stage results, 645 gate
+results, 3037 events, and left the database untouched (242 still there
+after). Unit-tested (13 tests: state.prune_data_runs + the CLI command)
+for cutoff boundaries, the running-run exclusion, cascade correctness,
+per-pipeline scoping, and the confirm/--yes/--dry-run flow. Not yet run for
+real (never executed with intent to actually delete) - that decision is the
+operator's.

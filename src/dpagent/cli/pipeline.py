@@ -543,3 +543,49 @@ def audit_cmd(run_id):
                 text.stylize("yellow")
             table.add_row(row["ts"].split("T")[-1], row["actor"], row["kind"], text)
         console.print(table)
+
+
+@pipeline_group.command("prune")
+@click.argument("name", required=False)
+@click.option("--older-than-days", type=int, required=True,
+              help="Delete finished runs whose finished_at is older than this many days.")
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted, delete nothing.")
+@click.option("--yes", "-y", is_flag=True)
+def prune_cmd(name, older_than_days, dry_run, yes):
+    """Delete old pipeline runs from dpagent's own journal.
+
+    `status`/`audit` history (docs/layer2.md, "Run ledger") is otherwise kept
+    forever, on purpose - a schedule ticking every 2 minutes leaves nothing to
+    ever bound its own growth (207 runs in 7 hours, in one real soak). This is
+    the one place that journal is allowed to shrink, and only because an
+    operator explicitly asked: it deletes runs and their stage/gate verdicts
+    and events, same as `undeploy` deliberately never does on its own.
+
+    NAME limits this to one pipeline; omitted, it applies across every
+    pipeline's history, deployed or not. A `running` run is never a
+    candidate, regardless of age.
+    """
+    if older_than_days < 1:
+        fail("--older-than-days must be at least 1")
+    if name is not None:
+        _load_or_fail(name)
+
+    counts = state.prune_data_runs(older_than_days, target=name, dry_run=True)
+    if counts["runs"] == 0:
+        console.print(f"[dim]nothing older than {older_than_days} day(s)"
+                      + (f" for {name!r}" if name else "") + "[/dim]")
+        return
+
+    scope = f"{name!r}" if name else "every pipeline"
+    console.print(f"would delete {counts['runs']} run(s) for {scope} older than "
+                  f"{older_than_days} day(s): {counts['stage_runs']} stage result(s), "
+                  f"{counts['gate_runs']} gate result(s), {counts['events']} event(s)")
+    if dry_run:
+        return
+    if not yes and not confirm("Delete these permanently? This cannot be undone.",
+                                default=False):
+        console.print("[yellow]nothing deleted[/yellow]")
+        sys.exit(1)
+
+    state.prune_data_runs(older_than_days, target=name, dry_run=False)
+    console.print(f"[green]deleted[/green] {counts['runs']} run(s)")
