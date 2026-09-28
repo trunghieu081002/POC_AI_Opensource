@@ -2564,3 +2564,27 @@ directly in Postgres, not just from the CLI's own report:**
 with the 10% VAT applied correctly. This is the dbt-engine counterpart of
 `pipelines/quickstart`'s own procedure-engine verification, and the
 remaining evidence gap for PR #8.
+
+### 2026-09-28 — incremental load verified a second time, through a real scheduled Airflow DAG
+
+The earlier incremental verification (see above) called `runtime.run_extract`
+directly, script-level - not through Airflow's own scheduler. Repeated it as
+a real scheduled DAG (`inc_sched_e2e`, self-contained: the same local
+Postgres plays source, schema `inc_src`, and warehouse, `schedule:
+"*/2 * * * *"`), deployed for real with `sudo dpagent pipeline deploy` (which
+restarted `airflow-scheduler` to pick up the new secrets), then left to run
+on its own schedule with no `dpagent pipeline run` involved. Source rows
+were mutated by hand between ticks. Six consecutive scheduled runs (277-282),
+all `ok`:
+
+| run | interval (UTC) | extract.done | landing `orders` |
+|---|---|---|---|
+| 277 | 02:24 | `orders +3` | 3 |
+| 278 | 02:26 | no rows extracted | 3 |
+| 279 | 02:28 | no rows extracted (mutation landed just after) | 3 |
+| 280 | 02:30 | `orders +3` (2 new, 1 updated) | 5, no duplicates, `order_id=2` -> `b-UPDATED`/99 |
+| 281 | 02:32 | no rows extracted | 5 |
+| 282 | 02:34 | no rows extracted | 5 |
+
+Confirms the script-level result holds under Airflow's own scheduler and
+process lifecycle, not just when driven directly.
