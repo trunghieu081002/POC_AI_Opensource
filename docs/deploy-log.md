@@ -2823,3 +2823,17 @@ that touch S3 auth (setup, roundtrip, restart, rejects-bad-credentials,
 teardown) now `source /etc/default/silo` for `MINIO_ROOT_USER`/
 `MINIO_ROOT_PASSWORD` instead. Not yet re-run for real; that is the next
 step.
+
+### 2026-09-29 — the /etc/default/silo fix itself broke, found on the very next real run
+
+`sudo -E dpagent test silo` failed again, differently: `/etc/default/silo:
+line 4: :9000: command not found`. The previous fix `source`d the whole
+env file in bash - works for simple `KEY=value` lines, but line 4 is
+`MINIO_OPTS=--address :9000 --console-address :9001`, an unquoted,
+multi-word value. Valid for systemd's own `EnvironmentFile=` parser (every
+line is `KEY=VALUE` literally, no word-splitting) - not valid for bash
+`source`, which treats the words after `--address` as a command to run
+with `MINIO_OPTS=--address` as its environment. Fixed by extracting only
+the two lines each script needs with `sed`, never executing the file:
+`sed -n 's/^MINIO_ROOT_USER=//p' /etc/default/silo`. Not yet re-run for
+real; that is the next step, again.

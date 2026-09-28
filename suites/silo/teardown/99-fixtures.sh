@@ -13,12 +13,15 @@ export S3_PORT="$(dp_param port 9000)"
 # required secret cannot be recovered from resolved params after install,
 # by design - a masked value must never be replayed as if real). Read the
 # real credentials from what install actually configured instead.
-set -a
-# shellcheck source=/dev/null
-source /etc/default/silo
-set +a
-export S3_ACCESS_KEY="$MINIO_ROOT_USER"
-export S3_SECRET_KEY="$MINIO_ROOT_PASSWORD"
+# `source`-ing the whole file breaks: MINIO_OPTS holds an unquoted,
+# multi-word value ("--address :9000 --console-address :9001") that is
+# valid for systemd's own EnvironmentFile= parser (each line is KEY=VALUE
+# literally - no word-splitting) but not for bash `source`, which treats
+# the words after the first as a command to run. Extract only the two
+# lines this script actually needs instead of executing the file.
+S3_ACCESS_KEY="$(sed -n 's/^MINIO_ROOT_USER=//p' /etc/default/silo)"
+export S3_ACCESS_KEY
+export S3_SECRET_KEY="$(sed -n 's/^MINIO_ROOT_PASSWORD=//p' /etc/default/silo)"
 S3="python3 ${DP_SUITE_ROOT:?}/s3sig.py"
 
 # A check that failed partway through may have left an object behind -
