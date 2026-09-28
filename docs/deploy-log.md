@@ -2720,3 +2720,27 @@ enough to depend on across the families this pack targets. A real suite
 needs its own SigV4 signer (stdlib-only Python, no boto3 assumption) rather
 than either of those. Tracked, not started. `maturity: draft` stays until
 it exists.
+
+### 2026-09-28 — silo acceptance suite written, verified by hand against the live install, not yet run through `dpagent test`
+
+`suites/silo/`: write/read roundtrip (listing + delete included), survives
+a real `systemctl restart`, rejects a wrong secret key/unknown access key
+(negative), and confirms the running server - not the env file - answers
+on the configured ports. No boto3/`mc`/`aws` CLI dependency and
+deliberately not `curl --aws-sigv4` (needs curl 7.75+, not guaranteed on
+every family this pack targets - this host's curl reports 7.61.1, a RHEL
+backport that happens to have the flag anyway, which is exactly the kind
+of host-specific accident not to depend on): a small stdlib-only Python
+SigV4 signer (`suites/silo/s3sig.py`, ~110 lines).
+
+Tested the signer directly against the real, running instance from the
+earlier install (not through the suite runner) before wiring it into
+checks: create bucket, put, get (exact match), list (key present), delete
+object, delete bucket, and a wrong-secret-key request - correctly
+`SignatureDoesNotMatch`. All real, all passed.
+
+`dpagent test silo` itself needs root (acquires `/var/lib/dpagent`'s host
+lock, and the restart check calls `systemctl restart`) - confirmed by
+trying it as the plain operator user, which failed cleanly at the lock,
+not inside the suite. Not yet run for real; that is the next step, and
+`maturity: draft` stays until it has.
