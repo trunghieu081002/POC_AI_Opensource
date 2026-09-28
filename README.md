@@ -318,18 +318,20 @@ not built yet:
       happy path, negative path (quarantine over threshold → terminal
       `failed`), and idempotent re-run all verified end to end on a real
       host, not just unit-tested — see `docs/layer2.md`
-- [ ] Pack: `silo` — single-node S3-compatible object storage
+- [x] Pack: `silo` — single-node S3-compatible object storage
       (github.com/pgsty/silo, a community-maintained MinIO fork; MinIO's own
       open-source server was archived and dl.min.io stopped serving
       binaries in September 2026 — found by this pack's first real install
-      attempt, not from reading a changelog). Installed for real on a live
-      host and verified past liveness: a real S3 round trip (create bucket,
-      write, read back byte-identical, list, delete) and a negative check
-      (wrong secret key genuinely rejected, not silently accepted) — see
-      docs/deploy-log.md. `maturity: draft` still, on purpose: no
-      acceptance suite yet (`suites/silo/`, wired into `dpagent install`
-      the way every stable pack's is) — do not promote to `stable` until
-      one exists.
+      attempt, not from reading a changelog). `maturity: stable`: installed
+      for real on a live host, `suites/silo/` (write/read roundtrip,
+      restart durability, rejects a wrong secret key, config actually
+      applied) 4/4 passed for real through `dpagent test silo` — see
+      docs/deploy-log.md, including three real bugs the suite's own first
+      run found (a Python 3.6-incompatible helper script, sourcing an env
+      file with an unquoted multi-word value, and a masked secret replayed
+      at test time). MinIO/Parquet Bronze landing (Layer 2, DuckDB reading
+      Parquet off it for raw/curated) is a separate, later piece — not
+      started.
 - [ ] Packs: clickhouse, trino, spark, iceberg, hive-metastore
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 

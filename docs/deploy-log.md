@@ -2837,3 +2837,25 @@ with `MINIO_OPTS=--address` as its environment. Fixed by extracting only
 the two lines each script needs with `sed`, never executing the file:
 `sed -n 's/^MINIO_ROOT_USER=//p' /etc/default/silo`. Not yet re-run for
 real; that is the next step, again.
+
+### 2026-09-29 — silo acceptance suite passes for real, promoted to stable
+
+`sudo -E dpagent test silo`, third attempt (after the Python 3.6 syntax
+fix and the two credential-sourcing fixes above): 4/4 passed for real -
+write/read roundtrip (plus listing and delete), survives a real
+`systemctl restart`, rejects a wrong secret key, and the running server
+answers on the configured ports. `maturity: draft` -> `stable`
+(`packs/silo/pack.yaml`) - both conditions README stated for that
+promotion (installed for real, acceptance suite passing) are now met.
+
+Three real bugs found across this suite's first three runs, none of them
+visible from reading the code, each one only by actually executing it as
+root against the real installed instance: a Python 3.6-incompatible
+helper script (system `python3` on Oracle Linux 8 is 3.6.8, not this
+repo's own venv's 3.11), a masked install-time secret being replayed
+verbatim at test time (`dp_param_required` returns a fixed placeholder,
+not the real password, by cli/operate.py's own documented design), and a
+`source`d env file with a line that is valid for systemd's own
+`EnvironmentFile=` parser but not for bash word-splitting. This is the
+same discipline the rest of Layer 1/2 has been held to throughout this
+project - a passing suite is not assumed correct until it has actually run.

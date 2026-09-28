@@ -6,7 +6,7 @@ summary: >
   MinIO's own open-source server was archived and its binary downloads
   removed from dl.min.io in September 2026 (see steps/20-install.sh's own
   comment). Reads the same MINIO_* environment interface.
-maturity: draft            # flip to stable once it has verified on a real host
+maturity: stable           # real install + suites/silo/ 4/4 on a real host, 2026-09-29
 
 provides: [minio, silo, object_storage, s3]
 requires: [base]
