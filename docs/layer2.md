@@ -532,8 +532,10 @@ Stated from what real runs actually showed, not from the design:
   or double-counted.
   Limits: **deletes at the source are not propagated** (a `--full-refresh`
   fixes that), and the cursor column must be reliably bumped on every update
-  (see the `write_date` row in the risks table). Not verified against SQL
-  Server yet.
+  (see the `write_date` row in the risks table). Verified against a real
+  SQL Server too (2022, `mssql+pymssql`, the same six-run script), identical
+  results to Postgres - the pymssql dialect and datetime2 cursor round-trip
+  correctly through dlt's `sql_database` source.
 - **Large data.** Violating rows are counted in SQL
   (`select count(*) from (<gate sql>)`), not fetched into Python: on 3M rows
   with 1.2M violations that took peak memory from 1.1 GB to 21 MB. Every
@@ -541,8 +543,15 @@ Stated from what real runs actually showed, not from the design:
   override per pipeline with `timeouts: {extract: N, transform: N, gate: N}`);
   hitting it fails the run with a message naming the limit.
 - **`undeploy` cancels in-flight runs** (their journal rows become
-  `cancelled`). The journal itself has no retention: a pipeline scheduled
-  every 2 minutes wrote 207 runs in 7 hours.
+  `cancelled`). The journal (`status`/`audit`) otherwise keeps every run
+  forever, on purpose - a pipeline scheduled every 2 minutes wrote 207 runs
+  in 7 hours in one real soak, with no built-in bound on that growth.
+  `dpagent pipeline prune [NAME] --older-than-days N` deletes finished runs
+  (and their stage/gate verdicts and events) past that age - the one place
+  this rule is allowed to bend, and only because an operator explicitly
+  called it; a `running` run is never a candidate regardless of age, and
+  `--dry-run` shows the count before anything is deleted. Not run against a
+  real long-lived journal yet, only unit-tested.
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
 - **Google Sheets has not run against Google** - only against a local

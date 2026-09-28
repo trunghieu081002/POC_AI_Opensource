@@ -16,7 +16,7 @@ import json
 import os
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -271,6 +271,69 @@ def find_data_run(target: str, airflow_run_id: str) -> int | None:
 
 def get_run(run_id: int) -> sqlite3.Row | None:
     return conn().execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+
+
+def prune_data_runs(older_than_days: int, target: str | None = None,
+                    dry_run: bool = False) -> dict[str, int]:
+    """Deletes finished pipeline runs (`kind='data'`) older than
+    `older_than_days`, and their stage_runs/gate_runs/events with them -
+    the one place this module's own rule for `events` ("Append-only. Never
+    UPDATE, never DELETE.", see the schema above) is deliberately broken.
+    Real gap this closes: a pipeline scheduled every 2 minutes wrote 207
+    runs in 7 hours with nothing to ever prune them, on a journal with no
+    retention at all.
+
+    Kept append-only in spirit, not in fact: this only ever runs when an
+    operator explicitly asks for it (`dpagent pipeline prune`), never on its
+    own after a run the way `finish_run` does - the same reasoning
+    `undeploy` already applies to *not* touching this journal at all
+    (docs/layer2.md, cli/pipeline.py's own undeploy_cmd docstring).
+
+    A `running` run is never a candidate regardless of age - a stuck one
+    must be cancelled first (`undeploy` already does this for a pipeline
+    being removed; there is deliberately no other way to force one out of
+    'running' here).
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat(
+        timespec="seconds")
+    clauses = ["kind='data'", "status != 'running'", "finished_at IS NOT NULL",
+              "finished_at < ?"]
+    params: list[Any] = [cutoff]
+    if target is not None:
+        clauses.append("target=?")
+        params.append(target)
+    run_ids = [row["id"] for row in conn().execute(
+        f"SELECT id FROM runs WHERE {' AND '.join(clauses)}", params).fetchall()]
+    if not run_ids:
+        return {"runs": 0, "stage_runs": 0, "gate_runs": 0, "events": 0}
+
+    placeholders = ",".join("?" * len(run_ids))
+    stage_run_ids = [row["id"] for row in conn().execute(
+        f"SELECT id FROM stage_runs WHERE run_id IN ({placeholders})", run_ids).fetchall()]
+    counts = {
+        "runs": len(run_ids),
+        "stage_runs": len(stage_run_ids),
+        "gate_runs": 0, "events": 0,
+    }
+    if stage_run_ids:
+        sr_placeholders = ",".join("?" * len(stage_run_ids))
+        counts["gate_runs"] = conn().execute(
+            f"SELECT COUNT(*) FROM gate_runs WHERE stage_run_id IN ({sr_placeholders})",
+            stage_run_ids).fetchone()[0]
+    counts["events"] = conn().execute(
+        f"SELECT COUNT(*) FROM events WHERE run_id IN ({placeholders})", run_ids).fetchone()[0]
+    if dry_run:
+        return counts
+
+    if stage_run_ids:
+        sr_placeholders = ",".join("?" * len(stage_run_ids))
+        conn().execute(f"DELETE FROM gate_runs WHERE stage_run_id IN ({sr_placeholders})",
+                       stage_run_ids)
+        conn().execute(f"DELETE FROM stage_runs WHERE id IN ({sr_placeholders})", stage_run_ids)
+    conn().execute(f"DELETE FROM events WHERE run_id IN ({placeholders})", run_ids)
+    conn().execute(f"DELETE FROM runs WHERE id IN ({placeholders})", run_ids)
+    conn().commit()
+    return counts
 
 
 # ---------------------------------------------------------------- steps
