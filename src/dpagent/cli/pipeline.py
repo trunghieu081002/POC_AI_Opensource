@@ -6,6 +6,7 @@ before anything is generated or run against a real warehouse.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 
@@ -564,6 +565,10 @@ def prune_cmd(name, older_than_days, dry_run, yes):
     NAME limits this to one pipeline; omitted, it applies across every
     pipeline's history, deployed or not. A `running` run is never a
     candidate, regardless of age.
+
+    `--dry-run` needs no privilege (the journal is world-readable). Actually
+    deleting does - the database is owned root:dpagent - so this needs
+    sudo, same as deploy/undeploy.
     """
     if older_than_days < 1:
         fail("--older-than-days must be at least 1")
@@ -586,6 +591,16 @@ def prune_cmd(name, older_than_days, dry_run, yes):
                                 default=False):
         console.print("[yellow]nothing deleted[/yellow]")
         sys.exit(1)
+
+    # Real gap found running this for real on the production journal: the
+    # dry-run's SELECTs succeeded for any user (world-readable), but the
+    # actual DELETE needs write access to a database file owned root:dpagent
+    # - the group Airflow's own tasks run as, not necessarily the operator
+    # typing this command. Caught here with an actionable message instead of
+    # a raw sqlite3.OperationalError("attempt to write a readonly database").
+    if hasattr(os, "access") and not os.access(state.DB_PATH, os.W_OK):
+        fail(f"no write access to {state.DB_PATH} - re-run as "
+             f"sudo -E dpagent pipeline prune ...")
 
     state.prune_data_runs(older_than_days, target=name, dry_run=False)
     console.print(f"[green]deleted[/green] {counts['runs']} run(s)")

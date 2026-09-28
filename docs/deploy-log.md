@@ -2635,3 +2635,22 @@ for cutoff boundaries, the running-run exclusion, cascade correctness,
 per-pipeline scoping, and the confirm/--yes/--dry-run flow. Not yet run for
 real (never executed with intent to actually delete) - that decision is the
 operator's.
+
+### 2026-09-28 — `pipeline prune` needs root against the real journal, only found by actually running it
+
+Ran `dpagent pipeline prune --older-than-days 7 --yes` for real on this
+host's actual journal (operator-authorized, 7 days/all pipelines). The
+`--dry-run` preview worked fine as the plain operator user (11 runs, 14
+stage results, 14 gate results, 79 events) - its SELECTs only need read
+access, and `/var/lib/dpagent/dpagent.db` is world-readable. The real
+DELETE then failed: `sqlite3.OperationalError: attempt to write a readonly
+database` - the file is owned `root:dpagent`, and the operator's own user
+was not in that group (Airflow's own tasks are, which is why `finish_run`/
+`event()` calls from a real DAG run always worked). Unit tests never caught
+this because they always run against a throwaway, fully-writable tmp_path
+database.
+
+**Fixed:** `prune` now checks `os.access(state.DB_PATH, os.W_OK)` before the
+real delete and fails with an actionable message ("re-run as sudo -E dpagent
+pipeline prune ...") instead of leaking the raw sqlite3 traceback. Same
+privilege story as deploy/undeploy now.
