@@ -325,6 +325,10 @@ dpagent pipeline undeploy <name> # remove the DAG, its Airflow history, publishe
 dpagent pipeline audit <run>     # every stage and gate decision, and who made it -
                                  #   a failed extract/transform carries the driver's own
                                  #   error (secrets masked), not just "failed"
+dpagent pipeline prune [<name>]  # delete finished runs (and their stage/gate verdicts and
+  --older-than-days N            #   events) past a given age, one pipeline or all of them -
+                                 #   --dry-run reports without deleting; a running run is
+                                 #   never a candidate regardless of age
 ```
 
 ## In scope (MVP)
@@ -392,9 +396,15 @@ procedure lands whenever a genuinely procedural transform actually shows up.
 
 ## Out of scope (MVP)
 
-CDC and streaming · incremental merge strategies beyond append/full-refresh
-· warehouses other than Postgres · Superset and dashboards (Layer 3) · a
-model drafting pipelines (Layer 3)
+CDC and streaming (log-based change capture) · warehouses other than
+Postgres · Superset and dashboards (Layer 3) · a model drafting pipelines
+(Layer 3)
+
+Cursor-based incremental merge (`source.incremental`, `odoo_postgres`/
+`sql_server`) was out of scope at first pass and has since shipped and been
+real-verified (see "Known limitations") - CDC/streaming above is a
+different, still-out-of-scope thing: no log-based capture, no tailing a
+replication slot, only "extract rows whose cursor moved since last time."
 
 ## Evidence of done
 
