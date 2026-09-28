@@ -518,6 +518,25 @@ def test_install_dbt_models_refuses_a_model_with_no_sql_file(isolated_db, pipeli
         deploy.install_dbt_models(pipeline)
 
 
+def test_install_dbt_models_refuses_a_model_name_that_collides_elsewhere_in_the_project(
+        isolated_db, pipeline, monkeypatch, tmp_path):
+    """The regression this guards: dbt resolves a model by its filename
+    stem across the *whole* project, not per-subdirectory - a leftover
+    models/staging/stg_orders.sql broke a real deploy's own
+    models/quickstart_dbt/stg_orders.sql with "dbt found two models with
+    the name 'stg_orders'", 5 seconds into a live Airflow run, not at
+    `dpagent pipeline deploy` time."""
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    project_dir = tmp_path / "dbtproject"
+    monkeypatch.setattr(deploy, "_dbt_project_dir", lambda: project_dir)
+    other = project_dir / "models" / "staging"
+    other.mkdir(parents=True)
+    (other / "stg_a.sql").write_text("select 1")
+
+    with pytest.raises(deploy.DeployError, match="stg_a.*collide|collide.*stg_a"):
+        deploy.install_dbt_models(pipeline)
+
+
 def test_install_dbt_models_publishes_every_model_and_a_schema_yml(isolated_db, pipeline,
                                                                    monkeypatch, tmp_path):
     monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
