@@ -2800,3 +2800,26 @@ customer name, amount - all Vietnamese names, all correct).
 This closes the one remaining unverified connector - all six (odoo_postgres,
 sql_server, csv, rest_api, elasticsearch, google_sheets) are now
 real-verified, not just unit-tested.
+
+### 2026-09-29 — silo suite's own real run found it was signing with a placeholder secret, not the real one
+
+`sudo -E dpagent test silo` failed at setup: `SignatureDoesNotMatch` even
+though the same credentials worked by hand against the same live instance
+just the day before. Cause: `dpagent test` resolves an installed pack's
+params from what was *recorded* at install time - a secret param (like
+`root_password`) is stored masked (`***REDACTED***`) and deliberately never
+replayed (`cli/operate.py`'s own `_stored_params()` docstring: "better to
+fall back to ... be obviously wrong than to silently use the literal
+string '***REDACTED***' as a password"). `dp_param_required root_password`
+inside a check script therefore returns a fixed placeholder string at test
+time, not the real secret - and every check script in this suite was
+signing S3 requests with that placeholder.
+
+Fixed by reading the real credentials the way the docstring itself says a
+suite must: from what install actually configured on disk
+(`/etc/default/silo`, which the suite can read because `dpagent test`
+already needs root) rather than from resolved params. All five scripts
+that touch S3 auth (setup, roundtrip, restart, rejects-bad-credentials,
+teardown) now `source /etc/default/silo` for `MINIO_ROOT_USER`/
+`MINIO_ROOT_PASSWORD` instead. Not yet re-run for real; that is the next
+step.

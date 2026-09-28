@@ -13,10 +13,19 @@ source "${DP_LIB:?dp.sh not found}"
 BUCKET="$(echo "${DP_TEST_NS:?}" | tr '_' '-')"
 export S3_HOST=127.0.0.1
 export S3_PORT="$(dp_param port 9000)"
-GOOD_KEY="$(dp_param_required root_password)"
 S3SIG="${DP_SUITE_ROOT:?}/s3sig.py"
 
-export S3_ACCESS_KEY="$(dp_param root_user silo_admin)"
+# dp_param_required root_password returns a placeholder at test time, not
+# the real secret (see cli/operate.py's _stored_params docstring: a
+# required secret cannot be recovered from resolved params after install,
+# by design - a masked value must never be replayed as if real). Read the
+# real credentials from what install actually configured instead.
+set -a
+# shellcheck source=/dev/null
+source /etc/default/silo
+set +a
+export S3_ACCESS_KEY="$MINIO_ROOT_USER"
+GOOD_KEY="$MINIO_ROOT_PASSWORD"
 
 # The control: the right credentials must work. Without this, a server that
 # refuses *everything* would pass the negative check below and look secure.
