@@ -322,10 +322,14 @@ not built yet:
       (github.com/pgsty/silo, a community-maintained MinIO fork; MinIO's own
       open-source server was archived and dl.min.io stopped serving
       binaries in September 2026 — found by this pack's first real install
-      attempt, not from reading a changelog). `maturity: draft`: lints
-      clean, passes the dry-run integration test on both families, but has
-      not installed for real on any host yet and has no acceptance suite -
-      do not promote to `stable` until both are done.
+      attempt, not from reading a changelog). Installed for real on a live
+      host and verified past liveness: a real S3 round trip (create bucket,
+      write, read back byte-identical, list, delete) and a negative check
+      (wrong secret key genuinely rejected, not silently accepted) — see
+      docs/deploy-log.md. `maturity: draft` still, on purpose: no
+      acceptance suite yet (`suites/silo/`, wired into `dpagent install`
+      the way every stable pack's is) — do not promote to `stable` until
+      one exists.
 - [ ] Packs: clickhouse, trino, spark, iceberg, hive-metastore
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 

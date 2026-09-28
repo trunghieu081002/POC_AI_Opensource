@@ -2693,3 +2693,30 @@ original static-binary design needed but this packaged one does not.
 (the operator's own attempt was against the now-dead binary; a real
 install against the rewritten pack has not happened yet), still no
 acceptance suite.
+
+### 2026-09-28 — silo pack installed and verified for real (S3 round trip, negative auth)
+
+`sudo -E dpagent install silo --allow-draft -y --set silo.root_password=...`
+on the real host (ol 8.10): preflight ok (one real warning - firewalld
+active, open_firewall off, correctly flagged as reachable only from this
+host), all 4 steps ok (install step took 36s - downloading and installing
+the real ~30MB package), `verify` ok (service active, both ports listening,
+S3 health endpoint answers), `base`'s own acceptance suite 4/4 (silo has
+none of its own yet - see below).
+
+Went further than the pack's own `verify` (liveness only) with a real S3
+protocol round trip via boto3 against the live instance: `create_bucket` ->
+`put_object` (76 bytes) -> `get_object` byte-for-byte identical ->
+`list_objects_v2` shows exactly the one key -> `delete_object` ->
+`delete_bucket`, all real. Negative check: the same client with a wrong
+secret key gets `SignatureDoesNotMatch`, not a silent accept.
+
+**Not yet done: an acceptance suite** (`suites/silo/`, wired into
+`dpagent install silo` the way `suites/postgres/` already is). Considered
+`curl --aws-sigv4` for it but that flag needs curl 7.75+; this host's own
+curl reports 7.61.1 (a RHEL backport, so it has the flag here, but a plain
+Debian/Ubuntu host at that upstream version would not) - not portable
+enough to depend on across the families this pack targets. A real suite
+needs its own SigV4 signer (stdlib-only Python, no boto3 assumption) rather
+than either of those. Tracked, not started. `maturity: draft` stays until
+it exists.
