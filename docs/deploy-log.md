@@ -2744,3 +2744,17 @@ lock, and the restart check calls `systemctl restart`) - confirmed by
 trying it as the plain operator user, which failed cleanly at the lock,
 not inside the suite. Not yet run for real; that is the next step, and
 `maturity: draft` stays until it has.
+
+### 2026-09-28 — silo suite's own s3sig.py broke on the real system python3 (3.6.8), not the repo's venv
+
+`sudo -E dpagent test silo` failed immediately in setup:
+`SyntaxError: future feature annotations is not defined`. Cause: `s3sig.py`
+used `from __future__ import annotations` (3.7+) and PEP 585 bracket
+generics (`tuple[int, bytes]`), and this real host's system `python3` -
+what `sudo dpagent test` actually invokes, not this repo's own venv - is
+Python 3.6.8 (Oracle Linux 8's default). My own manual test of this script
+earlier had `.venv/bin` ahead of `/usr/bin` on `PATH`, so it silently ran
+under 3.11 and never exercised this. Fixed by dropping the future import
+and every type hint; re-verified for real directly under
+`/usr/bin/python3` (create/put/get/negative/delete, all correct) before
+re-running the suite.
