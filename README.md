@@ -318,11 +318,14 @@ not built yet:
       happy path, negative path (quarantine over threshold → terminal
       `failed`), and idempotent re-run all verified end to end on a real
       host, not just unit-tested — see `docs/layer2.md`
-- [ ] Pack: `minio` — single-node object storage, static-binary install (no
-      distro package). `maturity: draft`: lints clean, passes the dry-run
-      integration test on both families, but has not installed for real on
-      any host yet and has no acceptance suite - do not promote to `stable`
-      until both are done.
+- [ ] Pack: `silo` — single-node S3-compatible object storage
+      (github.com/pgsty/silo, a community-maintained MinIO fork; MinIO's own
+      open-source server was archived and dl.min.io stopped serving
+      binaries in September 2026 — found by this pack's first real install
+      attempt, not from reading a changelog). `maturity: draft`: lints
+      clean, passes the dry-run integration test on both families, but has
+      not installed for real on any host yet and has no acceptance suite -
+      do not promote to `stable` until both are done.
 - [ ] Packs: clickhouse, trino, spark, iceberg, hive-metastore
 - [ ] Layer 3 — reading report/business logic into a DWH pipeline and dashboard
 

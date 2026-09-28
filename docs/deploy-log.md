@@ -2654,3 +2654,42 @@ database.
 real delete and fails with an actionable message ("re-run as sudo -E dpagent
 pipeline prune ...") instead of leaking the raw sqlite3 traceback. Same
 privilege story as deploy/undeploy now.
+
+### 2026-09-28 — the minio pack's first real install attempt found MinIO's open-source server is dead; rewritten as the silo pack
+
+`sudo -E dpagent install minio --allow-draft -y --set minio.root_password=...`
+failed at the `install` step: `curl: (22) The requested URL returned error:
+410` fetching `https://dl.min.io/server/minio/release/linux-amd64/minio`.
+Not a transient outage - researched it (web search): MinIO's own
+open-source server repository was marked "no longer maintained" on
+2026-02-12, formally archived 2026-04-25, and `dl.min.io` stopped serving
+any binaries around 2026-09-11 - roughly two weeks before this install
+attempt. The company now steers users to AIStor, a paid product.
+
+Asked the operator how to proceed rather than picking unilaterally
+(a storage backend choice has real consequences). Chose
+github.com/pgsty/silo - a community-maintained, wire-compatible fork
+(same `MINIO_*` environment interface, same S3 routes, still AGPLv3),
+distributing real `.rpm`/`.deb` packages via GitHub Releases.
+
+Before rewriting anything, downloaded both the real `.rpm` and `.deb`
+packages and inspected their contents directly (`rpm2cpio | cpio`,
+`dpkg-deb -c`) rather than trusting documentation: both ship identical
+layouts - `/usr/bin/silo`, `/usr/lib/systemd/system/silo.service` (its own
+unit - this pack no longer writes one), `/usr/lib/sysusers.d/silo.conf`
+(creates the `silo` system user itself - this pack no longer runs
+`useradd`), and `/etc/default/silo` as the `EnvironmentFile=-` this pack
+writes into. Also fetched all four (OS family x CPU arch) download URLs
+this pack's own `silo-lib.sh` constructs, for real, confirming each
+resolves to real package bytes (200, 30-34MB) rather than trusting a HEAD
+request alone.
+
+The pack is renamed `minio` -> `silo` throughout (directory, lib file,
+`pack.yaml` name), keeps `provides: [minio, silo, object_storage, s3]` so
+a pipeline's own capability lookup can still ask for "minio" and resolve
+to it, and drops the user-creation and hand-written systemd-unit steps the
+original static-binary design needed but this packaged one does not.
+`maturity: draft` unchanged - still not installed for real on any host
+(the operator's own attempt was against the now-dead binary; a real
+install against the rewritten pack has not happened yet), still no
+acceptance suite.

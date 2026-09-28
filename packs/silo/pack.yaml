@@ -1,0 +1,76 @@
+name: silo
+version: 1.0.0
+summary: >
+  S3-compatible single-node object storage (github.com/pgsty/silo) - a
+  community-maintained, wire-compatible fork of MinIO, installed after
+  MinIO's own open-source server was archived and its binary downloads
+  removed from dl.min.io in September 2026 (see steps/20-install.sh's own
+  comment). Reads the same MINIO_* environment interface.
+maturity: draft            # flip to stable once it has verified on a real host
+
+provides: [minio, silo, object_storage, s3]
+requires: [base]
+
+supports:
+  families: [debian, rhel]
+
+host_needs:
+  disk_mb: { /var/lib/silo: 2048 }
+
+params:
+  # Silo's own releases are date-tagged (RELEASE.<timestamp>), like MinIO's
+  # were. Empty means "the version this pack was written against" (pinned
+  # in steps/20-install.sh) rather than always fetching whatever is newest -
+  # a moving target neither this pack nor its acceptance suite could pin
+  # against. Set a RELEASE.* tag here to install a different one.
+  release:
+    type: string
+    default: ""
+  data_dir:
+    type: string
+    default: "/var/lib/silo/data"
+  port:
+    type: int
+    default: 9000            # S3 API
+  console_port:
+    type: int
+    default: 9001            # web console
+  root_user:
+    type: string
+    default: "silo_admin"
+  root_password:
+    type: string
+    required: true
+    secret: true
+  open_firewall:
+    type: bool
+    default: false
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+steps:
+  - id: data-dir
+    script: steps/10-data-dir.sh
+    description: Create data_dir (the 'silo' system user is created by the package itself)
+    timeout: 60
+    guard: 'test -d "$DP_PARAM_DATA_DIR"'
+
+  - id: install
+    script: steps/20-install.sh
+    description: Download and install the silo .rpm/.deb package
+    timeout: 600
+    guard: 'test -x /usr/bin/silo'
+
+  - id: config
+    script: steps/30-config.sh
+    description: Write /etc/default/silo (root user/password, volumes, address)
+    timeout: 60
+
+  - id: services
+    script: steps/40-services.sh
+    description: Enable and start the silo systemd unit the package installed
+    timeout: 300
