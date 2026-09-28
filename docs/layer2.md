@@ -355,20 +355,32 @@ dpagent pipeline prune [<name>]  # delete finished runs (and their stage/gate ve
     service-account auth only, never an interactive OAuth flow (cannot run
     unattended inside an Airflow task)
 
-  Verification status, stated plainly: REST API, CSV and Odoo PostgreSQL are
-  real-verified end to end. **SQL Server** (SQL Server 2022) and
-  **Elasticsearch** (8.15 and 9.0.0, no auth and `basic`, plus a wrong-password
-  negative that fails loudly with a 401) were real-verified on 2026-09-25
-  through the repo's own `runtime.run_extract` + `run_gate` against throwaway
-  Docker containers landing into a real Postgres, SQL Server also through the
-  real Airflow - see docs/deploy-log.md. **Google Sheets** has been *executed*
-  - real google-api-python-client, real dlt, real Postgres - against a local
-  stand-in for the Sheets API (which enforces the documented A1-quoting rule),
-  and that run found and fixed a real bug (a sheet name with a space was sent
-  unquoted). It has **not** run against Google itself: that needs a service
-  account and spreadsheet, so authentication and Google's actual responses
-  remain unverified. Every connector's own code path (script generation,
-  secret handling, loader validation) is unit-tested regardless.
+  Verification status, stated plainly: **all six connectors are now
+  real-verified end to end**, not just unit-tested. REST API, CSV and Odoo
+  PostgreSQL first; SQL Server 2022 and Elasticsearch (8.15 and 9.0.0, no
+  auth and `basic`, plus a wrong-password negative that fails loudly with a
+  401) on 2026-09-25 through the repo's own `runtime.run_extract` +
+  `run_gate` against throwaway Docker containers landing into a real
+  Postgres, SQL Server also through real Airflow; **Google Sheets** last,
+  on 2026-09-28, against a real spreadsheet and a real service account (see
+  docs/deploy-log.md for all three) - extract landed all 10 real rows,
+  verified byte-for-byte against the sheet. Every connector's own code path
+  (script generation, secret handling, loader validation) is unit-tested
+  regardless.
+
+  Google Sheets found two real things worth knowing before pointing this at
+  a non-English-locale spreadsheet: dlt's resource-name normalisation on a
+  name with a diacritic is not simple transliteration (a tab named
+  "Trang tính1" landed as table `trang_t_nh1` - the "í" dropped outright,
+  not rewritten to "i" - check the actual landed table name rather than
+  guessing it when writing a gate); and a host with IPv6 *configured* but
+  not actually routed can hang an internet-reaching connector
+  (`google_sheets`, `rest_api`) up to the extract timeout instead of
+  failing fast, because `curl`'s own Happy-Eyeballs behaviour (race IPv6
+  and IPv4, use whichever answers) masks the problem in a quick manual
+  check but the Python HTTP stack these connectors actually run on does not
+  race the two - confirmed on the verification host (`curl -6` hangs to
+  timeout, `curl -4` answers in 0.27s).
 
   Google Sheets details that matter when writing gates: a sheet's first row is
   the header; dlt normalizes resource names (`Sheet 1` lands as `sheet_1`,
@@ -564,6 +576,10 @@ Stated from what real runs actually showed, not from the design:
   real long-lived journal yet, only unit-tested.
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
-- **Google Sheets has not run against Google** - only against a local
-  stand-in with the real client libraries (needs a real service account and
-  spreadsheet for the rest).
+- **An internet-reaching connector can hang instead of failing fast on a
+  host with broken IPv6.** `google_sheets`/`rest_api` use Python's HTTP
+  stack, which - unlike `curl` - does not race IPv6 and IPv4 and use
+  whichever answers; a host with IPv6 *configured* (DNS returns an AAAA
+  record) but not actually routed blocks on the IPv6 attempt up to the
+  extract timeout. Found for real (docs/deploy-log.md, 2026-09-28
+  Google Sheets entry); not yet mitigated in the generated scripts.

@@ -2758,3 +2758,45 @@ under 3.11 and never exercised this. Fixed by dropping the future import
 and every type hint; re-verified for real directly under
 `/usr/bin/python3` (create/put/get/negative/delete, all correct) before
 re-running the suite.
+
+### 2026-09-28 — Google Sheets verified against real Google, at last
+
+Real spreadsheet (`1k8XaxmpyebFNs7YCCJXUubLe5TFJbE3_BsUxuoNBmIo`, shared
+with a real service account's `client_email`, read-only), real
+`runtime.run_extract` + `run_gate` end to end, real Postgres landing.
+
+**Real finding #1, host-level, not a dpagent bug:** this host has IPv6
+configured (DNS returns an AAAA record for `oauth2.googleapis.com`) but
+IPv6 egress is silently black-holed - `curl -6` hangs to timeout, `curl -4`
+answers in 0.27s. `curl` alone had masked this in every earlier check
+(Happy Eyeballs: it races both and uses whichever answers first) - the
+extract genuinely hung until `google-auth`'s `requests` transport (no
+Happy Eyeballs) gave up. Worked around for this verification only (forced
+IPv4 in the generated script's own process, not a dpagent code change);
+documented as a real known-limitations entry - any internet-reaching
+connector (`rest_api`, `google_sheets`) can hang up to the extract timeout
+on a host in this state instead of failing fast.
+
+**Real finding #2, a mistake in my own test data, not a code bug:** the
+spreadsheet's actual tab is named "Trang tính1" (Google Sheets' own
+Vietnamese-locale default name for the first tab), not "Sheet1" as
+assumed - both quoted and unquoted requests for the literal string
+"Sheet1" correctly failed with "Unable to parse range" since no such tab
+exists. Re-tested both quoting forms against the *real* tab name -
+identical success either way - which actually reconfirms `_a1()`'s
+always-quote behaviour is correct against the real API, not merely against
+the local stand-in used before.
+
+**Real finding #3:** dlt's resource-name normalisation on a name with a
+Vietnamese diacritic is not simple transliteration - "Trang tính1" landed
+as table `trang_t_nh1` (the "í" dropped outright, not rewritten to "i").
+Worth knowing before writing a gate against a non-ASCII sheet name: check
+the actual landed table name rather than guessing it.
+
+**Result:** extract.done `trang_t_nh1 +10`, gate passed, and the 10 landed
+rows verified byte-for-byte against the real sheet's own 10 rows (order_id,
+customer name, amount - all Vietnamese names, all correct).
+
+This closes the one remaining unverified connector - all six (odoo_postgres,
+sql_server, csv, rest_api, elasticsearch, google_sheets) are now
+real-verified, not just unit-tested.
