@@ -2528,3 +2528,39 @@ Evidence after the fixes (runs 62-64):
 - Scale: gate violations are counted in SQL. 3M rows / 1.2M violations:
   1.1 GB -> 21 MB peak. Subprocess timeouts (per-pipeline `timeouts:`) verified
   with a 1 s gate limit. `undeploy` marks in-flight runs `cancelled`.
+
+### 2026-09-28 — real bugs found deploying quickstart_dbt for the first time, and its real run through Airflow
+
+Deploying `quickstart_dbt` (the dbt-engine pipeline) for the first time hit a
+real, project-wide dbt failure: `dbt run` (run 273/274) failed 5s in with
+"dbt found two models with the name 'stg_orders'". The collision was with
+`models/staging/stg_orders.sql`, a file this project's own dbt install
+already had installed - traced to the 2026-09-11 manual `demo_etl_pipeline`
+demo, from before pipeline.yaml/the CLI existed
+(see the entry above). dbt resolves a model by filename stem across the
+*whole* project, not per pipeline subdirectory, and had no way to catch this
+short of actually running `dbt run`.
+
+**Fixed:** `install_dbt_models` now scans the whole dbt project for a
+filename collision before publishing and raises `DeployError` naming the
+conflicting file - caught at `dpagent pipeline deploy` time now, not mid
+Airflow run. Real mistake made fixing this, worth recording plainly: I told
+the operator to `rm -rf /opt/dbt/project/models/staging` without reading
+what was in it first, because its name didn't match dpagent's own
+`models/<pipeline>/` convention. It turned out to hold more than the
+demo's `stg_orders.sql` - `stg_customers.sql`, `stg_products.sql`,
+`stg_order_items.sql`, feeding a `models/marts/` layer (`fct_order_items`,
+`customer_ltv`, `revenue_by_category`, `revenue_by_region`,
+`orders_daily_summary`) that deploy-log had never fully documented. No git,
+no backup found; the operator confirmed the whole demo was retired and
+unused, so it was removed rather than reconstructed from a guess -
+`models/marts/` deleted too, nothing rebuilt. `quickstart_dbt` itself never
+depended on any of it.
+
+**Real run through Airflow (run 276, dbt engine end to end), verified
+directly in Postgres, not just from the CLI's own report:**
+`stg_orders`=8, `stg_orders_quarantine`=2 (both rows `order_id=1002`, reason
+`unique: duplicate order_id`, tagged `dpagent_run_id=276`), `fct_orders`=8
+with the 10% VAT applied correctly. This is the dbt-engine counterpart of
+`pipelines/quickstart`'s own procedure-engine verification, and the
+remaining evidence gap for PR #8.

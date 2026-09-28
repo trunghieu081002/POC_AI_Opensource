@@ -431,6 +431,21 @@ def install_dbt_models(pipeline: Pipeline) -> list[Path]:
                 raise DeployError(
                     f"stage {stage.name!r} declares dbt model {model!r}, but "
                     f"{src} does not exist")
+            # dbt resolves a model by its filename stem across the *whole*
+            # project - models/a/x.sql and models/b/x.sql collide even
+            # though dpagent keeps each pipeline in its own subdirectory
+            # (real failure: a leftover models/staging/stg_orders.sql on the
+            # host broke quickstart_dbt's own models/quickstart_dbt/
+            # stg_orders.sql - dbt run failed 5s into the run with "dbt
+            # found two models with the name 'stg_orders'"). Caught here,
+            # at deploy time, instead of inside the dbt subprocess.
+            for existing in project_dir.glob(f"models/**/{model}.sql"):
+                if existing != dest_dir / f"{model}.sql" and existing.is_file():
+                    raise DeployError(
+                        f"dbt model {model!r} (stage {stage.name!r}) would collide "
+                        f"with an existing model at {existing} - dbt resolves models "
+                        f"by filename across the whole project, not per-pipeline; "
+                        f"rename one of them")
             dest = dest_dir / f"{model}.sql"
             dest.write_text(src.read_text())
             written.append(dest)
