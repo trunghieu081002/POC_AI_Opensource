@@ -825,3 +825,85 @@ def test_validate_works_on_a_pipeline_never_drafted_by_synth(db, tmp_path, monke
     _draft_pipeline_dir(tmp_path, monkeypatch, name="hand_written")
     result = _runner().invoke(pipeline_group, ["validate", "hand_written"])
     assert result.exit_code == 0, result.output
+
+
+# ---------------------------------------------------------------- validate --fixture (M2, steps 4-5)
+
+def _fixture_and_expected_files(tmp_path):
+    fx = tmp_path / "fixture.yaml"
+    fx.write_text("tables:\n  - name: t\n    columns: {id: bigint}\n    rows: [{id: 1}]\n")
+    expected = tmp_path / "expected.yaml"
+    expected.write_text("table: fct_t\nrows: [{id: 1}]\n")
+    return fx, expected
+
+
+def test_validate_requires_fixture_and_expected_together(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, _ = _fixture_and_expected_files(tmp_path)
+    result = _runner().invoke(pipeline_group, ["validate", "demo", "--fixture", str(fx)])
+    assert result.exit_code != 0
+    assert "together" in result.output
+
+
+def test_validate_skips_the_fixture_run_when_step3_already_failed(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.validate import StepResult, ValidationReport
+    monkeypatch.setattr(pipeline_cli.validate_mod, "validate_pipeline", lambda p, **k: ValidationReport(
+        generated_at="t", generator="x", dbt=StepResult("fail", "boom")))
+    called = []
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: called.append(1))
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code != 0
+    assert called == []   # never even attempted
+
+
+def test_validate_fixture_reports_unavailable_gracefully(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import FixtureRunReport
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture",
+                        lambda *a, **k: FixtureRunReport(unavailable_reason="needs sudo"))
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code == 0, result.output   # unavailable is not a failure
+    assert "unavailable" in result.output and "needs sudo" in result.output
+
+
+def test_validate_fixture_reports_success(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
+    ok_report = FixtureRunReport(
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=ComparisonResult(True, "1 row matched"),
+        comparison_after_run2=ComparisonResult(True, "1 row matched"))
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code == 0, result.output
+    assert "idempotent" in result.output
+
+
+def test_validate_fixture_exits_nonzero_on_a_real_mismatch(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
+    bad_report = FixtureRunReport(
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=ComparisonResult(True, "matched"),
+        comparison_after_run2=ComparisonResult(False, "revenue doubled"))
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: bad_report)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code != 0
+    assert "failed" in result.output

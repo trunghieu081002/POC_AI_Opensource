@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +24,7 @@ from pathlib import Path
 import yaml
 
 from . import approval as approval_mod
+from . import pg_throwaway
 from .loader import Pipeline
 
 # A report, not an artifact: what a draft's validation actually found, for
@@ -140,9 +140,9 @@ def check_dbt_models(pipeline: Pipeline) -> StepResult:
 
 def check_procedures(pipeline: Pipeline) -> StepResult:
     """Applies every procedure-engine stage's SQL file for real -
-    `CREATE OR REPLACE PROCEDURE` against a throwaway database/role this
-    function creates and drops itself (unique names per call, dropped in a
-    `finally`), never the warehouse a promoted pipeline would actually use.
+    `CREATE OR REPLACE PROCEDURE` against a throwaway database/role
+    (`pg_throwaway.throwaway_database()` - unique names per call, dropped
+    on exit), never the warehouse a promoted pipeline would actually use.
     Needs passwordless sudo to the postgres OS user (the same requirement
     `packs/postgres`'s own acceptance suite already has) - *skipped*, not
     failed, when that is not available, since its absence says nothing
@@ -151,49 +151,29 @@ def check_procedures(pipeline: Pipeline) -> StepResult:
     if not procedure_stages:
         return StepResult("skipped", "no procedure-engine stage in this pipeline")
 
-    suffix = uuid.uuid4().hex[:10]
-    role = f"dpagent_validate_{suffix}"
-    db = f"dpagent_validate_{suffix}"
-    password = uuid.uuid4().hex
-
-    def run_as_postgres(sql: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
-            capture_output=True, text=True, timeout=30)
-
-    created_role = run_as_postgres(f"CREATE ROLE {role} LOGIN PASSWORD '{password}';")
-    if created_role.returncode != 0:
-        return StepResult("skipped",
-            f"could not provision a throwaway Postgres role (needs passwordless "
-            f"sudo to the postgres user): {created_role.stderr.strip()}")
-    created_db = run_as_postgres(f"CREATE DATABASE {db} OWNER {role};")
-    if created_db.returncode != 0:
-        run_as_postgres(f"DROP ROLE IF EXISTS {role};")
-        return StepResult("skipped",
-            f"could not provision a throwaway Postgres database: {created_db.stderr.strip()}")
-
     try:
-        failures = []
-        for stage in procedure_stages:
-            path = pipeline.path(stage.procedure)
-            try:
-                proc = subprocess.run(
-                    ["psql", "-h", "localhost", "-U", role, "-d", db,
-                     "-v", "ON_ERROR_STOP=1", "-f", str(path)],
-                    env={"PGPASSWORD": password, "PATH": "/usr/bin:/bin"},
-                    capture_output=True, text=True, timeout=30)
-            except subprocess.TimeoutExpired:
-                failures.append(f"{stage.procedure} (stage {stage.name!r}): timed out after 30s")
-                continue
-            if proc.returncode != 0:
-                failures.append(f"{stage.procedure} (stage {stage.name!r}): "
-                               f"{(proc.stderr or proc.stdout).strip()}")
-        if failures:
-            return StepResult("fail", "; ".join(failures))
-        return StepResult("pass", f"{len(procedure_stages)} procedure(s) applied clean")
-    finally:
-        run_as_postgres(f"DROP DATABASE IF EXISTS {db};")
-        run_as_postgres(f"DROP ROLE IF EXISTS {role};")
+        with pg_throwaway.throwaway_database(prefix="dpagent_validate") as db:
+            failures = []
+            for stage in procedure_stages:
+                path = pipeline.path(stage.procedure)
+                try:
+                    proc = subprocess.run(
+                        ["psql", "-h", db.host, "-U", db.user, "-d", db.database,
+                         "-v", "ON_ERROR_STOP=1", "-f", str(path)],
+                        env={"PGPASSWORD": db.password, "PATH": "/usr/bin:/bin"},
+                        capture_output=True, text=True, timeout=30)
+                except subprocess.TimeoutExpired:
+                    failures.append(f"{stage.procedure} (stage {stage.name!r}): timed out after 30s")
+                    continue
+                if proc.returncode != 0:
+                    failures.append(f"{stage.procedure} (stage {stage.name!r}): "
+                                   f"{(proc.stderr or proc.stdout).strip()}")
+    except pg_throwaway.ThrowawayUnavailable as exc:
+        return StepResult("skipped", str(exc))
+
+    if failures:
+        return StepResult("fail", "; ".join(failures))
+    return StepResult("pass", f"{len(procedure_stages)} procedure(s) applied clean")
 
 
 def check_compiles(pipeline: Pipeline) -> CompileReport:

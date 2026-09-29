@@ -3205,3 +3205,65 @@ content_hash/precise-wording additions. Full suite green (slower now - the
 growing number of real `dbt parse` subprocess calls across the test suite
 pushed a full run past 300s; confirmed green at 500s, no failures, just
 genuine real-subprocess time).
+
+### 2026-09-29 — Layer 3 M2, steps 4-5: fixture through a real Airflow round trip, compared against an independent expected result
+
+The step that actually proves a drafted pipeline's *numbers* are right,
+not just that it is well-formed and its SQL parses (steps 1-3).
+
+`src/dpagent/pipelines/fixture.py`: seeds a throwaway source database from
+an operator-authored fixture YAML, deploys the pipeline `--allow-draft`
+against a *second* throwaway warehouse database, triggers and waits for a
+real Airflow DAG run - twice, since a non-idempotent transform (a re-run
+that duplicates revenue instead of replacing it) looks fine after a single
+run - then compares the real `curated` output against an
+independently-authored expected result after each run. `idempotent` is
+only true when *both* runs matched expected exactly, not inferred from the
+second run merely completing without error.
+
+`env_overrides_for_source`/`env_overrides_for_warehouse` compute exactly
+which environment variables need to be set for a manifest's own `${VAR}`
+refs to resolve to the throwaway databases, by inspecting the already-
+loaded `Pipeline` object directly - real-verified against the actual
+`pipelines/demo` manifest, not a synthetic one: correctly produced
+`ODOO_DB_HOST`/`ODOO_DB_PORT`/etc. for the source and
+`WAREHOUSE_DB_HOST`/etc. for the warehouse, and correctly left a literal
+(non-`${...}`) field alone.
+
+Factored the throwaway-Postgres-database dance (`validate.check_procedures`
+already had its own copy) out into `src/dpagent/pipelines/pg_throwaway.py`
+- both a source and a warehouse throwaway are needed here, so the
+duplication would have been worse left in place. `check_procedures`
+refactored to use it too; its own tests still pass unchanged (same
+subprocess call shape).
+
+Real, end-to-end wired through the CLI:
+`dpagent pipeline validate <name> --fixture FILE --expected FILE` - ran
+this for real against `pipelines/quickstart` with a real (if minimal)
+fixture/expected pair. Confirmed the full plumbing works: loads the
+fixture and expected YAML, calls into `run_fixture()`, and reports
+`unavailable_reason` cleanly when the throwaway database cannot be
+provisioned - which is exactly what happened, for real, on this host (no
+passwordless sudo to postgres, the same constraint `check_procedures`
+already has). `deploy(..., allow_draft=True)` needing root was never
+reached in this run - the sudo wall comes first.
+
+**Honest status, not overstated**: code-complete, and unit-tested with
+every subprocess call mocked, including a full simulated two-run
+idempotency-violation scenario (run 1 matches expected, run 2 does not -
+`report.idempotent` correctly `False`). Only two things are real-verified
+on this host: the `env_overrides_*` functions (against the real `demo`
+manifest) and the "unavailable, no sudo" degradation path (the CLI run
+above). The actual end-to-end sequence - seed a real throwaway source,
+deploy for real, run twice through a real Airflow, compare real curated
+output - has not completed on any host yet. It needs an operator with both
+root and passwordless sudo to postgres to run it for real; nothing about
+building or testing this required either.
+
+This is the last piece of the 5-step validation list the M2 design review
+called for. Once it has actually run for real against a real BRD (the
+"doanh số theo tháng từ Odoo" example discussed earlier is the natural
+first candidate), the plan's own stated order applies: only then does a
+live LLM call add anything - it would only prove the model returns the
+right JSON shape, not that a drafted pipeline's numbers are correct, which
+is what steps 3-5 exist to prove regardless of who or what wrote the SQL.
