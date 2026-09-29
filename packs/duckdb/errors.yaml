@@ -1,0 +1,31 @@
+# DuckDB-specific failures. Generic ones (DNS, disk, apt locks) live in
+# packs/_lib/errors.yaml and are checked after these.
+
+- id: duckdb-httpfs-network-install-hangs
+  match:
+    output: "INSTALL httpfs.*Connection timed out|Failed to download extension \"httpfs\""
+  cause: >
+    Something ran `duckdb -c "INSTALL httpfs"` (or LOAD without a local
+    extension already present) instead of using the copy this pack already
+    fetched. DuckDB's own HTTP client does not race IPv6/IPv4 the way curl
+    does, so a host with IPv6 configured but not routed hangs until it gives
+    up.
+  autofix: []
+  ask_user: >
+    Use `SET extension_directory='<install_dir>/extensions'; LOAD httpfs;`
+    instead of `INSTALL httpfs` - this pack's own install already fetched it
+    there. If the extension directory is missing, re-run
+    `dpagent install duckdb`.
+  retry: false
+
+- id: duckdb-download-404
+  match:
+    output: "404 Not Found|The specified key does not exist"
+  cause: >
+    The `version` param names a duckdb release that does not exist (a typo,
+    or one older/newer than what this pack's URL construction expects).
+  autofix: []
+  ask_user: >
+    Check https://github.com/duckdb/duckdb/releases for a valid version
+    string (no leading "v").
+  retry: false

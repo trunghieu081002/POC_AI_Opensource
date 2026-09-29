@@ -2859,3 +2859,30 @@ not the real password, by cli/operate.py's own documented design), and a
 `EnvironmentFile=` parser but not for bash word-splitting. This is the
 same discipline the rest of Layer 1/2 has been held to throughout this
 project - a passing suite is not assumed correct until it has actually run.
+
+### 2026-09-29 — duckdb pack: the bridge for Layer 2's MinIO-backed pipelines
+
+Before writing it, verified the whole real toolchain by hand against the
+live `silo` instance on this host: downloaded the real DuckDB CLI binary
+(github.com/duckdb/duckdb releases, v1.5.6, both linux-amd64 and
+linux-arm64 zip URLs fetched for real), then hit the same broken-IPv6 wall
+as Google Sheets - `duckdb -c "INSTALL httpfs"` hung until "Connection
+timed out" fetching from extensions.duckdb.org, because DuckDB's own HTTP
+client does not race IPv4/IPv6 the way `curl` does (confirmed: `curl -6`
+to extensions.duckdb.org also hangs on this host, `curl -4` answers).
+Worked around by fetching the extension .gz directly with curl and loading
+it from a local path - confirmed for real that `SET extension_directory=...;
+LOAD httpfs;` finds it with zero network calls, and that DuckDB then
+writes and reads a real Parquet file through `s3://` (httpfs's S3 client,
+pointed at silo's endpoint) - full round trip, real bucket, real data.
+
+`packs/duckdb`: installs the CLI binary (`python3 -m zipfile`, not `unzip` -
+base guarantees the former, not the latter) and pre-fetches httpfs into a
+shared, world-readable `<install_dir>/extensions/v<version>/<platform>/`
+tree, so nothing at query time ever needs `INSTALL` (and its hang risk) at
+all - every invocation just does the `SET extension_directory` + `LOAD`
+this pack already proved works with no network. `maturity: draft`: lints
+clean (one non-blocking guard-shape warning, same class postgres/airflow
+already carry), dry-run integration test passes both families, generic
+pack tests pass. Not yet installed for real on any host, no acceptance
+suite yet - same two conditions `silo` needed before promotion.

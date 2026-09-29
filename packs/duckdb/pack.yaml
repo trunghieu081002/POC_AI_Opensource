@@ -1,0 +1,52 @@
+name: duckdb
+version: 1.0.0
+summary: >
+  DuckDB CLI, a single static binary, plus the httpfs extension pre-fetched
+  (not `INSTALL`ed at first use) - the bridge Layer 2 uses to gate and
+  transform Parquet landed in the silo/MinIO pack without a Postgres
+  warehouse in between.
+maturity: draft            # flip to stable once it has verified on a real host
+
+provides: [duckdb]
+requires: [base]
+
+supports:
+  families: [debian, rhel]
+
+host_needs:
+  disk_mb: { /opt/duckdb: 512 }
+
+params:
+  version:
+    type: string
+    default: "1.5.6"
+  install_dir:
+    type: string
+    default: "/opt/duckdb"
+
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+
+steps:
+  - id: install
+    script: steps/10-install.sh
+    description: Download the duckdb CLI binary
+    timeout: 300
+    guard: 'test -x "$DP_PARAM_INSTALL_DIR/bin/duckdb"'
+
+  - id: httpfs
+    script: steps/20-httpfs.sh
+    description: >
+      Fetch the httpfs extension directly (not `duckdb -c "INSTALL httpfs"`,
+      which downloads through DuckDB's own HTTP client - found to hang
+      indefinitely on a host with IPv6 configured but not routed, where a
+      plain `curl` succeeds because it races IPv4/IPv6 and DuckDB's client
+      does not) into a shared, world-readable extension directory every
+      invocation points `SET extension_directory` at.
+    timeout: 300
+    guard: >
+      find "$DP_PARAM_INSTALL_DIR/extensions" -name 'httpfs.duckdb_extension'
+      2>/dev/null | grep -q .
