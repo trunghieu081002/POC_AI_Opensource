@@ -2930,3 +2930,65 @@ succeeded, the temporarily-restored `packs/silo` files were removed again
 from the working tree with no new commit, confirmed via `git diff --stat
 HEAD` showing zero difference from `fc6ef6d`. Host and repo are now both
 fully back to Postgres-only.
+
+### 2026-09-29 — fixed: broken-IPv6 hang risk in `google_sheets`/`rest_api` generated scripts
+
+Closed the one gap left in the "Known limitations" list after the incremental/
+prune/Google Sheets work: `google_sheets` and `rest_api` are the only two
+connectors that reach an arbitrary internet host through Python's own HTTP
+stack (odoo_postgres/sql_server/elasticsearch each target one operator-given
+host; csv touches no network at all), so they are the only ones exposed to
+this host's real broken-IPv6 finding (2026-09-28 Google Sheets entry).
+
+Fix in `src/dpagent/pipelines/extract.py`: both generated scripts now open
+with a `socket.getaddrinfo` monkey-patch that filters results down to their
+IPv4 entries, falling back to whatever it returned when there are none (a
+genuinely IPv6-only host is untouched) - placed before any import that could
+open a connection (`google.oauth2`/`googleapiclient.discovery`,
+`dlt.sources.rest_api`), not merely present somewhere in the file.
+
+Verified for real against this same host with a controlled before/after,
+not just unit-tested: built the actual generated `google_sheets` script
+(real spreadsheet `1k8XaxmpyebFNs7YCCJXUubLe5TFJbE3_BsUxuoNBmIo`, real sheet
+`Trang tính1`) and ran the real Sheets API call it makes.
+- Unpatched (the script as it was before this fix): hung to a 30s timeout,
+  no response.
+- Patched: `REAL_API_CALL_OK, rows: 11` in under 2 seconds.
+
+Same file, same host, same API call - only the patch differs - so this
+isolates the fix as the actual cause, not a coincidentally-quiet network
+moment. `build()` itself was confirmed *not* to be the hang point (it uses a
+bundled static discovery document, no live call) - the real hang is in the
+first authenticated call (`execute()`, which triggers the OAuth2 token
+endpoint request), which is why an earlier version of this same check that
+stopped right after `build()` passed with or without the patch and would
+have been a false-negative verification.
+
+New tests in `tests/test_pipelines_extract.py`: the patch is present and
+precedes the connector's own risky import for `rest_api`/`google_sheets`,
+and is absent entirely from the other four connectors (no behaviour change
+for connectors that were never the problem). Full suite green after.
+
+### 2026-09-29 — `pipeline prune` real-verified against a non-empty candidate set: last Layer 2 evidence gap closed
+
+The one real prune run so far (`--older-than-days 7 --yes`, same day, after
+the permission fix) had found 0 candidates - correct, but it meant the
+actual DELETE path had never been exercised for real against non-empty
+data, only dry-run-checked. Closed that gap.
+
+Snapshotted exact row counts across all four tables before
+(`runs=231, stage_runs=649, gate_runs=649, events=3744`), ran
+`--older-than-days 3 --dry-run` (world-readable file, no sudo needed for a
+read): predicted 214 runs / 631 stage results / 631 gate results / 2958
+events. Operator ran the real delete
+(`sudo -E .venv/bin/dpagent pipeline prune --older-than-days 3 --yes`).
+After: `runs=17, stage_runs=18, gate_runs=18, events=786` - every delta
+matches the dry-run prediction exactly (214/631/631/2958). What remained
+was exactly the 5 runs with no `finished_at` (still open) and the 12 runs
+younger than the 3-day cutoff (2026-09-28), both correctly excluded from
+the candidate set.
+
+This was the last item on the Known limitations list without a real
+(non-empty) verification - `dpagent pipeline prune` is now real-verified
+end to end: dry-run counting, permission handling, and the delete itself,
+all against this host's actual production journal.

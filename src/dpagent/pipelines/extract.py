@@ -16,6 +16,37 @@ from .loader import Pipeline
 
 CONNECTORS = {"odoo_postgres", "csv", "rest_api", "sql_server", "elasticsearch", "google_sheets"}
 
+# Real, observed failure mode on at least one host (docs/layer2.md "Known
+# limitations"): DNS returns a genuine AAAA record but IPv6 egress is
+# silently black-holed. `curl` masks this with Happy Eyeballs (races both
+# families, uses whichever answers first); Python's own socket/HTTP stack -
+# what `requests`, `google-auth`'s transport and `googleapiclient.discovery`
+# all sit on - does not race them, so it hangs on the IPv6 attempt until its
+# own timeout instead of failing fast or just using the IPv4 route that
+# works. Only rest_api/google_sheets reach arbitrary internet hosts this way
+# (odoo_postgres/sql_server/elasticsearch target one operator-given host,
+# almost always resolved to a single family already; csv touches no
+# network). Confirmed for real against this failure (docs/deploy-log.md,
+# 2026-09-28 Google Sheets entry) that filtering getaddrinfo down to its
+# IPv4 results - falling back to whatever it returned when there are none,
+# so a genuinely IPv6-only host is untouched - makes the same call answer
+# in well under a second instead of hanging.
+_IPV4_PREFERRING_GETADDRINFO = '''\
+import socket as _dp_socket
+
+_dp_orig_getaddrinfo = _dp_socket.getaddrinfo
+
+
+def _dp_ipv4_preferring_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    results = _dp_orig_getaddrinfo(host, port, family, type, proto, flags)
+    ipv4_only = [r for r in results if r[0] == _dp_socket.AF_INET]
+    return ipv4_only or results
+
+
+_dp_socket.getaddrinfo = _dp_ipv4_preferring_getaddrinfo
+
+'''
+
 
 # Every connector lands with write_disposition="replace": landing is an
 # as-received snapshot of the source (docs/layer2.md), and a re-run must give
@@ -107,7 +138,7 @@ def _render_extract_body(pipeline: Pipeline) -> str:
         if paginator:
             client_config["paginator"] = paginator
         client_items = ", ".join(f"{k!r}: {v!r}" for k, v in client_config.items())
-        return header + textwrap.dedent(f'''\
+        return header + _IPV4_PREFERRING_GETADDRINFO + textwrap.dedent(f'''\
             import os
 
             import dlt
@@ -190,7 +221,7 @@ def _render_extract_body(pipeline: Pipeline) -> str:
         # literal in this file.
         spreadsheet_id = pipeline.source.connection["spreadsheet_id"]
         resources = list(pipeline.source.resources)
-        return header + textwrap.dedent(f'''\
+        return header + _IPV4_PREFERRING_GETADDRINFO + textwrap.dedent(f'''\
             import json
             import os
 

@@ -483,3 +483,46 @@ def test_every_script_reports_rows_extracted_per_table(root, source):
     assert 'print("DPAGENT_ROW_COUNTS "' in script
     assert script.rstrip().endswith('.dumps(counts))')
     ast.parse(script)
+
+
+# ---------------------------------------------------------- broken-IPv6 hang
+
+
+@pytest.mark.parametrize("source,risky_import", [
+    ({"connector": "rest_api", "connection": {"base_url": "https://a"}, "resources": ["u"]},
+     "from dlt.sources.rest_api import rest_api_source"),
+    ({"connector": "google_sheets",
+      "connection": {"spreadsheet_id": "a", "service_account_json": "x"}, "resources": ["S"]},
+     "from googleapiclient.discovery import build"),
+], ids=["rest_api", "google_sheets"])
+def test_internet_facing_connectors_prefer_ipv4_getaddrinfo_before_any_network_call(root, source, risky_import):
+    """Real, observed failure (docs/deploy-log.md, 2026-09-28): a host with
+    IPv6 *configured* (DNS returns AAAA) but not actually routed makes
+    Python's HTTP stack hang until its own timeout instead of failing fast
+    or just using the IPv4 route that works - `curl`'s Happy Eyeballs races
+    both and masks this, requests/google-auth/googleapiclient do not.
+    Confirmed the patch itself resolves this for real against the same host
+    (docs/deploy-log.md, 2026-09-29 entry). The patch must run before the
+    module that actually opens a connection is even imported (build() calls
+    out during construction, not just when a resource is read), not merely
+    be present somewhere in the file."""
+    script = _script_for(root, source)
+    ast.parse(script)
+    patch_index = script.index("_dp_socket.getaddrinfo = _dp_ipv4_preferring_getaddrinfo")
+    assert patch_index < script.index(risky_import)
+
+
+@pytest.mark.parametrize("source", [
+    {"connector": "csv", "files": {"path": "/data/*.csv"}},
+    {"connector": "elasticsearch", "connection": {"hosts": ["http://h"]}, "resources": ["o"]},
+    {"connector": "sql_server", "connection": {"host": "h"}, "tables": ["t"]},
+    {"connector": "odoo_postgres", "connection": {"host": "h"}, "tables": ["t"]},
+], ids=["csv", "elasticsearch", "sql_server", "odoo_postgres"])
+def test_single_host_connectors_are_not_patched(root, source):
+    """odoo_postgres/sql_server/elasticsearch each target one operator-given
+    host (almost always resolved to a single family already, and not a
+    connector this project has ever seen hang); csv touches no network at
+    all. Patching getaddrinfo globally in every generated script would be a
+    needless behaviour change for connectors that were never the problem."""
+    script = _script_for(root, source)
+    assert "_dp_ipv4_preferring_getaddrinfo" not in script
