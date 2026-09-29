@@ -2905,3 +2905,28 @@ repo; README's checklist put back to the pre-existing
 line. The real `silo` systemd service + data on this host still needs
 `sudo dpagent rollback silo` to actually remove (operator to run) -
 `duckdb` was never installed for real, nothing to roll back there.
+
+### 2026-09-29 — real `silo` rollback executed on host, MinIO/Silo direction fully closed out
+
+Operator ran `sudo -E .venv/bin/dpagent rollback silo` for real, closing
+the one item the previous entry left open. Had to temporarily restore
+`packs/silo` from git history (`git checkout b0703f3 -- packs/silo`,
+uncommitted) first, since the pack's own code - including `rollback.sh` -
+had already been deleted from the repo before the operator got to run the
+real rollback; `dpagent` resolves rollback steps from the pack directory
+on disk, not from history, so without it the command failed with
+`no pack for 'silo'`. Sequencing mistake on my part - should have asked
+the operator to roll back the real install before deleting the pack code
+that rollback depends on.
+
+Real rollback output confirmed: `dnf remove -y silo` removed the rpm,
+`systemctl disable --now silo` removed the unit, `/var/lib/silo/data`
+deleted. Two harmless leftovers the pack does not touch by design:
+`/etc/default/silo` saved by rpm as `/etc/default/silo.rpmsave` (plaintext
+old access/secret key - operator may `rm` it), and the `silo` system user
+created by the package's own `sysusers.d` entry (not by this pack) -
+`rollback.sh` explicitly leaves it in place. After the real rollback
+succeeded, the temporarily-restored `packs/silo` files were removed again
+from the working tree with no new commit, confirmed via `git diff --stat
+HEAD` showing zero difference from `fc6ef6d`. Host and repo are now both
+fully back to Postgres-only.
