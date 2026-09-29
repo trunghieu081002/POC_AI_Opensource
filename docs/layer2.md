@@ -521,9 +521,36 @@ after step 3, refuses to even attempt it if step 3 failed.
 
 - A throwaway source database is seeded from an operator-authored fixture
   YAML (`tables: [{name, columns, rows}]`).
-- The pipeline is deployed `--allow-draft` (M1's own manual-only escape
-  hatch - never unpaused, never scheduled) against a *second* throwaway
-  database standing in for the warehouse.
+- A throwaway, uniquely-named **validation clone** of the pipeline is
+  built (`fixture.make_validation_clone`) - `<name>__validate__<suffix>`,
+  never the real pipeline object itself - and deployed `--allow-draft`
+  (M1's own manual-only escape hatch - schedule forced to `None`) against
+  a *second* throwaway database standing in for the warehouse. Found
+  necessary by review, not by construction: `deploy()` publishes real,
+  host-shared artifacts keyed by `pipeline.name` alone (the DAG id,
+  `SHARED_PIPELINES_DIR/<name>`, the dbt project's own `models/<name>/`
+  subdirectory, dlt's local state) and merges a pipeline's `${VAR}`
+  secrets into one *shared* `pipelines.env` file every deployed pipeline
+  reads - deploying `monthly_sales` itself, even `--allow-draft`, to
+  validate a draft of `monthly_sales` would overwrite the real
+  `monthly_sales`'s own published artifacts and could push throwaway
+  credentials into a secret name another deployed pipeline still reads.
+  The clone gets its own name, its own `DPAGENT_VALIDATE_<suffix>_SRC_*`/
+  `_WH_*` secret refs (never the real pipeline's own ref names), and its
+  own uniquely-renamed dbt model files (dbt resolves a model by filename
+  across the *whole* shared project, not per pipeline - a same-named
+  unrenamed model file would collide with, or silently shadow, the real
+  pipeline's own already-published one). Refuses outright (no throwaway
+  database even provisioned) if the clone's own name is somehow already a
+  deployed pipeline name.
+- The clone's DAG is explicitly **unpaused** before triggering -
+  `--allow-draft` never unpauses (a paused DAG left one unpause away from
+  running unreviewed logic on a schedule is not the guarantee
+  `--allow-draft` is supposed to give), and a manual run of a still-paused
+  DAG is created `queued` and never actually starts
+  (`deploy.unpause_dag`'s own docstring) - triggering right after deploy
+  with no unpause, as an earlier version of this did, would sit forever
+  with no stage ever reporting in.
 - Triggered and waited for through a real Airflow DAG run - **twice**, not
   once: a transform that is not idempotent (a re-run that duplicates
   revenue instead of replacing it) looks perfectly fine after a single run
@@ -534,33 +561,110 @@ after step 3, refuses to even attempt it if step 3 failed.
   grading its own homework can be wrong the same way on both sides and
   never notice. `idempotent` is true only when *both* runs matched
   expected exactly, not inferred from the second run merely completing
-  without error.
+  without error. Compared through `row_to_json`, not raw tab-separated
+  `psql` text (an earlier version did, and it had real, distinct failure
+  modes: a Postgres `NULL` and an actual empty string both rendered as
+  `""`, a value containing a literal tab or newline broke the column
+  split, and `100` vs `100.00` compared unequal as text despite being the
+  same number) - every value on both sides is canonicalized through the
+  same function (`None` stays distinct from `""`; a number is rendered
+  through `Decimal` with no exponent/trailing zeros so any two
+  representations of the same value match; a `date`/`datetime` - what YAML
+  parses an unquoted date-looking scalar into - is rendered `.isoformat()`,
+  matching Postgres's own `row_to_json` rendering) before the rows are
+  sorted and compared. Every row `expected.yaml` declares must use the
+  same set of columns, checked up front, so the comparison is well-defined.
+- The clone is always `undeploy()`-ed, whether the run passed, failed
+  validation, or errored partway through - `cleanup_needed` is set `True`
+  *before* `deploy()` is even called, not after it returns successfully:
+  `deploy()` writes several real things in sequence (procedures, dbt
+  models, published files, secrets, the DAG), and can fail partway through
+  any one of them after earlier steps already had a real effect -
+  `undeploy()` is idempotent by design, so calling it even after a deploy
+  that got nowhere, or only partway, is always safe. Cleanup itself runs
+  *inside* the same `with` block that holds the two throwaway databases
+  open, not after it - undeploy() (and the real-state check below) always
+  completes before the throwaway source/warehouse databases are dropped,
+  never the other way around.
+- Cleanup is verified against **real, current state**, not inferred from
+  `undeploy()`'s own action flags (a passing "DAG delete did not error"
+  says nothing about whether the published pipeline directory, dbt models,
+  dlt state, or the clone's own secrets are actually gone -
+  `_release_pipeline_secrets()` can legitimately report "kept every
+  secret" while every other flag still looks clean): the DAG file, the
+  clone's listing under `SHARED_PIPELINES_DIR`, its dbt models directory,
+  its dlt state directory, its own secret refs in the shared
+  `pipelines.env`, and whether dpagent's own journal still shows a
+  `running` run for it are all checked directly. A run that timed out is
+  **never** reported as a complete cleanup, even when every one of those
+  checks comes back clean - this host has no way to confirm the Airflow
+  worker for a timed-out task has actually stopped (deleting a DAG/DagRun
+  row does not kill an already-running task), so the two throwaway
+  databases about to be dropped right after could still be in use.
+  `FixtureRunReport.ok` requires cleanup to have been both attempted *and*
+  actually succeeded: "validation không được coi là hoàn chỉnh nếu chạy
+  pass nhưng cleanup fail."
+- The fixture itself is seeded with every statement's `returncode` checked
+  - a `FixtureSeedError`, not a silent partial seed: an earlier version
+  did not check this at all, so a failed `CREATE TABLE`/`INSERT` could
+  still leave `report.seeded = True`, and if `expected.yaml` happened to
+  expect an empty result, the run could *pass* having validated nothing.
+  A seed failure is a validation failure (`dpagent pipeline validate`
+  exits `1`), never `unavailable_reason` (exit `2`) - the fixture/database
+  rejected it, the host was not incapable of attempting it.
 
 `env_overrides_for_source`/`env_overrides_for_warehouse` compute exactly
-which environment variables need to be set for the manifest's own
-`${VAR}` refs to resolve to the throwaway databases - by inspecting the
+which environment variables need to be set for the clone's own `${VAR}`
+refs to resolve to the throwaway databases - by inspecting the
 already-loaded `Pipeline` object directly (never a prefix guess), only for
 fields that are actually a ref in the first place; a literal value is left
 untouched. **Real-verified against the actual `pipelines/demo` manifest**,
 not a synthetic one (docs/deploy-log.md).
 
+The `.synth-validation.yaml` report's `steps.fixture` section (written by
+`dpagent pipeline validate --fixture/--expected` alongside step 3's own
+result, into the same file) records: `pipeline_hash`/`fixture_hash`/
+`expected_hash` (so the report is visibly stale the moment any of the
+three files changes since), the real dpagent `run_ids` (`dpagent pipeline
+audit <id>` reads either one directly), per-run comparison/idempotency
+verdicts, real per-stage gate verdicts from dpagent's own journal for each
+run (`fixture.gate_summary_for_run` - the actual proof a fixture's
+deliberately-bad rows were quarantined, not just that the run "completed"),
+and cleanup's own pass/fail.
+
+`dpagent pipeline validate --fixture` exits with a distinct code per
+outcome, not a flat 0/1 - a shell or CI script needs to be able to tell
+these apart: `0` real pass (data matched, idempotent, cleanup complete),
+`1` a real mismatch or failed run, `2` unavailable (missing root/sudo -
+**not** exit 0; treating "could not even run it" as success was a real gap
+an earlier version of this had), `3` a wait timed out, `4` data matched
+but cleanup did not complete (still needs a human to check by hand).
+
 Needs the same things `deploy(..., allow_draft=True)` and
 `pg_throwaway.throwaway_database()` (twice over - one throwaway source, one
 throwaway warehouse) always needed: root for deploy's Airflow-facing
 steps, passwordless sudo to the postgres OS user for the throwaway
-databases. Reported as `unavailable_reason`, never a failure, when either
-is missing - its absence says nothing about the pipeline's own
+databases. Reported as `unavailable_reason` (exit 2), never a failure,
+when either is missing - its absence says nothing about the pipeline's own
 correctness, mirroring step 3's own `skipped` status for the identical
 reason.
 
 **Status: code-complete and unit-tested (every subprocess call mocked,
-including a full simulated two-run idempotency-violation scenario) - the
-`env_overrides_*` functions and the "unavailable, no sudo" path are the
-only parts real-verified on this host** (confirmed for real: this
-operator has neither passwordless sudo to postgres nor root, the same
-pre-existing constraint `validate.check_procedures` already hits). The
-real end-to-end run - seed, deploy, two real Airflow runs, compare - has
-not happened on any host yet; it needs an operator with both.
+including a full simulated two-run idempotency-violation scenario and a
+simulated cleanup failure) - the clone-building itself
+(`make_validation_clone`: unique name, renamed refs, renamed dbt model
+files, manifest round-tripping through `loader.load()`), the
+`env_overrides_*` functions, and the full CLI path up to and including the
+"unavailable, no sudo" exit are real-verified on this host** (confirmed
+for real against both `pipelines/demo` and `pipelines/quickstart`; a real
+`dpagent pipeline validate quickstart --fixture ... --expected ...` run
+generated a real, uniquely-named clone id, correctly exited 2, and left no
+trace under `/opt/dpagent/pipelines` - this operator has neither
+passwordless sudo to postgres nor root, the same pre-existing constraint
+`validate.check_procedures` already hits). The real end-to-end run - seed,
+deploy, unpause, two real Airflow runs, compare, undeploy - has not
+happened on any host yet; it needs an operator with both (see M2.5 in
+docs/deploy-log.md).
 
 ## In scope (MVP)
 

@@ -871,7 +871,11 @@ def test_validate_fixture_reports_unavailable_gracefully(db, tmp_path, monkeypat
     result = _runner().invoke(pipeline_group, [
         "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
 
-    assert result.exit_code == 0, result.output   # unavailable is not a failure
+    # unavailable is not a *validation* failure, but it is not a silent
+    # success either (the P1 the user's own review flagged: this used to
+    # exit 0, which a shell/CI reads as "ran and passed") - exit 2, its own
+    # distinct code, never 0 and never the same code a real mismatch uses.
+    assert result.exit_code == 2, result.output
     assert "unavailable" in result.output and "needs sudo" in result.output
 
 
@@ -880,9 +884,11 @@ def test_validate_fixture_reports_success(db, tmp_path, monkeypatch):
     fx, expected = _fixture_and_expected_files(tmp_path)
     from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
     ok_report = FixtureRunReport(
+        clone_name="demo__validate__abc",
         seeded=True, deployed=True, run1_status="ok", run2_status="ok",
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
-        comparison_after_run2=ComparisonResult(True, "1 row matched"))
+        comparison_after_run2=ComparisonResult(True, "1 row matched"),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed")
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [
@@ -905,5 +911,65 @@ def test_validate_fixture_exits_nonzero_on_a_real_mismatch(db, tmp_path, monkeyp
     result = _runner().invoke(pipeline_group, [
         "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
 
-    assert result.exit_code != 0
+    assert result.exit_code == 1, result.output   # 1: mismatch/failed run
     assert "failed" in result.output
+
+
+def test_validate_fixture_exits_3_on_a_timeout(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import FixtureRunReport
+    timed_out = FixtureRunReport(seeded=True, deployed=True, run1_status="timeout")
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: timed_out)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code == 3, result.output
+    assert "timed out" in result.output
+
+
+def test_validate_fixture_exits_4_when_data_matches_but_cleanup_failed(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
+    dirty_report = FixtureRunReport(
+        clone_name="demo__validate__abc",
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=ComparisonResult(True, "matched"),
+        comparison_after_run2=ComparisonResult(True, "matched"),
+        cleanup_attempted=True, cleanup_ok=False, cleanup_detail="undeploy failed: needs root")
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: dirty_report)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code == 4, result.output
+    assert "cleanup did not complete" in result.output
+
+
+def test_validate_fixture_writes_the_fixture_section_into_the_report(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
+    ok_report = FixtureRunReport(
+        clone_name="demo__validate__abc",
+        seeded=True, deployed=True, run_ids=[401, 402], run1_status="ok", run2_status="ok",
+        comparison_after_run1=ComparisonResult(True, "1 row matched"),
+        comparison_after_run2=ComparisonResult(True, "1 row matched"),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed")
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+    assert result.exit_code == 0, result.output
+
+    import yaml
+    written = yaml.safe_load(
+        (tmp_path / "repo_pipelines" / "demo" / ".synth-validation.yaml").read_text())
+    fixture_section = written["steps"]["fixture"]
+    assert fixture_section["run_ids"] == [401, 402]
+    assert fixture_section["overall"] == "pass"
+    assert fixture_section["pipeline_hash"] == written["content_hash"]
+    assert fixture_section["fixture_hash"].startswith("sha256:")
+    assert fixture_section["expected_hash"].startswith("sha256:")

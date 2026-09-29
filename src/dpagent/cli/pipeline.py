@@ -91,10 +91,13 @@ def _print_validation_steps(report) -> None:
                  f"{'pass' if report.load_ok else 'fail'}[/]")
     if report.dbt is not None:
         colour = _STEP_STYLE.get(report.dbt.status, "yellow")
-        console.print(f"[bold]dbt parse:[/bold] [{colour}]{report.dbt.status}[/{colour}]"
+        console.print(f"[bold]dbt project/Jinja parse:[/bold] "
+                     f"[{colour}]{report.dbt.status}[/{colour}]"
                      + (f" - {report.dbt.detail}" if report.dbt.detail else ""))
-        console.print("[dim]  (Jinja/SQL syntax only, no live database - not "
-                      "dbt compile/run, does not check against a real schema)[/dim]")
+        console.print("[dim]  (structure/Jinja/config only, no live database - does NOT "
+                      "confirm the SQL itself is valid Postgres, e.g. a 'SELEC ...' typo "
+                      "still parses clean; not dbt compile/run; the SQL is only actually "
+                      "proven by steps 4-5's real dbt run against a fixture)[/dim]")
     if report.procedures is not None:
         colour = _STEP_STYLE.get(report.procedures.status, "yellow")
         console.print(f"[bold]procedures:[/bold] [{colour}]{report.procedures.status}[/{colour}]"
@@ -194,10 +197,14 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
 @click.argument("name")
 @click.option("--fixture", "fixture_path", type=click.Path(exists=True, dir_okay=False),
               help="Steps 4-5 too: seed this fixture (YAML) into a throwaway source, "
-                   "deploy --allow-draft, run twice through a real Airflow, and compare "
-                   "the real curated output against --expected. Needs root (deploy's own "
-                   "Airflow-facing steps) and passwordless sudo to postgres twice over - "
-                   "reported as unavailable, not failed, when either is missing.")
+                   "deploy --allow-draft an isolated, uniquely-named clone of this "
+                   "pipeline (never the real pipeline's own artifacts/secrets), run it "
+                   "twice through a real Airflow, compare the real curated output "
+                   "against --expected, then undeploy the clone. Needs root (deploy's "
+                   "own Airflow-facing steps) and passwordless sudo to postgres twice "
+                   "over - reported as unavailable (exit 2), not failed, when either is "
+                   "missing. Exit codes: 0 pass, 1 mismatch/failed run, 2 unavailable, "
+                   "3 timeout, 4 data matched but cleanup did not complete.")
 @click.option("--expected", "expected_path", type=click.Path(exists=True, dir_okay=False),
               help="The independently-authored expected result (YAML) --fixture's real "
                    "curated output is compared against. Required together with --fixture.")
@@ -239,15 +246,36 @@ def validate_cmd(name, fixture_path, expected_path):
 
     fx = fixture_mod.load_fixture(Path(fixture_path))
     expected = fixture_mod.load_expected(Path(expected_path))
-    console.print(f"\n[bold]running fixture through a real, --allow-draft deploy "
-                 f"(2 runs, for idempotency)...[/bold]")
+    console.print(f"\n[bold]running fixture through a real, --allow-draft deploy of an "
+                 f"isolated validation clone (2 runs, for idempotency)...[/bold]")
     result = fixture_mod.run_fixture(pipeline, fx, expected)
+    if result.clone_name:
+        console.print(f"[dim]validation clone: {result.clone_name}[/dim]")
+
+    # Merge steps 4-5 into the same report step 3 already wrote, hashed
+    # against the exact pipeline/fixture/expected content this run used -
+    # the report is visibly stale the moment any of the three changes.
+    fixture_section = fixture_mod.fixture_report_dict(
+        result,
+        pipeline_hash=report.content_hash,
+        fixture_hash=fixture_mod.hash_file(Path(fixture_path)),
+        expected_hash=fixture_mod.hash_file(Path(expected_path)),
+    )
+    report.fixture = fixture_section
+    validate_mod.write_validation_report(pipeline.root, report)
 
     if result.unavailable_reason:
         console.print(f"[yellow]steps 4-5 unavailable:[/yellow] {result.unavailable_reason}")
         console.print("[dim](its absence says nothing about the pipeline's own "
                       "correctness - it means this operator/host could not run it)[/dim]")
-        return
+        sys.exit(2)
+
+    if result.seed_error:
+        # A validation failure, not "unavailable": the fixture itself (or
+        # the throwaway database) rejected it - exit 1, same as a real
+        # mismatch, never exit 2 (which means "could not even attempt it").
+        console.print(f"[red]fixture seed failed:[/red] {result.seed_error}")
+        sys.exit(1)
 
     for label, comparison in (("run 1", result.comparison_after_run1),
                               ("run 2", result.comparison_after_run2)):
@@ -258,12 +286,34 @@ def validate_cmd(name, fixture_path, expected_path):
                      f"[{colour}]{'match' if comparison.ok else 'mismatch'}[/{colour}]"
                      + (f" - {comparison.detail}" if comparison.detail else ""))
 
-    if result.ok:
-        console.print("\n[green]fixture run: both runs matched expected, idempotent[/green]")
-    else:
+    if result.cleanup_attempted:
+        colour = "green" if result.cleanup_ok else "red"
+        console.print(f"[bold]cleanup:[/bold] [{colour}]"
+                     f"{'complete' if result.cleanup_ok else 'FAILED'}[/{colour}]"
+                     f" - {result.cleanup_detail}")
+
+    data_ok = (result.seeded and result.deployed
+              and result.run1_status == "ok" and result.run2_status == "ok"
+              and result.idempotent)
+
+    if result.run1_status == "timeout" or result.run2_status == "timeout":
+        console.print(f"\n[red]fixture run timed out[/red] "
+                      f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
+        sys.exit(3)
+
+    if not data_ok:
         console.print(f"\n[red]fixture run failed[/red] "
                       f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
         sys.exit(1)
+
+    if not (result.cleanup_attempted and result.cleanup_ok):
+        console.print(f"\n[red]fixture data matched, but cleanup did not complete[/red] - "
+                      f"a passing comparison does not count as done until cleanup does "
+                      f"too. Check by hand: dpagent pipeline undeploy {result.clone_name}")
+        sys.exit(4)
+
+    console.print("\n[green]fixture run: both runs matched expected, idempotent, "
+                  "cleanup complete[/green]")
 
 
 @pipeline_group.command("lint")
