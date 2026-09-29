@@ -2859,3 +2859,74 @@ not the real password, by cli/operate.py's own documented design), and a
 `EnvironmentFile=` parser but not for bash word-splitting. This is the
 same discipline the rest of Layer 1/2 has been held to throughout this
 project - a passing suite is not assumed correct until it has actually run.
+
+### 2026-09-29 — duckdb pack: the bridge for Layer 2's MinIO-backed pipelines
+
+Before writing it, verified the whole real toolchain by hand against the
+live `silo` instance on this host: downloaded the real DuckDB CLI binary
+(github.com/duckdb/duckdb releases, v1.5.6, both linux-amd64 and
+linux-arm64 zip URLs fetched for real), then hit the same broken-IPv6 wall
+as Google Sheets - `duckdb -c "INSTALL httpfs"` hung until "Connection
+timed out" fetching from extensions.duckdb.org, because DuckDB's own HTTP
+client does not race IPv4/IPv6 the way `curl` does (confirmed: `curl -6`
+to extensions.duckdb.org also hangs on this host, `curl -4` answers).
+Worked around by fetching the extension .gz directly with curl and loading
+it from a local path - confirmed for real that `SET extension_directory=...;
+LOAD httpfs;` finds it with zero network calls, and that DuckDB then
+writes and reads a real Parquet file through `s3://` (httpfs's S3 client,
+pointed at silo's endpoint) - full round trip, real bucket, real data.
+
+`packs/duckdb`: installs the CLI binary (`python3 -m zipfile`, not `unzip` -
+base guarantees the former, not the latter) and pre-fetches httpfs into a
+shared, world-readable `<install_dir>/extensions/v<version>/<platform>/`
+tree, so nothing at query time ever needs `INSTALL` (and its hang risk) at
+all - every invocation just does the `SET extension_directory` + `LOAD`
+this pack already proved works with no network. `maturity: draft`: lints
+clean (one non-blocking guard-shape warning, same class postgres/airflow
+already carry), dry-run integration test passes both families, generic
+pack tests pass. Not yet installed for real on any host, no acceptance
+suite yet - same two conditions `silo` needed before promotion.
+
+### 2026-09-29 — silo/duckdb reverted: back to Postgres only, by operator decision
+
+After `silo` was installed and verified for real (4/4 suite pass) and
+`duckdb` was built (draft, not yet installed), the operator decided to
+drop the MinIO/Parquet Bronze direction entirely and keep the warehouse
+Postgres-only, as it was before this session's Layer 1 work started on it.
+Not a technical failure of either pack - both worked, real bugs found
+along the way are recorded above as-is, kept for the record rather than
+scrubbed. Layer 2 itself was never touched for this: `warehouse:` in
+`pipeline.yaml` was never changed to support anything but Postgres, so
+there was nothing to revert there.
+
+Cleanup: `packs/silo`, `packs/duckdb` and `suites/silo` removed from the
+repo; README's checklist put back to the pre-existing
+"clickhouse, minio, trino, spark, iceberg, hive-metastore" not-yet-built
+line. The real `silo` systemd service + data on this host still needs
+`sudo dpagent rollback silo` to actually remove (operator to run) -
+`duckdb` was never installed for real, nothing to roll back there.
+
+### 2026-09-29 — real `silo` rollback executed on host, MinIO/Silo direction fully closed out
+
+Operator ran `sudo -E .venv/bin/dpagent rollback silo` for real, closing
+the one item the previous entry left open. Had to temporarily restore
+`packs/silo` from git history (`git checkout b0703f3 -- packs/silo`,
+uncommitted) first, since the pack's own code - including `rollback.sh` -
+had already been deleted from the repo before the operator got to run the
+real rollback; `dpagent` resolves rollback steps from the pack directory
+on disk, not from history, so without it the command failed with
+`no pack for 'silo'`. Sequencing mistake on my part - should have asked
+the operator to roll back the real install before deleting the pack code
+that rollback depends on.
+
+Real rollback output confirmed: `dnf remove -y silo` removed the rpm,
+`systemctl disable --now silo` removed the unit, `/var/lib/silo/data`
+deleted. Two harmless leftovers the pack does not touch by design:
+`/etc/default/silo` saved by rpm as `/etc/default/silo.rpmsave` (plaintext
+old access/secret key - operator may `rm` it), and the `silo` system user
+created by the package's own `sysusers.d` entry (not by this pack) -
+`rollback.sh` explicitly leaves it in place. After the real rollback
+succeeded, the temporarily-restored `packs/silo` files were removed again
+from the working tree with no new commit, confirmed via `git diff --stat
+HEAD` showing zero difference from `fc6ef6d`. Host and repo are now both
+fully back to Postgres-only.
