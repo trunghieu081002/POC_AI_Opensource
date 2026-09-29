@@ -34,11 +34,14 @@ real against a live pipeline does.
 from __future__ import annotations
 
 import contextlib
+import datetime as _dt
 import hashlib
+import json
 import os
 import subprocess
 import uuid
 from dataclasses import dataclass, field, replace
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import yaml
@@ -321,20 +324,51 @@ def _quote_literal(value: object) -> str:
     return f"'{text}'"
 
 
+def _quote_ident(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+class FixtureSeedError(Exception):
+    """The fixture itself could not be loaded into the throwaway source -
+    a validation *failure* (the fixture is bad, or the throwaway database
+    rejected it), never `unavailable_reason` (which means "could not even
+    attempt this," e.g. no sudo). The distinction matters for real: a
+    silently-half-seeded fixture (a CREATE TABLE or INSERT failing but
+    `seed_source` not checking `returncode`, as an earlier version of this
+    did) could let `report.seeded = True` stand while the source is empty
+    or missing rows - and if `expected.yaml` also happens to expect an
+    empty result, the run would *pass*, having validated nothing. This is
+    raised, not just logged, specifically so `run_fixture` cannot proceed
+    past a bad seed."""
+
+
 def seed_source(fixture: Fixture, db: ThrowawayDB) -> None:
     """`CREATE TABLE` + `INSERT` for real, against a real (throwaway)
     Postgres database this function does not create or drop itself -
     same separation `validate.check_procedures` keeps between provisioning
-    (`pg_throwaway`) and applying."""
+    (`pg_throwaway`) and applying. Every statement's `returncode` is
+    checked - a silently-failed seed is worse than no seed at all (see
+    `FixtureSeedError`'s own docstring)."""
     for table in fixture.tables:
-        col_defs = ", ".join(f"{col} {type_}" for col, type_ in table.columns.items())
-        create_sql = f"CREATE TABLE {table.name} ({col_defs});"
-        _psql(db, "-c", create_sql)
+        col_defs = ", ".join(f"{_quote_ident(col)} {type_}"
+                             for col, type_ in table.columns.items())
+        create_sql = f"CREATE TABLE {_quote_ident(table.name)} ({col_defs});"
+        proc = _psql(db, "-c", create_sql)
+        if proc.returncode != 0:
+            raise FixtureSeedError(
+                f"CREATE TABLE {table.name} failed: "
+                f"{(proc.stderr or proc.stdout).strip()}")
         for row in table.rows:
             cols = list(row.keys())
+            col_list = ", ".join(_quote_ident(c) for c in cols)
             values = ", ".join(_quote_literal(row[c]) for c in cols)
-            insert_sql = f"INSERT INTO {table.name} ({', '.join(cols)}) VALUES ({values});"
-            _psql(db, "-c", insert_sql)
+            insert_sql = (f"INSERT INTO {_quote_ident(table.name)} ({col_list}) "
+                          f"VALUES ({values});")
+            proc = _psql(db, "-c", insert_sql)
+            if proc.returncode != 0:
+                raise FixtureSeedError(
+                    f"INSERT INTO {table.name} failed: "
+                    f"{(proc.stderr or proc.stdout).strip()}")
 
 
 def _psql(db: ThrowawayDB, *args: str, timeout: int = 30) -> subprocess.CompletedProcess:
@@ -368,32 +402,94 @@ class ComparisonResult:
     detail: str = ""
 
 
+def _canon_value(value: object) -> object:
+    """Normalizes one value so two representations of the same real value
+    compare equal after JSON-serializing a whole row for comparison -
+    `None` (Postgres `NULL`) stays distinct from `""` (an actual empty
+    string, indistinguishable from NULL in the old tab-separated-text
+    approach this replaced); a `bool` is left alone (checked before `int`,
+    since `bool` is a subclass of it); a `date`/`datetime` (which YAML
+    parses an *unquoted* date-looking scalar into) is rendered
+    `.isoformat()`, matching Postgres's own `row_to_json` rendering of a
+    timestamp column; a number is rendered through `Decimal` with no
+    exponent and no trailing zeros, so `100`, `100.0`, and `100.00` all
+    canonicalize identically regardless of which side (the fixture author's
+    YAML, or Postgres's own JSON output) happened to write it which way;
+    anything else becomes its plain string form."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (_dt.datetime, _dt.date)):
+        return value.isoformat()
+    if isinstance(value, (int, float)):
+        try:
+            d = Decimal(str(value)).normalize()
+        except InvalidOperation:
+            return value
+        if d == d.to_integral_value():
+            return str(d.to_integral_value())
+        return format(d, "f")
+    return str(value)
+
+
+def _canon_row(row: dict) -> str:
+    return json.dumps({k: _canon_value(v) for k, v in row.items()},
+                      sort_keys=True, ensure_ascii=False)
+
+
 def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: str) -> ComparisonResult:
     """Queries the real `curated` table for real and compares against
     `expected` - order-independent, exact match on every column the
     expected rows themselves declare (extra columns the pipeline produced
     but the reviewer did not list are ignored, the same way a reviewer
-    writing an expected.yaml would not enumerate every internal column)."""
-    if not expected.rows:
-        columns = "*"
+    writing an expected.yaml would not enumerate every internal column).
+
+    Compares through `row_to_json`, not raw tab-separated text (an earlier
+    version of this did, and it had real, distinct failure modes: a
+    Postgres `NULL` and an actual empty string both rendered as "", a
+    value containing a literal tab or newline broke the column split
+    entirely, and `100` vs `100.00` compared unequal as text despite being
+    the same number). `_canon_value`/`_canon_row` normalize both sides -
+    the expected rows from `expected.yaml` and the actual rows straight out
+    of Postgres - through the identical function before comparing, so
+    "same value, different representation" on either side cannot produce a
+    false mismatch (or, worse, a false match)."""
+    if expected.rows:
+        column_sets = {frozenset(row.keys()) for row in expected.rows}
+        if len(column_sets) > 1:
+            return ComparisonResult(
+                False, "expected.yaml's rows do not all declare the same set of "
+                      "columns - every row must declare the same columns for the "
+                      "comparison to mean anything")
+        columns = sorted(expected.rows[0].keys())
+        select_list = ", ".join(_quote_ident(c) for c in columns)
+        inner = f"SELECT {select_list} FROM {_quote_ident(schema)}.{_quote_ident(expected.table)}"
     else:
-        columns = ", ".join(sorted(expected.rows[0].keys()))
-    proc = _psql(warehouse, "-c",
-                f"SELECT {columns} FROM {schema}.{expected.table};",
-                "-A", "-F", "\t", "-t")
+        inner = f"SELECT * FROM {_quote_ident(schema)}.{_quote_ident(expected.table)}"
+    query = f"SELECT row_to_json(t) FROM ({inner}) t;"
+
+    proc = _psql(warehouse, "-c", query, "-A", "-t")
     if proc.returncode != 0:
         return ComparisonResult(False, (proc.stderr or proc.stdout).strip())
 
-    lines = [line for line in proc.stdout.splitlines() if line.strip()]
-    if expected.row_count is not None and len(lines) != expected.row_count:
-        return ComparisonResult(False, f"expected {expected.row_count} row(s), got {len(lines)}")
+    try:
+        actual_rows = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+    except json.JSONDecodeError as exc:
+        return ComparisonResult(
+            False, f"could not parse curated output as JSON ({exc}); raw output: "
+                  f"{proc.stdout[:2000]!r}")
 
-    actual_sorted = sorted(lines)
-    expected_lines = sorted(
-        "\t".join(str(row[c]) for c in sorted(row.keys())) for row in expected.rows)
-    if actual_sorted != expected_lines:
-        return ComparisonResult(False, f"expected rows:\n  {expected_lines}\nactual rows:\n  {actual_sorted}")
-    return ComparisonResult(True, f"{len(lines)} row(s) matched exactly")
+    if expected.row_count is not None and len(actual_rows) != expected.row_count:
+        return ComparisonResult(
+            False, f"expected {expected.row_count} row(s), got {len(actual_rows)}")
+
+    actual_sorted = sorted(_canon_row(r) for r in actual_rows)
+    expected_sorted = sorted(_canon_row(r) for r in expected.rows)
+    if actual_sorted != expected_sorted:
+        return ComparisonResult(
+            False, f"expected rows:\n  {expected_sorted}\nactual rows:\n  {actual_sorted}")
+    return ComparisonResult(True, f"{len(actual_rows)} row(s) matched exactly")
 
 
 @contextlib.contextmanager
@@ -444,6 +540,116 @@ def _summarize_undeploy(result) -> str:
     return "; ".join(parts) if parts else "nothing to remove (deploy never got far enough)"
 
 
+def _verify_cleanup_complete(clone: Pipeline, undeploy_result, deploy_mod) -> tuple[bool, str]:
+    """Checks real, final state - not whether `undeploy()`'s own action
+    flags say it *did something*, which is not the same claim.
+    `undeploy_result.dag_delete_failed is False` alone used to be treated
+    as "cleanup ok," but that only means the DAG delete step itself did not
+    error - it says nothing about whether the published pipeline
+    directory, dbt models, dlt state, or the clone's own secrets are
+    actually still there (e.g. `_release_pipeline_secrets()` can legitimately
+    return `secrets_note="kept every secret: ..."` - every action flag
+    still looks clean, but the clone's own throwaway credentials are still
+    sitting in the shared `pipelines.env` file). This reaches into
+    `deploy.py`'s own private path-resolution helpers (`_airflow_install_dir`,
+    `_dbt_project_dir`, `_pipeline_secrets_file`, `_parse_env_file`,
+    `_pipeline_env_refs`) deliberately - `fixture.py` already runs in the
+    same CLI-side process context `deploy.py` assumes throughout (never
+    inside a DAG task), so this is the same kind of within-package reuse
+    `deploy.py`'s own `undeploy()` already does internally."""
+    remaining = []
+
+    def _safe_missing(path: Path, what: str) -> None:
+        """`path.exists()` itself can raise (not just return False) when
+        this operator cannot even read the parent directory - real on this
+        project's own host: `install_dag()`'s own docstring says
+        `<airflow install_dir>/home` is 700, airflow-only. A real run gets
+        this far only as root (every write step above already required
+        it), so this is mostly a concern for anything short of a real,
+        root run - but "cannot tell" must never silently become "assumed
+        gone" either way, so it counts as `remaining`, not as verified."""
+        try:
+            exists = path.exists()
+        except OSError as exc:
+            remaining.append(f"{what}: could not check ({exc})")
+            return
+        if exists:
+            remaining.append(f"{what} still present: {path}")
+
+    if undeploy_result.dag_delete_failed:
+        remaining.append(f"DAG still registered in Airflow: {undeploy_result.dag_delete_note}")
+
+    _safe_missing(deploy_mod._airflow_install_dir() / "home" / "dags" / f"{clone.name}.py",
+                 "DAG file")
+
+    if clone.name in deploy_mod.deployed_names():
+        remaining.append(f"{clone.name!r} still listed under {deploy_mod.SHARED_PIPELINES_DIR}")
+
+    _safe_missing(deploy_mod._dbt_project_dir() / "models" / clone.name, "dbt models")
+
+    _safe_missing(deploy_mod._airflow_install_dir() / "home" / ".dlt"
+                 / "pipelines" / f"{clone.name}_extract", "dlt state")
+
+    secrets_file = deploy_mod._pipeline_secrets_file()
+    try:
+        existing_secrets = deploy_mod._parse_env_file(secrets_file)
+    except OSError as exc:
+        remaining.append(f"pipeline secrets file: could not check ({exc})")
+        existing_secrets = {}
+    clone_refs = set(deploy_mod._pipeline_env_refs(clone))
+    leftover_secrets = sorted(clone_refs & set(existing_secrets))
+    if leftover_secrets:
+        remaining.append(f"clone secret(s) still in {secrets_file}: "
+                         f"{', '.join(leftover_secrets)}")
+
+    from ..engine import state
+    active = state.conn().execute(
+        "SELECT id FROM runs WHERE kind='data' AND target=? AND status='running'",
+        (clone.name,)).fetchall()
+    if active:
+        remaining.append("dpagent still shows run(s) 'running' for this clone: "
+                         + ", ".join(str(r["id"]) for r in active))
+
+    if remaining:
+        return False, "; ".join(remaining)
+    return True, ("verified gone: DAG (file + Airflow registration + published "
+                  "files + dbt models + dlt state), no clone secrets left in "
+                  f"{secrets_file}, no active runs")
+
+
+def _do_cleanup(report: "FixtureRunReport", clone: Pipeline, deploy_mod) -> None:
+    """Actually undeploys the clone, then verifies real end state - never
+    trusts `undeploy()`'s own action flags alone (`_verify_cleanup_complete`'s
+    own docstring). A timeout is never reported as a *complete* cleanup even
+    when every artifact this function knows how to look for is gone: this
+    host has no way to confirm the Airflow worker process for a timed-out
+    task has actually stopped (deleting a DAG/DagRun row does not kill an
+    already-running LocalExecutor task), so the two throwaway databases this
+    function's caller is about to drop right after this returns could still
+    be in use - "if không xác nhận được worker đã dừng, cleanup phải
+    fail/exit 4, không được ghi complete" (the user's own review)."""
+    report.cleanup_attempted = True
+    try:
+        undeploy_result = deploy_mod.undeploy(clone)
+    except Exception as exc:
+        report.cleanup_ok = False
+        report.cleanup_detail = f"undeploy failed: {exc}"
+        return
+
+    ok, detail = _verify_cleanup_complete(clone, undeploy_result, deploy_mod)
+    timed_out = report.run1_status == "timeout" or report.run2_status == "timeout"
+    if timed_out:
+        ok = False
+        detail = (
+            (detail + "; " if detail else "")
+            + "run timed out - this host cannot confirm the Airflow worker "
+              "actually stopped before cleanup ran (undeploy() does not kill "
+              "an already-running task), so this is never reported as a "
+              "complete cleanup even when every artifact checked here is gone")
+    report.cleanup_ok = ok
+    report.cleanup_detail = f"{_summarize_undeploy(undeploy_result)} | {detail}"
+
+
 @dataclass
 class FixtureRunReport:
     """What actually happened running a fixture through a real, deployed
@@ -453,6 +659,8 @@ class FixtureRunReport:
     and a reviewer needs to see which one."""
     clone_name: str = ""
     seeded: bool = False
+    seed_error: str = ""   # the fixture itself failed to load - a validation
+                           # failure (exit 1), never unavailable_reason (exit 2)
     deployed: bool = False
     run_ids: list[int] = field(default_factory=list)
     run1_status: str = ""
@@ -476,15 +684,18 @@ class FixtureRunReport:
 
     @property
     def ok(self) -> bool:
-        """Passing requires cleanup to have actually succeeded too - a run
-        that got the right numbers but left a validation DAG, published
-        files, or leaked secrets behind is not a clean result (the user's
-        own review: "Validation không được coi là hoàn chỉnh nếu chạy pass
-        nhưng cleanup fail")."""
+        """Passing requires cleanup to have actually been attempted *and*
+        to have actually succeeded - a run that got the right numbers but
+        left a validation DAG, published files, or leaked secrets behind is
+        not a clean result (the user's own review: "Validation không được
+        coi là hoàn chỉnh nếu chạy pass nhưng cleanup fail"), and neither is
+        one where cleanup was, for whatever reason, never even attempted -
+        `not self.cleanup_attempted or self.cleanup_ok` would have let that
+        second case through silently."""
         return (self.seeded and self.deployed
                 and self.run1_status == "ok" and self.run2_status == "ok"
                 and self.idempotent
-                and (not self.cleanup_attempted or self.cleanup_ok))
+                and self.cleanup_attempted and self.cleanup_ok)
 
 
 def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResult, *,
@@ -544,86 +755,110 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                 f"is generated every time)")
             return report
 
-        deployed = False
         try:
             with pg_throwaway.throwaway_database(prefix="dpagent_fixture_src") as src_db, \
                  pg_throwaway.throwaway_database(prefix="dpagent_fixture_wh") as wh_db:
-                seed_source(fixture_obj, src_db)
+                try:
+                    seed_source(fixture_obj, src_db)
+                except FixtureSeedError as exc:
+                    # A validation failure (the fixture/throwaway database
+                    # rejected it), never unavailable_reason - nothing was
+                    # deployed yet, so there is nothing to clean up.
+                    report.seed_error = str(exc)
+                    return report
                 report.seeded = True
 
                 overrides = {**env_overrides_for_source(clone, src_db),
                             **env_overrides_for_warehouse(clone, wh_db)}
                 with _temporarily(overrides):
+                    # `cleanup_needed` is set True *before* deploy() is even
+                    # called, not after it returns - deploy() writes several
+                    # real things in sequence (procedures, dbt models,
+                    # published files, secrets, the DAG itself) and can fail
+                    # partway through any one of them, after earlier steps
+                    # already had a real effect. Gating cleanup on "deploy()
+                    # returned successfully" would skip undeploy() for
+                    # exactly the case that most needs it - a partial
+                    # deploy. undeploy() is idempotent by design (its own
+                    # docstring: "every step tolerates already gone"), so
+                    # calling it after a deploy that did nothing at all, or
+                    # one that got partway through, is always safe.
+                    cleanup_needed = False
                     try:
-                        deploy_mod.deploy(clone, allow_draft=True)
-                    except deploy_mod.DeployError as exc:
-                        report.unavailable_reason = f"deploy() failed (needs root): {exc}"
-                        return report
-                    deployed = True
-                    report.deployed = True
+                        cleanup_needed = True
+                        try:
+                            deploy_mod.deploy(clone, allow_draft=True)
+                        except deploy_mod.DeployError as exc:
+                            report.unavailable_reason = f"deploy() failed (needs root): {exc}"
+                            return report
+                        report.deployed = True
 
-                    # --allow-draft never unpauses (M1's own guarantee for a
-                    # pipeline nobody has reviewed) - a validation clone is
-                    # never promoted, so it would stay paused forever
-                    # without this explicit, scoped unpause. Still
-                    # manual-only: schedule stayed None throughout, so
-                    # unpausing only lets *this* trigger_dag() call below
-                    # actually start, never a schedule.
-                    unpaused = deploy_mod.unpause_dag(clone.name)
-                    if unpaused.returncode != 0:
-                        report.unavailable_reason = (
-                            f"could not unpause validation DAG {clone.name!r} (a "
-                            f"manual run of a still-paused DAG is created queued "
-                            f"and never starts): "
-                            f"{(unpaused.stderr or unpaused.stdout).strip()}")
-                        return report
-
-                    for attempt in (1, 2):
-                        run_id = state.start_run("data", clone.name)
-                        report.run_ids.append(run_id)
-                        triggered = deploy_mod.trigger_dag(clone.name, run_id)
-                        if triggered.returncode != 0:
-                            setattr(report, f"run{attempt}_status", "trigger_failed")
+                        # --allow-draft never unpauses (M1's own guarantee
+                        # for a pipeline nobody has reviewed) - a validation
+                        # clone is never promoted, so it would stay paused
+                        # forever without this explicit, scoped unpause.
+                        # Still manual-only: schedule stayed None
+                        # throughout, so unpausing only lets *this*
+                        # trigger_dag() call below actually start, never a
+                        # schedule.
+                        unpaused = deploy_mod.unpause_dag(clone.name)
+                        if unpaused.returncode != 0:
                             report.unavailable_reason = (
-                                f"could not trigger run {attempt}: {triggered.stderr.strip()}")
+                                f"could not unpause validation DAG {clone.name!r} (a "
+                                f"manual run of a still-paused DAG is created queued "
+                                f"and never starts): "
+                                f"{(unpaused.stderr or unpaused.stdout).strip()}")
                             return report
 
-                        deadline = clock() + wait_timeout
-                        status = "running"
-                        while True:
-                            row = state.get_run(run_id)
-                            if row is not None and row["status"] != "running":
-                                status = row["status"]
-                                break
-                            if clock() >= deadline:
-                                status = "timeout"
-                                break
-                            sleep(poll_interval)
-                        setattr(report, f"run{attempt}_status", status)
-                        if status != "ok":
-                            return report
+                        for attempt in (1, 2):
+                            run_id = state.start_run("data", clone.name)
+                            report.run_ids.append(run_id)
+                            triggered = deploy_mod.trigger_dag(clone.name, run_id)
+                            if triggered.returncode != 0:
+                                setattr(report, f"run{attempt}_status", "trigger_failed")
+                                report.unavailable_reason = (
+                                    f"could not trigger run {attempt}: "
+                                    f"{triggered.stderr.strip()}")
+                                return report
 
-                        comparison = compare_curated(expected, wh_db, schema=clone.warehouse.schema)
-                        setattr(report, f"comparison_after_run{attempt}", comparison)
-                        if not comparison.ok:
-                            return report
+                            deadline = clock() + wait_timeout
+                            status = "running"
+                            while True:
+                                row = state.get_run(run_id)
+                                if row is not None and row["status"] != "running":
+                                    status = row["status"]
+                                    break
+                                if clock() >= deadline:
+                                    status = "timeout"
+                                    break
+                                sleep(poll_interval)
+                            setattr(report, f"run{attempt}_status", status)
+                            if status != "ok":
+                                return report
+
+                            comparison = compare_curated(
+                                expected, wh_db, schema=clone.warehouse.schema)
+                            setattr(report, f"comparison_after_run{attempt}", comparison)
+                            if not comparison.ok:
+                                return report
+                    finally:
+                        # Runs *inside* the throwaway-database `with` block,
+                        # deliberately - so undeploy() (and the real-state
+                        # verification in `_do_cleanup`) always completes
+                        # before the throwaway source/warehouse databases
+                        # are dropped, never after. An earlier version of
+                        # this had the cleanup in an outer `finally`,
+                        # outside the `with pg_throwaway...:` block - the
+                        # databases were dropped *first* (the `with`'s own
+                        # `__exit__`, unwinding before an enclosing `finally`
+                        # runs), then undeploy() ran against a pipeline
+                        # whose own database connections had already gone
+                        # stale.
+                        if cleanup_needed:
+                            _do_cleanup(report, clone, deploy_mod)
         except pg_throwaway.ThrowawayUnavailable as exc:
             report.unavailable_reason = str(exc)
             return report
-        finally:
-            # Cleanup happens whether the run passed, failed validation, or
-            # errored out - "Validation không được coi là hoàn chỉnh nếu
-            # chạy pass nhưng cleanup fail" (the user's own review): a
-            # passing comparison with a failed cleanup is not `report.ok`.
-            if deployed:
-                report.cleanup_attempted = True
-                try:
-                    undeploy_result = deploy_mod.undeploy(clone)
-                    report.cleanup_ok = not undeploy_result.dag_delete_failed
-                    report.cleanup_detail = _summarize_undeploy(undeploy_result)
-                except Exception as exc:
-                    report.cleanup_ok = False
-                    report.cleanup_detail = f"undeploy failed: {exc}"
 
     return report
 

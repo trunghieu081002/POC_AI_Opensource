@@ -270,6 +270,13 @@ def validate_cmd(name, fixture_path, expected_path):
                       "correctness - it means this operator/host could not run it)[/dim]")
         sys.exit(2)
 
+    if result.seed_error:
+        # A validation failure, not "unavailable": the fixture itself (or
+        # the throwaway database) rejected it - exit 1, same as a real
+        # mismatch, never exit 2 (which means "could not even attempt it").
+        console.print(f"[red]fixture seed failed:[/red] {result.seed_error}")
+        sys.exit(1)
+
     for label, comparison in (("run 1", result.comparison_after_run1),
                               ("run 2", result.comparison_after_run2)):
         if comparison is None:
@@ -299,7 +306,7 @@ def validate_cmd(name, fixture_path, expected_path):
                       f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
         sys.exit(1)
 
-    if result.cleanup_attempted and not result.cleanup_ok:
+    if not (result.cleanup_attempted and result.cleanup_ok):
         console.print(f"\n[red]fixture data matched, but cleanup did not complete[/red] - "
                       f"a passing comparison does not count as done until cleanup does "
                       f"too. Check by hand: dpagent pipeline undeploy {result.clone_name}")

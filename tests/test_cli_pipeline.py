@@ -884,9 +884,11 @@ def test_validate_fixture_reports_success(db, tmp_path, monkeypatch):
     fx, expected = _fixture_and_expected_files(tmp_path)
     from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
     ok_report = FixtureRunReport(
+        clone_name="demo__validate__abc",
         seeded=True, deployed=True, run1_status="ok", run2_status="ok",
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
-        comparison_after_run2=ComparisonResult(True, "1 row matched"))
+        comparison_after_run2=ComparisonResult(True, "1 row matched"),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed")
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [

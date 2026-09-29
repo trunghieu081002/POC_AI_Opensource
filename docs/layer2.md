@@ -561,13 +561,57 @@ after step 3, refuses to even attempt it if step 3 failed.
   grading its own homework can be wrong the same way on both sides and
   never notice. `idempotent` is true only when *both* runs matched
   expected exactly, not inferred from the second run merely completing
-  without error.
-- The clone is always `undeploy()`-ed in a `finally`, whether the run
-  passed, failed validation, or errored partway through - a passing
-  comparison with a failed cleanup is **not** reported as an overall pass
-  (`FixtureRunReport.ok` requires cleanup to have actually succeeded too,
-  when it was attempted at all): "validation không được coi là hoàn
-  chỉnh nếu chạy pass nhưng cleanup fail."
+  without error. Compared through `row_to_json`, not raw tab-separated
+  `psql` text (an earlier version did, and it had real, distinct failure
+  modes: a Postgres `NULL` and an actual empty string both rendered as
+  `""`, a value containing a literal tab or newline broke the column
+  split, and `100` vs `100.00` compared unequal as text despite being the
+  same number) - every value on both sides is canonicalized through the
+  same function (`None` stays distinct from `""`; a number is rendered
+  through `Decimal` with no exponent/trailing zeros so any two
+  representations of the same value match; a `date`/`datetime` - what YAML
+  parses an unquoted date-looking scalar into - is rendered `.isoformat()`,
+  matching Postgres's own `row_to_json` rendering) before the rows are
+  sorted and compared. Every row `expected.yaml` declares must use the
+  same set of columns, checked up front, so the comparison is well-defined.
+- The clone is always `undeploy()`-ed, whether the run passed, failed
+  validation, or errored partway through - `cleanup_needed` is set `True`
+  *before* `deploy()` is even called, not after it returns successfully:
+  `deploy()` writes several real things in sequence (procedures, dbt
+  models, published files, secrets, the DAG), and can fail partway through
+  any one of them after earlier steps already had a real effect -
+  `undeploy()` is idempotent by design, so calling it even after a deploy
+  that got nowhere, or only partway, is always safe. Cleanup itself runs
+  *inside* the same `with` block that holds the two throwaway databases
+  open, not after it - undeploy() (and the real-state check below) always
+  completes before the throwaway source/warehouse databases are dropped,
+  never the other way around.
+- Cleanup is verified against **real, current state**, not inferred from
+  `undeploy()`'s own action flags (a passing "DAG delete did not error"
+  says nothing about whether the published pipeline directory, dbt models,
+  dlt state, or the clone's own secrets are actually gone -
+  `_release_pipeline_secrets()` can legitimately report "kept every
+  secret" while every other flag still looks clean): the DAG file, the
+  clone's listing under `SHARED_PIPELINES_DIR`, its dbt models directory,
+  its dlt state directory, its own secret refs in the shared
+  `pipelines.env`, and whether dpagent's own journal still shows a
+  `running` run for it are all checked directly. A run that timed out is
+  **never** reported as a complete cleanup, even when every one of those
+  checks comes back clean - this host has no way to confirm the Airflow
+  worker for a timed-out task has actually stopped (deleting a DAG/DagRun
+  row does not kill an already-running task), so the two throwaway
+  databases about to be dropped right after could still be in use.
+  `FixtureRunReport.ok` requires cleanup to have been both attempted *and*
+  actually succeeded: "validation không được coi là hoàn chỉnh nếu chạy
+  pass nhưng cleanup fail."
+- The fixture itself is seeded with every statement's `returncode` checked
+  - a `FixtureSeedError`, not a silent partial seed: an earlier version
+  did not check this at all, so a failed `CREATE TABLE`/`INSERT` could
+  still leave `report.seeded = True`, and if `expected.yaml` happened to
+  expect an empty result, the run could *pass* having validated nothing.
+  A seed failure is a validation failure (`dpagent pipeline validate`
+  exits `1`), never `unavailable_reason` (exit `2`) - the fixture/database
+  rejected it, the host was not incapable of attempting it.
 
 `env_overrides_for_source`/`env_overrides_for_warehouse` compute exactly
 which environment variables need to be set for the clone's own `${VAR}`

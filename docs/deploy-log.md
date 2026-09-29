@@ -3395,3 +3395,107 @@ path), and M2.5 (real end-to-end verification on a disposable host with
 root + passwordless sudo), Layer 2.5 (publish-curated-only-after-gate-pass),
 and live LLM evaluation - all explicitly still pending, in the order the
 review itself laid out.
+
+## 2026-09-29 - Git hygiene correction + M2.4 second-pass hardening
+
+**Git status correction**: PR #18 had already merged (merge commit
+`a776693`, containing commits up to `690481a`) *before* the M2.4 hardening
+commit (`58d43a4`) was created and pushed to the same branch - so `58d43a4`
+was never actually part of any merged PR, despite being reported as "pushed
+to PR #18." Fixed the safe way, per review: `git switch main && git pull
+--ff-only`, a fresh branch `m2.4-fixture-hardening` off current `main`,
+`git cherry-pick 58d43a4` onto it (clean, no conflicts), full suite re-run
+before pushing. No force-push, no continuing to call the old, already-merged
+branch "PR #18."
+
+A second review of that same M2.4 commit (still correct on the isolation
+fixes it made - clone naming, unpause, exit codes, report hashing) found
+three more real P0s and two P1s in the fixture harness itself:
+
+- **P0: a deploy that failed partway could skip cleanup entirely** -
+  `deployed = True` was only set *after* `deploy()` returned successfully,
+  but `deploy()` writes several real things in sequence (procedures, dbt
+  models, published files, secrets, the DAG) and can fail after several of
+  them already landed. Fixed: `cleanup_needed = True` is now set *before*
+  `deploy()` is even called - `undeploy()` is idempotent by design, so
+  calling it after a deploy that got nowhere, or only partway, is always
+  safe.
+- **P0: `seed_source()` never checked `returncode`** - a failed `CREATE
+  TABLE`/`INSERT` could still leave `report.seeded = True`; if
+  `expected.yaml` happened to expect an empty result, the run could *pass*
+  having validated nothing - the scorer itself silently broken, not just
+  the pipeline. Fixed: a new `FixtureSeedError`, raised on any non-zero
+  `returncode`; `dpagent pipeline validate --fixture` now exits `1` for a
+  seed failure (a validation failure, correctly distinct from exit `2`
+  "could not even attempt it").
+- **P0: `cleanup_ok` trusted `undeploy()`'s own action flags, not real
+  state** - `not undeploy_result.dag_delete_failed` alone says nothing
+  about whether the published pipeline directory, dbt models, dlt state,
+  or the clone's own secrets are actually gone (`_release_pipeline_secrets()`
+  can legitimately report "kept every secret" while every other flag still
+  looks clean). Fixed: `_verify_cleanup_complete()` checks real, current
+  state directly - the DAG file, `deployed_names()`, the dbt models
+  directory, the dlt state directory, the clone's own secret refs still in
+  the shared `pipelines.env`, and whether dpagent's own journal still shows
+  a `running` run for the clone.
+- **P1: `FixtureRunReport.ok` let `cleanup_attempted=False` count as ok** -
+  `not self.cleanup_attempted or self.cleanup_ok` is true when cleanup was
+  never attempted at all. Fixed: `self.cleanup_attempted and
+  self.cleanup_ok`, both required; CLI's exit-4 check changed to match.
+- **P1: a timeout could drop the throwaway databases before cleanup ran** -
+  the `finally` that called `undeploy()` was *outside* the
+  `with pg_throwaway.throwaway_database()...:` block, so Python's own
+  unwinding order dropped both throwaway databases first (the `with`
+  block's `__exit__`), then ran `undeploy()` against a clone whose own
+  database connections had already gone stale. Fixed: the cleanup `finally`
+  now sits *inside* that `with` block - undeploy() (and the real-state
+  check above) always completes before the throwaway databases are
+  dropped. A timeout is additionally never reported as a *complete*
+  cleanup even when every checked artifact is gone: this host has no way
+  to confirm the Airflow worker for a timed-out task has actually stopped
+  (deleting a DAG/DagRun row does not kill an already-running task), so
+  the databases about to be dropped could still be in use - honestly
+  reported as an incomplete cleanup (exit 4) rather than a false
+  "complete."
+- **P1: `compare_curated()` compared raw tab-separated `psql` text** - real,
+  distinct failure modes: a Postgres `NULL` and an actual empty string both
+  rendered as `""`; a value containing a literal tab or newline broke the
+  column split; `100` vs `100.00` compared unequal as text despite being
+  the same number. Fixed: compares through `row_to_json` + `json.loads`
+  instead, with every value canonicalized through the same function on
+  both sides (`_canon_value`) before sorting and comparing - `None` stays
+  distinct from `""`, a number normalizes through `Decimal` (no
+  exponent/trailing zeros), a `date`/`datetime` (what YAML parses an
+  unquoted date-looking scalar into) renders `.isoformat()`, matching
+  Postgres's own JSON rendering. `expected.yaml`'s rows must all declare
+  the same column set, checked up front.
+
+**Real-verified on this host after this round**: a real `dpagent pipeline
+validate quickstart --fixture ... --expected ...` run still completes the
+same graceful degradation as before (real clone id generated, exit 2,
+nothing left under `/opt/dpagent/pipelines`) - confirming the restructured
+`run_fixture()` (seed error handling, reordered cleanup, real-state
+verification) did not regress the one path this host can actually exercise
+end to end. Full test suite green before every push in this round,
+including a real (unmocked) `PermissionError` finding along the way:
+`Path.exists()` on `/opt/airflow/home/dags/<file>` raises rather than
+returning `False` for an operator without read access to that 700,
+airflow-only directory (confirmed for real on this host) - `_safe_missing()`
+now catches `OSError` there and reports "could not check" as `remaining`
+(never silently "assumed gone").
+
+**Not real-verified**: the actual pass/fail path of the new
+`_verify_cleanup_complete()`/timeout-forces-incomplete logic against a real,
+running Airflow (same standing constraint - no root, no passwordless sudo
+to postgres on this host). Unit-tested with every subprocess call and every
+private `deploy.py` path-resolution helper mocked against throwaway
+directories, including a dedicated test for the reordering itself (cleanup
+attempted even when `deploy()` raises immediately) and for each new
+`compare_curated()` edge case (NULL vs empty string, equivalent decimal
+formatting, a literal tab in a value, mismatched expected-row column sets).
+
+M2.4 stands as: git hygiene now correct (this entry's own fix), the four
+original P0s/two P1s from the first M2.4 review, and the five additional
+items above. Still not proceeding to M2.5 (real verification on a
+disposable host with root + passwordless sudo), Layer 2.5, or live LLM
+evaluation - unchanged from the standing decision.

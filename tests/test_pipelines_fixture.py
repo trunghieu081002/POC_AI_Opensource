@@ -9,6 +9,7 @@ compare_curated are unit-tested with the psql subprocess call mocked, the
 same wall validate.check_procedures already hits on this host (no
 passwordless sudo to postgres)."""
 import contextlib
+import json
 import os
 import subprocess
 
@@ -164,9 +165,9 @@ def test_seed_source_creates_the_table_then_inserts_every_row(monkeypatch):
         rows=[{"id": 1, "amount": 100}, {"id": 2, "amount": 200}])])
     fixture.seed_source(fx, _DB)
 
-    assert calls[0].startswith("CREATE TABLE sale_order")
-    assert "INSERT INTO sale_order" in calls[1] and "1" in calls[1]
-    assert "INSERT INTO sale_order" in calls[2] and "200" in calls[2]
+    assert calls[0].startswith('CREATE TABLE "sale_order"')
+    assert 'INSERT INTO "sale_order"' in calls[1] and "1" in calls[1]
+    assert 'INSERT INTO "sale_order"' in calls[2] and "200" in calls[2]
 
 
 def test_seed_source_quotes_string_values_and_passes_null_through(monkeypatch):
@@ -185,31 +186,72 @@ def test_seed_source_quotes_string_values_and_passes_null_through(monkeypatch):
     assert "NULL" in insert_sql
 
 
+def test_seed_source_raises_a_seed_error_when_create_table_fails(monkeypatch):
+    """The P0 the review found: an earlier version never checked
+    `returncode` at all, so a failed CREATE TABLE/INSERT still left
+    `report.seeded = True` - a validation that could pass having actually
+    validated nothing."""
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
+        cmd, 1, stdout="", stderr='relation "sale_order" already exists'))
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    with pytest.raises(fixture.FixtureSeedError, match="already exists"):
+        fixture.seed_source(fx, _DB)
+
+
+def test_seed_source_raises_a_seed_error_when_an_insert_fails(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **k):
+        calls.append(1)
+        # CREATE TABLE succeeds, the INSERT fails.
+        ok = len(calls) == 1
+        return subprocess.CompletedProcess(
+            cmd, 0 if ok else 1, stdout="", stderr="" if ok else "duplicate key value")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="t", columns={"id": "bigint"}, rows=[{"id": 1}, {"id": 1}])])
+    with pytest.raises(fixture.FixtureSeedError, match="duplicate key"):
+        fixture.seed_source(fx, _DB)
+
+
 # ---------------------------------------------------------------- compare_curated (mocked)
+#
+# Compares through `row_to_json`, not raw tab-separated text (see
+# fixture.compare_curated's own docstring for exactly why: NULL vs "",
+# 100 vs 100.00, a value containing a literal tab) - every mocked
+# `psql -c "SELECT row_to_json(t) FROM (...) t;"` call below returns one
+# JSON object per line, the real shape `-A -t` output takes for that query.
+
+def _json_lines(*rows: dict) -> str:
+    return "\n".join(json.dumps(r) for r in rows) + ("\n" if rows else "")
+
 
 def test_compare_curated_passes_when_rows_match_exactly(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout="2026-01\t1500000\n", stderr=""))
+        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 1500000}), stderr=""))
     expected = fixture.ExpectedResult(
-        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": "1500000"}])
+        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 1500000}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is True
 
 
 def test_compare_curated_fails_when_a_row_differs(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout="2026-01\t9999999\n", stderr=""))
+        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 9999999}), stderr=""))
     expected = fixture.ExpectedResult(
-        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": "1500000"}])
+        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 1500000}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is False
 
 
 def test_compare_curated_fails_on_a_row_count_mismatch(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout="2026-01\t100\n2026-02\t200\n", stderr=""))
+        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 100},
+                                   {"month": "2026-02", "revenue": 200}), stderr=""))
     expected = fixture.ExpectedResult(
-        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": "100"}], row_count=1)
+        table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 100}], row_count=1)
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is False
     assert "expected 1" in result.detail
@@ -217,9 +259,10 @@ def test_compare_curated_fails_on_a_row_count_mismatch(monkeypatch):
 
 def test_compare_curated_is_order_independent(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout="2026-02\t200\n2026-01\t100\n", stderr=""))
+        cmd, 0, stdout=_json_lines({"month": "2026-02", "revenue": 200},
+                                   {"month": "2026-01", "revenue": 100}), stderr=""))
     expected = fixture.ExpectedResult(table="fct_x", rows=[
-        {"month": "2026-01", "revenue": "100"}, {"month": "2026-02", "revenue": "200"}])
+        {"month": "2026-01", "revenue": 100}, {"month": "2026-02", "revenue": 200}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is True
 
@@ -231,6 +274,42 @@ def test_compare_curated_surfaces_a_real_query_failure(monkeypatch):
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is False
     assert "does not exist" in result.detail
+
+
+def test_compare_curated_distinguishes_null_from_empty_string(monkeypatch):
+    """The exact ambiguity the old tab-separated-text approach had: a
+    Postgres NULL and a real empty string both rendered as "" there."""
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
+        cmd, 0, stdout=_json_lines({"note": None}), stderr=""))
+    expected = fixture.ExpectedResult(table="t", rows=[{"note": ""}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is False   # NULL != "" - must not be treated as a match
+
+
+def test_compare_curated_treats_equivalent_decimal_formatting_as_equal(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
+        cmd, 0, stdout=_json_lines({"total": 100.00}), stderr=""))
+    expected = fixture.ExpectedResult(table="t", rows=[{"total": 100}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is True
+
+
+def test_compare_curated_rejects_expected_rows_with_different_column_sets(monkeypatch):
+    expected = fixture.ExpectedResult(table="t", rows=[
+        {"id": 1, "amount": 100}, {"id": 2}])   # second row is missing "amount"
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is False
+    assert "same set of columns" in result.detail
+
+
+def test_compare_curated_handles_a_value_containing_a_literal_tab(monkeypatch):
+    """The other real failure mode the old tab-separated-text approach
+    had - JSON round-trips this correctly with no special-case code."""
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
+        cmd, 0, stdout=_json_lines({"note": "a\tb"}), stderr=""))
+    expected = fixture.ExpectedResult(table="t", rows=[{"note": "a\tb"}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is True
 
 
 # ---------------------------------------------------------------- _temporarily
@@ -310,14 +389,20 @@ def _mark_run_ok_immediately(monkeypatch):
     monkeypatch.setattr(deploy_mod, "trigger_dag", fake_trigger)
 
 
-def _mock_deploy_isolation(monkeypatch, *, unpause_ok=True, undeploy_ok=True):
+def _mock_deploy_isolation(monkeypatch, tmp_path, *, unpause_ok=True, undeploy_ok=True):
     """Every real, host-touching call `run_fixture` makes around the
     clone's own deploy/unpause/undeploy - `deploy_mod.deploy` itself is
     mocked per-test (its own success/failure is what each test is about),
     but unpause/undeploy/deployed_names are real subprocess/filesystem
     calls that would otherwise fire for real (and fail, on a host with no
     root/no airflow OS user) in every test that does not itself care about
-    them."""
+    them. Also points every private path-resolution helper
+    `_verify_cleanup_complete` reaches into at empty, throwaway directories
+    under `tmp_path` - real host paths under `/opt/airflow` are 700,
+    airflow-only (confirmed for real: `Path.exists()` on them raises
+    `PermissionError`, not just "False", for this operator), so a mocked
+    test needs its own, readable stand-ins to get a deterministic
+    "verified gone" instead of always the "could not check" branch."""
     from dpagent.pipelines import deploy as deploy_mod
     import subprocess as _sp
 
@@ -325,6 +410,17 @@ def _mock_deploy_isolation(monkeypatch, *, unpause_ok=True, undeploy_ok=True):
     monkeypatch.setattr(deploy_mod, "unpause_dag", lambda name: _sp.CompletedProcess(
         [], 0 if unpause_ok else 1, stdout="", stderr="" if unpause_ok else "unpause failed"))
     monkeypatch.setattr(deploy_mod, "undeploy", lambda pipeline: _FakeUndeployResult(undeploy_ok))
+
+    airflow_home = tmp_path / "fake_airflow_home"
+    (airflow_home / "dags").mkdir(parents=True, exist_ok=True)
+    dbt_project = tmp_path / "fake_dbt_project"
+    dbt_project.mkdir(parents=True, exist_ok=True)
+    secrets_file = airflow_home / "pipelines.env"
+    secrets_file.write_text("")
+    monkeypatch.setattr(deploy_mod, "_airflow_install_dir", lambda: airflow_home)
+    monkeypatch.setattr(deploy_mod, "_dbt_project_dir", lambda: dbt_project)
+    monkeypatch.setattr(deploy_mod, "_pipeline_secrets_file", lambda: secrets_file)
+    return airflow_home, dbt_project, secrets_file
 
 
 class _FakeUndeployResult:
@@ -365,8 +461,7 @@ def test_run_fixture_reports_unavailable_when_deploy_needs_root(
     wh_db = ThrowawayDB(host="h2", port="5432", database="wh", user="u2", password="p2")
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
-
-    monkeypatch.setattr(deploy_mod, "deployed_names", lambda: [])
+    _mock_deploy_isolation(monkeypatch, tmp_path)
 
     def boom(pipeline, **kwargs):
         raise deploy_mod.DeployError("publishing dbt models needs root")
@@ -381,9 +476,13 @@ def test_run_fixture_reports_unavailable_when_deploy_needs_root(
     assert report.seeded is True
     assert report.deployed is False
     assert "root" in report.unavailable_reason
-    # deploy() itself raised - nothing was ever deployed, so there is
-    # nothing for the finally block to clean up.
-    assert report.cleanup_attempted is False
+    # The P0 the review found: cleanup must still be attempted even when
+    # deploy() raised immediately - deploy() writes several real things in
+    # sequence (procedures, dbt models, published files, secrets, the DAG
+    # itself) and can fail partway through any one of them, after earlier
+    # steps already had a real effect. undeploy() is idempotent, so calling
+    # it here is always safe even when deploy() got nowhere at all.
+    assert report.cleanup_attempted is True
 
 
 def test_run_fixture_happy_path_both_runs_ok_and_idempotent(isolated_db, tmp_path, monkeypatch):
@@ -394,7 +493,7 @@ def test_run_fixture_happy_path_both_runs_ok_and_idempotent(isolated_db, tmp_pat
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
-    _mock_deploy_isolation(monkeypatch)
+    _mock_deploy_isolation(monkeypatch, tmp_path)
     _mark_run_ok_immediately(monkeypatch)
     monkeypatch.setattr(fixture, "compare_curated",
                         lambda expected, db, schema: fixture.ComparisonResult(True, "matched"))
@@ -427,7 +526,7 @@ def test_run_fixture_stops_after_the_first_run_fails(isolated_db, tmp_path, monk
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
-    _mock_deploy_isolation(monkeypatch)
+    _mock_deploy_isolation(monkeypatch, tmp_path)
 
     def fake_trigger(name, run_id, full_refresh=False):
         state.finish_run(run_id, "failed")
@@ -463,7 +562,7 @@ def test_run_fixture_detects_a_non_idempotent_second_run(isolated_db, tmp_path, 
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
-    _mock_deploy_isolation(monkeypatch)
+    _mock_deploy_isolation(monkeypatch, tmp_path)
     _mark_run_ok_immediately(monkeypatch)
 
     comparisons = [fixture.ComparisonResult(True, "matched"),
@@ -499,7 +598,7 @@ def test_run_fixture_reports_unavailable_when_the_dag_cannot_be_unpaused(
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
-    _mock_deploy_isolation(monkeypatch, unpause_ok=False)
+    _mock_deploy_isolation(monkeypatch, tmp_path, unpause_ok=False)
     triggered = []
     monkeypatch.setattr(deploy_mod, "trigger_dag", lambda *a, **k: triggered.append(1))
 
@@ -528,7 +627,7 @@ def test_run_fixture_is_not_ok_when_data_matches_but_cleanup_fails(
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
-    _mock_deploy_isolation(monkeypatch, undeploy_ok=False)
+    _mock_deploy_isolation(monkeypatch, tmp_path, undeploy_ok=False)
     _mark_run_ok_immediately(monkeypatch)
     monkeypatch.setattr(fixture, "compare_curated",
                         lambda expected, db, schema: fixture.ComparisonResult(True, "matched"))
