@@ -888,7 +888,9 @@ def test_validate_fixture_reports_success(db, tmp_path, monkeypatch):
         seeded=True, deployed=True, run1_status="ok", run2_status="ok",
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
         comparison_after_run2=ComparisonResult(True, "1 row matched"),
-        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed")
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+        source_database_dropped=True, source_role_dropped=True,
+        warehouse_database_dropped=True, warehouse_role_dropped=True)
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [
@@ -948,6 +950,34 @@ def test_validate_fixture_exits_4_when_data_matches_but_cleanup_failed(db, tmp_p
     assert "cleanup did not complete" in result.output
 
 
+def test_validate_fixture_exits_4_when_a_throwaway_database_is_not_dropped(
+        db, tmp_path, monkeypatch):
+    """Pipeline artifacts cleaned up fine, but one of the two throwaway
+    databases was not - still exit 4, not 0. The M2.4.2 review's own P0:
+    "Không được đặt cleanup_ok=True trước khi cả source và warehouse đã
+    được drop thành công.\""""
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, expected = _fixture_and_expected_files(tmp_path)
+    from dpagent.pipelines.fixture import ComparisonResult, FixtureRunReport
+    dirty_report = FixtureRunReport(
+        clone_name="demo__validate__abc",
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=ComparisonResult(True, "matched"),
+        comparison_after_run2=ComparisonResult(True, "matched"),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+        source_database_dropped=True, source_role_dropped=True,
+        warehouse_database_dropped=False, warehouse_database_drop_error="in use",
+        warehouse_role_dropped=True)
+    monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: dirty_report)
+
+    result = _runner().invoke(pipeline_group, [
+        "validate", "demo", "--fixture", str(fx), "--expected", str(expected)])
+
+    assert result.exit_code == 4, result.output
+    assert "cleanup did not complete" in result.output
+    assert "warehouse database" in result.output.lower()
+
+
 def test_validate_fixture_writes_the_fixture_section_into_the_report(db, tmp_path, monkeypatch):
     _draft_pipeline_dir(tmp_path, monkeypatch)
     fx, expected = _fixture_and_expected_files(tmp_path)
@@ -957,7 +987,9 @@ def test_validate_fixture_writes_the_fixture_section_into_the_report(db, tmp_pat
         seeded=True, deployed=True, run_ids=[401, 402], run1_status="ok", run2_status="ok",
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
         comparison_after_run2=ComparisonResult(True, "1 row matched"),
-        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed")
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+        source_database_dropped=True, source_role_dropped=True,
+        warehouse_database_dropped=True, warehouse_role_dropped=True)
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [

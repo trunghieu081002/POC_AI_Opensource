@@ -15,6 +15,7 @@ built here yet.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -65,10 +66,11 @@ class StepResult:
 class CompileReport:
     dbt: StepResult
     procedures: StepResult
+    dbt_dependencies: StepResult
 
     @property
     def ok(self) -> bool:
-        return self.dbt.ok and self.procedures.ok
+        return self.dbt.ok and self.procedures.ok and self.dbt_dependencies.ok
 
 
 def _dbt_bin() -> str:
@@ -138,6 +140,91 @@ def check_dbt_models(pipeline: Pipeline) -> StepResult:
         return StepResult("pass", f"{model_count} model(s) parsed clean")
 
 
+# A dbt Jinja call to `ref(...)` or `source(...)` - cross-model/cross-project
+# dependency machinery this validation harness does not support isolating
+# (see check_dbt_dependencies's own docstring). Word-bounded so it does not
+# false-positive on an unrelated identifier merely containing "source"
+# (e.g. a `source_system` column).
+_DBT_CROSS_MODEL_CALL = re.compile(r"\b(ref|source)\s*\(")
+
+
+def find_dbt_cross_model_refs(sql_text: str) -> list[str]:
+    """Every distinct `ref`/`source` Jinja call found in `sql_text`, in the
+    order first seen - a plain regex over the raw model text, not a real
+    Jinja/dbt manifest parse: the smallest check that fits this project's
+    existing model-authoring convention (every real model under
+    `pipelines/*/models/*.sql` already reads its input via a literal,
+    schema-qualified table name - `from demo_landing.res_partner`, e.g. -
+    never `ref()`/`source()`; confirmed against every model file in this
+    repo, docs/deploy-log.md, Layer 3 M2.2), not a general-purpose dbt
+    dependency resolver."""
+    seen: list[str] = []
+    for m in _DBT_CROSS_MODEL_CALL.finditer(sql_text):
+        name = m.group(1)
+        if name not in seen:
+            seen.append(name)
+    return seen
+
+
+def check_dbt_dependencies(pipeline: Pipeline) -> StepResult:
+    """Refuses a dbt-engine stage whose model uses `ref()`/`source()` -
+    not because dpagent rewrites SQL/Jinja to isolate it (out of scope for
+    M2, per the review this responds to: "Trong phạm vi M2 hiện tại, không
+    tự rewrite SQL/Jinja"), but because this validation harness's own
+    isolation guarantee depends on every model being self-contained:
+
+    - Step 3's own throwaway dbt project (`check_dbt_models`, above) has no
+      `sources.yml` and no other models - a `ref()`/`source()` call in it
+      would simply fail to resolve, which `dbt parse` would already catch
+      on its own (nothing new needed there).
+    - Steps 4-5's validation *clone* (`fixture.make_validation_clone`) is
+      far more dangerous: its dbt models are published into the dbt pack's
+      **shared, real** project directory (renamed, but still a sibling of
+      every other pipeline's own real, already-published models there). A
+      `ref('some_model')` call would resolve against *whatever dbt model of
+      that name already exists in the shared project* - silently reading
+      real, production data instead of the clone's own isolated fixture,
+      which could make a broken draft look like it passed validation
+      cleanly. This is exactly the "lỗ hổng" the review asked to close, not
+      a hypothetical.
+
+    So: any `ref()`/`source()` call blocks validation outright, at step 3 -
+    before `--fixture` is ever allowed to run (`dpagent pipeline validate`'s
+    own step3_ok gate) - with a message telling the author to read from the
+    fully-schema-qualified physical table directly instead, the convention
+    every real model in this project already follows.
+    """
+    dbt_stages = [s for s in pipeline.stages if s.engine == "dbt"]
+    if not dbt_stages:
+        return StepResult("skipped", "no dbt-engine stage in this pipeline")
+
+    offenders = []
+    model_count = 0
+    for stage in dbt_stages:
+        for model in stage.models:
+            model_count += 1
+            path = pipeline.path(f"models/{model}.sql")
+            if not path.exists():
+                continue
+            calls = find_dbt_cross_model_refs(path.read_text(encoding="utf-8"))
+            if calls:
+                offenders.append(f"{model}.sql uses {', '.join(f'{c}()' for c in calls)}")
+
+    if offenders:
+        return StepResult(
+            "fail",
+            "dbt ref()/source() dependency found - not supported by this validation "
+            "harness yet (chưa hỗ trợ cô lập dependency này): a validation clone's "
+            "dbt models are published into the *shared* dbt project directory, so "
+            "ref()/source() could silently resolve against a real, already-deployed "
+            "pipeline's own model instead of this draft's own fixture data. Rewrite "
+            "the model to read its input from the fully-schema-qualified physical "
+            "table directly (the convention every real model in this project already "
+            "uses - see pipelines/demo/models/*.sql) instead of ref()/source(): "
+            + "; ".join(offenders))
+    return StepResult("pass", f"{model_count} model(s), no ref()/source() dependency")
+
+
 def check_procedures(pipeline: Pipeline) -> StepResult:
     """Applies every procedure-engine stage's SQL file for real -
     `CREATE OR REPLACE PROCEDURE` against a throwaway database/role
@@ -168,8 +255,26 @@ def check_procedures(pipeline: Pipeline) -> StepResult:
                 if proc.returncode != 0:
                     failures.append(f"{stage.procedure} (stage {stage.name!r}): "
                                    f"{(proc.stderr or proc.stdout).strip()}")
+        # Checked *after* the `with` block above has already exited cleanly
+        # (see pg_throwaway.ThrowawayCleanupError's own docstring for why
+        # this can never be inside it) - a throwaway role/database left
+        # behind on this real host is a real problem even when every
+        # procedure itself applied clean, so it must not be reported as a
+        # silent "pass."
+        if not db.cleanup_ok:
+            parts = []
+            if not db.database_dropped:
+                parts.append(f"database not dropped: {db.database_drop_error}")
+            if not db.role_dropped:
+                parts.append(f"role not dropped: {db.role_drop_error}")
+            raise pg_throwaway.ThrowawayCleanupError("; ".join(parts))
     except pg_throwaway.ThrowawayUnavailable as exc:
         return StepResult("skipped", str(exc))
+    except pg_throwaway.ThrowawayCleanupError as exc:
+        return StepResult(
+            "fail", f"procedure(s) applied, but the throwaway database/role used to "
+                    f"apply them could not be torn down afterward and is left on this "
+                    f"host: {exc}")
 
     if failures:
         return StepResult("fail", "; ".join(failures))
@@ -177,7 +282,8 @@ def check_procedures(pipeline: Pipeline) -> StepResult:
 
 
 def check_compiles(pipeline: Pipeline) -> CompileReport:
-    return CompileReport(dbt=check_dbt_models(pipeline), procedures=check_procedures(pipeline))
+    return CompileReport(dbt=check_dbt_models(pipeline), procedures=check_procedures(pipeline),
+                         dbt_dependencies=check_dbt_dependencies(pipeline))
 
 
 @dataclass
@@ -203,6 +309,7 @@ class ValidationReport:
     load_error: str = ""
     dbt: StepResult | None = None
     procedures: StepResult | None = None
+    dbt_dependencies: StepResult | None = None
     assumptions: str = ""
     open_questions: list[str] = field(default_factory=list)
     # Steps 4-5 (fixture through a real, --allow-draft Airflow run, compared
@@ -253,6 +360,14 @@ class ValidationReport:
         if self.procedures is not None:
             data["steps"]["procedures"] = {"status": self.procedures.status,
                                           "detail": self.procedures.detail}
+        if self.dbt_dependencies is not None:
+            data["steps"]["dbt_dependencies"] = {
+                "status": self.dbt_dependencies.status, "detail": self.dbt_dependencies.detail,
+                "checks_for": "ref()/source() Jinja calls - not supported by this "
+                             "validation harness (see check_dbt_dependencies's own "
+                             "docstring); models must read from a fully-schema-qualified "
+                             "physical table instead",
+            }
         data["assumptions"] = self.assumptions
         data["open_questions"] = list(self.open_questions)
         if self.fixture is not None:
@@ -286,6 +401,7 @@ def validate_pipeline(pipeline: Pipeline, *, generator: str = "dpagent pipeline 
         generator=generator, model=model,
         content_hash=approval_mod.content_hash(pipeline),
         load_ok=True, dbt=compiled.dbt, procedures=compiled.procedures,
+        dbt_dependencies=compiled.dbt_dependencies,
         assumptions=assumptions, open_questions=list(open_questions or []),
     )
     write_validation_report(pipeline.root, report)

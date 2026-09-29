@@ -102,6 +102,12 @@ def _print_validation_steps(report) -> None:
         colour = _STEP_STYLE.get(report.procedures.status, "yellow")
         console.print(f"[bold]procedures:[/bold] [{colour}]{report.procedures.status}[/{colour}]"
                      + (f" - {report.procedures.detail}" if report.procedures.detail else ""))
+    if report.dbt_dependencies is not None:
+        colour = _STEP_STYLE.get(report.dbt_dependencies.status, "yellow")
+        console.print(f"[bold]dbt ref()/source() check:[/bold] "
+                     f"[{colour}]{report.dbt_dependencies.status}[/{colour}]"
+                     + (f" - {report.dbt_dependencies.detail}"
+                        if report.dbt_dependencies.detail else ""))
     if report.content_hash:
         console.print(f"[dim]content hash at validation time: {report.content_hash}[/dim]")
 
@@ -233,7 +239,8 @@ def validate_cmd(name, fixture_path, expected_path):
     path = pipeline.path(validate_mod.VALIDATION_REPORT_FILENAME)
     console.print(f"\n[dim]written: {path}[/dim]")
     step3_ok = ((report.dbt is None or report.dbt.ok)
-               and (report.procedures is None or report.procedures.ok))
+               and (report.procedures is None or report.procedures.ok)
+               and (report.dbt_dependencies is None or report.dbt_dependencies.ok))
 
     if not fixture_path:
         if not step3_ok:
@@ -288,9 +295,20 @@ def validate_cmd(name, fixture_path, expected_path):
 
     if result.cleanup_attempted:
         colour = "green" if result.cleanup_ok else "red"
-        console.print(f"[bold]cleanup:[/bold] [{colour}]"
+        console.print(f"[bold]cleanup (pipeline artifacts):[/bold] [{colour}]"
                      f"{'complete' if result.cleanup_ok else 'FAILED'}[/{colour}]"
                      f" - {result.cleanup_detail}")
+        for label, dropped, error in (
+            ("source database", result.source_database_dropped, result.source_database_drop_error),
+            ("source role", result.source_role_dropped, result.source_role_drop_error),
+            ("warehouse database", result.warehouse_database_dropped,
+             result.warehouse_database_drop_error),
+            ("warehouse role", result.warehouse_role_dropped, result.warehouse_role_drop_error),
+        ):
+            colour = "green" if dropped else "red"
+            console.print(f"[bold]cleanup ({label}):[/bold] [{colour}]"
+                         f"{'dropped' if dropped else 'FAILED'}[/{colour}]"
+                         + (f" - {error}" if error and not dropped else ""))
 
     data_ok = (result.seeded and result.deployed
               and result.run1_status == "ok" and result.run2_status == "ok"
@@ -306,14 +324,15 @@ def validate_cmd(name, fixture_path, expected_path):
                       f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
         sys.exit(1)
 
-    if not (result.cleanup_attempted and result.cleanup_ok):
+    if not (result.cleanup_attempted and result.cleanup_ok and result.throwaway_cleanup_ok):
         console.print(f"\n[red]fixture data matched, but cleanup did not complete[/red] - "
-                      f"a passing comparison does not count as done until cleanup does "
-                      f"too. Check by hand: dpagent pipeline undeploy {result.clone_name}")
+                      f"a passing comparison does not count as done until cleanup (pipeline "
+                      f"artifacts AND both throwaway databases) does too. Check by hand: "
+                      f"dpagent pipeline undeploy {result.clone_name}")
         sys.exit(4)
 
     console.print("\n[green]fixture run: both runs matched expected, idempotent, "
-                  "cleanup complete[/green]")
+                  "cleanup complete (pipeline artifacts + both throwaway databases)[/green]")
 
 
 @pipeline_group.command("lint")

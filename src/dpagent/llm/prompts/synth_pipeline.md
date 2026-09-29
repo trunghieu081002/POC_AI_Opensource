@@ -124,6 +124,18 @@ Rules, all non-negotiable:
   where discarding some bad rows and keeping the run alive is the right
   call; omit it where a single bad row means the transform logic itself is
   wrong and the run should simply fail.
+- A dbt-engine model's SQL must read its input by a literal, fully
+  schema-qualified physical table name (e.g. `from demo_landing.res_partner`),
+  the same way every real model in this project already does - **never**
+  dbt's own `ref(...)` or `source(...)` Jinja functions. This is not a
+  style preference: the validation harness (`dpagent pipeline validate
+  --fixture`) publishes a draft's dbt models into the *shared* dbt project
+  directory to prove them against a fixture, and a `ref()`/`source()` call
+  there would resolve against whatever real, already-deployed pipeline's
+  model happens to share that name - silently validating against real
+  production data instead of the fixture, or simply failing to resolve at
+  all. A drafted model using either is refused outright at validation time,
+  before it ever reaches a fixture run.
 
 # What "verified source schema" means
 

@@ -666,6 +666,109 @@ deploy, unpause, two real Airflow runs, compare, undeploy - has not
 happened on any host yet; it needs an operator with both (see M2.5 in
 docs/deploy-log.md).
 
+### M2.4.2: closing the remaining ways the harness could report a false pass
+
+A third review pass, aimed specifically at "can `validate --fixture` ever
+report pass/complete when it should not, and can it ever leave something
+real behind" - seven changes, all in `fixture.py`/`validate.py`/
+`pg_throwaway.py`:
+
+1. **Preflight, before any mutation.** `fixture.preflight_fixture_host()`
+   checks root, passwordless `sudo -n -u postgres`, PostgreSQL actually
+   accepting connections, the airflow pack recorded installed + its CLI
+   binary present + `airflow-scheduler` active, dlt recorded installed,
+   dbt recorded installed *only if* the pipeline has a dbt-engine stage,
+   and that the shared pipelines/dbt-project directories are writable -
+   all *before* `run_fixture()` creates a single throwaway database/role,
+   seeds anything, or deploys a single artifact. A failure here is exit 2
+   with zero external mutation, real-verified on this host (this
+   operator's own missing root/sudo is exactly what it reports, and a
+   dedicated test confirms `throwaway_database()`/`seed_source()`/
+   `deploy()` are never even called when it fails).
+2. **Real teardown verification for the two throwaway databases.**
+   `pg_throwaway.throwaway_database()` now checks `DROP DATABASE`'s and
+   `DROP ROLE`'s own `returncode` (an earlier version issued both without
+   checking either) and records the result on the yielded `ThrowawayDB`
+   object itself (`database_dropped`/`role_dropped`/the matching
+   `*_drop_error`) - never raised from `__exit__` itself (a new
+   `ThrowawayCleanupError`, deliberately only ever raised by a *caller*,
+   after its own `with` block has already exited cleanly - see its own
+   docstring for exactly why raising from `__exit__` would be worse, not
+   better). `validate.check_procedures()` now downgrades a would-be "pass"
+   to "fail" if either drop failed - a procedure applying cleanly but
+   orphaning its own throwaway database is not a pass. `fixture.
+   run_fixture()`'s report carries all four flags separately
+   (`source_database_dropped`/`source_role_dropped`/
+   `warehouse_database_dropped`/`warehouse_role_dropped`), and
+   `FixtureRunReport.ok`/`ok`'s own exit-4 CLI check both require every
+   one of them `True`, not just the pipeline clone's own artifacts.
+3. **dbt `ref()`/`source()` closed off, not rewritten.** Explicitly out of
+   scope for M2 to rewrite a model's SQL/Jinja to isolate a real
+   cross-model dependency - instead, `validate.check_dbt_dependencies()`
+   (a new step-3 check, gating `--fixture` exactly like `check_dbt_models`/
+   `check_procedures` already do) refuses outright if any dbt-engine
+   model's SQL contains a `ref(...)`/`source(...)` Jinja call (a plain,
+   word-bounded regex over the model text - the smallest check that fits
+   this project's own model-authoring convention, not a general dbt
+   dependency resolver). The real risk this closes: a validation clone's
+   dbt models publish into the dbt pack's *shared* real project directory,
+   so a `ref()`/`source()` call could silently resolve against a real,
+   already-deployed pipeline's own model instead of the clone's own
+   fixture data - a false pass, not a hypothetical. The synth prompt
+   (`synth_pipeline.md`) now tells the model the same rule up front: read
+   from the fully-schema-qualified physical table, never `ref()`/`source()`.
+4. **Decimal precision, not native float, throughout.** `compare_curated()`
+   now parses the actual side with `json.loads(..., parse_float=Decimal)`
+   (never the default, lossy `float`), and `_canon_value` canonicalizes
+   `int`/`float`/`Decimal`, *and* a plain string that looks like nothing
+   but a decimal number, all through the same `Decimal`-based
+   `_canon_number()` - deliberately, so a monetary value authored as a
+   quoted string in `expected.yaml` (the recommended convention, to
+   protect it from YAML's own lossy float parsing of an unquoted decimal)
+   compares equal to Postgres's own high-precision numeric JSON output. A
+   real bug caught by this round's own tests before it shipped:
+   `Decimal.normalize()` can legitimately render a round number in
+   scientific notation (`Decimal("100.00").normalize()` → `Decimal("1E+2")`)
+   - `_canon_number` uses `format(d, "f")` (forces fixed-point), never
+   `str(d)`, specifically to avoid that.
+5. **Gates reported as a list, not a dict keyed by type.** `fixture.
+   gate_summary_for_run()` used to build `{gate_type: status}` per stage -
+   silently overwriting one gate's result with another's if a stage
+   declares two gates of the same type (two separate `business_rule`
+   checks, e.g.). Now a list of `{type, status, detail, rows_checked,
+   rows_rejected}` per stage, so both survive.
+6. **Exit codes, precisely**: `0` both runs matched, idempotent, *every*
+   cleanup verified (pipeline artifacts and all four throwaway
+   drop/role flags); `1` a seed, pipeline run, or comparison failure; `2`
+   preflight failed, zero mutation; `3` an Airflow run timed out, cleanup
+   never claimed complete; `4` the data matched but cleanup (pipeline
+   artifacts or either throwaway database) did not finish. Cleanup detail
+   - including each throwaway resource's own drop status - is always
+   printed to the CLI, never swallowed by `unavailable_reason`.
+7. **Test coverage** added for every item above, plus the specific
+   scenarios the review named: preflight failing with zero downstream
+   calls made; `DROP DATABASE`/`DROP ROLE` each failing independently;
+   every artifact `_verify_cleanup_complete` checks (DAG file, published
+   directory, dbt models, dlt state, secrets, a still-`running` journal
+   entry) reported missing on its own; a real, unmocked `PermissionError`
+   from `Path.exists()` treated as "could not check," never "gone"; a
+   partial deploy still triggering cleanup; two gates of the same type
+   both surviving; `ref()`/`source()` refused; and all five exit codes.
+
+**Status: all of the above is real-verified on this host up to the same
+boundary steps 4-5 already had** (preflight's own real failure reasons,
+and the fact that nothing downstream runs when it fails, are both
+confirmed for real; the two throwaway databases' teardown-verification
+logic, the dbt-dependency check, and the Decimal comparison are
+unit-tested with subprocess mocked - this host still has neither root nor
+passwordless sudo to actually exercise a real deploy/drop pass/fail path).
+Definition of done for M2.4.2, all met before M2.5 starts: full test suite
+green; no code path sets `cleanup_ok=True` before both the source and
+warehouse throwaway databases are confirmed dropped; exit 2 guarantees
+zero external mutation (test-confirmed); a validation clone cannot resolve
+a dbt model outside itself (unique renamed model files *and* `ref()`/
+`source()` refused outright, defense in depth).
+
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
