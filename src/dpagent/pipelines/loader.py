@@ -552,6 +552,13 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
             raise PipelineError(
                 f"{where}: stage {stage.name!r} points at procedure "
                 f"{stage.procedure}, which does not exist under {pipeline.root}")
+        if stage.engine == "dbt":
+            for model in stage.models:
+                model_path = pipeline.path(f"models/{model}.sql")
+                if not model_path.exists():
+                    raise PipelineError(
+                        f"{where}: stage {stage.name!r} declares dbt model {model!r}, "
+                        f"but {model_path} does not exist")
 
     return pipeline
 

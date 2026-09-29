@@ -336,6 +336,8 @@ def _pipeline(root, throwaway_warehouse, monkeypatch, *, quarantine_pct):
     d = root / "rt"
     d.mkdir(parents=True)
     (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    (d / "models").mkdir()
+    (d / "models" / "orders.sql").write_text("select 1\n")
     return loader.load("rt", root)
 
 

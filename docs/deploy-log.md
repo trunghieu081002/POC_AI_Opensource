@@ -3049,3 +3049,125 @@ verified both directions for real:
 zero-side-effect refusal, `--allow-draft`'s forced manual-only DAG) and
 `tests/test_cli_pipeline.py` (`promote_cmd`, `--allow-draft` threading, the
 paused-draft message never suggesting a manual unpause). Full suite green.
+
+### 2026-09-29 — Layer 3 M2 (start): model drafts a pipeline from a BRD, or asks a blocker instead of guessing
+
+First half of Layer 3 ("BRD/report specs -> drafted pipeline, for a human
+to review"), built on top of the same day's M1 approval gate: a model can
+now draft a full pipeline (`pipeline.yaml` + its `models/`/`procedures/`
+SQL) from a BRD, through `dpagent pipeline synth <name> --brd FILE --schema
+FILE`.
+
+The rule that mattered most in the spec discussion before this was built:
+a BRD silent or ambiguous about anything that would change the actual
+numbers must produce a blocking question, never a guess that looks
+complete - `docs/layer2.md`'s own "wrong numbers stay green" applies at
+authoring time too, not just run time. `synth()` returns
+`result.blocked`/`result.blockers` and writes nothing at all when this
+fires.
+
+Same "never trust the model" discipline `router.py` already applies to
+pack routing, extended to this artifact:
+- every connector/gate/engine name checked against the real catalog
+  (`synth.capability_catalog()`, generated from `loader.py`/`extract.py`'s
+  own constants - not a hand-maintained list that could drift);
+- file paths limited to `pipeline.yaml` and `.sql` under `models/`/
+  `procedures/` - no `.sh`, no path escapes;
+- **a drafted pipeline can never write its own `.approved.yaml`** - the
+  single guard that actually connects this to M1's gate; without it a
+  model could self-approve straight past `deploy()`'s refusal;
+- `maturity` is never the model's to set - stripped regardless of what it
+  wrote, `loader.load()`'s own default (draft) is the only value a fresh
+  draft can have;
+- the draft is loaded through the real `loader.load()` right after writing
+  (steps 1-2 of the design's 5-step validation list: structure, then the
+  real parser) - kept on disk either way so a reviewer can see what the
+  model actually produced, `result.load_error` naming the failure when it
+  does not load clean.
+
+23 new tests (`tests/test_pipelines_synth.py`, `tests/test_cli_pipeline.py`)
+via the same `FakeReply` stand-in `tests/test_router.py` already uses for
+pack routing - no LLM credential needed to cover every safety mechanism
+above, including the self-approval-forgery attempt and every disallowed
+file path. Full suite green.
+
+**Not yet done, not claimed done**: no real LLM call has been made against
+this (no credential configured on this host) - the safety scaffolding is
+real-code-real-tested, the actual drafting behavior against a real model is
+not yet verified. Steps 3-5 of the design's validation list (compile the
+dbt part / run a procedure against a throwaway database, execute against an
+operator-defined fixture, compare against an independently-defined expected
+result) are not built - `synth` only covers structural validation (steps
+1-2). Both gaps are the explicit next step, not an oversight.
+
+### 2026-09-29 — Layer 3 M2.2: real, isolated step-3 validation (dbt parse + procedure apply), plus review fixes
+
+Response to a detailed review of PR #17's M2 work. Two real things fixed,
+one real gap closed, one terminology correction, before building the
+requested M2.2 harness.
+
+**Real gap found and fixed**: `loader.load()` checked a procedure-engine
+stage's file exists, but never did the same for a dbt-engine stage's
+declared models - `deploy_mod.install_dbt_models()` had its own late check
+for this, `dpagent pipeline lint` did not, so a typo'd model name surfaced
+as a DeployError mid-deploy instead of at lint time like every other
+authoring mistake in the manifest. Fixed; every test fixture across the
+suite building a dbt-engine stage now creates the model file it declares
+(several silently relied on the gap this closes).
+
+**`synth()` gained an explicit overwrite policy**: `overwrite=False`
+(default, unchanged) refuses an existing directory; `overwrite=True`
+redrafts a `draft` (or unparseable leftover), but refuses outright - even
+with overwrite=True - against a `maturity: reviewed` pipeline, which must
+never be silently clobbered by a redraft. CLI gained `--overwrite`.
+
+**Terminology corrected**: the earlier PR description's "real-code-real-
+tested" was reasonably read as implying a real model/database/Airflow run
+had happened. It had not - restated everywhere as code-complete and
+unit-tested via FakeReply, not yet integration- or real-verified.
+
+**M2.2 built**: `src/dpagent/pipelines/validate.py` - step 3 of the
+5-step validation list, as its own module and its own command
+(`dpagent pipeline validate <name>`), not folded silently into `synth`
+alone (though `synth` calls it automatically right after a draft loads
+clean). Works on any pipeline, hand-written or drafted.
+
+- **dbt-engine stages**: `dbt parse` in a throwaway project built from
+  scratch (own `dbt_project.yml`/`profiles.yml`, copies of just this
+  pipeline's own model files) - never the real shared `/opt/dbt/project`.
+  Real pipelines in this repo reference their landing table by literal
+  schema-qualified name, not dbt `source()`/`ref()` across projects, so
+  this isolated project parses clean with no `sources.yml` and no live DB
+  connection. Verified for real: built the throwaway project, ran real
+  `dbt parse` against `pipelines/quickstart_dbt`'s actual
+  `stg_orders.sql` - passed clean; appended broken Jinja to a copy of the
+  same real file and reran - failed with a real dbt compile error, restored
+  the file after (confirmed `git diff --stat` clean). Also confirmed `dbt
+  parse` needs no live connection at all (profile points at an unreachable
+  host/db) and genuinely fails, not silently no-ops, on bad syntax (real
+  exit code 2 vs 0).
+- **procedure-engine stages**: `CREATE OR REPLACE PROCEDURE` against a
+  throwaway database/role created and dropped for real per call. Needs
+  passwordless sudo to the postgres OS user - this host's operator does
+  not have that (confirmed for real: `sudo -n` fails, and the pre-existing
+  `tests/test_pipelines_runtime.py::test_run_transform_calls_a_deployed_procedure`
+  already `skip`s for the identical reason, not something this change
+  introduced). Real-verified the `skipped` path only; `pass`/`fail` are
+  unit-tested with the subprocess call mocked.
+- `.synth-validation.yaml` (gitignored, regenerated every run): which
+  steps passed/failed, load error if any, model/provider used, timestamp,
+  the model's own stated assumptions. Never part of what gets promoted or
+  executed - outside `approval.py`'s hash, and not a path a model is even
+  allowed to write under `synth`'s own allowlist. Written even when
+  `loader.load()` itself fails (records the load failure, skips compile
+  checks - nothing to compile-check yet), not only on the happy path.
+
+Real end-to-end confirmed (FakeReply for the model call, everything
+downstream real): a fake pipeline reply drafted through `synth()` produced
+a real `.synth-validation.yaml` with a real `dbt parse` result inside it.
+
+Steps 4-5 (run against an operator-defined fixture through a real,
+`--allow-draft` deploy; compare `curated` output against an independently-
+authored expected result) are still not built - the next, larger piece,
+and the one that actually proves a drafted pipeline's numbers are right,
+not just that it is well-formed.

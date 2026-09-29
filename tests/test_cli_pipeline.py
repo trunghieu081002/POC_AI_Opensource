@@ -671,3 +671,157 @@ def test_deploy_reports_a_paused_draft_dag_without_suggesting_manual_unpause(db,
     assert result.exit_code == 0, result.output
     assert "paused on purpose" in result.output
     assert "airflow dags unpause" not in result.output
+
+
+# ---------------------------------------------------------------- synth (M2)
+
+def _brd_and_schema_files(tmp_path):
+    brd = tmp_path / "brd.txt"
+    brd.write_text("Monthly revenue by order date.")
+    schema = tmp_path / "schema.txt"
+    schema.write_text("sale_order(id bigint, amount_total numeric, date_order date)")
+    return brd, schema
+
+
+def test_synth_fails_clearly_with_no_llm_credential(db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: False)
+
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema)])
+
+    assert result.exit_code != 0
+    assert "credential" in result.output
+
+
+def test_synth_prints_blockers_and_exits_nonzero_without_calling_synth_mod(
+        db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
+    from dpagent.pipelines.synth import Blocker, SynthResult
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request, **k: SynthResult(
+        name="monthly_sales", root=Path("/x"),
+        blockers=[Blocker(question="Ngày đặt hay ngày xác nhận?", why_it_matters="đổi số liệu")]))
+
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema)])
+
+    assert result.exit_code != 0
+    assert "Ngày đặt hay ngày xác nhận?" in result.output
+    assert "đổi số liệu" in result.output
+
+
+def test_synth_reports_the_written_files_and_mapping_on_success(db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
+    from dpagent.pipelines.synth import SynthResult
+    captured = {}
+    def fake_synth(request, **kwargs):
+        captured["request"] = request
+        return SynthResult(name="monthly_sales", root=Path("/x/monthly_sales"),
+                           files=["pipeline.yaml", "models/stg_sale_order.sql"],
+                           mapping="revenue -> sum(amount_total)")
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", fake_synth)
+
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema),
+        "--secret", "SRC_DB_PASSWORD=Odoo replica password", "--hint", "test hint"])
+
+    assert result.exit_code == 0, result.output
+    assert "pipeline.yaml" in result.output and "stg_sale_order.sql" in result.output
+    assert "revenue -> sum(amount_total)" in result.output
+    assert "structurally valid" in result.output
+    assert "This is a draft" in result.output
+    req = captured["request"]
+    assert req.brd == "Monthly revenue by order date."
+    assert req.secret_refs == {"SRC_DB_PASSWORD": "Odoo replica password"}
+    assert req.warehouse["schema"] == "monthly_sales"   # defaults to NAME
+    assert req.hint == "test hint"
+
+
+def test_synth_reports_a_load_error_instead_of_hiding_it(db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
+    from dpagent.pipelines.synth import SynthResult
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request, **k: SynthResult(
+        name="monthly_sales", root=Path("/x"), files=["pipeline.yaml"],
+        load_error="pipeline.yaml: gate 'made_up_gate_type' is not one of [...]"))
+
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema)])
+
+    assert result.exit_code == 0   # written, just not clean yet - not a CLI failure
+    assert "structural validation failed" in result.output
+    assert "made_up_gate_type" in result.output
+
+
+def test_synth_rejects_a_malformed_secret_flag(db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema),
+        "--secret", "not-a-key-value-pair"])
+    assert result.exit_code != 0
+    assert "NAME=DESCRIPTION" in result.output
+
+
+def test_synth_surfaces_file_exists_error_cleanly(db, tmp_path, monkeypatch):
+    brd, schema = _brd_and_schema_files(tmp_path)
+    monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
+    def boom(request, **kwargs):
+        raise FileExistsError("already exists")
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", boom)
+
+    result = _runner().invoke(pipeline_group, [
+        "synth", "monthly_sales", "--brd", str(brd), "--schema", str(schema)])
+
+    assert result.exit_code != 0
+    assert "already exists" in result.output
+
+
+# ---------------------------------------------------------------- validate (M2.2)
+
+def test_validate_reports_skipped_steps_for_a_pipeline_with_neither_dbt_nor_procedure(
+        db, tmp_path, monkeypatch):
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code == 0, result.output
+    assert "load: pass" in result.output
+    assert "skipped" in result.output
+    assert (d / ".synth-validation.yaml").exists()
+
+
+def test_validate_exits_nonzero_when_a_compile_check_fails(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    from dpagent.pipelines.validate import StepResult, ValidationReport
+    monkeypatch.setattr(pipeline_cli.validate_mod, "validate_pipeline", lambda p, **k: ValidationReport(
+        generated_at="t", generator="dpagent pipeline validate",
+        dbt=StepResult("fail", "boom"), procedures=StepResult("skipped", "")))
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code != 0
+    assert "fail" in result.output and "boom" in result.output
+
+
+def test_validate_exits_zero_when_everything_passes(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    from dpagent.pipelines.validate import StepResult, ValidationReport
+    monkeypatch.setattr(pipeline_cli.validate_mod, "validate_pipeline", lambda p, **k: ValidationReport(
+        generated_at="t", generator="dpagent pipeline validate",
+        dbt=StepResult("pass", "1 model parsed"), procedures=StepResult("pass", "1 procedure applied")))
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code == 0, result.output
+    assert "pass" in result.output
+
+
+def test_validate_works_on_a_pipeline_never_drafted_by_synth(db, tmp_path, monkeypatch):
+    """The generalisation this command is for: any pipeline, hand-written
+    or model-drafted, gets exactly the same step-3 check."""
+    _draft_pipeline_dir(tmp_path, monkeypatch, name="hand_written")
+    result = _runner().invoke(pipeline_group, ["validate", "hand_written"])
+    assert result.exit_code == 0, result.output

@@ -10,6 +10,11 @@ build/
 # Drafted by the diagnose hook — review, move into errors.yaml, then delete.
 packs/*/errors.proposed.yaml
 
+# A validation report, regenerated on every `dpagent pipeline synth`/
+# `validate` run - not an artifact to review in a diff, unlike
+# .approved.yaml (which stays tracked).
+pipelines/*/.synth-validation.yaml
+
 *.db
 *.jsonl
 *.dpagent-*.bak
