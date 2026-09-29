@@ -3267,3 +3267,131 @@ first candidate), the plan's own stated order applies: only then does a
 live LLM call add anything - it would only prove the model returns the
 right JSON shape, not that a drafted pipeline's numbers are correct, which
 is what steps 3-5 exist to prove regardless of who or what wrote the SQL.
+
+## 2026-09-29 - Layer 3 M2.4: fixture-validation isolation and cleanup hardening
+
+A second, independent review of PR #18 (fixture.py/deploy.py as they stood
+right after M2's steps 4-5 first landed) found four real P0s and two P1s in
+the fixture-through-Airflow harness itself - not hypothetical, traced
+through the actual code:
+
+- **Paused DAG**: `--allow-draft` deploys never unpause (M1's own
+  guarantee), and `fixture.run_fixture()` triggered right after `deploy()`
+  with no unpause call at all - `deploy.unpause_dag`'s own docstring says
+  exactly what that does: a manual run of a still-paused DAG is created
+  `queued` and never starts. A real run would have deployed clean,
+  triggered "successfully" (a `DagRun` row gets created either way), then
+  sat forever with no stage ever reporting in, indistinguishable from a
+  slow scheduler until the wait loop timed out.
+- **Shared namespace**: `deploy()` publishes real artifacts keyed by
+  `pipeline.name` alone - the DAG id, `SHARED_PIPELINES_DIR/<name>`, the
+  dbt project's own `models/<name>/` subdirectory, dlt's local state
+  directory. `run_fixture()` deployed the pipeline object *itself*, under
+  its own real name - validating a draft of an already-deployed pipeline
+  (the common case: re-validating an edit) would have overwritten that
+  pipeline's real, currently-running artifacts with the throwaway-fixture
+  version.
+- **Shared secrets**: `ensure_pipeline_secrets_available()` merges a
+  pipeline's `${VAR}` refs into one *shared* `pipelines.env` file every
+  deployed pipeline's Airflow tasks read. `env_overrides_for_*` resolved
+  the manifest's own real ref names (`WAREHOUSE_DB_HOST`, etc.) - a
+  throwaway database's credentials would have been merged in under the
+  same key a real, currently-deployed pipeline also reads, and dropping it
+  again at cleanup would have taken that real pipeline's own credential
+  down with it.
+- **No cleanup**: `run_fixture()` never called `deploy_mod.undeploy()` -
+  every real side effect above (DAG, published files, dbt models, dlt
+  state, secrets) would have been left behind after every single
+  `--fixture` run, pass or fail.
+- **P1: `--fixture` unavailable exited 0** - a shell/CI reading exit code
+  alone would see "ran and passed" when the fixture never actually ran.
+- **P1: the step-3 dbt-parse description still slightly overstated what
+  it proves** - "Jinja/SQL syntax only" reads as though a real SQL typo
+  would be caught; `dbt parse` never sends a query to a database at all,
+  so `SELEC ...` inside an otherwise well-formed model still parses clean.
+
+Fixed, all in `src/dpagent/pipelines/fixture.py` (the caller; `deploy()`
+itself did not need to change - `unpause_dag()`/`undeploy()` already
+existed and already worked correctly, they just were not being called from
+here):
+
+1. `make_validation_clone(pipeline, workdir)` - builds a complete, real,
+   on-disk clone under `<name>__validate__<suffix>` (a random 8-hex
+   suffix): its own `pipeline.yaml` (written fresh, round-tripped through
+   `loader.load()` to confirm it parses back exactly), every referenced
+   `${VAR}` ref renamed to `DPAGENT_VALIDATE_<SUFFIX>_SRC_*`/`_WH_*`
+   (literal values left untouched, same `_ref_name` rule as before), and
+   every dbt-engine stage's model file physically renamed
+   (`<model>__validate_<suffix>.sql`) - dbt resolves a model by filename
+   across the *whole* shared project, not per pipeline, so a same-named
+   unrenamed file would collide with (or silently shadow) the real
+   pipeline's own. Procedure files are copied verbatim (not renamed): they
+   apply straight against a whole throwaway *database*, never a
+   cross-pipeline shared location, so no collision is possible there.
+   `warehouse.schema` is deliberately left as the original pipeline
+   declared it - a dbt model's own `{{ config(schema=...) }}` is a literal
+   string baked into its `.sql` file that dpagent never parses or
+   rewrites, so renaming the manifest's `schema:` field alone would make
+   `compare_curated()` look in a schema dbt never actually wrote into;
+   real isolation for a dbt-produced table already comes from the
+   throwaway *database* itself, not the schema name.
+2. `run_fixture()` now deploys the *clone*, calls `deploy_mod.unpause_dag`
+   explicitly right after deploying (still manual-only throughout -
+   `schedule` stayed `None`, so this only lets this one triggered run
+   start, never a schedule), refuses outright if the clone's own name
+   somehow collides with an already-deployed one, and wraps the whole
+   deploy→run→compare sequence in a `finally` that always calls
+   `deploy_mod.undeploy(clone)` once `deploy()` has actually succeeded -
+   regardless of whether the runs passed, failed, or errored partway.
+   `FixtureRunReport.ok` now requires cleanup to have actually succeeded
+   too (when attempted) - a passing comparison with a failed cleanup is
+   not reported as done.
+3. `dpagent pipeline validate --fixture` now exits `0` real pass, `1`
+   mismatch/failed run, `2` unavailable, `3` timeout, `4` data matched but
+   cleanup did not complete - never a flat 0/1, and never 0 for
+   "could not run it at all."
+4. `.synth-validation.yaml`'s `steps.fixture` section now carries
+   `pipeline_hash`/`fixture_hash`/`expected_hash` (via a new
+   `fixture.hash_file()`), the real `run_ids`, per-run comparison and
+   idempotency verdicts, and real per-stage gate verdicts pulled from
+   dpagent's own journal for each run (`fixture.gate_summary_for_run()` -
+   proof a fixture's deliberately-bad rows were actually quarantined, not
+   just that the run "completed"), and cleanup's own pass/fail.
+5. The dbt-parse step's description (report JSON, CLI output, docs) now
+   says "dbt project/Jinja parse" and states plainly that it does not
+   confirm the SQL is valid Postgres - only `dbt run`, against a real
+   fixture (steps 4-5), actually proves that.
+
+**Real-verified on this host**: `make_validation_clone()` against the real
+`pipelines/demo` manifest (business_rule/referential_integrity/unique
+gates and all) round-trips cleanly through `loader.load()`; every renamed
+`${VAR}` ref is unique per run and never collides with the original
+pipeline's own ref names; a real `dpagent pipeline validate quickstart
+--fixture ... --expected ...` run generated a real clone id
+(`quickstart__validate__17ac3769`), correctly exited `2`, and left
+**nothing** under `/opt/dpagent/pipelines` - confirmed by listing it
+directly afterward (only the three real pipelines were present). The
+report's `steps.fixture` section was written correctly for this
+unavailable case too (`overall: unavailable`, real content hashes, empty
+`run_ids`).
+
+**Not real-verified**: the actual pass/fail path of `unpause_dag`/
+`undeploy` against a real, running Airflow (this host has neither root nor
+passwordless sudo to postgres, so `deploy()` itself is never reached in a
+real run here) - unit-tested with every subprocess call mocked, including
+a dedicated test for "data matched but cleanup failed" and a dedicated
+test for the name-collision refusal path. Full test suite green
+(`EXIT_CODE=0`) before every commit in this round.
+
+Deliberately out of scope for this round (matching the review's own M2.4
+item list, not expanded on): gating `dpagent pipeline promote` on the
+fixture report not being stale (the hashes are recorded and *enable* that
+check; nothing yet reads them back to enforce it), CSV/file-sourced
+pipelines' own fixture story (`env_overrides_for_source` produces no
+overrides at all for a `files:`-based source - a fixture run against one
+would seed a throwaway database nothing points at and fail extract with a
+missing-file error, which is honest but not yet a designed, first-class
+path), and M2.5 (real end-to-end verification on a disposable host with
+root + passwordless sudo), Layer 2.5 (publish-curated-only-after-gate-pass),
+and live LLM evaluation - all explicitly still pending, in the order the
+review itself laid out.

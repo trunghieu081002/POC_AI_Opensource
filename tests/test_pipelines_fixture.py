@@ -310,6 +310,39 @@ def _mark_run_ok_immediately(monkeypatch):
     monkeypatch.setattr(deploy_mod, "trigger_dag", fake_trigger)
 
 
+def _mock_deploy_isolation(monkeypatch, *, unpause_ok=True, undeploy_ok=True):
+    """Every real, host-touching call `run_fixture` makes around the
+    clone's own deploy/unpause/undeploy - `deploy_mod.deploy` itself is
+    mocked per-test (its own success/failure is what each test is about),
+    but unpause/undeploy/deployed_names are real subprocess/filesystem
+    calls that would otherwise fire for real (and fail, on a host with no
+    root/no airflow OS user) in every test that does not itself care about
+    them."""
+    from dpagent.pipelines import deploy as deploy_mod
+    import subprocess as _sp
+
+    monkeypatch.setattr(deploy_mod, "deployed_names", lambda: [])
+    monkeypatch.setattr(deploy_mod, "unpause_dag", lambda name: _sp.CompletedProcess(
+        [], 0 if unpause_ok else 1, stdout="", stderr="" if unpause_ok else "unpause failed"))
+    monkeypatch.setattr(deploy_mod, "undeploy", lambda pipeline: _FakeUndeployResult(undeploy_ok))
+
+
+class _FakeUndeployResult:
+    def __init__(self, ok=True):
+        self.dag_file_removed = ok
+        self.dag_deleted_from_airflow = ok
+        self.dag_delete_failed = not ok
+        self.dag_delete_note = "" if ok else "simulated undeploy failure"
+        self.published_files_removed = ok
+        self.dbt_models_removed = ok
+        self.dlt_state_removed = ok
+        self.secrets_removed = ["DPAGENT_VALIDATE_X_WH_HOST"] if ok else []
+        self.secrets_kept = {}
+        self.secrets_note = ""
+        self.scheduler_restarted = ok
+        self.runs_cancelled = []
+
+
 def test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing(tmp_path):
     """Real on this host, not mocked - no passwordless sudo to postgres."""
     pipeline = _real_pipeline(tmp_path)
@@ -333,6 +366,8 @@ def test_run_fixture_reports_unavailable_when_deploy_needs_root(
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
 
+    monkeypatch.setattr(deploy_mod, "deployed_names", lambda: [])
+
     def boom(pipeline, **kwargs):
         raise deploy_mod.DeployError("publishing dbt models needs root")
     monkeypatch.setattr(deploy_mod, "deploy", boom)
@@ -346,6 +381,9 @@ def test_run_fixture_reports_unavailable_when_deploy_needs_root(
     assert report.seeded is True
     assert report.deployed is False
     assert "root" in report.unavailable_reason
+    # deploy() itself raised - nothing was ever deployed, so there is
+    # nothing for the finally block to clean up.
+    assert report.cleanup_attempted is False
 
 
 def test_run_fixture_happy_path_both_runs_ok_and_idempotent(isolated_db, tmp_path, monkeypatch):
@@ -356,6 +394,7 @@ def test_run_fixture_happy_path_both_runs_ok_and_idempotent(isolated_db, tmp_pat
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
+    _mock_deploy_isolation(monkeypatch)
     _mark_run_ok_immediately(monkeypatch)
     monkeypatch.setattr(fixture, "compare_curated",
                         lambda expected, db, schema: fixture.ComparisonResult(True, "matched"))
@@ -371,6 +410,12 @@ def test_run_fixture_happy_path_both_runs_ok_and_idempotent(isolated_db, tmp_pat
     assert report.idempotent is True
     assert report.run1_status == "ok" and report.run2_status == "ok"
     assert called_sleep == []   # the wait loop never had to actually poll-and-wait
+    assert report.clone_name.startswith("demo__validate__")
+    assert len(report.run_ids) == 2
+    # Cleanup ran for real (mocked undeploy) and succeeded - a pass that
+    # left a mess behind is not what `.ok` means (see FixtureRunReport.ok).
+    assert report.cleanup_attempted is True
+    assert report.cleanup_ok is True
 
 
 def test_run_fixture_stops_after_the_first_run_fails(isolated_db, tmp_path, monkeypatch):
@@ -382,6 +427,7 @@ def test_run_fixture_stops_after_the_first_run_fails(isolated_db, tmp_path, monk
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
+    _mock_deploy_isolation(monkeypatch)
 
     def fake_trigger(name, run_id, full_refresh=False):
         state.finish_run(run_id, "failed")
@@ -401,6 +447,10 @@ def test_run_fixture_stops_after_the_first_run_fails(isolated_db, tmp_path, monk
     assert report.run2_status == ""   # never attempted
     assert compare_calls == []        # never compared a failed run's output
     assert report.ok is False
+    # A failed run still gets cleaned up - deploy() did succeed, so the
+    # clone's artifacts are real and must still be undeployed.
+    assert report.cleanup_attempted is True
+    assert report.cleanup_ok is True
 
 
 def test_run_fixture_detects_a_non_idempotent_second_run(isolated_db, tmp_path, monkeypatch):
@@ -413,6 +463,7 @@ def test_run_fixture_detects_a_non_idempotent_second_run(isolated_db, tmp_path, 
     monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
     monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
     monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
+    _mock_deploy_isolation(monkeypatch)
     _mark_run_ok_immediately(monkeypatch)
 
     comparisons = [fixture.ComparisonResult(True, "matched"),
@@ -431,3 +482,255 @@ def test_run_fixture_detects_a_non_idempotent_second_run(isolated_db, tmp_path, 
     assert report.comparison_after_run2.ok is False
     assert report.idempotent is False
     assert report.ok is False
+    assert report.cleanup_attempted is True and report.cleanup_ok is True
+
+
+def test_run_fixture_reports_unavailable_when_the_dag_cannot_be_unpaused(
+        isolated_db, tmp_path, monkeypatch):
+    """--allow-draft never unpauses (M1's own guarantee) - run_fixture must
+    unpause the validation clone's DAG itself, explicitly, or a manual run
+    of it is created queued and never starts (deploy.unpause_dag's own
+    docstring). This is the P0 the review found: fixture.py used to trigger
+    straight after deploy() with no unpause at all."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    src_db = ThrowawayDB(host="h1", port="5432", database="src", user="u1", password="p1")
+    wh_db = ThrowawayDB(host="h2", port="5432", database="wh", user="u2", password="p2")
+    monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
+    monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
+    monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
+    _mock_deploy_isolation(monkeypatch, unpause_ok=False)
+    triggered = []
+    monkeypatch.setattr(deploy_mod, "trigger_dag", lambda *a, **k: triggered.append(1))
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[])
+
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert report.deployed is True
+    assert "unpause" in report.unavailable_reason
+    assert triggered == []   # never even tried to trigger a still-paused DAG
+    # deploy() did succeed, so the clone is real and must still be cleaned up.
+    assert report.cleanup_attempted is True
+
+
+def test_run_fixture_is_not_ok_when_data_matches_but_cleanup_fails(
+        isolated_db, tmp_path, monkeypatch):
+    """The user's own review: "Validation không được coi là hoàn chỉnh nếu
+    chạy pass nhưng cleanup fail" - a passing comparison alone must not be
+    `report.ok`."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    src_db = ThrowawayDB(host="h1", port="5432", database="src", user="u1", password="p1")
+    wh_db = ThrowawayDB(host="h2", port="5432", database="wh", user="u2", password="p2")
+    monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src_db, wh_db))
+    monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
+    monkeypatch.setattr(deploy_mod, "deploy", lambda pipeline, **k: None)
+    _mock_deploy_isolation(monkeypatch, undeploy_ok=False)
+    _mark_run_ok_immediately(monkeypatch)
+    monkeypatch.setattr(fixture, "compare_curated",
+                        lambda expected, db, schema: fixture.ComparisonResult(True, "matched"))
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[{"a": 1}])
+
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert report.run1_status == "ok" and report.run2_status == "ok"
+    assert report.idempotent is True
+    assert report.cleanup_attempted is True
+    assert report.cleanup_ok is False
+    assert report.ok is False   # data matched, but cleanup failing still fails the whole run
+
+
+def test_run_fixture_refuses_a_clone_name_collision(isolated_db, tmp_path, monkeypatch):
+    """Astronomically unlikely with a random 8-hex suffix, but must refuse
+    outright rather than deploy over whatever is already there under that
+    name - the user's own review item 5 ("refuse if collision detected")."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(fixture, "_validation_suffix", lambda: "deadbeef")
+    monkeypatch.setattr(deploy_mod, "deployed_names", lambda: ["demo__validate__deadbeef"])
+    deploy_calls = []
+    monkeypatch.setattr(deploy_mod, "deploy", lambda *a, **k: deploy_calls.append(1))
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[])
+
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert "collision" in report.unavailable_reason
+    assert deploy_calls == []   # refused before even provisioning a throwaway database
+    assert report.seeded is False
+
+
+# ---------------------------------------------------------------- make_validation_clone
+
+def test_make_validation_clone_gets_a_unique_namespaced_name(tmp_path):
+    pipeline = _real_pipeline(tmp_path)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    assert clone.name == f"demo__validate__{suffix}"
+    assert clone.name != pipeline.name
+    assert clone.maturity == "draft"
+    assert clone.schedule is None
+
+
+def test_make_validation_clone_renames_every_ref_uniquely(tmp_path):
+    pipeline = _real_pipeline(tmp_path)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    prefix = f"DPAGENT_VALIDATE_{suffix.upper()}_"
+    assert clone.source.connection["host"] == f"${{{prefix}SRC_HOST}}"
+    assert clone.warehouse.host == f"${{{prefix}WH_HOST}}"
+    assert clone.warehouse.database == f"${{{prefix}WH_DATABASE}}"
+    # None of the clone's own refs collide with the real pipeline's own ref
+    # names - this is what keeps ensure_pipeline_secrets_available()'s
+    # *shared* pipelines.env file from ever conflating the two.
+    assert clone.source.connection["host"] != pipeline.source.connection["host"]
+    assert clone.warehouse.host != pipeline.warehouse.host
+
+
+def test_make_validation_clone_leaves_literal_values_untouched(tmp_path):
+    root = tmp_path / "pipelines"
+    d = root / "quickstart"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "quickstart", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/orders.csv"}},
+        "warehouse": {"host": "literal-host", "database": "literal-db", "schema": "quickstart"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "orders", "min": 1}]}],
+    }, sort_keys=False))
+    pipeline = loader.load("quickstart", root)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    assert clone.warehouse.host == "literal-host"   # not a ${VAR} ref - left alone
+    assert clone.warehouse.database == "literal-db"
+
+
+def test_make_validation_clone_renames_dbt_model_files_uniquely(tmp_path):
+    root = tmp_path / "pipelines"
+    d = root / "demo_dbt"
+    (d / "models").mkdir(parents=True)
+    (d / "models" / "stg_orders.sql").write_text(
+        "{{ config(materialized='table', schema='demo_dbt') }}\nselect 1 as id")
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo_dbt", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/o.csv"}},
+        "warehouse": {"host": "h", "database": "d", "schema": "demo_dbt"},
+        "stages": [
+            {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "o", "min": 1}]},
+            {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_orders"]},
+        ],
+    }, sort_keys=False))
+    pipeline = loader.load("demo_dbt", root)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+
+    raw_stage = next(s for s in clone.stages if s.name == "raw")
+    assert raw_stage.models == [f"stg_orders__validate_{suffix}"]
+    model_file = (tmp_path / "clones" / clone.name / "models"
+                 / f"stg_orders__validate_{suffix}.sql")
+    assert model_file.exists()
+    assert "select 1 as id" in model_file.read_text()
+    # The real pipeline's own model file is untouched.
+    assert (d / "models" / "stg_orders.sql").exists()
+
+
+def test_make_validation_clone_manifest_round_trips_through_loader(tmp_path):
+    """What deploy.install_pipeline_files() actually publishes and what a
+    DAG task later reloads via loader.load(clone_name) must be this exact
+    file - a real round trip, not just an in-memory Pipeline object."""
+    pipeline = _real_pipeline(tmp_path)
+    clones_dir = tmp_path / "clones"
+    clone, suffix = fixture.make_validation_clone(pipeline, clones_dir)
+    reloaded = loader.load(clone.name, clones_dir)
+    assert reloaded.name == clone.name
+    assert reloaded.source.connection == clone.source.connection
+    assert reloaded.warehouse.host == clone.warehouse.host
+    assert reloaded.maturity == "draft"
+    assert reloaded.schedule is None
+
+
+def test_make_validation_clone_copies_procedure_files_verbatim(tmp_path):
+    root = tmp_path / "pipelines"
+    d = root / "proc_pipe"
+    (d / "procedures").mkdir(parents=True)
+    (d / "procedures" / "convert.sql").write_text("CREATE OR REPLACE PROCEDURE convert() ...")
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "proc_pipe", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/o.csv"}},
+        "warehouse": {"host": "h", "database": "d", "schema": "proc_pipe"},
+        "stages": [
+            {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "o", "min": 1}]},
+            {"name": "curated", "engine": "procedure", "depends_on": "landing",
+             "procedure": "procedures/convert.sql"},
+        ],
+    }, sort_keys=False))
+    pipeline = loader.load("proc_pipe", root)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    curated = next(s for s in clone.stages if s.name == "curated")
+    assert curated.procedure == "procedures/convert.sql"   # not renamed
+    copied = (tmp_path / "clones" / clone.name / "procedures" / "convert.sql")
+    assert copied.exists()
+    assert "CREATE OR REPLACE PROCEDURE convert" in copied.read_text()
+
+
+# ---------------------------------------------------------------- reporting helpers
+
+def test_hash_file_is_stable_and_content_sensitive(tmp_path):
+    path = tmp_path / "f.yaml"
+    path.write_text("a: 1\n")
+    h1 = fixture.hash_file(path)
+    assert h1.startswith("sha256:")
+    assert fixture.hash_file(path) == h1
+    path.write_text("a: 2\n")
+    assert fixture.hash_file(path) != h1
+
+
+def test_fixture_report_dict_shape_on_a_full_pass():
+    report = fixture.FixtureRunReport(
+        clone_name="demo__validate__abc", seeded=True, deployed=True,
+        run_ids=[401, 402], run1_status="ok", run2_status="ok",
+        comparison_after_run1=fixture.ComparisonResult(True, "1 row matched"),
+        comparison_after_run2=fixture.ComparisonResult(True, "1 row matched"),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+    )
+    data = fixture.fixture_report_dict(
+        report, pipeline_hash="sha256:p", fixture_hash="sha256:f", expected_hash="sha256:e")
+    assert data["pipeline_hash"] == "sha256:p"
+    assert data["fixture_hash"] == "sha256:f"
+    assert data["expected_hash"] == "sha256:e"
+    assert data["run_ids"] == [401, 402]
+    assert data["comparison"] == {"run_1": "pass", "run_2": "pass", "idempotent": True}
+    assert data["cleanup"]["status"] == "pass"
+    assert data["overall"] == "pass"
+
+
+def test_fixture_report_dict_marks_unavailable_distinctly_from_fail():
+    report = fixture.FixtureRunReport(unavailable_reason="no sudo to postgres")
+    data = fixture.fixture_report_dict(report)
+    assert data["overall"] == "unavailable"
+    assert data["unavailable_reason"] == "no sudo to postgres"
+
+
+def test_fixture_report_dict_marks_fail_when_cleanup_failed_despite_a_match():
+    report = fixture.FixtureRunReport(
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=fixture.ComparisonResult(True), comparison_after_run2=fixture.ComparisonResult(True),
+        cleanup_attempted=True, cleanup_ok=False, cleanup_detail="undeploy failed: needs root",
+    )
+    data = fixture.fixture_report_dict(report)
+    assert data["cleanup"]["status"] == "fail"
+    assert data["overall"] == "fail"   # report.ok is False because cleanup failed
+
+
+def test_gate_summary_for_run_reads_the_real_journal(isolated_db):
+    from dpagent.engine import state
+    run_id = state.start_run("data", "demo__validate__x")
+    stage_id = state.start_stage(run_id, "demo__validate__x", "landing")
+    state.finish_stage(stage_id, "passed", row_count=3)
+    state.record_gate(stage_id, "row_count_bounds", "passed", detail="3 rows, within bounds")
+    summary = fixture.gate_summary_for_run(run_id)
+    assert summary == {"landing": {"row_count_bounds": "passed"}}
