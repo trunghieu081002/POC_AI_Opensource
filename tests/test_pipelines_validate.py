@@ -218,3 +218,49 @@ def test_check_compiles_reports_ok_only_when_both_checks_are_ok(tmp_path, monkey
     assert report.dbt.status == "skipped"
     assert report.procedures.status == "skipped"
     assert report.ok is True
+
+
+# ---------------------------------------------------------------- validate_pipeline / report
+
+def test_validate_pipeline_records_the_same_hash_approval_would_compute(tmp_path):
+    from dpagent.pipelines import approval
+    pipeline = _pipeline(tmp_path / "pipelines", with_dbt=False, with_procedure=False)
+    report = validate.validate_pipeline(pipeline)
+    assert report.content_hash == approval.content_hash(pipeline)
+    assert report.content_hash.startswith("sha256:")
+
+
+def test_validate_pipeline_hash_changes_when_a_referenced_procedure_changes(tmp_path):
+    root = tmp_path / "pipelines"
+    pipeline = _pipeline(root, with_dbt=False)
+    report1 = validate.validate_pipeline(pipeline)
+
+    proc = pipeline.path("procedures/build.sql")
+    proc.write_text(proc.read_text() + "-- edited\n")
+    reloaded = loader.load("demo", root)
+    report2 = validate.validate_pipeline(reloaded)
+
+    assert report1.content_hash != report2.content_hash
+
+
+def test_write_validation_report_persists_the_content_hash_to_disk(tmp_path):
+    root = tmp_path / "pipelines"
+    pipeline = _pipeline(root, with_dbt=False, with_procedure=False)
+    report = validate.validate_pipeline(pipeline)
+
+    on_disk = yaml.safe_load((root / "demo" / validate.VALIDATION_REPORT_FILENAME).read_text())
+    assert on_disk["content_hash"] == report.content_hash
+
+
+def test_dbt_compile_step_in_the_report_names_its_own_method_precisely(tmp_path):
+    """The exact distinction that matters: dbt parse never touches a live
+    database (confirmed for real, docs/deploy-log.md) - dbt compile does
+    and would fail without one. The report must not let a reader assume
+    more was checked than actually was."""
+    if not __import__("pathlib").Path(validate._dbt_bin()).exists():
+        pytest.skip("dbt is not installed on this machine")
+    pipeline = _pipeline(tmp_path / "pipelines", with_procedure=False)
+    report = validate.validate_pipeline(pipeline)
+    on_disk = report.to_dict()
+    assert "parse" in on_disk["steps"]["dbt_compile"]["method"]
+    assert "no live database" in on_disk["steps"]["dbt_compile"]["method"]

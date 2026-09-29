@@ -3171,3 +3171,37 @@ Steps 4-5 (run against an operator-defined fixture through a real,
 authored expected result) are still not built - the next, larger piece,
 and the one that actually proves a drafted pipeline's numbers are right,
 not just that it is well-formed.
+
+### 2026-09-29 — hardening from review before steps 4-5: overwrite guard, content_hash, precise dbt-parse wording
+
+1. **Overwrite guard, hardened.** `synth(overwrite=True)` used to decide
+   whether an existing directory was safe to redraft by loading the
+   pipeline and checking `maturity == "reviewed"` - a real hole: a
+   manifest broken by a hand-edit, or one whose approval had gone stale
+   (approval.py's own hash check), read as "not reviewed" either way, even
+   though `.approved.yaml` sitting right there is real evidence someone
+   reviewed *something* under this name once. Fixed: checks
+   `.approved.yaml`'s plain existence directly, not inferred through
+   loader.load()+maturity - refuses unconditionally if it exists, whether
+   or not the current manifest still parses.
+2. **Validation report tied to content hash.** `.synth-validation.yaml`
+   now records `content_hash` - the same hash `approval.content_hash()`
+   computes - so a reviewer can tell a report that still matches what is
+   on disk from a stale one left over before a later edit.
+3. **Precise dbt-parse wording.** The report and CLI output now say
+   exactly what was checked: "dbt parse (Jinja/SQL syntax only, no live
+   database - not dbt compile/run, does not check against a real
+   schema)". Confirmed for real which of `dbt parse`/`dbt compile` needs a
+   live connection and which does not: `dbt compile` against the same
+   throwaway (deliberately unreachable) profile fails with a real
+   "password authentication failed" database error; `dbt parse` against
+   the identical profile does not even attempt to connect. `dbt compile`
+   was considered and rejected for this check specifically because it
+   would require a live, reachable database - the opposite of "isolated."
+
+New/updated tests lock in the overwrite hole's exact scenario (a
+promoted-then-hand-corrupted manifest still refuses overwrite) and the
+content_hash/precise-wording additions. Full suite green (slower now - the
+growing number of real `dbt parse` subprocess calls across the test suite
+pushed a full run past 300s; confirmed green at 500s, no failures, just
+genuine real-subprocess time).

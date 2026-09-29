@@ -436,6 +436,22 @@ hallucinated pack name before it becomes an install:
   names the failure) so a reviewer can see what the model actually wrote
   instead of it silently vanishing; a still-`draft` pipeline cannot be
   deployed regardless of whether it happens to load.
+- `synth(overwrite=True)` (CLI: `--overwrite`) redrafts an existing
+  directory of the same name only when it has never been promoted -
+  checked by the plain existence of `.approved.yaml`, not by loading the
+  manifest and asking if `maturity == "reviewed"`. That weaker check has a
+  real hole a stronger one does not: a manifest broken by a hand-edit, or
+  one whose approval has gone stale (approval.py's own hash check), reads
+  as "not reviewed" either way, even though `.approved.yaml` sitting right
+  there is real evidence someone reviewed *something* under this name once
+  - that history must never be silently deleted by an automated redraft.
+
+Every one of these is checked *at the point of writing*, not left as a
+convention `synth` merely tries to follow - see `tests/test_pipelines_synth.py`
+for each one exercised as an actual attack: a hallucinated gate type, a
+forged `.approved.yaml`, a path-escaping filename, a claimed `maturity:
+reviewed`, and a redraft attempted against a pipeline whose approval file
+is still there even though its manifest no longer loads.
 
 Input the operator supplies, none of it a live connection: the BRD text, a
 **verified** source schema (real table/column names/types plus a one-line
@@ -459,7 +475,12 @@ pipeline, hand-written or drafted, useful to re-check after a manual edit.
 Writes `pipelines/<name>/.synth-validation.yaml` (gitignored, regenerated
 every run - a report for a reviewer, never part of what gets promoted or
 executed: outside `approval.py`'s hash, and not a path a model is even
-allowed to write to under `synth`'s own file allowlist).
+allowed to write to under `synth`'s own file allowlist). Records
+`content_hash` - the exact same hash `approval.content_hash()` computes -
+at the moment validation ran, so a reviewer can tell whether this report
+still describes what is actually on disk or is stale from before a later
+edit, the same reasoning `approval.py`'s own hash check already applies to
+a promoted pipeline.
 
 - **dbt-engine stages**: `dbt parse` inside a throwaway project this
   function builds from scratch (its own `dbt_project.yml`/`profiles.yml`,

@@ -88,12 +88,18 @@ def _print_validation_steps(report) -> None:
     console.print(f"[bold]load:[/bold] "
                  f"[{'green' if report.load_ok else 'red'}]"
                  f"{'pass' if report.load_ok else 'fail'}[/]")
-    for label, step in (("dbt compile", report.dbt), ("procedures", report.procedures)):
-        if step is None:
-            continue
-        colour = _STEP_STYLE.get(step.status, "yellow")
-        console.print(f"[bold]{label}:[/bold] [{colour}]{step.status}[/{colour}]"
-                     + (f" - {step.detail}" if step.detail else ""))
+    if report.dbt is not None:
+        colour = _STEP_STYLE.get(report.dbt.status, "yellow")
+        console.print(f"[bold]dbt parse:[/bold] [{colour}]{report.dbt.status}[/{colour}]"
+                     + (f" - {report.dbt.detail}" if report.dbt.detail else ""))
+        console.print("[dim]  (Jinja/SQL syntax only, no live database - not "
+                      "dbt compile/run, does not check against a real schema)[/dim]")
+    if report.procedures is not None:
+        colour = _STEP_STYLE.get(report.procedures.status, "yellow")
+        console.print(f"[bold]procedures:[/bold] [{colour}]{report.procedures.status}[/{colour}]"
+                     + (f" - {report.procedures.detail}" if report.procedures.detail else ""))
+    if report.content_hash:
+        console.print(f"[dim]content hash at validation time: {report.content_hash}[/dim]")
 
 
 @pipeline_group.command("synth")

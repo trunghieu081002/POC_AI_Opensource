@@ -24,6 +24,7 @@ from pathlib import Path
 
 import yaml
 
+from . import approval as approval_mod
 from .loader import Pipeline
 
 # A report, not an artifact: what a draft's validation actually found, for
@@ -204,10 +205,20 @@ class ValidationReport:
     """What a draft's validation actually found, for a reviewer to read
     before promoting - not a pass/fail gate itself (`deploy()`'s own
     approval gate, M1, is that) and never part of what gets promoted or
-    executed."""
+    executed.
+
+    `content_hash` is the same hash `approval.content_hash()` computes
+    (pipeline.yaml + every referenced procedure/model, `maturity:`
+    excluded) at the moment this report was generated - a reviewer, or
+    `dpagent pipeline promote` itself, can compare it against the current
+    content to tell a report that still describes what is on disk from a
+    stale one left over from before an edit. Empty when the manifest did
+    not even load (nothing to hash against real referenced files yet).
+    """
     generated_at: str
     generator: str                        # "dpagent pipeline synth" | "dpagent pipeline validate"
     model: str = ""                       # DPAGENT_MODEL, empty when not model-authored
+    content_hash: str = ""
     load_ok: bool = True
     load_error: str = ""
     dbt: StepResult | None = None
@@ -220,6 +231,7 @@ class ValidationReport:
             "generated_at": self.generated_at,
             "generator": self.generator,
             "model": self.model,
+            "content_hash": self.content_hash,
             "steps": {
                 "structure": {"status": "pass"},
                 "load": {"status": "pass" if self.load_ok else "fail",
@@ -227,7 +239,18 @@ class ValidationReport:
             },
         }
         if self.dbt is not None:
-            data["steps"]["dbt_compile"] = {"status": self.dbt.status, "detail": self.dbt.detail}
+            # dbt parse, precisely: Jinja/SQL syntax and manifest-building
+            # only - no live database, so it does NOT catch a column that
+            # does not actually exist, a type mismatch, or anything else
+            # that needs a real schema to notice (dbt compile/run would,
+            # but compile needs a reachable connection - confirmed for
+            # real, docs/deploy-log.md - which this isolated check
+            # deliberately does not require).
+            data["steps"]["dbt_compile"] = {
+                "status": self.dbt.status, "detail": self.dbt.detail,
+                "method": "dbt parse (Jinja/SQL syntax only, no live database - "
+                         "not dbt compile/run, and does not check against a real schema)",
+            }
         if self.procedures is not None:
             data["steps"]["procedures"] = {"status": self.procedures.status,
                                           "detail": self.procedures.detail}
@@ -260,6 +283,7 @@ def validate_pipeline(pipeline: Pipeline, *, generator: str = "dpagent pipeline 
     report = ValidationReport(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         generator=generator, model=model,
+        content_hash=approval_mod.content_hash(pipeline),
         load_ok=True, dbt=compiled.dbt, procedures=compiled.procedures,
         assumptions=assumptions, open_questions=list(open_questions or []),
     )
