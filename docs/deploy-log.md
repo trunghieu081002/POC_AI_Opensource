@@ -2886,3 +2886,22 @@ clean (one non-blocking guard-shape warning, same class postgres/airflow
 already carry), dry-run integration test passes both families, generic
 pack tests pass. Not yet installed for real on any host, no acceptance
 suite yet - same two conditions `silo` needed before promotion.
+
+### 2026-09-29 — silo/duckdb reverted: back to Postgres only, by operator decision
+
+After `silo` was installed and verified for real (4/4 suite pass) and
+`duckdb` was built (draft, not yet installed), the operator decided to
+drop the MinIO/Parquet Bronze direction entirely and keep the warehouse
+Postgres-only, as it was before this session's Layer 1 work started on it.
+Not a technical failure of either pack - both worked, real bugs found
+along the way are recorded above as-is, kept for the record rather than
+scrubbed. Layer 2 itself was never touched for this: `warehouse:` in
+`pipeline.yaml` was never changed to support anything but Postgres, so
+there was nothing to revert there.
+
+Cleanup: `packs/silo`, `packs/duckdb` and `suites/silo` removed from the
+repo; README's checklist put back to the pre-existing
+"clickhouse, minio, trino, spark, iceberg, hive-metastore" not-yet-built
+line. The real `silo` systemd service + data on this host still needs
+`sudo dpagent rollback silo` to actually remove (operator to run) -
+`duckdb` was never installed for real, nothing to roll back there.
