@@ -572,14 +572,18 @@ Stated from what real runs actually showed, not from the design:
   (and their stage/gate verdicts and events) past that age - the one place
   this rule is allowed to bend, and only because an operator explicitly
   called it; a `running` run is never a candidate regardless of age, and
-  `--dry-run` shows the count before anything is deleted. Run for real
-  against this host's real journal once (2026-09-29, `--older-than-days 7
-  --yes`, after the permission fix): 0 candidates, since nothing in the
-  journal happened to be older than 7 days at that moment - the delete path
-  itself has therefore only been exercised against an empty candidate set
-  for real; a non-empty real journal has so far only been dry-run against
-  (225 of 242 real rows correctly identified as older than 1 day, nothing
-  deleted).
+  `--dry-run` shows the count before anything is deleted. Real-verified
+  against this host's real journal with a non-empty candidate set
+  (2026-09-29, `--older-than-days 3 --yes`): `--dry-run` predicted 214
+  runs/631 stage results/631 gate results/2958 events; the real delete
+  removed exactly that many - before/after row counts across all four
+  tables (231/649/649/3744 -> 17/18/18/786) confirm the deltas match to the
+  row, and what remained was exactly the 5 still-open runs (no
+  `finished_at`) and the 12 runs younger than the 3-day cutoff, both
+  correctly excluded. (An earlier real run the same day with
+  `--older-than-days 7` had found 0 candidates - not a bug, just nothing in
+  the journal was that old at the time; this second run is what actually
+  exercises the delete path.)
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
 - **An internet-reaching connector can hang instead of failing fast on a

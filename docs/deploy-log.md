@@ -2968,3 +2968,27 @@ New tests in `tests/test_pipelines_extract.py`: the patch is present and
 precedes the connector's own risky import for `rest_api`/`google_sheets`,
 and is absent entirely from the other four connectors (no behaviour change
 for connectors that were never the problem). Full suite green after.
+
+### 2026-09-29 — `pipeline prune` real-verified against a non-empty candidate set: last Layer 2 evidence gap closed
+
+The one real prune run so far (`--older-than-days 7 --yes`, same day, after
+the permission fix) had found 0 candidates - correct, but it meant the
+actual DELETE path had never been exercised for real against non-empty
+data, only dry-run-checked. Closed that gap.
+
+Snapshotted exact row counts across all four tables before
+(`runs=231, stage_runs=649, gate_runs=649, events=3744`), ran
+`--older-than-days 3 --dry-run` (world-readable file, no sudo needed for a
+read): predicted 214 runs / 631 stage results / 631 gate results / 2958
+events. Operator ran the real delete
+(`sudo -E .venv/bin/dpagent pipeline prune --older-than-days 3 --yes`).
+After: `runs=17, stage_runs=18, gate_runs=18, events=786` - every delta
+matches the dry-run prediction exactly (214/631/631/2958). What remained
+was exactly the 5 runs with no `finished_at` (still open) and the 12 runs
+younger than the 3-day cutoff (2026-09-28), both correctly excluded from
+the candidate set.
+
+This was the last item on the Known limitations list without a real
+(non-empty) verification - `dpagent pipeline prune` is now real-verified
+end to end: dry-run counting, permission handling, and the delete itself,
+all against this host's actual production journal.
