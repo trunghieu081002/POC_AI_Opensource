@@ -1,0 +1,44 @@
+suite: silo
+summary: Prove the S3 API actually stores, returns and protects objects - not just that the port is open
+
+requires: [silo]
+
+# Fixtures live in their own bucket (derived from DP_TEST_NS). A check that
+# writes into a bucket an operator might already be using is a liability,
+# not a test.
+setup:
+  - id: create-test-bucket
+    script: setup/00-fixtures.sh
+    description: Create an isolated bucket for the checks to work in
+    timeout: 60
+
+checks:
+  # Ordered cheapest-and-most-fundamental first: if the roundtrip fails there
+  # is no point asking anything else, which is why it is critical.
+  - id: write-read-roundtrip
+    script: checks/10-roundtrip.sh
+    description: An object written is the same object read back, and listing/deleting work
+    critical: true
+    timeout: 60
+
+  - id: survives-restart
+    script: checks/20-survives-restart.sh
+    description: An object committed before a service restart is still there after it
+    timeout: 120
+
+  - id: rejects-bad-credentials
+    script: checks/30-rejects-bad-credentials.sh
+    description: A wrong secret key is refused, not silently accepted
+    negative: true
+    timeout: 60
+
+  - id: config-actually-applied
+    script: checks/40-config-applied.sh
+    description: The running server answers on the port and console_port that were asked for
+    timeout: 60
+
+teardown:
+  - id: drop-test-bucket
+    script: teardown/99-fixtures.sh
+    description: Remove everything the suite created
+    timeout: 60

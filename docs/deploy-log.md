@@ -2635,3 +2635,227 @@ for cutoff boundaries, the running-run exclusion, cascade correctness,
 per-pipeline scoping, and the confirm/--yes/--dry-run flow. Not yet run for
 real (never executed with intent to actually delete) - that decision is the
 operator's.
+
+### 2026-09-28 — `pipeline prune` needs root against the real journal, only found by actually running it
+
+Ran `dpagent pipeline prune --older-than-days 7 --yes` for real on this
+host's actual journal (operator-authorized, 7 days/all pipelines). The
+`--dry-run` preview worked fine as the plain operator user (11 runs, 14
+stage results, 14 gate results, 79 events) - its SELECTs only need read
+access, and `/var/lib/dpagent/dpagent.db` is world-readable. The real
+DELETE then failed: `sqlite3.OperationalError: attempt to write a readonly
+database` - the file is owned `root:dpagent`, and the operator's own user
+was not in that group (Airflow's own tasks are, which is why `finish_run`/
+`event()` calls from a real DAG run always worked). Unit tests never caught
+this because they always run against a throwaway, fully-writable tmp_path
+database.
+
+**Fixed:** `prune` now checks `os.access(state.DB_PATH, os.W_OK)` before the
+real delete and fails with an actionable message ("re-run as sudo -E dpagent
+pipeline prune ...") instead of leaking the raw sqlite3 traceback. Same
+privilege story as deploy/undeploy now.
+
+### 2026-09-28 — the minio pack's first real install attempt found MinIO's open-source server is dead; rewritten as the silo pack
+
+`sudo -E dpagent install minio --allow-draft -y --set minio.root_password=...`
+failed at the `install` step: `curl: (22) The requested URL returned error:
+410` fetching `https://dl.min.io/server/minio/release/linux-amd64/minio`.
+Not a transient outage - researched it (web search): MinIO's own
+open-source server repository was marked "no longer maintained" on
+2026-02-12, formally archived 2026-04-25, and `dl.min.io` stopped serving
+any binaries around 2026-09-11 - roughly two weeks before this install
+attempt. The company now steers users to AIStor, a paid product.
+
+Asked the operator how to proceed rather than picking unilaterally
+(a storage backend choice has real consequences). Chose
+github.com/pgsty/silo - a community-maintained, wire-compatible fork
+(same `MINIO_*` environment interface, same S3 routes, still AGPLv3),
+distributing real `.rpm`/`.deb` packages via GitHub Releases.
+
+Before rewriting anything, downloaded both the real `.rpm` and `.deb`
+packages and inspected their contents directly (`rpm2cpio | cpio`,
+`dpkg-deb -c`) rather than trusting documentation: both ship identical
+layouts - `/usr/bin/silo`, `/usr/lib/systemd/system/silo.service` (its own
+unit - this pack no longer writes one), `/usr/lib/sysusers.d/silo.conf`
+(creates the `silo` system user itself - this pack no longer runs
+`useradd`), and `/etc/default/silo` as the `EnvironmentFile=-` this pack
+writes into. Also fetched all four (OS family x CPU arch) download URLs
+this pack's own `silo-lib.sh` constructs, for real, confirming each
+resolves to real package bytes (200, 30-34MB) rather than trusting a HEAD
+request alone.
+
+The pack is renamed `minio` -> `silo` throughout (directory, lib file,
+`pack.yaml` name), keeps `provides: [minio, silo, object_storage, s3]` so
+a pipeline's own capability lookup can still ask for "minio" and resolve
+to it, and drops the user-creation and hand-written systemd-unit steps the
+original static-binary design needed but this packaged one does not.
+`maturity: draft` unchanged - still not installed for real on any host
+(the operator's own attempt was against the now-dead binary; a real
+install against the rewritten pack has not happened yet), still no
+acceptance suite.
+
+### 2026-09-28 — silo pack installed and verified for real (S3 round trip, negative auth)
+
+`sudo -E dpagent install silo --allow-draft -y --set silo.root_password=...`
+on the real host (ol 8.10): preflight ok (one real warning - firewalld
+active, open_firewall off, correctly flagged as reachable only from this
+host), all 4 steps ok (install step took 36s - downloading and installing
+the real ~30MB package), `verify` ok (service active, both ports listening,
+S3 health endpoint answers), `base`'s own acceptance suite 4/4 (silo has
+none of its own yet - see below).
+
+Went further than the pack's own `verify` (liveness only) with a real S3
+protocol round trip via boto3 against the live instance: `create_bucket` ->
+`put_object` (76 bytes) -> `get_object` byte-for-byte identical ->
+`list_objects_v2` shows exactly the one key -> `delete_object` ->
+`delete_bucket`, all real. Negative check: the same client with a wrong
+secret key gets `SignatureDoesNotMatch`, not a silent accept.
+
+**Not yet done: an acceptance suite** (`suites/silo/`, wired into
+`dpagent install silo` the way `suites/postgres/` already is). Considered
+`curl --aws-sigv4` for it but that flag needs curl 7.75+; this host's own
+curl reports 7.61.1 (a RHEL backport, so it has the flag here, but a plain
+Debian/Ubuntu host at that upstream version would not) - not portable
+enough to depend on across the families this pack targets. A real suite
+needs its own SigV4 signer (stdlib-only Python, no boto3 assumption) rather
+than either of those. Tracked, not started. `maturity: draft` stays until
+it exists.
+
+### 2026-09-28 — silo acceptance suite written, verified by hand against the live install, not yet run through `dpagent test`
+
+`suites/silo/`: write/read roundtrip (listing + delete included), survives
+a real `systemctl restart`, rejects a wrong secret key/unknown access key
+(negative), and confirms the running server - not the env file - answers
+on the configured ports. No boto3/`mc`/`aws` CLI dependency and
+deliberately not `curl --aws-sigv4` (needs curl 7.75+, not guaranteed on
+every family this pack targets - this host's curl reports 7.61.1, a RHEL
+backport that happens to have the flag anyway, which is exactly the kind
+of host-specific accident not to depend on): a small stdlib-only Python
+SigV4 signer (`suites/silo/s3sig.py`, ~110 lines).
+
+Tested the signer directly against the real, running instance from the
+earlier install (not through the suite runner) before wiring it into
+checks: create bucket, put, get (exact match), list (key present), delete
+object, delete bucket, and a wrong-secret-key request - correctly
+`SignatureDoesNotMatch`. All real, all passed.
+
+`dpagent test silo` itself needs root (acquires `/var/lib/dpagent`'s host
+lock, and the restart check calls `systemctl restart`) - confirmed by
+trying it as the plain operator user, which failed cleanly at the lock,
+not inside the suite. Not yet run for real; that is the next step, and
+`maturity: draft` stays until it has.
+
+### 2026-09-28 — silo suite's own s3sig.py broke on the real system python3 (3.6.8), not the repo's venv
+
+`sudo -E dpagent test silo` failed immediately in setup:
+`SyntaxError: future feature annotations is not defined`. Cause: `s3sig.py`
+used `from __future__ import annotations` (3.7+) and PEP 585 bracket
+generics (`tuple[int, bytes]`), and this real host's system `python3` -
+what `sudo dpagent test` actually invokes, not this repo's own venv - is
+Python 3.6.8 (Oracle Linux 8's default). My own manual test of this script
+earlier had `.venv/bin` ahead of `/usr/bin` on `PATH`, so it silently ran
+under 3.11 and never exercised this. Fixed by dropping the future import
+and every type hint; re-verified for real directly under
+`/usr/bin/python3` (create/put/get/negative/delete, all correct) before
+re-running the suite.
+
+### 2026-09-28 — Google Sheets verified against real Google, at last
+
+Real spreadsheet (`1k8XaxmpyebFNs7YCCJXUubLe5TFJbE3_BsUxuoNBmIo`, shared
+with a real service account's `client_email`, read-only), real
+`runtime.run_extract` + `run_gate` end to end, real Postgres landing.
+
+**Real finding #1, host-level, not a dpagent bug:** this host has IPv6
+configured (DNS returns an AAAA record for `oauth2.googleapis.com`) but
+IPv6 egress is silently black-holed - `curl -6` hangs to timeout, `curl -4`
+answers in 0.27s. `curl` alone had masked this in every earlier check
+(Happy Eyeballs: it races both and uses whichever answers first) - the
+extract genuinely hung until `google-auth`'s `requests` transport (no
+Happy Eyeballs) gave up. Worked around for this verification only (forced
+IPv4 in the generated script's own process, not a dpagent code change);
+documented as a real known-limitations entry - any internet-reaching
+connector (`rest_api`, `google_sheets`) can hang up to the extract timeout
+on a host in this state instead of failing fast.
+
+**Real finding #2, a mistake in my own test data, not a code bug:** the
+spreadsheet's actual tab is named "Trang tính1" (Google Sheets' own
+Vietnamese-locale default name for the first tab), not "Sheet1" as
+assumed - both quoted and unquoted requests for the literal string
+"Sheet1" correctly failed with "Unable to parse range" since no such tab
+exists. Re-tested both quoting forms against the *real* tab name -
+identical success either way - which actually reconfirms `_a1()`'s
+always-quote behaviour is correct against the real API, not merely against
+the local stand-in used before.
+
+**Real finding #3:** dlt's resource-name normalisation on a name with a
+Vietnamese diacritic is not simple transliteration - "Trang tính1" landed
+as table `trang_t_nh1` (the "í" dropped outright, not rewritten to "i").
+Worth knowing before writing a gate against a non-ASCII sheet name: check
+the actual landed table name rather than guessing it.
+
+**Result:** extract.done `trang_t_nh1 +10`, gate passed, and the 10 landed
+rows verified byte-for-byte against the real sheet's own 10 rows (order_id,
+customer name, amount - all Vietnamese names, all correct).
+
+This closes the one remaining unverified connector - all six (odoo_postgres,
+sql_server, csv, rest_api, elasticsearch, google_sheets) are now
+real-verified, not just unit-tested.
+
+### 2026-09-29 — silo suite's own real run found it was signing with a placeholder secret, not the real one
+
+`sudo -E dpagent test silo` failed at setup: `SignatureDoesNotMatch` even
+though the same credentials worked by hand against the same live instance
+just the day before. Cause: `dpagent test` resolves an installed pack's
+params from what was *recorded* at install time - a secret param (like
+`root_password`) is stored masked (`***REDACTED***`) and deliberately never
+replayed (`cli/operate.py`'s own `_stored_params()` docstring: "better to
+fall back to ... be obviously wrong than to silently use the literal
+string '***REDACTED***' as a password"). `dp_param_required root_password`
+inside a check script therefore returns a fixed placeholder string at test
+time, not the real secret - and every check script in this suite was
+signing S3 requests with that placeholder.
+
+Fixed by reading the real credentials the way the docstring itself says a
+suite must: from what install actually configured on disk
+(`/etc/default/silo`, which the suite can read because `dpagent test`
+already needs root) rather than from resolved params. All five scripts
+that touch S3 auth (setup, roundtrip, restart, rejects-bad-credentials,
+teardown) now `source /etc/default/silo` for `MINIO_ROOT_USER`/
+`MINIO_ROOT_PASSWORD` instead. Not yet re-run for real; that is the next
+step.
+
+### 2026-09-29 — the /etc/default/silo fix itself broke, found on the very next real run
+
+`sudo -E dpagent test silo` failed again, differently: `/etc/default/silo:
+line 4: :9000: command not found`. The previous fix `source`d the whole
+env file in bash - works for simple `KEY=value` lines, but line 4 is
+`MINIO_OPTS=--address :9000 --console-address :9001`, an unquoted,
+multi-word value. Valid for systemd's own `EnvironmentFile=` parser (every
+line is `KEY=VALUE` literally, no word-splitting) - not valid for bash
+`source`, which treats the words after `--address` as a command to run
+with `MINIO_OPTS=--address` as its environment. Fixed by extracting only
+the two lines each script needs with `sed`, never executing the file:
+`sed -n 's/^MINIO_ROOT_USER=//p' /etc/default/silo`. Not yet re-run for
+real; that is the next step, again.
+
+### 2026-09-29 — silo acceptance suite passes for real, promoted to stable
+
+`sudo -E dpagent test silo`, third attempt (after the Python 3.6 syntax
+fix and the two credential-sourcing fixes above): 4/4 passed for real -
+write/read roundtrip (plus listing and delete), survives a real
+`systemctl restart`, rejects a wrong secret key, and the running server
+answers on the configured ports. `maturity: draft` -> `stable`
+(`packs/silo/pack.yaml`) - both conditions README stated for that
+promotion (installed for real, acceptance suite passing) are now met.
+
+Three real bugs found across this suite's first three runs, none of them
+visible from reading the code, each one only by actually executing it as
+root against the real installed instance: a Python 3.6-incompatible
+helper script (system `python3` on Oracle Linux 8 is 3.6.8, not this
+repo's own venv's 3.11), a masked install-time secret being replayed
+verbatim at test time (`dp_param_required` returns a fixed placeholder,
+not the real password, by cli/operate.py's own documented design), and a
+`source`d env file with a line that is valid for systemd's own
+`EnvironmentFile=` parser but not for bash word-splitting. This is the
+same discipline the rest of Layer 1/2 has been held to throughout this
+project - a passing suite is not assumed correct until it has actually run.

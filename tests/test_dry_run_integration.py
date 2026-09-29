@@ -35,6 +35,7 @@ requires_bash = pytest.mark.skipif(
 # exactly like a real --dry-run with no --set flags.
 REQUIRED_OVERRIDES = {
     "airflow": {"backend_password": "dryrun-test-pw", "admin_password": "dryrun-test-pw"},
+    "silo": {"root_password": "dryrun-test-pw"},
 }
 
 FAKE_OS_FOR_FAMILY = {"debian": "ubuntu", "rhel": "ol"}

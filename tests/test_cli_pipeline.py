@@ -536,3 +536,18 @@ def test_prune_without_a_name_applies_to_every_pipeline(db):
 def test_prune_rejects_a_nonpositive_older_than_days(db):
     result = _runner().invoke(pipeline_group, ["prune", "demo", "--older-than-days", "0"])
     assert result.exit_code != 0
+
+
+def test_prune_fails_clearly_without_write_access_to_the_journal(db, monkeypatch):
+    """Real gap found running this for real: the dry-run's SELECTs succeed
+    for anyone (the journal is world-readable), but the actual DELETE needs
+    root - caught here with an actionable message, not a raw
+    sqlite3.OperationalError."""
+    _old_run("demo", days_old=40)
+    monkeypatch.setattr(pipeline_cli.os, "access", lambda *a, **k: False)
+
+    result = _runner().invoke(pipeline_group, ["prune", "demo", "--older-than-days", "30",
+                                              "--yes"])
+
+    assert result.exit_code != 0
+    assert "sudo" in result.output
