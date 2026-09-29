@@ -133,28 +133,36 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
 
     Refuses an existing pipeline directory unless `overwrite=True` (mirrors
     pack synth's own `--overwrite`) - and even then, refuses outright if
-    what is there is `maturity: reviewed`: a reviewed pipeline is real,
-    promoted, possibly deployed work, never something a redraft should be
-    able to silently clobber. Pick a different name instead. A `draft` (or
-    a directory `loader.load()` cannot even parse - a previous synth
-    attempt's near-miss) is safe to overwrite.
+    `.approved.yaml` exists at all, checked directly as a file, not by
+    loading the manifest and reading its `maturity:` field. A weaker check
+    (load the pipeline, ask if `maturity == "reviewed"`) has a real hole: a
+    manifest a human broke while hand-editing it (or one whose approval has
+    gone stale per approval.is_approved()'s own hash check) fails
+    loader.load() or reads as "not reviewed" either way, even though
+    `.approved.yaml` sitting right there is real evidence someone reviewed
+    *something* under this name once. That history must never be silently
+    deleted by an automated redraft - refused unconditionally, whether or
+    not the current manifest still parses; remove `.approved.yaml` by hand
+    first if that history is genuinely meant to be discarded. A pipeline
+    that was never promoted (no `.approved.yaml` ever written) is safe to
+    overwrite regardless of whether it currently loads.
     """
+    import shutil
+
     root = (pipelines_dir or loader_mod.PIPELINES_DIR) / request.name
     if root.exists():
         if not overwrite:
             raise FileExistsError(
                 f"{root} already exists - pass overwrite=True (CLI: --overwrite) "
                 f"to redraft it, or choose a different name")
-        try:
-            existing = loader_mod.load(request.name, pipelines_dir or loader_mod.PIPELINES_DIR)
-            existing_is_reviewed = not existing.is_draft
-        except loader_mod.PipelineError:
-            existing_is_reviewed = False   # an unparseable leftover draft is safe to redo
-        if existing_is_reviewed:
+        approval_file = root / approval_mod.APPROVAL_FILENAME
+        if approval_file.exists():
             raise ValueError(
-                f"{root} is maturity: reviewed - refusing to overwrite real, promoted "
-                f"work even with overwrite=True. Draft under a different name instead.")
-        import shutil
+                f"{approval_file} exists - real approval history for this name, even "
+                f"if the pipeline no longer loads cleanly or its approval has since "
+                f"gone stale. Refusing to overwrite even with overwrite=True - draft "
+                f"under a different name, or remove {approval_file} by hand first if "
+                f"you are certain this history should be discarded.")
         shutil.rmtree(root)
     if not request.source_schema.strip():
         raise ValueError(

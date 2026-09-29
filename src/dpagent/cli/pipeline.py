@@ -22,6 +22,7 @@ from ..llm import client as llm
 from ..pipelines import approval as approval_mod
 from ..pipelines import deploy as deploy_mod
 from ..pipelines import extract as extract_mod
+from ..pipelines import fixture as fixture_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
 from ..pipelines import synth as synth_mod
@@ -88,12 +89,18 @@ def _print_validation_steps(report) -> None:
     console.print(f"[bold]load:[/bold] "
                  f"[{'green' if report.load_ok else 'red'}]"
                  f"{'pass' if report.load_ok else 'fail'}[/]")
-    for label, step in (("dbt compile", report.dbt), ("procedures", report.procedures)):
-        if step is None:
-            continue
-        colour = _STEP_STYLE.get(step.status, "yellow")
-        console.print(f"[bold]{label}:[/bold] [{colour}]{step.status}[/{colour}]"
-                     + (f" - {step.detail}" if step.detail else ""))
+    if report.dbt is not None:
+        colour = _STEP_STYLE.get(report.dbt.status, "yellow")
+        console.print(f"[bold]dbt parse:[/bold] [{colour}]{report.dbt.status}[/{colour}]"
+                     + (f" - {report.dbt.detail}" if report.dbt.detail else ""))
+        console.print("[dim]  (Jinja/SQL syntax only, no live database - not "
+                      "dbt compile/run, does not check against a real schema)[/dim]")
+    if report.procedures is not None:
+        colour = _STEP_STYLE.get(report.procedures.status, "yellow")
+        console.print(f"[bold]procedures:[/bold] [{colour}]{report.procedures.status}[/{colour}]"
+                     + (f" - {report.procedures.detail}" if report.procedures.detail else ""))
+    if report.content_hash:
+        console.print(f"[dim]content hash at validation time: {report.content_hash}[/dim]")
 
 
 @pipeline_group.command("synth")
@@ -185,23 +192,77 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
 
 @pipeline_group.command("validate")
 @click.argument("name")
-def validate_cmd(name):
-    """Step 3: does the SQL this pipeline references actually compile/apply
-    for real, in isolation - never the real shared dbt project or the
-    warehouse a promoted pipeline would use.
+@click.option("--fixture", "fixture_path", type=click.Path(exists=True, dir_okay=False),
+              help="Steps 4-5 too: seed this fixture (YAML) into a throwaway source, "
+                   "deploy --allow-draft, run twice through a real Airflow, and compare "
+                   "the real curated output against --expected. Needs root (deploy's own "
+                   "Airflow-facing steps) and passwordless sudo to postgres twice over - "
+                   "reported as unavailable, not failed, when either is missing.")
+@click.option("--expected", "expected_path", type=click.Path(exists=True, dir_okay=False),
+              help="The independently-authored expected result (YAML) --fixture's real "
+                   "curated output is compared against. Required together with --fixture.")
+def validate_cmd(name, fixture_path, expected_path):
+    """Step 3 (always): does the SQL this pipeline references actually
+    compile/apply for real, in isolation - never the real shared dbt
+    project or the warehouse a promoted pipeline would use.
+
+    Steps 4-5 (with --fixture/--expected): does the pipeline's *output*
+    match an independently-authored expected result, run twice to catch a
+    non-idempotent transform - the check that actually proves the numbers
+    are right, not just that the manifest is well-formed.
 
     Works on any pipeline, hand-written or drafted by `dpagent pipeline
-    synth` (which already runs this once itself, right after drafting) -
+    synth` (which already runs step 3 once itself, right after drafting) -
     useful to re-check after editing a draft by hand. Writes/overwrites
     `.synth-validation.yaml` next to the pipeline - a report for a
     reviewer, never part of what gets promoted or executed.
     """
+    if bool(fixture_path) != bool(expected_path):
+        fail("--fixture and --expected must be given together")
+
     pipeline = _load_or_fail(name)
     report = validate_mod.validate_pipeline(pipeline, generator="dpagent pipeline validate")
     _print_validation_steps(report)
     path = pipeline.path(validate_mod.VALIDATION_REPORT_FILENAME)
     console.print(f"\n[dim]written: {path}[/dim]")
-    if not (report.dbt is None or report.dbt.ok) or not (report.procedures is None or report.procedures.ok):
+    step3_ok = ((report.dbt is None or report.dbt.ok)
+               and (report.procedures is None or report.procedures.ok))
+
+    if not fixture_path:
+        if not step3_ok:
+            sys.exit(1)
+        return
+
+    if not step3_ok:
+        fail("step 3 failed - fix that before running the fixture (steps 4-5 would only "
+             "confirm the same broken SQL against real data)")
+
+    fx = fixture_mod.load_fixture(Path(fixture_path))
+    expected = fixture_mod.load_expected(Path(expected_path))
+    console.print(f"\n[bold]running fixture through a real, --allow-draft deploy "
+                 f"(2 runs, for idempotency)...[/bold]")
+    result = fixture_mod.run_fixture(pipeline, fx, expected)
+
+    if result.unavailable_reason:
+        console.print(f"[yellow]steps 4-5 unavailable:[/yellow] {result.unavailable_reason}")
+        console.print("[dim](its absence says nothing about the pipeline's own "
+                      "correctness - it means this operator/host could not run it)[/dim]")
+        return
+
+    for label, comparison in (("run 1", result.comparison_after_run1),
+                              ("run 2", result.comparison_after_run2)):
+        if comparison is None:
+            continue
+        colour = "green" if comparison.ok else "red"
+        console.print(f"[bold]{label} vs expected:[/bold] "
+                     f"[{colour}]{'match' if comparison.ok else 'mismatch'}[/{colour}]"
+                     + (f" - {comparison.detail}" if comparison.detail else ""))
+
+    if result.ok:
+        console.print("\n[green]fixture run: both runs matched expected, idempotent[/green]")
+    else:
+        console.print(f"\n[red]fixture run failed[/red] "
+                      f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
         sys.exit(1)
 
 

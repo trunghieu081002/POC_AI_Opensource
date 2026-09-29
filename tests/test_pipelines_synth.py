@@ -101,11 +101,46 @@ def test_synth_overwrite_refuses_outright_against_a_reviewed_pipeline(root, monk
     pipeline = loader.load("monthly_sales", root)
     synth.approval_mod.promote(pipeline, "alice")
 
-    with pytest.raises(ValueError, match="reviewed"):
+    with pytest.raises(ValueError, match="approval history"):
         synth.synth(_request(), pipelines_dir=root, overwrite=True)
 
     # untouched - still there, still reviewed
     assert loader.load("monthly_sales", root).maturity == "reviewed"
+
+
+def test_synth_overwrite_refuses_even_when_the_reviewed_manifest_no_longer_loads(root, monkeypatch):
+    """The exact hole the file-existence check closes over a
+    load-then-check-maturity check: a hand-edit that breaks the manifest
+    (or lets its approval go stale) must not turn into "safe to overwrite"
+    just because loader.load() no longer succeeds or maturity no longer
+    reads reviewed - .approved.yaml being there at all is real approval
+    history for this name and is checked directly, not inferred."""
+    monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
+    synth.synth(_request(), pipelines_dir=root)
+    pipeline = loader.load("monthly_sales", root)
+    synth.approval_mod.promote(pipeline, "alice")
+    # Corrupt the manifest after promoting - loader.load() will now fail,
+    # but .approved.yaml is still sitting right there.
+    (root / "monthly_sales" / "pipeline.yaml").write_text("not: [valid, pipeline, at all\n")
+
+    with pytest.raises(ValueError, match="approval history"):
+        synth.synth(_request(), pipelines_dir=root, overwrite=True)
+
+    assert (root / "monthly_sales" / ".approved.yaml").exists()   # untouched
+
+
+def test_synth_overwrite_proceeds_when_no_approval_file_was_ever_written(root, monkeypatch):
+    """The other half of the same guard: a pipeline that was drafted but
+    never promoted has no approval history to protect, however broken its
+    current manifest is."""
+    d = root / "monthly_sales"
+    d.mkdir()
+    (d / "pipeline.yaml").write_text("not: [valid, at, all\n")
+    monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
+
+    result = synth.synth(_request(), pipelines_dir=root, overwrite=True)
+
+    assert result.structurally_valid is True
 
 
 def test_synth_returns_blockers_without_writing_anything(root, monkeypatch):

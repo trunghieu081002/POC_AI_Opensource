@@ -319,6 +319,9 @@ dpagent pipeline synth <name>    # draft pipeline.yaml + its SQL from a BRD (--b
 dpagent pipeline validate <name> # step 3: dbt parse / apply procedures for real, isolated -
                                  #   any pipeline, not just a synth draft; synth already runs
                                  #   this once itself. Writes .synth-validation.yaml (gitignored)
+  --fixture F --expected F       #   + steps 4-5: seed F into a throwaway source, deploy
+                                 #   --allow-draft, run twice through real Airflow, compare
+                                 #   curated output against expected - needs root + sudo
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline promote <name>  # record approval of this pipeline's current manifest +
@@ -436,6 +439,22 @@ hallucinated pack name before it becomes an install:
   names the failure) so a reviewer can see what the model actually wrote
   instead of it silently vanishing; a still-`draft` pipeline cannot be
   deployed regardless of whether it happens to load.
+- `synth(overwrite=True)` (CLI: `--overwrite`) redrafts an existing
+  directory of the same name only when it has never been promoted -
+  checked by the plain existence of `.approved.yaml`, not by loading the
+  manifest and asking if `maturity == "reviewed"`. That weaker check has a
+  real hole a stronger one does not: a manifest broken by a hand-edit, or
+  one whose approval has gone stale (approval.py's own hash check), reads
+  as "not reviewed" either way, even though `.approved.yaml` sitting right
+  there is real evidence someone reviewed *something* under this name once
+  - that history must never be silently deleted by an automated redraft.
+
+Every one of these is checked *at the point of writing*, not left as a
+convention `synth` merely tries to follow - see `tests/test_pipelines_synth.py`
+for each one exercised as an actual attack: a hallucinated gate type, a
+forged `.approved.yaml`, a path-escaping filename, a claimed `maturity:
+reviewed`, and a redraft attempted against a pipeline whose approval file
+is still there even though its manifest no longer loads.
 
 Input the operator supplies, none of it a live connection: the BRD text, a
 **verified** source schema (real table/column names/types plus a one-line
@@ -459,7 +478,12 @@ pipeline, hand-written or drafted, useful to re-check after a manual edit.
 Writes `pipelines/<name>/.synth-validation.yaml` (gitignored, regenerated
 every run - a report for a reviewer, never part of what gets promoted or
 executed: outside `approval.py`'s hash, and not a path a model is even
-allowed to write to under `synth`'s own file allowlist).
+allowed to write to under `synth`'s own file allowlist). Records
+`content_hash` - the exact same hash `approval.content_hash()` computes -
+at the moment validation ran, so a reviewer can tell whether this report
+still describes what is actually on disk or is stale from before a later
+edit, the same reasoning `approval.py`'s own hash check already applies to
+a promoted pipeline.
 
 - **dbt-engine stages**: `dbt parse` inside a throwaway project this
   function builds from scratch (its own `dbt_project.yml`/`profiles.yml`,
@@ -487,16 +511,56 @@ allowed to write to under `synth`'s own file allowlist).
   limitation `tests/test_pipelines_runtime.py`'s own `throwaway_warehouse`
   fixture already hits).
 
-### Steps 4-5: not built yet
+### Steps 4-5: does the pipeline's output match an independently-defined expectation
 
-Run the draft against an operator-defined fixture through a real,
-`--allow-draft` deploy (`dpagent pipeline run --wait`), then compare the
-real `curated` output against an independently-authored expected result -
-never the model grading its own SQL, the fixture and the expected numbers
-both fixed by a human before the model ever sees the BRD's answer. This is
-the step that actually proves a drafted pipeline's *numbers* are right, not
-just that it runs; steps 1-3 only prove it is well-formed and its SQL is
-syntactically sound.
+`dpagent pipeline validate <name> --fixture FILE --expected FILE`
+(`src/dpagent/pipelines/fixture.py`): the step that actually proves a
+drafted pipeline's *numbers* are right, not just that it runs - steps 1-3
+only prove it is well-formed and its SQL is syntactically sound. Runs
+after step 3, refuses to even attempt it if step 3 failed.
+
+- A throwaway source database is seeded from an operator-authored fixture
+  YAML (`tables: [{name, columns, rows}]`).
+- The pipeline is deployed `--allow-draft` (M1's own manual-only escape
+  hatch - never unpaused, never scheduled) against a *second* throwaway
+  database standing in for the warehouse.
+- Triggered and waited for through a real Airflow DAG run - **twice**, not
+  once: a transform that is not idempotent (a re-run that duplicates
+  revenue instead of replacing it) looks perfectly fine after a single run
+  and is exactly the bug this catches.
+- The real `curated` output is compared against an independently-authored
+  expected result YAML (`table`, `rows`, optional `row_count`) after each
+  run - **never generated by the same model that wrote the SQL**: a model
+  grading its own homework can be wrong the same way on both sides and
+  never notice. `idempotent` is true only when *both* runs matched
+  expected exactly, not inferred from the second run merely completing
+  without error.
+
+`env_overrides_for_source`/`env_overrides_for_warehouse` compute exactly
+which environment variables need to be set for the manifest's own
+`${VAR}` refs to resolve to the throwaway databases - by inspecting the
+already-loaded `Pipeline` object directly (never a prefix guess), only for
+fields that are actually a ref in the first place; a literal value is left
+untouched. **Real-verified against the actual `pipelines/demo` manifest**,
+not a synthetic one (docs/deploy-log.md).
+
+Needs the same things `deploy(..., allow_draft=True)` and
+`pg_throwaway.throwaway_database()` (twice over - one throwaway source, one
+throwaway warehouse) always needed: root for deploy's Airflow-facing
+steps, passwordless sudo to the postgres OS user for the throwaway
+databases. Reported as `unavailable_reason`, never a failure, when either
+is missing - its absence says nothing about the pipeline's own
+correctness, mirroring step 3's own `skipped` status for the identical
+reason.
+
+**Status: code-complete and unit-tested (every subprocess call mocked,
+including a full simulated two-run idempotency-violation scenario) - the
+`env_overrides_*` functions and the "unavailable, no sudo" path are the
+only parts real-verified on this host** (confirmed for real: this
+operator has neither passwordless sudo to postgres nor root, the same
+pre-existing constraint `validate.check_procedures` already hits). The
+real end-to-end run - seed, deploy, two real Airflow runs, compare - has
+not happened on any host yet; it needs an operator with both.
 
 ## In scope (MVP)
 

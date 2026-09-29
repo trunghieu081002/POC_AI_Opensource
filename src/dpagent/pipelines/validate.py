@@ -17,13 +17,14 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
+from . import approval as approval_mod
+from . import pg_throwaway
 from .loader import Pipeline
 
 # A report, not an artifact: what a draft's validation actually found, for
@@ -139,9 +140,9 @@ def check_dbt_models(pipeline: Pipeline) -> StepResult:
 
 def check_procedures(pipeline: Pipeline) -> StepResult:
     """Applies every procedure-engine stage's SQL file for real -
-    `CREATE OR REPLACE PROCEDURE` against a throwaway database/role this
-    function creates and drops itself (unique names per call, dropped in a
-    `finally`), never the warehouse a promoted pipeline would actually use.
+    `CREATE OR REPLACE PROCEDURE` against a throwaway database/role
+    (`pg_throwaway.throwaway_database()` - unique names per call, dropped
+    on exit), never the warehouse a promoted pipeline would actually use.
     Needs passwordless sudo to the postgres OS user (the same requirement
     `packs/postgres`'s own acceptance suite already has) - *skipped*, not
     failed, when that is not available, since its absence says nothing
@@ -150,49 +151,29 @@ def check_procedures(pipeline: Pipeline) -> StepResult:
     if not procedure_stages:
         return StepResult("skipped", "no procedure-engine stage in this pipeline")
 
-    suffix = uuid.uuid4().hex[:10]
-    role = f"dpagent_validate_{suffix}"
-    db = f"dpagent_validate_{suffix}"
-    password = uuid.uuid4().hex
-
-    def run_as_postgres(sql: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
-            capture_output=True, text=True, timeout=30)
-
-    created_role = run_as_postgres(f"CREATE ROLE {role} LOGIN PASSWORD '{password}';")
-    if created_role.returncode != 0:
-        return StepResult("skipped",
-            f"could not provision a throwaway Postgres role (needs passwordless "
-            f"sudo to the postgres user): {created_role.stderr.strip()}")
-    created_db = run_as_postgres(f"CREATE DATABASE {db} OWNER {role};")
-    if created_db.returncode != 0:
-        run_as_postgres(f"DROP ROLE IF EXISTS {role};")
-        return StepResult("skipped",
-            f"could not provision a throwaway Postgres database: {created_db.stderr.strip()}")
-
     try:
-        failures = []
-        for stage in procedure_stages:
-            path = pipeline.path(stage.procedure)
-            try:
-                proc = subprocess.run(
-                    ["psql", "-h", "localhost", "-U", role, "-d", db,
-                     "-v", "ON_ERROR_STOP=1", "-f", str(path)],
-                    env={"PGPASSWORD": password, "PATH": "/usr/bin:/bin"},
-                    capture_output=True, text=True, timeout=30)
-            except subprocess.TimeoutExpired:
-                failures.append(f"{stage.procedure} (stage {stage.name!r}): timed out after 30s")
-                continue
-            if proc.returncode != 0:
-                failures.append(f"{stage.procedure} (stage {stage.name!r}): "
-                               f"{(proc.stderr or proc.stdout).strip()}")
-        if failures:
-            return StepResult("fail", "; ".join(failures))
-        return StepResult("pass", f"{len(procedure_stages)} procedure(s) applied clean")
-    finally:
-        run_as_postgres(f"DROP DATABASE IF EXISTS {db};")
-        run_as_postgres(f"DROP ROLE IF EXISTS {role};")
+        with pg_throwaway.throwaway_database(prefix="dpagent_validate") as db:
+            failures = []
+            for stage in procedure_stages:
+                path = pipeline.path(stage.procedure)
+                try:
+                    proc = subprocess.run(
+                        ["psql", "-h", db.host, "-U", db.user, "-d", db.database,
+                         "-v", "ON_ERROR_STOP=1", "-f", str(path)],
+                        env={"PGPASSWORD": db.password, "PATH": "/usr/bin:/bin"},
+                        capture_output=True, text=True, timeout=30)
+                except subprocess.TimeoutExpired:
+                    failures.append(f"{stage.procedure} (stage {stage.name!r}): timed out after 30s")
+                    continue
+                if proc.returncode != 0:
+                    failures.append(f"{stage.procedure} (stage {stage.name!r}): "
+                                   f"{(proc.stderr or proc.stdout).strip()}")
+    except pg_throwaway.ThrowawayUnavailable as exc:
+        return StepResult("skipped", str(exc))
+
+    if failures:
+        return StepResult("fail", "; ".join(failures))
+    return StepResult("pass", f"{len(procedure_stages)} procedure(s) applied clean")
 
 
 def check_compiles(pipeline: Pipeline) -> CompileReport:
@@ -204,10 +185,20 @@ class ValidationReport:
     """What a draft's validation actually found, for a reviewer to read
     before promoting - not a pass/fail gate itself (`deploy()`'s own
     approval gate, M1, is that) and never part of what gets promoted or
-    executed."""
+    executed.
+
+    `content_hash` is the same hash `approval.content_hash()` computes
+    (pipeline.yaml + every referenced procedure/model, `maturity:`
+    excluded) at the moment this report was generated - a reviewer, or
+    `dpagent pipeline promote` itself, can compare it against the current
+    content to tell a report that still describes what is on disk from a
+    stale one left over from before an edit. Empty when the manifest did
+    not even load (nothing to hash against real referenced files yet).
+    """
     generated_at: str
     generator: str                        # "dpagent pipeline synth" | "dpagent pipeline validate"
     model: str = ""                       # DPAGENT_MODEL, empty when not model-authored
+    content_hash: str = ""
     load_ok: bool = True
     load_error: str = ""
     dbt: StepResult | None = None
@@ -220,6 +211,7 @@ class ValidationReport:
             "generated_at": self.generated_at,
             "generator": self.generator,
             "model": self.model,
+            "content_hash": self.content_hash,
             "steps": {
                 "structure": {"status": "pass"},
                 "load": {"status": "pass" if self.load_ok else "fail",
@@ -227,7 +219,18 @@ class ValidationReport:
             },
         }
         if self.dbt is not None:
-            data["steps"]["dbt_compile"] = {"status": self.dbt.status, "detail": self.dbt.detail}
+            # dbt parse, precisely: Jinja/SQL syntax and manifest-building
+            # only - no live database, so it does NOT catch a column that
+            # does not actually exist, a type mismatch, or anything else
+            # that needs a real schema to notice (dbt compile/run would,
+            # but compile needs a reachable connection - confirmed for
+            # real, docs/deploy-log.md - which this isolated check
+            # deliberately does not require).
+            data["steps"]["dbt_compile"] = {
+                "status": self.dbt.status, "detail": self.dbt.detail,
+                "method": "dbt parse (Jinja/SQL syntax only, no live database - "
+                         "not dbt compile/run, and does not check against a real schema)",
+            }
         if self.procedures is not None:
             data["steps"]["procedures"] = {"status": self.procedures.status,
                                           "detail": self.procedures.detail}
@@ -260,6 +263,7 @@ def validate_pipeline(pipeline: Pipeline, *, generator: str = "dpagent pipeline 
     report = ValidationReport(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         generator=generator, model=model,
+        content_hash=approval_mod.content_hash(pipeline),
         load_ok=True, dbt=compiled.dbt, procedures=compiled.procedures,
         assumptions=assumptions, open_questions=list(open_questions or []),
     )
