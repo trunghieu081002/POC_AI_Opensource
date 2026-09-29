@@ -572,14 +572,27 @@ Stated from what real runs actually showed, not from the design:
   (and their stage/gate verdicts and events) past that age - the one place
   this rule is allowed to bend, and only because an operator explicitly
   called it; a `running` run is never a candidate regardless of age, and
-  `--dry-run` shows the count before anything is deleted. Not run against a
-  real long-lived journal yet, only unit-tested.
+  `--dry-run` shows the count before anything is deleted. Run for real
+  against this host's real journal once (2026-09-29, `--older-than-days 7
+  --yes`, after the permission fix): 0 candidates, since nothing in the
+  journal happened to be older than 7 days at that moment - the delete path
+  itself has therefore only been exercised against an empty candidate set
+  for real; a non-empty real journal has so far only been dry-run against
+  (225 of 242 real rows correctly identified as older than 1 day, nothing
+  deleted).
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
 - **An internet-reaching connector can hang instead of failing fast on a
-  host with broken IPv6.** `google_sheets`/`rest_api` use Python's HTTP
-  stack, which - unlike `curl` - does not race IPv6 and IPv4 and use
-  whichever answers; a host with IPv6 *configured* (DNS returns an AAAA
-  record) but not actually routed blocks on the IPv6 attempt up to the
-  extract timeout. Found for real (docs/deploy-log.md, 2026-09-28
-  Google Sheets entry); not yet mitigated in the generated scripts.
+  host with broken IPv6 - mitigated.** `google_sheets`/`rest_api` use
+  Python's HTTP stack, which - unlike `curl` - does not race IPv6 and IPv4
+  and use whichever answers; a host with IPv6 *configured* (DNS returns an
+  AAAA record) but not actually routed blocks on the IPv6 attempt up to the
+  extract timeout. Found for real (docs/deploy-log.md, 2026-09-28 Google
+  Sheets entry). Fixed: both connectors' generated scripts now monkey-patch
+  `socket.getaddrinfo` to prefer IPv4 results (falling back to whatever it
+  returned when there are none, so a genuinely IPv6-only host is
+  untouched), before importing anything that could open a connection.
+  Verified for real against this same host with a controlled before/after
+  (docs/deploy-log.md, 2026-09-29 entry): the unpatched script hangs to a
+  30s timeout calling the real Sheets API; the patched one returns real
+  data in under 2s.
