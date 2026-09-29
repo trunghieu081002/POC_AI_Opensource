@@ -315,7 +315,13 @@ dpagent pipeline list             # every pipeline: connector, deployed?, last r
                                  #   deployed pipeline whose manifest is no longer in this checkout
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
+dpagent pipeline promote <name>  # record approval of this pipeline's current manifest +
+                                 #   procedures/models (hash-pinned); deploy refuses it until
+                                 #   this has run, and again the moment any of them change
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them
+                                 #   --allow-draft: apply an unreviewed/stale-approval pipeline
+                                 #   anyway, for real - manual-only, never unpaused, regardless
+                                 #   of the manifest's own schedule:
 dpagent pipeline run <name>      # trigger through Airflow, not around it
                                  #   --wait blocks until the run is terminal: exit 0 ok,
                                  #   1 failed, 3 if --timeout (default 1800s) passes first
@@ -330,6 +336,56 @@ dpagent pipeline prune [<name>]  # delete finished runs (and their stage/gate ve
                                  #   --dry-run reports without deleting; a running run is
                                  #   never a candidate regardless of age
 ```
+
+## Authoring pipelines with a model
+
+Layer 3 (later) is "BRD / report specs / DWH design → drafted pipeline +
+Superset dashboard, for a human to review" ("Boundary" above) - a model
+writing exactly the artifact this document defines, the same way
+`dpagent synth` already writes a draft *pack* for Layer 1. That only works
+if the artifact is safe to hand to a model in the first place: something
+with no path from "drafted" to "running against a real warehouse on a
+schedule" without a human in between. This section is that path, built
+before any model touches it, the same order `packs/` had to exist in a
+fixed shape before `dpagent synth` could write one (see "Boundary" above,
+and README's "The one design decision").
+
+`pipeline.yaml` carries `maturity: draft | reviewed`, defaulting to
+`draft` when the key is absent - a manifest that has never been reviewed
+looks exactly like one that predates this field, on purpose. `deploy()`
+refuses to apply anything for real (schema, procedures, dbt models,
+Airflow install, secrets, unpausing - all of it, not just some of it under
+particular flags) unless the pipeline is `reviewed` *and* its approval is
+still current:
+
+- `dpagent pipeline promote <name>` hashes the manifest plus every
+  procedure/dbt model it actually references, records that hash next to
+  the pipeline (`.approved.yaml`, git-tracked - reviewed in a PR like
+  anything else in this repo), and sets `maturity: reviewed`.
+- Editing any of those files again afterward - a procedure, a model, the
+  manifest itself - invalidates the approval, even though `maturity` still
+  says `reviewed`: `deploy` hashes the content again at deploy time and
+  compares. There is deliberately no way to promote once and keep editing.
+- `--yes` only skips the two confirmation prompts `deploy` already asks
+  (applying procedures/dbt models; installing into Airflow) - it was never
+  a way past this gate and still is not.
+- `--allow-draft` is the deliberate escape hatch, for proving a draft on a
+  real host before anyone has reviewed it. It does not run the pipeline
+  unattended: the generated DAG is always manual-only (`schedule=None`,
+  regardless of what the manifest declares) and is never unpaused - a
+  scheduled draft left merely *paused* is one `airflow dags unpause` away
+  from running unreviewed logic on schedule, which is not the guarantee
+  this flag is supposed to give. `dpagent pipeline run` still works for a
+  manual test.
+
+Real migration, not a hypothetical: `demo`, `quickstart` and
+`quickstart_dbt` all predate this field and were all already deployed and
+running on this host. Nothing was grandfathered in automatically - each
+was promoted for real by the operator (`dpagent pipeline promote`, having
+already been reviewed over the course of building this project), and
+`deploy`'s refusal-then-acceptance and its later re-refusal after a
+procedure was deliberately edited were both verified for real on this same
+host, not just unit-tested (docs/deploy-log.md, 2026-09-29).
 
 ## In scope (MVP)
 
@@ -394,7 +450,9 @@ dpagent pipeline prune [<name>]  # delete finished runs (and their stage/gate ve
   the gate step it wires in afterward is identical either way (Concepts #3)
 - Quarantine tables and a declared rejection threshold
 - `stage_runs` / `gate_runs` state, wired into `status` and `audit`
-- The six CLI verbs above
+- The CLI verbs above (already stale as "six" before this pass added
+  `promote` - not worth pinning to an exact count that drifts every time a
+  verb is added)
 - An acceptance suite for the pipeline machinery, including the negative that
   matters: **a file with known-bad rows must leave those rows in quarantine and
   must not let them reach `curated`**

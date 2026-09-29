@@ -123,6 +123,9 @@ class Stage:
         return any(g.type in ROW_LEVEL_GATE_TYPES for g in self.gates)
 
 
+MATURITIES = ("draft", "reviewed")
+
+
 @dataclass
 class Pipeline:
     name: str
@@ -133,6 +136,13 @@ class Pipeline:
     stages: list[Stage]
     schedule: str | None = None   # None = manual-only (`dpagent pipeline run`)
     timeouts: dict = field(default_factory=dict)   # seconds, by kind; see DEFAULT_TIMEOUTS
+    # "draft" (default - missing the key means draft, never "assume reviewed")
+    # or "reviewed" - gates `deploy()`'s real side effects (approval.py,
+    # docs/layer2.md "Authoring pipelines with a model"). A pipeline hand-
+    # written and deployed before this field existed is still `draft` until
+    # an operator actually runs `dpagent pipeline promote` on it - no
+    # migration silently grandfathers existing pipelines in as reviewed.
+    maturity: str = "draft"
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -143,6 +153,10 @@ class Pipeline:
     @property
     def landing(self) -> Stage:
         return self.stages[0]
+
+    @property
+    def is_draft(self) -> bool:
+        return self.maturity != "reviewed"
 
 
 def _validate_gate(raw: dict, where: str) -> Gate:
@@ -516,6 +530,11 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         known_names.add(stage.name)
         stages.append(stage)
 
+    maturity = data.get("maturity", "draft")
+    if maturity not in MATURITIES:
+        raise PipelineError(
+            f"{where}: maturity {maturity!r} is not one of {MATURITIES}")
+
     pipeline = Pipeline(
         name=name,
         summary=data.get("summary", ""),
@@ -525,6 +544,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         stages=stages,
         schedule=_validate_schedule(data.get("schedule"), where),
         timeouts=_validate_timeouts(data.get("timeouts"), where),
+        maturity=maturity,
     )
 
     for stage in pipeline.stages:

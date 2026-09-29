@@ -551,3 +551,123 @@ def test_prune_fails_clearly_without_write_access_to_the_journal(db, monkeypatch
 
     assert result.exit_code != 0
     assert "sudo" in result.output
+
+
+# ---------------------------------------------------------------- promote, --allow-draft (M1)
+
+def _draft_pipeline_dir(tmp_path, monkeypatch, name="demo"):
+    """A minimal, valid, unreviewed (maturity defaults to draft) pipeline -
+    a csv connector needs no dbt/procedure stage, so only dlt+airflow are
+    required prerequisites."""
+    root = tmp_path / "repo_pipelines"
+    d = root / name
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(
+        f"name: {name}\nsummary: t\nsource: {{connector: csv, files: {{path: /tmp/x.csv}}}}\n"
+        "warehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    monkeypatch.setattr(pipeline_cli.pipelines_mod, "PIPELINES_DIR", root)
+    for pack in ("dlt", "airflow"):
+        state.record_install(pack, "1.0.0", {}, "hash", "rhel", "installed")
+    return d
+
+
+def test_promote_writes_the_approval_file_and_marks_the_manifest_reviewed(db, tmp_path, monkeypatch):
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "reviewed" in result.output
+    assert (d / ".approved.yaml").exists()
+    assert "maturity: reviewed" in (d / "pipeline.yaml").read_text()
+
+
+def test_promote_lists_every_file_being_approved(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    assert "pipeline.yaml" in result.output
+
+
+def test_promote_without_yes_declining_confirmation_writes_nothing(db, tmp_path, monkeypatch):
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+    result = _runner().invoke(pipeline_group, ["promote", "demo"], input="n\n")
+    assert result.exit_code != 0
+    assert not (d / ".approved.yaml").exists()
+
+
+def test_promote_is_a_no_op_when_already_approved_and_unchanged(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    assert result.exit_code == 0
+    assert "already reviewed" in result.output
+
+
+def test_deploy_refuses_a_draft_pipeline_and_never_calls_deploy(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "deploy", lambda *a, **k: calls.append(k))
+
+    result = _runner().invoke(pipeline_group, ["deploy", "demo", "--yes"])
+
+    assert result.exit_code != 0
+    assert "promote" in result.output and "--allow-draft" in result.output
+    assert calls == []
+
+
+def test_deploy_yes_alone_does_not_bypass_the_draft_gate(db, tmp_path, monkeypatch):
+    """--yes only ever skipped the DB/Airflow confirmation prompts - it must
+    not become a second way past the approval gate."""
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "deploy", lambda *a, **k: calls.append(k))
+
+    result = _runner().invoke(pipeline_group, ["deploy", "demo", "--yes", "--no-db", "--no-airflow"])
+
+    assert result.exit_code != 0
+    assert calls == []
+
+
+def test_deploy_allow_draft_calls_deploy_with_allow_draft_true(db, tmp_path, monkeypatch):
+    from dpagent.pipelines.deploy import DeployResult
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "deploy",
+                        lambda p, **k: calls.append(k) or DeployResult())
+
+    result = _runner().invoke(pipeline_group, ["deploy", "demo", "--yes", "--allow-draft"])
+
+    assert result.exit_code == 0, result.output
+    assert calls and calls[0]["allow_draft"] is True
+    assert "--allow-draft" in result.output
+
+
+def test_deploy_of_a_reviewed_pipeline_calls_deploy_without_allow_draft(db, tmp_path, monkeypatch):
+    from dpagent.pipelines.deploy import DeployResult
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    calls = []
+    monkeypatch.setattr(pipeline_cli.deploy_mod, "deploy",
+                        lambda p, **k: calls.append(k) or DeployResult())
+
+    result = _runner().invoke(pipeline_group, ["deploy", "demo", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert calls and calls[0]["allow_draft"] is False
+    assert "--allow-draft:" not in result.output
+
+
+def test_deploy_reports_a_paused_draft_dag_without_suggesting_manual_unpause(db, tmp_path, monkeypatch):
+    """The one thing that must never be printed here: instructions to
+    manually `airflow dags unpause` an --allow-draft deploy - that is
+    exactly the gap this feature closes."""
+    from dpagent.pipelines.deploy import DeployResult
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        pipeline_cli.deploy_mod, "deploy",
+        lambda p, **k: DeployResult(dag_installed=Path("/x/demo.py"), dag_paused_for_draft=True))
+
+    result = _runner().invoke(pipeline_group, ["deploy", "demo", "--yes", "--allow-draft"])
+
+    assert result.exit_code == 0, result.output
+    assert "paused on purpose" in result.output
+    assert "airflow dags unpause" not in result.output

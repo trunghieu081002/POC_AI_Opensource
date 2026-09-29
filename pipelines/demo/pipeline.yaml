@@ -110,3 +110,4 @@ stages:
         columns: [converted_amount]   # gate does not trust the procedure - verifies it too
     quarantine:
       reject_threshold_pct: 1   # both gates here target fct_sales -> fct_sales_quarantine
+maturity: reviewed

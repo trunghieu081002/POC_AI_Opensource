@@ -52,3 +52,4 @@ stages:
       - type: not_null
         table: fct_orders
         columns: [order_id, amount]
+maturity: reviewed

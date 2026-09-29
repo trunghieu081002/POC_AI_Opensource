@@ -2992,3 +2992,60 @@ This was the last item on the Known limitations list without a real
 (non-empty) verification - `dpagent pipeline prune` is now real-verified
 end to end: dry-run counting, permission handling, and the delete itself,
 all against this host's actual production journal.
+
+### 2026-09-29 — Layer 3 M1: pipeline approval gate (`maturity`, `promote`, `--allow-draft`)
+
+Before any model is allowed to draft a `pipeline.yaml` (Layer 3, "BRD/report
+specs -> drafted pipeline", docs/layer2.md's Boundary), the artifact it would
+draft had to first have a safe path from "drafted" to "human said yes" to
+"applied for real" - the same order `packs/` existed in before `dpagent
+synth` could write one.
+
+Added: `maturity: draft | reviewed` on `pipeline.yaml` (missing key = draft,
+never assumed reviewed). `deploy()` itself - not just `deploy_cmd`, so
+`--no-db --no-airflow` gets no exemption either - refuses to apply an
+unreviewed pipeline for real, at all, unless `--allow-draft` is passed
+explicitly. `dpagent pipeline promote <name>` records approval by hashing the
+manifest plus every procedure/dbt model it actually references
+(`src/dpagent/pipelines/approval.py`) into a git-tracked `.approved.yaml`
+next to the pipeline - editing any of those files again after promoting
+invalidates it, even though `maturity` still reads `reviewed`, closing the
+exact gap pack `promote()` has always had (editing `pack.yaml` after
+`maturity: stable` does nothing to re-validate it).
+
+Real bug caught before it shipped: the first version hashed `pipeline.yaml`
+literally, including its own `maturity:` line - `set_maturity_reviewed()`
+appending that line changed the file's bytes, which made the just-recorded
+approval invalid the instant `promote()` finished (a blank line left behind
+by removing the line via regex substitution instead of dropping it outright
+was the actual cause). Fixed by excluding `maturity:` from what gets hashed
+entirely (it is bookkeeping about approval status, not executable content)
+and filtering it out line-by-line rather than substituting text in place.
+
+`--allow-draft` forces the rendered DAG to `schedule=None` regardless of the
+manifest's own `schedule:`, and never calls `unpause_dag` - a scheduled
+draft left merely paused is one `airflow dags unpause` away from running
+unreviewed logic on schedule, which "paused" alone does not prevent.
+
+Real migration executed on this host, not just unit-tested: `demo`,
+`quickstart` and `quickstart_dbt` all predate this field and were all
+already deployed. `dpagent pipeline lint` confirmed all three still load
+clean; each was promoted for real
+(`dpagent pipeline promote <name> --yes --approved-by "operator..."`,
+having already been reviewed over the course of this project) - each
+`pipeline.yaml` gained exactly one line (`maturity: reviewed`), verified via
+`git diff --stat` (1 insertion each, comments/formatting untouched). Then
+verified both directions for real:
+- `dpagent pipeline deploy <name> --no-db --no-airflow --yes` succeeded for
+  all three post-promotion.
+- Appending a comment to `quickstart`'s `build_raw_orders.sql` and
+  redeploying failed immediately with "changed since it was approved" -
+  restoring the file and redeploying succeeded again, confirmed via
+  `git diff --stat` showing zero difference afterward.
+
+37 new tests across `tests/test_pipelines_loader.py` (maturity validation),
+`tests/test_pipelines_approval.py` (new - hash stability/sensitivity),
+`tests/test_pipelines_deploy.py` (the gate inside `deploy()` itself,
+zero-side-effect refusal, `--allow-draft`'s forced manual-only DAG) and
+`tests/test_cli_pipeline.py` (`promote_cmd`, `--allow-draft` threading, the
+paused-draft message never suggesting a manual unpause). Full suite green.

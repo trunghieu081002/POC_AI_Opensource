@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 from dpagent.engine import state
-from dpagent.pipelines import deploy, loader
+from dpagent.pipelines import approval, deploy, loader
 
 requires_psql = pytest.mark.skipif(
     shutil.which("psql") is None, reason="psql is not installed on this machine")
@@ -53,6 +53,13 @@ def _pipeline(root):
     (d / "models").mkdir()
     (d / "models" / "stg_a.sql").write_text("select 1 as id\n")
     (d / "models" / "stg_b.sql").write_text("select 1 as id\n")
+    loaded = loader.load("demo", root)
+    # Every test below exercises deploy() mechanics unrelated to the
+    # approval gate (see test_pipelines_approval.py /
+    # test_deploy_refuses_a_draft_pipeline* for that) - defaulting this
+    # fixture to already-reviewed keeps them from all needing --allow-draft
+    # just to run at all.
+    approval.promote(loaded, "test-fixture")
     return loader.load("demo", root)
 
 
@@ -825,6 +832,130 @@ def test_deploy_does_not_touch_airflow_at_all_under_no_airflow(isolated_db, pipe
     monkeypatch.setattr(deploy, "unpause_dag", lambda name: called.append(name))
     deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False)
     assert called == []
+
+
+# ---------------------------------------------------- approval gate (M1)
+
+def _unreviewed_pipeline(tmp_path):
+    """The same shape _pipeline() builds, but never promoted - maturity
+    defaults to draft, exactly what a freshly-drafted (hand-written or
+    model-generated) pipeline looks like before anyone has reviewed it."""
+    root = tmp_path / "pipelines"
+    d = root / "demo"
+    d.mkdir(parents=True)
+    data = {
+        "name": "demo", "summary": "test",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}, "tables": ["t"]},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
+        "schedule": "*/5 * * * *",
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "t", "min": 1}]}],
+    }
+    (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    return loader.load("demo", root)
+
+
+def test_deploy_refuses_a_draft_pipeline_with_zero_side_effects(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(deploy, "write_artifacts", lambda p: calls.append("write_artifacts") or [])
+    monkeypatch.setattr(deploy, "ensure_warehouse_schema", lambda p: calls.append("schema") or "")
+    monkeypatch.setattr(deploy, "install_pipeline_files", lambda p: calls.append("files") or None)
+
+    pipeline = _unreviewed_pipeline(tmp_path)
+    with pytest.raises(deploy.DeployError, match="draft"):
+        deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False)
+
+    assert calls == [], "a refused draft must not call a single deploy step, not even under --no-db --no-airflow"
+
+
+def test_deploy_refuses_even_under_no_db_and_no_airflow(tmp_path):
+    """The gate lives in deploy() itself, not deploy_cmd's own flags - the
+    exact gap flagged before this was built: --no-db --no-airflow used to
+    still write pipelines/<name>/build/ for an unreviewed pipeline."""
+    pipeline = _unreviewed_pipeline(tmp_path)
+    with pytest.raises(deploy.DeployError):
+        deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False)
+
+
+def test_deploy_yes_flag_does_not_bypass_the_draft_gate(tmp_path):
+    """`--yes` (apply_db=True, install_dag_to_airflow=True, the CLI's own
+    default) only ever skipped confirmation prompts even before this gate
+    existed - it must not become a second way past it."""
+    pipeline = _unreviewed_pipeline(tmp_path)
+    with pytest.raises(deploy.DeployError):
+        deploy.deploy(pipeline)
+
+
+def test_allow_draft_deploys_but_forces_manual_only_and_never_unpauses(
+        isolated_db, tmp_path, monkeypatch):
+    """The exact gap flagged before this was built: leaving a scheduled
+    draft merely paused is one `airflow dags unpause` away from running
+    unreviewed logic on schedule."""
+    monkeypatch.setattr(deploy, "install_pipeline_files", lambda p: "/opt/dpagent/pipelines/demo")
+    monkeypatch.setattr(deploy, "ensure_airflow_can_run_pipelines", lambda: [])
+    monkeypatch.setattr(deploy, "ensure_pipeline_secrets_available", lambda p: False)
+    monkeypatch.setattr(deploy, "install_dag", lambda p: deploy.Path("/opt/airflow/home/dags/demo.py"))
+    unpause_calls = []
+    monkeypatch.setattr(deploy, "unpause_dag",
+                        lambda name: unpause_calls.append(name))
+
+    pipeline = _unreviewed_pipeline(tmp_path)
+    assert pipeline.schedule == "*/5 * * * *"   # the manifest really does ask for a schedule
+
+    # write_artifacts() runs for real (it only writes under this tmp_path
+    # pipeline's own build/ dir) so render_dag actually gets called with
+    # whatever deploy() decided the effective pipeline should be.
+    rendered = {}
+    real_render_dag = deploy.render_dag
+    monkeypatch.setattr(deploy, "render_dag",
+                        lambda p: rendered.setdefault("schedule", p.schedule) or real_render_dag(p))
+
+    result = deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=True,
+                           allow_draft=True)
+
+    assert rendered["schedule"] is None, "the DAG must be rendered manual-only, not the manifest's own schedule"
+    assert unpause_calls == [], "an --allow-draft deploy must never unpause the DAG"
+    assert result.dag_paused_for_draft is True
+    assert result.dag_unpaused is False
+
+
+def test_allow_draft_does_not_change_the_manifest_on_disk(tmp_path):
+    """--allow-draft is for testing, not for silently promoting - the
+    pipeline must still show as draft (and still be refused without
+    --allow-draft) after a deploy that used it."""
+    pipeline = _unreviewed_pipeline(tmp_path)
+    try:
+        deploy.deploy(pipeline, apply_db=False, install_dag_to_airflow=False, allow_draft=True)
+    except deploy.DeployError:
+        pass   # write_artifacts/etc aren't stubbed here - only the gate itself is under test
+    reloaded = loader.load("demo", pipeline.root.parent)
+    assert reloaded.is_draft
+    with pytest.raises(deploy.DeployError):
+        deploy.deploy(reloaded, apply_db=False, install_dag_to_airflow=False)
+
+
+def test_editing_a_procedure_after_promote_invalidates_the_approval(tmp_path):
+    """The gap the hash exists to close: `maturity: reviewed` alone cannot
+    tell a stale approval from a fresh one."""
+    pipeline = _pipeline(tmp_path / "pipelines")   # already promoted by the fixture helper
+    assert not pipeline.is_draft
+    proc_path = pipeline.path(pipeline.stages[2].procedure)
+    proc_path.write_text(proc_path.read_text() + "-- edited after promote\n")
+
+    reloaded = loader.load(pipeline.name, pipeline.root.parent)
+    assert not reloaded.is_draft   # the label still says reviewed...
+    with pytest.raises(deploy.DeployError, match="changed since it was approved"):
+        deploy.deploy(reloaded, apply_db=False, install_dag_to_airflow=False)   # ...but is refused anyway
+
+
+def test_editing_a_dbt_model_after_promote_invalidates_the_approval(tmp_path):
+    pipeline = _pipeline(tmp_path / "pipelines")
+    model_path = pipeline.path("models/stg_a.sql")
+    model_path.write_text(model_path.read_text() + "-- edited\n")
+
+    reloaded = loader.load(pipeline.name, pipeline.root.parent)
+    with pytest.raises(deploy.DeployError, match="changed since it was approved"):
+        deploy.deploy(reloaded, apply_db=False, install_dag_to_airflow=False)
 
 
 # ---------------------------------------------------------------- undeploy
