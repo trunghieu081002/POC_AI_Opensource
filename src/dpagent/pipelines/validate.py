@@ -205,6 +205,14 @@ class ValidationReport:
     procedures: StepResult | None = None
     assumptions: str = ""
     open_questions: list[str] = field(default_factory=list)
+    # Steps 4-5 (fixture through a real, --allow-draft Airflow run, compared
+    # against an independently-authored expected result) - a plain dict
+    # built by `fixture.fixture_report_dict()`, None until `dpagent pipeline
+    # validate --fixture/--expected` actually runs it. Kept as a dict, not a
+    # new dataclass field per sub-value, so this module never needs to know
+    # fixture.py's own internal shapes - it only ever writes back exactly
+    # what that module already decided to report.
+    fixture: dict | None = None
 
     def to_dict(self) -> dict:
         data = {
@@ -219,23 +227,36 @@ class ValidationReport:
             },
         }
         if self.dbt is not None:
-            # dbt parse, precisely: Jinja/SQL syntax and manifest-building
-            # only - no live database, so it does NOT catch a column that
-            # does not actually exist, a type mismatch, or anything else
-            # that needs a real schema to notice (dbt compile/run would,
-            # but compile needs a reachable connection - confirmed for
-            # real, docs/deploy-log.md - which this isolated check
-            # deliberately does not require).
+            # "dbt project/Jinja parse", precisely - not "SQL syntax passed":
+            # `dbt parse` builds the project's manifest (Jinja rendering,
+            # ref()/config resolution, structural checks) but never sends a
+            # single query to a real database, so it does not validate the
+            # SQL itself is even grammatically correct Postgres - a typo'd
+            # keyword ("SELEC ...") inside an otherwise well-formed Jinja
+            # block still parses clean, because dbt treats the query body as
+            # an opaque string at this stage. Only `dbt run` (steps 4-5,
+            # against a real fixture) ever actually sends this SQL to
+            # Postgres and would catch that. `dbt compile` sits in between -
+            # renders Jinja to final SQL - but still needs a reachable
+            # database connection to run at all (confirmed for real,
+            # docs/deploy-log.md), which is exactly why this isolated check
+            # uses `parse`, not `compile`.
             data["steps"]["dbt_compile"] = {
                 "status": self.dbt.status, "detail": self.dbt.detail,
-                "method": "dbt parse (Jinja/SQL syntax only, no live database - "
-                         "not dbt compile/run, and does not check against a real schema)",
+                "method": "dbt project/Jinja parse only - structure, Jinja rendering, "
+                         "ref()/config resolution; no live database, so it does NOT "
+                         "confirm the SQL itself is valid Postgres (a typo like "
+                         "'SELEC ...' still parses clean). Not dbt compile/run. The "
+                         "SQL is only actually proven by steps 4-5 (dbt run against a "
+                         "real fixture database).",
             }
         if self.procedures is not None:
             data["steps"]["procedures"] = {"status": self.procedures.status,
                                           "detail": self.procedures.detail}
         data["assumptions"] = self.assumptions
         data["open_questions"] = list(self.open_questions)
+        if self.fixture is not None:
+            data["steps"]["fixture"] = self.fixture
         return data
 
 

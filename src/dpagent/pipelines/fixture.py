@@ -1,11 +1,28 @@
 """Steps 4-5 of the validation a drafted pipeline needs before its
 *numbers* can be trusted, not just its structure/syntax (steps 1-3,
 `synth.py`/`validate.py`): load an operator-defined fixture into a
-throwaway source, deploy the draft manual-only (`--allow-draft`, M1's own
-escape hatch), run it for real through Airflow, and compare the real
-`curated` output against an independently-authored expected result -
-never the model grading its own SQL, since the fixture and the expected
-numbers are both fixed by a human before the model ever sees the BRD.
+throwaway source, deploy a throwaway *clone* of the draft manual-only
+(`--allow-draft`, M1's own escape hatch), run it for real through Airflow,
+and compare the real `curated` output against an independently-authored
+expected result - never the model grading its own SQL, since the fixture
+and the expected numbers are both fixed by a human before the model ever
+sees the BRD.
+
+Runs a *clone* of the pipeline under review, not the pipeline object
+itself, deployed under a throwaway, uuid-suffixed name
+(`make_validation_clone`) - found necessary by review, not by construction:
+`deploy()` publishes real, host-shared artifacts keyed by `pipeline.name`
+alone (the DAG id, `SHARED_PIPELINES_DIR/<name>`, the dbt project's own
+`models/<name>/` subdirectory, dlt's local state directory) and merges a
+pipeline's `${VAR}` secrets into one *shared* `pipelines.env` file used by
+every deployed pipeline. Deploying `monthly_sales` itself - even
+`--allow-draft` - to prove a draft of `monthly_sales` would overwrite the
+real `monthly_sales`'s published artifacts and could push throwaway
+database credentials into secrets another deployed pipeline reads. The
+clone gets its own name, its own renamed `${VAR}` refs, and its own,
+uniquely-named dbt model files, so nothing it deploys is a real pipeline's
+artifact - and it is always `undeploy()`-ed in a `finally`, so nothing it
+created is left behind whether the run passes, fails, or errors.
 
 Needs the same things a real `dpagent pipeline deploy --allow-draft` /
 `dpagent pipeline run` always needed - root, for the Airflow-facing parts
@@ -17,16 +34,18 @@ real against a live pipeline does.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import os
 import subprocess
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import yaml
 
 from ..engine.params import ENV_REF
 from . import pg_throwaway
-from .loader import Pipeline
+from .loader import Pipeline, Stage, Warehouse
 from .pg_throwaway import ThrowawayDB
 
 _CONN_KEYS = ("host", "port", "database", "user", "password")
@@ -50,7 +69,9 @@ def env_overrides_for_source(pipeline: Pipeline, db: ThrowawayDB) -> dict[str, s
     `${VAR}` refs in the first place; a literal value in the manifest is
     left exactly as the author wrote it. Pure inspection of the already-
     loaded manifest, no subprocess, no database - real-verifiable with
-    nothing more than a `Pipeline` object."""
+    nothing more than a `Pipeline` object. Called with the validation
+    *clone* (renamed refs), not the original pipeline - see this module's
+    own docstring for why."""
     values = {"host": db.host, "port": db.port, "database": db.database,
              "user": db.user, "password": db.password}
     overrides = {}
@@ -73,6 +94,190 @@ def env_overrides_for_warehouse(pipeline: Pipeline, db: ThrowawayDB) -> dict[str
         if ref:
             overrides[ref] = values[key]
     return overrides
+
+
+# ------------------------------------------------------------- isolation
+
+class ValidationCloneError(Exception):
+    pass
+
+
+def _validation_suffix() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def _renamed_ref(kind: str, suffix: str, key: str) -> str:
+    return f"DPAGENT_VALIDATE_{suffix.upper()}_{kind}_{key.upper()}"
+
+
+def _clone_connection(connection: dict, suffix: str) -> dict:
+    """Every `${VAR}`/`${VAR:-default}` field in a source connection dict,
+    renamed to a `DPAGENT_VALIDATE_<suffix>_SRC_<KEY>` ref unique to this
+    one validation run - a literal (non-ref) value is left untouched, same
+    rule `_ref_name` already applies everywhere else. This is what keeps a
+    validation run's throwaway credentials out of the *shared*
+    `pipelines.env` file's real secret names (`ODOO_DB_PASSWORD`, e.g.) -
+    without it, `ensure_pipeline_secrets_available()` would merge the
+    throwaway source's password in under the same key a real, currently-
+    deployed pipeline also reads, and dropping it again at cleanup would
+    take that real pipeline's own credential down with it."""
+    new_conn = dict(connection)
+    for key in _CONN_KEYS:
+        ref = _ref_name(connection.get(key))
+        if ref:
+            new_conn[key] = f"${{{_renamed_ref('SRC', suffix, key)}}}"
+    return new_conn
+
+
+def _clone_warehouse(warehouse: Warehouse, suffix: str) -> Warehouse:
+    kwargs = {}
+    for key in _CONN_KEYS:
+        value = getattr(warehouse, key)
+        ref = _ref_name(value)
+        kwargs[key] = f"${{{_renamed_ref('WH', suffix, key)}}}" if ref else value
+    # Schema is deliberately NOT renamed here for a dbt-engine stage: a
+    # model's own `{{ config(schema='...') }}` is a literal string baked
+    # into its .sql file (dpagent never parses/rewrites model SQL - the
+    # model-authoring convention this project uses, confirmed against
+    # every real model under pipelines/*/models/), so renaming
+    # warehouse.schema alone would make compare_curated() look in a schema
+    # dbt never actually wrote into. Real isolation for a dbt-produced
+    # table already comes from the throwaway *database* itself (a whole
+    # separate Postgres database, not just a schema within the real one) -
+    # renaming schema on top of that would help only a procedure-engine
+    # stage (which does resolve warehouse.schema literally, via
+    # PGOPTIONS's search_path) while silently breaking comparison against
+    # a dbt-produced curated table, so it is left as the original
+    # pipeline declared it.
+    return Warehouse(schema=warehouse.schema, **kwargs)
+
+
+def _model_alias(model: str, suffix: str) -> str:
+    """A dbt-engine stage's model file, renamed - dbt resolves a model by
+    its filename stem across the *whole* shared project
+    (`deploy.install_dbt_models`'s own comment/collision check), not per
+    pipeline, so a validation clone publishing a model file under its
+    original name would either collide with (or silently shadow) the real
+    pipeline's own already-published model of the same name. Renaming the
+    file itself - not just the directory it lands in - is what makes this
+    collision-free regardless of whether the real pipeline of the same
+    name happens to be deployed at the same time."""
+    return f"{model}__validate_{suffix}"
+
+
+def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, str]:
+    """Builds a complete, on-disk, throwaway clone of `pipeline` under a
+    unique name - `<name>__validate__<suffix>` - with its own renamed
+    `${VAR}` secret refs and its own uniquely-named dbt model files, ready
+    to pass to `deploy_mod.deploy(clone, allow_draft=True)`.
+
+    A real directory under `workdir`, not just an in-memory `Pipeline` with
+    a different `.name`: `deploy.install_pipeline_files()` publishes a
+    pipeline by literally `shutil.copytree`-ing `pipeline.root` - the copy
+    it publishes (and the DAG task later reloads via `loader.load()`) must
+    itself already be the clone's own manifest, not the original's.
+    """
+    suffix = _validation_suffix()
+    clone_name = f"{pipeline.name}__validate__{suffix}"
+    clone_root = workdir / clone_name
+    (clone_root / "models").mkdir(parents=True, exist_ok=True)
+
+    new_source = replace(pipeline.source,
+                         connection=_clone_connection(pipeline.source.connection, suffix))
+    new_warehouse = _clone_warehouse(pipeline.warehouse, suffix)
+
+    model_alias: dict[str, str] = {}
+    new_stages: list[Stage] = []
+    for stage in pipeline.stages:
+        if stage.engine == "dbt":
+            aliased = []
+            for model in stage.models:
+                alias = _model_alias(model, suffix)
+                model_alias[model] = alias
+                aliased.append(alias)
+                content = pipeline.path(f"models/{model}.sql").read_text(encoding="utf-8")
+                (clone_root / "models" / f"{alias}.sql").write_text(content, encoding="utf-8")
+            new_stages.append(replace(stage, models=aliased))
+        elif stage.engine == "procedure":
+            # Procedures are applied straight against `pipeline.warehouse`
+            # (a whole throwaway *database*, distinct from every other
+            # pipeline's) - not published into any shared, cross-pipeline
+            # location the way dbt models are, so no rename is needed for
+            # the file itself to stay collision-free.
+            src = pipeline.path(stage.procedure)
+            dest = clone_root / stage.procedure
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            new_stages.append(stage)
+        else:
+            new_stages.append(stage)
+
+    clone = Pipeline(
+        name=clone_name,
+        summary=f"[validation clone of {pipeline.name}] {pipeline.summary}",
+        root=clone_root,
+        source=new_source,
+        warehouse=new_warehouse,
+        stages=new_stages,
+        schedule=None,
+        timeouts=dict(pipeline.timeouts),
+        maturity="draft",
+    )
+    _write_clone_manifest(clone, clone_root)
+    return clone, suffix
+
+
+def _stage_to_dict(stage: Stage) -> dict:
+    data: dict = {"name": stage.name}
+    if stage.engine:
+        data["engine"] = stage.engine
+    if stage.depends_on:
+        data["depends_on"] = stage.depends_on
+    if stage.models:
+        data["models"] = list(stage.models)
+    if stage.procedure:
+        data["procedure"] = stage.procedure
+    if stage.gates:
+        data["gates"] = [{"type": g.type, **g.params} for g in stage.gates]
+    if stage.quarantine:
+        data["quarantine"] = {"reject_threshold_pct": stage.quarantine.reject_threshold_pct}
+    return data
+
+
+def _write_clone_manifest(clone: Pipeline, root: Path) -> None:
+    """The clone's own `pipeline.yaml`, matching exactly the shape
+    `loader.load()` expects - written for real (not merely held in memory)
+    because `deploy.install_pipeline_files()` publishes a pipeline by
+    copying its directory verbatim, and the DAG task that later runs it
+    reloads this same file fresh, by name, from that published copy."""
+    source_data: dict = {"connector": clone.source.connector}
+    if clone.source.connection:
+        source_data["connection"] = dict(clone.source.connection)
+    if clone.source.tables:
+        source_data["tables"] = list(clone.source.tables)
+    if clone.source.files:
+        source_data["files"] = dict(clone.source.files)
+    if clone.source.resources:
+        source_data["resources"] = list(clone.source.resources)
+    if clone.source.incremental:
+        source_data["incremental"] = clone.source.incremental
+
+    data = {
+        "name": clone.name,
+        "summary": clone.summary,
+        "source": source_data,
+        "warehouse": {
+            "host": clone.warehouse.host, "port": clone.warehouse.port,
+            "database": clone.warehouse.database, "user": clone.warehouse.user,
+            "password": clone.warehouse.password, "schema": clone.warehouse.schema,
+        },
+        "stages": [_stage_to_dict(s) for s in clone.stages],
+        "maturity": "draft",
+    }
+    if clone.timeouts:
+        data["timeouts"] = dict(clone.timeouts)
+    (root / "pipeline.yaml").write_text(
+        yaml.safe_dump(data, sort_keys=False), encoding="utf-8", newline="\n")
 
 
 @dataclass
@@ -199,7 +404,15 @@ def _temporarily(overrides: dict[str, str]):
     pipeline's ${VAR} refs from this process's environment (its own
     docstring), which is why this must happen before deploy() runs, not
     after; restoring afterward keeps this a scoped effect, not a
-    permanent mutation of the caller's process."""
+    permanent mutation of the caller's process.
+
+    This only ever scopes the *renamed*, clone-only ref names
+    `make_validation_clone` invented - never a real pipeline's own secret
+    name - so restoring/clearing them on exit cannot affect any other
+    pipeline's environment, in this process or (via
+    `ensure_pipeline_secrets_available`'s shared `pipelines.env` file,
+    released again by `undeploy()` in `run_fixture`'s own `finally`)
+    Airflow's."""
     previous = {k: os.environ.get(k) for k in overrides}
     os.environ.update(overrides)
     try:
@@ -212,20 +425,44 @@ def _temporarily(overrides: dict[str, str]):
                 os.environ[key] = value
 
 
+def _summarize_undeploy(result) -> str:
+    parts = []
+    if result.dag_file_removed or result.dag_deleted_from_airflow:
+        parts.append("DAG removed")
+    if result.dag_delete_failed:
+        parts.append(f"DAG delete FAILED: {result.dag_delete_note}")
+    if result.published_files_removed:
+        parts.append("published files removed")
+    if result.dbt_models_removed:
+        parts.append("dbt models removed")
+    if result.dlt_state_removed:
+        parts.append("dlt state removed")
+    if result.secrets_removed:
+        parts.append(f"secrets released: {', '.join(result.secrets_removed)}")
+    if result.secrets_note:
+        parts.append(f"secrets note: {result.secrets_note}")
+    return "; ".join(parts) if parts else "nothing to remove (deploy never got far enough)"
+
+
 @dataclass
 class FixtureRunReport:
     """What actually happened running a fixture through a real, deployed
-    (`--allow-draft`) pipeline, twice - not a single pass/fail, because
-    each stage this needs (seeding, deploy, two real Airflow runs,
-    comparing) can fail or be unavailable for a different reason, and a
-    reviewer needs to see which one."""
+    (`--allow-draft`) validation clone, twice - not a single pass/fail,
+    because each stage this needs (seeding, deploy, two real Airflow runs,
+    comparing, cleanup) can fail or be unavailable for a different reason,
+    and a reviewer needs to see which one."""
+    clone_name: str = ""
     seeded: bool = False
     deployed: bool = False
+    run_ids: list[int] = field(default_factory=list)
     run1_status: str = ""
     run2_status: str = ""
     comparison_after_run1: ComparisonResult | None = None
     comparison_after_run2: ComparisonResult | None = None
     unavailable_reason: str = ""   # set, not an exception, when root/sudo is missing
+    cleanup_attempted: bool = False
+    cleanup_ok: bool = False
+    cleanup_detail: str = ""
 
     @property
     def idempotent(self) -> bool:
@@ -239,9 +476,15 @@ class FixtureRunReport:
 
     @property
     def ok(self) -> bool:
+        """Passing requires cleanup to have actually succeeded too - a run
+        that got the right numbers but left a validation DAG, published
+        files, or leaked secrets behind is not a clean result (the user's
+        own review: "Validation không được coi là hoàn chỉnh nếu chạy pass
+        nhưng cleanup fail")."""
         return (self.seeded and self.deployed
                 and self.run1_status == "ok" and self.run2_status == "ok"
-                and self.idempotent)
+                and self.idempotent
+                and (not self.cleanup_attempted or self.cleanup_ok))
 
 
 def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResult, *,
@@ -249,13 +492,18 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                 sleep=None, clock=None) -> FixtureRunReport:
     """The real thing steps 1-3 cannot prove: that a drafted pipeline's
     *numbers* are right, not just that it is well-formed and its SQL
-    parses. Throwaway source seeded with `fixture_obj`, throwaway
-    warehouse, the pipeline deployed `--allow-draft` (M1's own manual-only
-    escape hatch - never unpaused, never scheduled), triggered and waited
-    for through a real Airflow DAG run - twice, since a non-idempotent
-    transform is exactly the kind of bug that looks fine on the first run
-    - then the real `curated` output compared against `expected` after
-    each run.
+    parses. A throwaway *clone* of `pipeline` (`make_validation_clone` -
+    its own name, its own renamed secrets, its own dbt model files, never
+    the real pipeline's own artifacts) is deployed `--allow-draft` (M1's
+    own manual-only escape hatch - schedule forced to None), its DAG
+    unpaused (a manual run of a still-paused DAG is created `queued` and
+    never starts - `deploy.unpause_dag`'s own docstring), triggered and
+    waited for through a real Airflow DAG run - twice, since a
+    non-idempotent transform is exactly the kind of bug that looks fine on
+    the first run - then the real `curated` output compared against
+    `expected` after each run. The clone is always `undeploy()`-ed in a
+    `finally`, whether the run passed, failed, or errored, so nothing it
+    created is left behind.
 
     Needs root (`deploy()`'s own Airflow-facing steps - DAG install,
     secrets sync, unpause/trigger machinery) and passwordless sudo to the
@@ -267,59 +515,194 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
     same reasoning `validate.check_procedures`'s own `skipped` status
     already applies.
     """
+    import tempfile
     import time as _time
     sleep = sleep or _time.sleep
     clock = clock or _time.monotonic
 
+    from . import deploy as deploy_mod
+    from ..engine import state
+
     report = FixtureRunReport()
-    try:
-        with pg_throwaway.throwaway_database(prefix="dpagent_fixture_src") as src_db, \
-             pg_throwaway.throwaway_database(prefix="dpagent_fixture_wh") as wh_db:
-            seed_source(fixture_obj, src_db)
-            report.seeded = True
 
-            overrides = {**env_overrides_for_source(pipeline, src_db),
-                        **env_overrides_for_warehouse(pipeline, wh_db)}
-            with _temporarily(overrides):
-                from . import deploy as deploy_mod
-                from ..engine import state
+    with tempfile.TemporaryDirectory(prefix="dpagent_validate_clone_") as tmp:
+        try:
+            clone, suffix = make_validation_clone(pipeline, Path(tmp))
+        except Exception as exc:
+            report.unavailable_reason = f"could not build a validation clone: {exc}"
+            return report
+        report.clone_name = clone.name
 
-                try:
-                    deploy_mod.deploy(pipeline, allow_draft=True)
-                except deploy_mod.DeployError as exc:
-                    report.unavailable_reason = f"deploy() failed (needs root): {exc}"
-                    return report
-                report.deployed = True
+        # Astronomically unlikely with a random 8-hex suffix, but a real
+        # collision (or a stale clone from a previous run that crashed
+        # before its own undeploy) must refuse to deploy over it rather
+        # than silently share artifacts with whatever is already there.
+        if clone.name in deploy_mod.deployed_names():
+            report.unavailable_reason = (
+                f"refusing to run: name collision - {clone.name!r} is already a "
+                f"deployed pipeline name - re-run validate again (a fresh suffix "
+                f"is generated every time)")
+            return report
 
-                for attempt in (1, 2):
-                    run_id = state.start_run("data", pipeline.name)
-                    triggered = deploy_mod.trigger_dag(pipeline.name, run_id)
-                    if triggered.returncode != 0:
-                        setattr(report, f"run{attempt}_status", "trigger_failed")
+        deployed = False
+        try:
+            with pg_throwaway.throwaway_database(prefix="dpagent_fixture_src") as src_db, \
+                 pg_throwaway.throwaway_database(prefix="dpagent_fixture_wh") as wh_db:
+                seed_source(fixture_obj, src_db)
+                report.seeded = True
+
+                overrides = {**env_overrides_for_source(clone, src_db),
+                            **env_overrides_for_warehouse(clone, wh_db)}
+                with _temporarily(overrides):
+                    try:
+                        deploy_mod.deploy(clone, allow_draft=True)
+                    except deploy_mod.DeployError as exc:
+                        report.unavailable_reason = f"deploy() failed (needs root): {exc}"
+                        return report
+                    deployed = True
+                    report.deployed = True
+
+                    # --allow-draft never unpauses (M1's own guarantee for a
+                    # pipeline nobody has reviewed) - a validation clone is
+                    # never promoted, so it would stay paused forever
+                    # without this explicit, scoped unpause. Still
+                    # manual-only: schedule stayed None throughout, so
+                    # unpausing only lets *this* trigger_dag() call below
+                    # actually start, never a schedule.
+                    unpaused = deploy_mod.unpause_dag(clone.name)
+                    if unpaused.returncode != 0:
                         report.unavailable_reason = (
-                            f"could not trigger run {attempt}: {triggered.stderr.strip()}")
+                            f"could not unpause validation DAG {clone.name!r} (a "
+                            f"manual run of a still-paused DAG is created queued "
+                            f"and never starts): "
+                            f"{(unpaused.stderr or unpaused.stdout).strip()}")
                         return report
 
-                    deadline = clock() + wait_timeout
-                    status = "running"
-                    while True:
-                        row = state.get_run(run_id)
-                        if row is not None and row["status"] != "running":
-                            status = row["status"]
-                            break
-                        if clock() >= deadline:
-                            break
-                        sleep(poll_interval)
-                    setattr(report, f"run{attempt}_status", status)
-                    if status != "ok":
-                        return report
+                    for attempt in (1, 2):
+                        run_id = state.start_run("data", clone.name)
+                        report.run_ids.append(run_id)
+                        triggered = deploy_mod.trigger_dag(clone.name, run_id)
+                        if triggered.returncode != 0:
+                            setattr(report, f"run{attempt}_status", "trigger_failed")
+                            report.unavailable_reason = (
+                                f"could not trigger run {attempt}: {triggered.stderr.strip()}")
+                            return report
 
-                    comparison = compare_curated(expected, wh_db, schema=pipeline.warehouse.schema)
-                    setattr(report, f"comparison_after_run{attempt}", comparison)
-                    if not comparison.ok:
-                        return report
-    except pg_throwaway.ThrowawayUnavailable as exc:
-        report.unavailable_reason = str(exc)
-        return report
+                        deadline = clock() + wait_timeout
+                        status = "running"
+                        while True:
+                            row = state.get_run(run_id)
+                            if row is not None and row["status"] != "running":
+                                status = row["status"]
+                                break
+                            if clock() >= deadline:
+                                status = "timeout"
+                                break
+                            sleep(poll_interval)
+                        setattr(report, f"run{attempt}_status", status)
+                        if status != "ok":
+                            return report
+
+                        comparison = compare_curated(expected, wh_db, schema=clone.warehouse.schema)
+                        setattr(report, f"comparison_after_run{attempt}", comparison)
+                        if not comparison.ok:
+                            return report
+        except pg_throwaway.ThrowawayUnavailable as exc:
+            report.unavailable_reason = str(exc)
+            return report
+        finally:
+            # Cleanup happens whether the run passed, failed validation, or
+            # errored out - "Validation không được coi là hoàn chỉnh nếu
+            # chạy pass nhưng cleanup fail" (the user's own review): a
+            # passing comparison with a failed cleanup is not `report.ok`.
+            if deployed:
+                report.cleanup_attempted = True
+                try:
+                    undeploy_result = deploy_mod.undeploy(clone)
+                    report.cleanup_ok = not undeploy_result.dag_delete_failed
+                    report.cleanup_detail = _summarize_undeploy(undeploy_result)
+                except Exception as exc:
+                    report.cleanup_ok = False
+                    report.cleanup_detail = f"undeploy failed: {exc}"
 
     return report
+
+
+# --------------------------------------------------------------- reporting
+
+def hash_file(path: Path) -> str:
+    """Same shape as `approval.content_hash()` ("sha256:<hex>") for a
+    single file - `pipeline_hash`/`fixture_hash`/`expected_hash` in the
+    validation report, so a reviewer (or a future automated check) can tell
+    whether the report on disk still describes the exact pipeline, fixture,
+    and expected-result files it was generated against, or is stale because
+    one of the three has since changed."""
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return f"sha256:{digest}"
+
+
+def gate_summary_for_run(run_id: int) -> dict:
+    """Every gate's real verdict for one dpagent run, from the same journal
+    `dpagent pipeline audit` reads - not inferred from run1_status alone,
+    since a stage can pass with rows correctly quarantined (the fixture's
+    own deliberately-bad rows are supposed to do exactly that, not fail the
+    whole run) and this is what actually proves gate/quarantine behaviour
+    was exercised, the M2.5 "bad data: gate/quarantine hoạt động" case."""
+    from ..engine import state
+
+    summary: dict[str, dict[str, str]] = {}
+    for stage_row in state.stages_for_run(run_id):
+        gates = state.gates_for_stage(stage_row["id"])
+        if not gates:
+            continue
+        summary[stage_row["stage"]] = {g["gate_type"]: g["status"] for g in gates}
+    return summary
+
+
+def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
+                        fixture_hash: str = "", expected_hash: str = "") -> dict:
+    """The steps-4-5 section of `.synth-validation.yaml` - everything the
+    user's own review asked this report to carry: content hashes (so a
+    later edit to the pipeline, fixture, or expected file makes this
+    section visibly stale against a fresh recompute), real run ids (an
+    operator can `dpagent pipeline audit <id>` either one directly), per-run
+    comparison/idempotency verdicts, real gate verdicts per run, and
+    cleanup's own pass/fail - a passing comparison with a failed cleanup is
+    not reported as an overall pass."""
+    def _cmp_status(c: ComparisonResult | None) -> str:
+        if c is None:
+            return "not_run"
+        return "pass" if c.ok else "fail"
+
+    def _gates(run_id: int | None) -> dict:
+        return gate_summary_for_run(run_id) if run_id is not None else {}
+
+    run1_id = report.run_ids[0] if len(report.run_ids) > 0 else None
+    run2_id = report.run_ids[1] if len(report.run_ids) > 1 else None
+
+    if report.unavailable_reason:
+        overall = "unavailable"
+    elif report.ok:
+        overall = "pass"
+    else:
+        overall = "fail"
+
+    return {
+        "clone_name": report.clone_name,
+        "pipeline_hash": pipeline_hash,
+        "fixture_hash": fixture_hash,
+        "expected_hash": expected_hash,
+        "run_ids": list(report.run_ids),
+        "run_status": {"run_1": report.run1_status or "not_run",
+                      "run_2": report.run2_status or "not_run"},
+        "comparison": {"run_1": _cmp_status(report.comparison_after_run1),
+                       "run_2": _cmp_status(report.comparison_after_run2),
+                       "idempotent": report.idempotent},
+        "gates": {"run_1": _gates(run1_id), "run_2": _gates(run2_id)},
+        "cleanup": {"attempted": report.cleanup_attempted,
+                    "status": ("pass" if report.cleanup_ok else
+                              "fail" if report.cleanup_attempted else "not_attempted"),
+                    "detail": report.cleanup_detail},
+        "unavailable_reason": report.unavailable_reason,
+        "overall": overall,
+    }
