@@ -3049,3 +3049,53 @@ verified both directions for real:
 zero-side-effect refusal, `--allow-draft`'s forced manual-only DAG) and
 `tests/test_cli_pipeline.py` (`promote_cmd`, `--allow-draft` threading, the
 paused-draft message never suggesting a manual unpause). Full suite green.
+
+### 2026-09-29 — Layer 3 M2 (start): model drafts a pipeline from a BRD, or asks a blocker instead of guessing
+
+First half of Layer 3 ("BRD/report specs -> drafted pipeline, for a human
+to review"), built on top of the same day's M1 approval gate: a model can
+now draft a full pipeline (`pipeline.yaml` + its `models/`/`procedures/`
+SQL) from a BRD, through `dpagent pipeline synth <name> --brd FILE --schema
+FILE`.
+
+The rule that mattered most in the spec discussion before this was built:
+a BRD silent or ambiguous about anything that would change the actual
+numbers must produce a blocking question, never a guess that looks
+complete - `docs/layer2.md`'s own "wrong numbers stay green" applies at
+authoring time too, not just run time. `synth()` returns
+`result.blocked`/`result.blockers` and writes nothing at all when this
+fires.
+
+Same "never trust the model" discipline `router.py` already applies to
+pack routing, extended to this artifact:
+- every connector/gate/engine name checked against the real catalog
+  (`synth.capability_catalog()`, generated from `loader.py`/`extract.py`'s
+  own constants - not a hand-maintained list that could drift);
+- file paths limited to `pipeline.yaml` and `.sql` under `models/`/
+  `procedures/` - no `.sh`, no path escapes;
+- **a drafted pipeline can never write its own `.approved.yaml`** - the
+  single guard that actually connects this to M1's gate; without it a
+  model could self-approve straight past `deploy()`'s refusal;
+- `maturity` is never the model's to set - stripped regardless of what it
+  wrote, `loader.load()`'s own default (draft) is the only value a fresh
+  draft can have;
+- the draft is loaded through the real `loader.load()` right after writing
+  (steps 1-2 of the design's 5-step validation list: structure, then the
+  real parser) - kept on disk either way so a reviewer can see what the
+  model actually produced, `result.load_error` naming the failure when it
+  does not load clean.
+
+23 new tests (`tests/test_pipelines_synth.py`, `tests/test_cli_pipeline.py`)
+via the same `FakeReply` stand-in `tests/test_router.py` already uses for
+pack routing - no LLM credential needed to cover every safety mechanism
+above, including the self-approval-forgery attempt and every disallowed
+file path. Full suite green.
+
+**Not yet done, not claimed done**: no real LLM call has been made against
+this (no credential configured on this host) - the safety scaffolding is
+real-code-real-tested, the actual drafting behavior against a real model is
+not yet verified. Steps 3-5 of the design's validation list (compile the
+dbt part / run a procedure against a throwaway database, execute against an
+operator-defined fixture, compare against an independently-defined expected
+result) are not built - `synth` only covers structural validation (steps
+1-2). Both gaps are the explicit next step, not an oversight.

@@ -313,6 +313,9 @@ Mirrors the install/verify/test verbs, for the same reasons:
 ```
 dpagent pipeline list             # every pipeline: connector, deployed?, last run - and any
                                  #   deployed pipeline whose manifest is no longer in this checkout
+dpagent pipeline synth <name>    # draft pipeline.yaml + its SQL from a BRD (--brd/--schema files) -
+  --brd FILE --schema FILE       #   writes maturity: draft, or a blocker instead of guessing at
+                                 #   anything that would change the numbers ("Authoring..." below)
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline promote <name>  # record approval of this pipeline's current manifest +
@@ -386,6 +389,66 @@ already been reviewed over the course of building this project), and
 `deploy`'s refusal-then-acceptance and its later re-refusal after a
 procedure was deliberately edited were both verified for real on this same
 host, not just unit-tested (docs/deploy-log.md, 2026-09-29).
+
+### The model's side: `dpagent pipeline synth`
+
+The gate above is the precondition; `dpagent pipeline synth <name> --brd
+FILE --schema FILE` is the first thing it makes safe to build: a model
+turns a BRD into a draft `pipeline.yaml` plus whatever `models/*.sql` /
+`procedures/*.sql` it references - the same shape `dpagent synth` already
+writes for a pack, aimed at this document's own artifact instead.
+
+**The one rule that matters more than any other**: a BRD that is silent or
+ambiguous about anything that would change the actual numbers - which date
+field, currency handling, whether cancelled rows count, which company -
+must produce a *blocker* (a question the model refuses to guess past), not
+a pipeline that looks complete. "wrong numbers stay green" (this document's
+own opening line) is exactly the failure mode a model confidently guessing
+would reproduce at authoring time instead of run time. `synth` returns
+`result.blocked` with the question(s) and writes nothing at all when this
+fires - never a partial draft.
+
+What is never trusted, checked the same way `router.py` already refuses a
+hallucinated pack name before it becomes an install:
+
+- Every `source.connector` / gate `type` / stage `engine` the model writes
+  is checked against the real catalog (`synth.capability_catalog()`,
+  generated from `loader.py`/`extract.py`'s own constants, not a
+  hand-maintained copy that could drift) - a name that is not exactly one
+  of those is not "close enough."
+- **A drafted pipeline can never write its own `.approved.yaml`** - the one
+  guard that actually connects M2 to M1's gate above. Without it, a model
+  could self-approve and walk straight past `deploy()`'s refusal; `synth`
+  raises before writing anything if the reply tries.
+- File paths are limited to `pipeline.yaml` itself and `.sql` files under
+  `models/`/`procedures/` - no `.sh`, no path escaping the pipeline's own
+  directory.
+- `maturity` is never the model's to set - `synth` strips whatever it wrote
+  and lets `loader.load()`'s own default (draft) apply, the only value a
+  freshly drafted pipeline can ever have.
+- The draft is loaded through the real `loader.load()` immediately after
+  writing (docs/layer2.md's validation list, steps 1-2: structure, then the
+  real parser) - a hallucinated gate type or a missing required field fails
+  right there. The files are kept on disk either way (`result.load_error`
+  names the failure) so a reviewer can see what the model actually wrote
+  instead of it silently vanishing; a still-`draft` pipeline cannot be
+  deployed regardless of whether it happens to load.
+
+Input the operator supplies, none of it a live connection: the BRD text, a
+**verified** source schema (real table/column names/types plus a one-line
+meaning for anything not self-evident - its absence for a column the BRD
+needs is itself grounds for a blocker, not an invented column), and the
+`${ENV_VAR}` secret names the draft may reference. `synth` refuses to run
+at all against a blank schema rather than draft blind.
+
+**Status: built and unit-tested (FakeReply-style, no real model call) -
+not yet real-verified against a live LLM call.** Steps 3-5 of the full
+validation list this document's own design calls for (compile the dbt
+part / run a procedure against a throwaway database, execute against a
+fixture, compare against an independently-defined expected result - never
+the model grading its own SQL) are not built yet; `synth` only covers
+steps 1-2. Both are needed before a model-drafted pipeline can be called
+done, not just drafted.
 
 ## In scope (MVP)
 
