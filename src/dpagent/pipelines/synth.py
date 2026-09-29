@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -24,6 +25,7 @@ import yaml
 from . import approval as approval_mod
 from . import extract as extract_mod
 from . import loader as loader_mod
+from . import validate as validate_mod
 from ..llm import client as llm
 
 _SQL_PATH = re.compile(r"^(models|procedures)/[^./][^/]*\.sql$")
@@ -54,6 +56,10 @@ class SynthResult:
     mapping: str = ""
     notes: str = ""
     load_error: str = ""   # set when the draft failed loader.load() - kept on disk anyway
+    # validate.ValidationReport | None - step 3's result, also written to
+    # .synth-validation.yaml; None only when load_error is set (nothing to
+    # compile-check yet).
+    validation: "validate_mod.ValidationReport | None" = None
 
     @property
     def blocked(self) -> bool:
@@ -205,13 +211,38 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
     # fixing a near-miss draft by hand needs to see what the model actually
     # wrote, not have it vanish.
     load_error = ""
+    loaded_pipeline = None
     try:
-        loader_mod.load(request.name, pipelines_dir or loader_mod.PIPELINES_DIR)
+        loaded_pipeline = loader_mod.load(request.name, pipelines_dir or loader_mod.PIPELINES_DIR)
     except loader_mod.PipelineError as exc:
         load_error = str(exc)
+
+    # Step 3 (docs/layer2.md's 5-step list): does the SQL a stage
+    # references actually compile/apply for real, in an isolation
+    # check_compiles() builds itself - only meaningful once the manifest
+    # itself parses; a structurally broken draft has nothing here worth
+    # compiling, but the report is still written either way (with load
+    # itself recorded as the failure) - a reviewer needs one place that
+    # says what happened, not a missing file when things went worst.
+    # Written to .synth-validation.yaml - never part of what gets promoted
+    # or executed (excluded from approval.py's hash and from what a model
+    # itself is even allowed to write, _safe_relative's own allowlist
+    # above).
+    if loaded_pipeline is not None:
+        validation = validate_mod.validate_pipeline(
+            loaded_pipeline, generator="dpagent pipeline synth", model=llm.get_model(),
+            assumptions=str(data.get("notes", "")))
+    else:
+        validation = validate_mod.ValidationReport(
+            generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            generator="dpagent pipeline synth", model=llm.get_model(),
+            load_ok=False, load_error=load_error,
+            assumptions=str(data.get("notes", "")),
+        )
+        validate_mod.write_validation_report(root, validation)
 
     return SynthResult(
         name=request.name, root=root, files=sorted(written),
         mapping=str(data.get("mapping", "")), notes=str(data.get("notes", "")),
-        load_error=load_error,
+        load_error=load_error, validation=validation,
     )

@@ -316,6 +316,9 @@ dpagent pipeline list             # every pipeline: connector, deployed?, last r
 dpagent pipeline synth <name>    # draft pipeline.yaml + its SQL from a BRD (--brd/--schema files) -
   --brd FILE --schema FILE       #   writes maturity: draft, or a blocker instead of guessing at
                                  #   anything that would change the numbers ("Authoring..." below)
+dpagent pipeline validate <name> # step 3: dbt parse / apply procedures for real, isolated -
+                                 #   any pipeline, not just a synth draft; synth already runs
+                                 #   this once itself. Writes .synth-validation.yaml (gitignored)
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
 dpagent pipeline promote <name>  # record approval of this pipeline's current manifest +
@@ -441,14 +444,59 @@ needs is itself grounds for a blocker, not an invented column), and the
 `${ENV_VAR}` secret names the draft may reference. `synth` refuses to run
 at all against a blank schema rather than draft blind.
 
-**Status: built and unit-tested (FakeReply-style, no real model call) -
-not yet real-verified against a live LLM call.** Steps 3-5 of the full
-validation list this document's own design calls for (compile the dbt
-part / run a procedure against a throwaway database, execute against a
-fixture, compare against an independently-defined expected result - never
-the model grading its own SQL) are not built yet; `synth` only covers
-steps 1-2. Both are needed before a model-drafted pipeline can be called
-done, not just drafted.
+**Status: code-complete and unit-tested (FakeReply-style, no real model
+call) - not yet integration- or real-verified against a live LLM call.**
+That phrasing matters: an earlier pass of this document said
+"real-code-real-tested," which reads as implying a real model/database/
+Airflow run already happened. It had not. Steps 1-3 are built; steps 4-5
+are not.
+
+### Step 3: does the SQL actually compile/apply - `dpagent pipeline validate`
+
+`synth()` calls this itself right after a draft loads clean, and it is
+also its own command (`dpagent pipeline validate <name>`) - works on any
+pipeline, hand-written or drafted, useful to re-check after a manual edit.
+Writes `pipelines/<name>/.synth-validation.yaml` (gitignored, regenerated
+every run - a report for a reviewer, never part of what gets promoted or
+executed: outside `approval.py`'s hash, and not a path a model is even
+allowed to write to under `synth`'s own file allowlist).
+
+- **dbt-engine stages**: `dbt parse` inside a throwaway project this
+  function builds from scratch (its own `dbt_project.yml`/`profiles.yml`,
+  copies of just this pipeline's own model files) - never the real, shared
+  `/opt/dbt/project` a promoted pipeline's models actually land in (not
+  even readable by an unprivileged operator on this host - `dbtread`-group
+  only). Real pipelines in this project reference their landing table by
+  its literal, schema-qualified name (`from demo_landing.res_partner`,
+  e.g.), never dbt's own `source()`/cross-project `ref()` machinery, so
+  this isolated project parses clean with no `sources.yml` and no live
+  database connection needed. Verified for real, not just unit-tested:
+  `pipelines/quickstart_dbt`'s actual model parses clean through this exact
+  path; a deliberately broken copy of the same file fails with a real dbt
+  compile error (docs/deploy-log.md, 2026-09-29).
+- **procedure-engine stages**: `CREATE OR REPLACE PROCEDURE` applied for
+  real against a throwaway database/role this function creates and drops
+  itself (unique names per call, dropped in a `finally`) - never the
+  warehouse a promoted pipeline would actually use. Needs passwordless
+  sudo to the postgres OS user, the same requirement `packs/postgres`'s own
+  acceptance suite already has - **skipped**, not failed, when that is not
+  available, since its absence says nothing about the procedure's own
+  correctness. This host's own operator does not have that access, so only
+  the `skipped` path is real-verified here, not `pass`/`fail` - those are
+  unit-tested with the subprocess call mocked (same known, pre-existing
+  limitation `tests/test_pipelines_runtime.py`'s own `throwaway_warehouse`
+  fixture already hits).
+
+### Steps 4-5: not built yet
+
+Run the draft against an operator-defined fixture through a real,
+`--allow-draft` deploy (`dpagent pipeline run --wait`), then compare the
+real `curated` output against an independently-authored expected result -
+never the model grading its own SQL, the fixture and the expected numbers
+both fixed by a human before the model ever sees the BRD's answer. This is
+the step that actually proves a drafted pipeline's *numbers* are right, not
+just that it runs; steps 1-3 only prove it is well-formed and its SQL is
+syntactically sound.
 
 ## In scope (MVP)
 

@@ -206,6 +206,43 @@ def test_synth_records_a_load_error_but_keeps_the_files_for_a_reviewer(root, mon
     assert "made_up_gate_type" in result.load_error
     assert (root / "monthly_sales" / "pipeline.yaml").exists()
 
+    assert result.validation is not None
+    assert result.validation.load_ok is False
+    assert "made_up_gate_type" in result.validation.load_error
+    report_path = root / "monthly_sales" / ".synth-validation.yaml"
+    assert report_path.exists()
+    on_disk = yaml.safe_load(report_path.read_text())
+    assert on_disk["steps"]["load"]["status"] == "fail"
+    assert "made_up_gate_type" in on_disk["steps"]["load"]["error"]
+    assert "dbt_compile" not in on_disk["steps"]   # nothing to compile-check, never attempted
+
+
+def test_synth_writes_a_validation_report_with_real_compile_check_results(root, monkeypatch):
+    """The report a reviewer actually reads - step 3 ran for real (dbt
+    parse against this exact drafted model, no mocking of the check
+    itself), not just recorded as a stub."""
+    monkeypatch.setattr(llm, "chat_json", FakeReply({
+        "files": dict(VALID_FILES), "notes": "assumed nothing not already confirmed",
+    }))
+    result = synth.synth(_request(), pipelines_dir=root)
+
+    assert result.validation is not None
+    assert result.validation.load_ok is True
+    assert result.validation.assumptions == "assumed nothing not already confirmed"
+    report_path = root / "monthly_sales" / ".synth-validation.yaml"
+    on_disk = yaml.safe_load(report_path.read_text())
+    assert on_disk["steps"]["load"]["status"] == "pass"
+    assert on_disk["steps"]["dbt_compile"]["status"] in ("pass", "fail", "skipped")
+    assert on_disk["assumptions"] == "assumed nothing not already confirmed"
+
+
+def test_synth_never_writes_a_validation_report_when_blocked(root, monkeypatch):
+    monkeypatch.setattr(llm, "chat_json", FakeReply({
+        "blockers": [{"question": "which date field?"}],
+    }))
+    synth.synth(_request(), pipelines_dir=root)
+    assert not (root / "monthly_sales").exists()   # nothing written at all, report included
+
 
 def test_synth_raises_when_the_reply_has_neither_files_nor_blockers(root, monkeypatch):
     monkeypatch.setattr(llm, "chat_json", FakeReply({"notes": "oops, forgot everything else"}))

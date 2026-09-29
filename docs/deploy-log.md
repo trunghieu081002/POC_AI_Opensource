@@ -3099,3 +3099,75 @@ dbt part / run a procedure against a throwaway database, execute against an
 operator-defined fixture, compare against an independently-defined expected
 result) are not built - `synth` only covers structural validation (steps
 1-2). Both gaps are the explicit next step, not an oversight.
+
+### 2026-09-29 — Layer 3 M2.2: real, isolated step-3 validation (dbt parse + procedure apply), plus review fixes
+
+Response to a detailed review of PR #17's M2 work. Two real things fixed,
+one real gap closed, one terminology correction, before building the
+requested M2.2 harness.
+
+**Real gap found and fixed**: `loader.load()` checked a procedure-engine
+stage's file exists, but never did the same for a dbt-engine stage's
+declared models - `deploy_mod.install_dbt_models()` had its own late check
+for this, `dpagent pipeline lint` did not, so a typo'd model name surfaced
+as a DeployError mid-deploy instead of at lint time like every other
+authoring mistake in the manifest. Fixed; every test fixture across the
+suite building a dbt-engine stage now creates the model file it declares
+(several silently relied on the gap this closes).
+
+**`synth()` gained an explicit overwrite policy**: `overwrite=False`
+(default, unchanged) refuses an existing directory; `overwrite=True`
+redrafts a `draft` (or unparseable leftover), but refuses outright - even
+with overwrite=True - against a `maturity: reviewed` pipeline, which must
+never be silently clobbered by a redraft. CLI gained `--overwrite`.
+
+**Terminology corrected**: the earlier PR description's "real-code-real-
+tested" was reasonably read as implying a real model/database/Airflow run
+had happened. It had not - restated everywhere as code-complete and
+unit-tested via FakeReply, not yet integration- or real-verified.
+
+**M2.2 built**: `src/dpagent/pipelines/validate.py` - step 3 of the
+5-step validation list, as its own module and its own command
+(`dpagent pipeline validate <name>`), not folded silently into `synth`
+alone (though `synth` calls it automatically right after a draft loads
+clean). Works on any pipeline, hand-written or drafted.
+
+- **dbt-engine stages**: `dbt parse` in a throwaway project built from
+  scratch (own `dbt_project.yml`/`profiles.yml`, copies of just this
+  pipeline's own model files) - never the real shared `/opt/dbt/project`.
+  Real pipelines in this repo reference their landing table by literal
+  schema-qualified name, not dbt `source()`/`ref()` across projects, so
+  this isolated project parses clean with no `sources.yml` and no live DB
+  connection. Verified for real: built the throwaway project, ran real
+  `dbt parse` against `pipelines/quickstart_dbt`'s actual
+  `stg_orders.sql` - passed clean; appended broken Jinja to a copy of the
+  same real file and reran - failed with a real dbt compile error, restored
+  the file after (confirmed `git diff --stat` clean). Also confirmed `dbt
+  parse` needs no live connection at all (profile points at an unreachable
+  host/db) and genuinely fails, not silently no-ops, on bad syntax (real
+  exit code 2 vs 0).
+- **procedure-engine stages**: `CREATE OR REPLACE PROCEDURE` against a
+  throwaway database/role created and dropped for real per call. Needs
+  passwordless sudo to the postgres OS user - this host's operator does
+  not have that (confirmed for real: `sudo -n` fails, and the pre-existing
+  `tests/test_pipelines_runtime.py::test_run_transform_calls_a_deployed_procedure`
+  already `skip`s for the identical reason, not something this change
+  introduced). Real-verified the `skipped` path only; `pass`/`fail` are
+  unit-tested with the subprocess call mocked.
+- `.synth-validation.yaml` (gitignored, regenerated every run): which
+  steps passed/failed, load error if any, model/provider used, timestamp,
+  the model's own stated assumptions. Never part of what gets promoted or
+  executed - outside `approval.py`'s hash, and not a path a model is even
+  allowed to write under `synth`'s own allowlist. Written even when
+  `loader.load()` itself fails (records the load failure, skips compile
+  checks - nothing to compile-check yet), not only on the happy path.
+
+Real end-to-end confirmed (FakeReply for the model call, everything
+downstream real): a fake pipeline reply drafted through `synth()` produced
+a real `.synth-validation.yaml` with a real `dbt parse` result inside it.
+
+Steps 4-5 (run against an operator-defined fixture through a real,
+`--allow-draft` deploy; compare `curated` output against an independently-
+authored expected result) are still not built - the next, larger piece,
+and the one that actually proves a drafted pipeline's numbers are right,
+not just that it is well-formed.

@@ -25,6 +25,7 @@ from ..pipelines import extract as extract_mod
 from ..pipelines import generator as generator_mod
 from ..pipelines import loader as pipelines_mod
 from ..pipelines import synth as synth_mod
+from ..pipelines import validate as validate_mod
 from ..pipelines.loader import quarantine_table_for
 from .render import confirm, console, fail
 
@@ -79,6 +80,20 @@ _STANDARD_WAREHOUSE_REFS = {
     "user": "${WAREHOUSE_DB_USER}",
     "password": "${WAREHOUSE_DB_PASSWORD}",
 }
+
+_STEP_STYLE = {"pass": "green", "fail": "red", "skipped": "dim"}
+
+
+def _print_validation_steps(report) -> None:
+    console.print(f"[bold]load:[/bold] "
+                 f"[{'green' if report.load_ok else 'red'}]"
+                 f"{'pass' if report.load_ok else 'fail'}[/]")
+    for label, step in (("dbt compile", report.dbt), ("procedures", report.procedures)):
+        if step is None:
+            continue
+        colour = _STEP_STYLE.get(step.status, "yellow")
+        console.print(f"[bold]{label}:[/bold] [{colour}]{step.status}[/{colour}]"
+                     + (f" - {step.detail}" if step.detail else ""))
 
 
 @pipeline_group.command("synth")
@@ -159,11 +174,35 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
                      f"Fix it by hand, then re-check with `dpagent pipeline lint {name}`.")
     else:
         console.print("[green]structurally valid[/green] - loads and lints clean.")
+    if result.validation is not None:
+        _print_validation_steps(result.validation)
     if result.notes:
         console.print(f"[dim]model notes: {result.notes}[/dim]")
     console.print(f"\n[yellow]This is a draft, maturity: draft.[/yellow] Read every "
                  f"file under {result.root} before `dpagent pipeline promote {name}` - "
                  f"deploy refuses it until then.")
+
+
+@pipeline_group.command("validate")
+@click.argument("name")
+def validate_cmd(name):
+    """Step 3: does the SQL this pipeline references actually compile/apply
+    for real, in isolation - never the real shared dbt project or the
+    warehouse a promoted pipeline would use.
+
+    Works on any pipeline, hand-written or drafted by `dpagent pipeline
+    synth` (which already runs this once itself, right after drafting) -
+    useful to re-check after editing a draft by hand. Writes/overwrites
+    `.synth-validation.yaml` next to the pipeline - a report for a
+    reviewer, never part of what gets promoted or executed.
+    """
+    pipeline = _load_or_fail(name)
+    report = validate_mod.validate_pipeline(pipeline, generator="dpagent pipeline validate")
+    _print_validation_steps(report)
+    path = pipeline.path(validate_mod.VALIDATION_REPORT_FILENAME)
+    console.print(f"\n[dim]written: {path}[/dim]")
+    if not (report.dbt is None or report.dbt.ok) or not (report.procedures is None or report.procedures.ok):
+        sys.exit(1)
 
 
 @pipeline_group.command("lint")

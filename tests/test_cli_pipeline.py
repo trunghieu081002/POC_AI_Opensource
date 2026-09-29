@@ -777,3 +777,51 @@ def test_synth_surfaces_file_exists_error_cleanly(db, tmp_path, monkeypatch):
 
     assert result.exit_code != 0
     assert "already exists" in result.output
+
+
+# ---------------------------------------------------------------- validate (M2.2)
+
+def test_validate_reports_skipped_steps_for_a_pipeline_with_neither_dbt_nor_procedure(
+        db, tmp_path, monkeypatch):
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code == 0, result.output
+    assert "load: pass" in result.output
+    assert "skipped" in result.output
+    assert (d / ".synth-validation.yaml").exists()
+
+
+def test_validate_exits_nonzero_when_a_compile_check_fails(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    from dpagent.pipelines.validate import StepResult, ValidationReport
+    monkeypatch.setattr(pipeline_cli.validate_mod, "validate_pipeline", lambda p, **k: ValidationReport(
+        generated_at="t", generator="dpagent pipeline validate",
+        dbt=StepResult("fail", "boom"), procedures=StepResult("skipped", "")))
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code != 0
+    assert "fail" in result.output and "boom" in result.output
+
+
+def test_validate_exits_zero_when_everything_passes(db, tmp_path, monkeypatch):
+    _draft_pipeline_dir(tmp_path, monkeypatch)
+    from dpagent.pipelines.validate import StepResult, ValidationReport
+    monkeypatch.setattr(pipeline_cli.validate_mod, "validate_pipeline", lambda p, **k: ValidationReport(
+        generated_at="t", generator="dpagent pipeline validate",
+        dbt=StepResult("pass", "1 model parsed"), procedures=StepResult("pass", "1 procedure applied")))
+
+    result = _runner().invoke(pipeline_group, ["validate", "demo"])
+
+    assert result.exit_code == 0, result.output
+    assert "pass" in result.output
+
+
+def test_validate_works_on_a_pipeline_never_drafted_by_synth(db, tmp_path, monkeypatch):
+    """The generalisation this command is for: any pipeline, hand-written
+    or model-drafted, gets exactly the same step-3 check."""
+    _draft_pipeline_dir(tmp_path, monkeypatch, name="hand_written")
+    result = _runner().invoke(pipeline_group, ["validate", "hand_written"])
+    assert result.exit_code == 0, result.output
