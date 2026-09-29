@@ -81,3 +81,74 @@ def test_env_produces_the_shape_a_pipelines_env_refs_expect():
         "SRC_HOST": "h", "SRC_PORT": "5432", "SRC_DATABASE": "d",
         "SRC_NAME": "d", "SRC_USER": "u", "SRC_PASSWORD": "p",
     }
+
+
+# ---------------------------------------------------------------- teardown verification (M2.4.2)
+
+def test_throwaway_database_records_a_confirmed_successful_teardown(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a[0] if a else [], 0, stdout="", stderr=""))
+    with pg_throwaway.throwaway_database() as db:
+        assert db.database_dropped is False   # not yet - teardown hasn't run
+        assert db.role_dropped is False
+        assert db.cleanup_ok is False
+    assert db.database_dropped is True
+    assert db.role_dropped is True
+    assert db.cleanup_ok is True
+    assert db.database_drop_error == ""
+    assert db.role_drop_error == ""
+
+
+def test_throwaway_database_records_a_failed_drop_database(monkeypatch):
+    """The P0 the M2.4.2 review found: an earlier version issued DROP
+    DATABASE without ever checking its returncode."""
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("DROP DATABASE"):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="database is in use")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.database_dropped is False
+    assert "database is in use" in db.database_drop_error
+    assert db.role_dropped is True   # DROP ROLE was still attempted and succeeded
+    assert db.cleanup_ok is False    # not True until BOTH succeed
+
+
+def test_throwaway_database_records_a_failed_drop_role(monkeypatch):
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("DROP ROLE"):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="role has dependents")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.database_dropped is True
+    assert db.role_dropped is False
+    assert "role has dependents" in db.role_drop_error
+    assert db.cleanup_ok is False
+
+
+def test_throwaway_database_never_raises_from_teardown_even_when_both_drops_fail(monkeypatch):
+    """`throwaway_database()` itself must never raise on a teardown
+    failure - doing so while the `with` block's own body is unwinding
+    (an early `return`, or a real exception) would mask whatever the body
+    was already trying to return or raise (see
+    `pg_throwaway.ThrowawayCleanupError`'s own docstring). A caller decides
+    whether/how to surface a teardown failure only after its own `with`
+    block has already exited cleanly - `check_procedures`/`run_fixture` do
+    exactly that."""
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("DROP"):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="boom")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pg_throwaway.throwaway_database() as db:
+        pass   # no exception escapes here, despite both drops failing below
+    assert db.cleanup_ok is False

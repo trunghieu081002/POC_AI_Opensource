@@ -312,6 +312,38 @@ def test_compare_curated_handles_a_value_containing_a_literal_tab(monkeypatch):
     assert result.ok is True
 
 
+def test_compare_curated_does_not_round_a_high_precision_decimal(monkeypatch):
+    """`json.loads(..., parse_float=Decimal)` on the actual side, and a
+    numeric-looking *string* on the expected side (the M2.4.2 review's own
+    recommended authoring convention for a monetary `expected.yaml` value,
+    to protect it from YAML's own lossy float parsing) - a raw JSON literal
+    with more significant digits than a native float can represent, typed
+    directly here (not built through `json.dumps` of a Python float, which
+    would already lose the precision this test exists to catch, before
+    compare_curated ever runs)."""
+    raw = '{"revenue": 123456789012345.123456789}\n'
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
+        cmd, 0, stdout=raw, stderr=""))
+    expected = fixture.ExpectedResult(
+        table="t", rows=[{"revenue": "123456789012345.123456789"}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is True, result.detail
+
+
+def test_canon_value_normalizes_decimal_int_float_and_precise_string_identically():
+    from decimal import Decimal
+    assert (fixture._canon_value(Decimal("100.00")) == fixture._canon_value(100)
+           == fixture._canon_value(100.0) == fixture._canon_value("100.00") == "100")
+    assert fixture._canon_value("123456789012345.123456789") == "123456789012345.123456789"
+    assert fixture._canon_value(Decimal("123456789012345.123456789")) == \
+        fixture._canon_value("123456789012345.123456789")
+
+
+def test_canon_value_leaves_a_non_numeric_string_untouched():
+    assert fixture._canon_value("Acme Corp") == "Acme Corp"
+    assert fixture._canon_value("2026-01") == "2026-01"   # not a pure decimal literal
+
+
 # ---------------------------------------------------------------- _temporarily
 
 def test_temporarily_restores_a_previously_set_value(monkeypatch):
@@ -337,6 +369,169 @@ def test_temporarily_restores_even_when_the_block_raises():
     assert "DPAGENT_FIXTURE_TEST_VAR_3" not in _os.environ
 
 
+# ---------------------------------------------------------------- preflight_fixture_host
+
+def test_preflight_fixture_host_is_really_unavailable_on_this_host(tmp_path):
+    """Real, not mocked - this operator has neither root nor passwordless
+    sudo to postgres on this host."""
+    pipeline = _real_pipeline(tmp_path)
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "root" in result.detail
+    assert "sudo" in result.detail
+
+
+def test_preflight_fixture_host_zero_mutation_when_it_fails(tmp_path, monkeypatch):
+    """"Nếu thiếu điều kiện: Exit 2. Chưa tạo database/role tạm. Chưa
+    seed. Chưa deploy bất cứ artifact nào" - the M2.4.2 review's own
+    Definition of Done. Confirmed by making every downstream step raise if
+    it is ever reached at all."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+
+    def boom(*a, **k):
+        raise AssertionError("must not be called when preflight fails")
+    monkeypatch.setattr(fixture.pg_throwaway, "throwaway_database", boom)
+    monkeypatch.setattr(fixture, "seed_source", boom)
+    monkeypatch.setattr(deploy_mod, "deploy", boom)
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[])
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert "preflight failed" in report.unavailable_reason
+    assert report.seeded is False
+    assert report.deployed is False
+    assert report.clone_name == ""   # never even got to building a clone
+
+
+def _mock_preflight_subprocess(monkeypatch, *, sudo_ok=True, pg_ready_ok=True,
+                               scheduler_active=True):
+    import subprocess as _sp
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:4] == ["sudo", "-n", "-u", "postgres"] and cmd[4:5] == ["true"]:
+            return _sp.CompletedProcess(cmd, 0 if sudo_ok else 1, stdout="", stderr="")
+        if cmd[:4] == ["sudo", "-n", "-u", "postgres"] and cmd[4:5] == ["pg_isready"]:
+            return _sp.CompletedProcess(cmd, 0 if pg_ready_ok else 1, stdout="",
+                                        stderr="" if pg_ready_ok else "no response")
+        if cmd[:2] == ["systemctl", "is-active"]:
+            return _sp.CompletedProcess(
+                cmd, 0, stdout="active\n" if scheduler_active else "inactive\n", stderr="")
+        return _sp.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+
+def _mock_preflight_installed(monkeypatch, *, dlt=True, dbt=True, airflow=True):
+    from dpagent.engine import state
+
+    def fake_get_install(pack):
+        present = {"dlt": dlt, "dbt": dbt, "airflow": airflow}.get(pack, False)
+        return {"pack": pack} if present else None
+    monkeypatch.setattr(state, "get_install", fake_get_install)
+
+
+def test_preflight_fixture_host_passes_when_every_precondition_is_met(tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is True, result.detail
+
+
+def test_preflight_fixture_host_fails_when_dlt_is_not_installed(tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch)
+    _mock_preflight_installed(monkeypatch, dlt=False)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "dlt" in result.detail
+
+
+def test_preflight_fixture_host_fails_when_postgres_is_not_accepting_connections(
+        tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch, pg_ready_ok=False)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "PostgreSQL" in result.detail
+
+
+def test_preflight_fixture_host_fails_when_scheduler_is_not_active(tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch, scheduler_active=False)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "scheduler" in result.detail
+
+
+def test_preflight_fixture_host_requires_dbt_only_when_the_pipeline_has_a_dbt_stage(
+        tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    root = tmp_path / "pipelines"
+    d = root / "demo_dbt"
+    (d / "models").mkdir(parents=True)
+    (d / "models" / "stg_a.sql").write_text("select 1 as id\n")
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo_dbt", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/o.csv"}},
+        "warehouse": {"host": "h", "database": "d"},
+        "stages": [
+            {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "o", "min": 1}]},
+            {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_a"]},
+        ],
+    }, sort_keys=False))
+    pipeline = loader.load("demo_dbt", root)
+
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch)
+    _mock_preflight_installed(monkeypatch, dbt=False)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "dbt" in result.detail
+
+
 # ---------------------------------------------------------------- run_fixture (mocked end to end)
 
 @pytest.fixture
@@ -350,12 +545,22 @@ def isolated_db(tmp_path, monkeypatch):
 
 def _fake_throwaway(*dbs):
     """Replacement for pg_throwaway.throwaway_database that hands out
-    `dbs` in order across nested `with` calls, real ContextManager shape."""
+    `dbs` in order across nested `with` calls, real ContextManager shape -
+    and, on exit, marks each db's teardown as having actually succeeded
+    (`database_dropped`/`role_dropped = True`), the default assumption
+    every "happy path" test below makes. A test that needs to simulate a
+    *failed* teardown does not use this helper - see
+    `test_run_fixture_is_not_ok_when_a_throwaway_database_fails_to_drop`."""
     it = iter(dbs)
 
     @contextlib.contextmanager
     def _cm(prefix="x"):
-        yield next(it)
+        db = next(it)
+        try:
+            yield db
+        finally:
+            db.database_dropped = True
+            db.role_dropped = True
     return _cm
 
 
@@ -406,6 +611,16 @@ def _mock_deploy_isolation(monkeypatch, tmp_path, *, unpause_ok=True, undeploy_o
     from dpagent.pipelines import deploy as deploy_mod
     import subprocess as _sp
 
+    # preflight_fixture_host() runs real sudo/systemctl/pg_isready/state
+    # lookups - real on this host means "not root, no sudo," which would
+    # make every mocked test below fail at the very first check instead of
+    # exercising what it actually means to test. Bypassed here, for every
+    # mocked test; the one test that wants the *real* preflight path
+    # (test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing)
+    # deliberately does not call this helper.
+    monkeypatch.setattr(fixture, "preflight_fixture_host",
+                        lambda pipeline: fixture.PreflightResult(ok=True))
+
     monkeypatch.setattr(deploy_mod, "deployed_names", lambda: [])
     monkeypatch.setattr(deploy_mod, "unpause_dag", lambda name: _sp.CompletedProcess(
         [], 0 if unpause_ok else 1, stdout="", stderr="" if unpause_ok else "unpause failed"))
@@ -421,6 +636,114 @@ def _mock_deploy_isolation(monkeypatch, tmp_path, *, unpause_ok=True, undeploy_o
     monkeypatch.setattr(deploy_mod, "_dbt_project_dir", lambda: dbt_project)
     monkeypatch.setattr(deploy_mod, "_pipeline_secrets_file", lambda: secrets_file)
     return airflow_home, dbt_project, secrets_file
+
+
+def test_verify_cleanup_complete_treats_a_permission_error_as_unverified(tmp_path):
+    """Real on this host, not synthetic: `install_dag()`'s own docstring
+    says `<airflow install_dir>/home` is 700, airflow-only -
+    `Path.exists()` on a file inside a directory this operator cannot even
+    traverse raises `PermissionError`, not just `False`. Must never be
+    silently read as "verified gone" - `_safe_missing()` catches it and
+    reports "could not check" instead."""
+    from dpagent.pipelines import deploy as deploy_mod
+    airflow_home = tmp_path / "airflow_home"
+    dags_dir = airflow_home / "home" / "dags"   # _verify_cleanup_complete's own path shape
+    dags_dir.mkdir(parents=True)
+    dbt_project = tmp_path / "dbt_project"
+    dbt_project.mkdir()
+    secrets_file = tmp_path / "pipelines.env"
+    secrets_file.write_text("")
+
+    dags_dir.chmod(0o000)
+    try:
+        pipeline = _real_pipeline(tmp_path)
+        clone, _ = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+
+        class _Deploy:
+            SHARED_PIPELINES_DIR = tmp_path / "shared"
+
+            @staticmethod
+            def _airflow_install_dir():
+                return airflow_home
+
+            @staticmethod
+            def _dbt_project_dir():
+                return dbt_project
+
+            @staticmethod
+            def _pipeline_secrets_file():
+                return secrets_file
+
+            @staticmethod
+            def _parse_env_file(path):
+                return {}
+
+            @staticmethod
+            def _pipeline_env_refs(p):
+                return {}
+
+            @staticmethod
+            def deployed_names():
+                return []
+
+        undeploy_result = _FakeUndeployResult(True)
+        ok, detail = fixture._verify_cleanup_complete(clone, undeploy_result, _Deploy)
+        assert ok is False
+        assert "could not check" in detail
+    finally:
+        dags_dir.chmod(0o755)   # tmp_path's own cleanup needs traverse access back
+
+
+def test_verify_cleanup_complete_reports_a_still_running_journal_entry(isolated_db, tmp_path):
+    """The DAG/database/secrets can all be gone and this still must not be
+    "verified gone" - a run dpagent's own journal still shows `running` for
+    this clone means something (a worker, a stuck task) may still be
+    touching it."""
+    from dpagent.engine import state
+    from dpagent.pipelines import deploy as deploy_mod
+
+    pipeline = _real_pipeline(tmp_path)
+    clone, _ = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    state.start_run("data", clone.name)   # left running, on purpose
+
+    airflow_home = tmp_path / "airflow_home"
+    (airflow_home / "home" / "dags").mkdir(parents=True)
+    dbt_project = tmp_path / "dbt_project"
+    dbt_project.mkdir()
+    secrets_file = tmp_path / "pipelines.env"
+    secrets_file.write_text("")
+
+    class _Deploy:
+        SHARED_PIPELINES_DIR = tmp_path / "shared"
+
+        @staticmethod
+        def _airflow_install_dir():
+            return airflow_home
+
+        @staticmethod
+        def _dbt_project_dir():
+            return dbt_project
+
+        @staticmethod
+        def _pipeline_secrets_file():
+            return secrets_file
+
+        @staticmethod
+        def _parse_env_file(path):
+            return {}
+
+        @staticmethod
+        def _pipeline_env_refs(p):
+            return {}
+
+        @staticmethod
+        def deployed_names():
+            return []
+
+    undeploy_result = _FakeUndeployResult(True)
+    ok, detail = fixture._verify_cleanup_complete(clone, undeploy_result, _Deploy)
+    assert ok is False
+    assert "running" in detail
 
 
 class _FakeUndeployResult:
@@ -651,6 +974,8 @@ def test_run_fixture_refuses_a_clone_name_collision(isolated_db, tmp_path, monke
     name - the user's own review item 5 ("refuse if collision detected")."""
     from dpagent.pipelines import deploy as deploy_mod
     pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(fixture, "preflight_fixture_host",
+                        lambda pipeline: fixture.PreflightResult(ok=True))
     monkeypatch.setattr(fixture, "_validation_suffix", lambda: "deadbeef")
     monkeypatch.setattr(deploy_mod, "deployed_names", lambda: ["demo__validate__deadbeef"])
     deploy_calls = []
@@ -795,6 +1120,8 @@ def test_fixture_report_dict_shape_on_a_full_pass():
         comparison_after_run1=fixture.ComparisonResult(True, "1 row matched"),
         comparison_after_run2=fixture.ComparisonResult(True, "1 row matched"),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+        source_database_dropped=True, source_role_dropped=True,
+        warehouse_database_dropped=True, warehouse_role_dropped=True,
     )
     data = fixture.fixture_report_dict(
         report, pipeline_hash="sha256:p", fixture_hash="sha256:f", expected_hash="sha256:e")
@@ -803,7 +1130,12 @@ def test_fixture_report_dict_shape_on_a_full_pass():
     assert data["expected_hash"] == "sha256:e"
     assert data["run_ids"] == [401, 402]
     assert data["comparison"] == {"run_1": "pass", "run_2": "pass", "idempotent": True}
-    assert data["cleanup"]["status"] == "pass"
+    assert data["cleanup"]["pipeline_artifacts"] == "pass"
+    assert data["cleanup"]["source_database"] == "pass"
+    assert data["cleanup"]["source_role"] == "pass"
+    assert data["cleanup"]["warehouse_database"] == "pass"
+    assert data["cleanup"]["warehouse_role"] == "pass"
+    assert data["cleanup"]["overall"] == "pass"
     assert data["overall"] == "pass"
 
 
@@ -821,8 +1153,30 @@ def test_fixture_report_dict_marks_fail_when_cleanup_failed_despite_a_match():
         cleanup_attempted=True, cleanup_ok=False, cleanup_detail="undeploy failed: needs root",
     )
     data = fixture.fixture_report_dict(report)
-    assert data["cleanup"]["status"] == "fail"
+    assert data["cleanup"]["pipeline_artifacts"] == "fail"
+    assert data["cleanup"]["overall"] == "fail"
     assert data["overall"] == "fail"   # report.ok is False because cleanup failed
+
+
+def test_fixture_report_dict_reports_each_throwaway_resource_separately():
+    """M2.4.2's own required shape: pipeline_artifacts, source_database,
+    source_role, warehouse_database, warehouse_role, each independently -
+    not folded into one combined "cleanup passed/failed" boolean."""
+    report = fixture.FixtureRunReport(
+        seeded=True, deployed=True, run1_status="ok", run2_status="ok",
+        comparison_after_run1=fixture.ComparisonResult(True), comparison_after_run2=fixture.ComparisonResult(True),
+        cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
+        source_database_dropped=True, source_role_dropped=True,
+        warehouse_database_dropped=False, warehouse_database_drop_error="permission denied",
+        warehouse_role_dropped=True,
+    )
+    data = fixture.fixture_report_dict(report)
+    assert data["cleanup"]["source_database"] == "pass"
+    assert data["cleanup"]["source_role"] == "pass"
+    assert "permission denied" in data["cleanup"]["warehouse_database"]
+    assert data["cleanup"]["warehouse_role"] == "pass"
+    assert data["cleanup"]["overall"] == "fail"   # one of the four still failed
+    assert data["overall"] == "fail"
 
 
 def test_gate_summary_for_run_reads_the_real_journal(isolated_db):
@@ -832,4 +1186,26 @@ def test_gate_summary_for_run_reads_the_real_journal(isolated_db):
     state.finish_stage(stage_id, "passed", row_count=3)
     state.record_gate(stage_id, "row_count_bounds", "passed", detail="3 rows, within bounds")
     summary = fixture.gate_summary_for_run(run_id)
-    assert summary == {"landing": {"row_count_bounds": "passed"}}
+    assert summary == {"landing": [
+        {"type": "row_count_bounds", "status": "passed", "detail": "3 rows, within bounds",
+         "rows_checked": None, "rows_rejected": None},
+    ]}
+
+
+def test_gate_summary_for_run_keeps_two_gates_of_the_same_type_separate(isolated_db):
+    """The exact case M2.4.2's own review flagged: a dict keyed by
+    gate_type alone would silently overwrite one business_rule gate's
+    result with the other's."""
+    from dpagent.engine import state
+    run_id = state.start_run("data", "demo__validate__x")
+    stage_id = state.start_stage(run_id, "demo__validate__x", "curated")
+    state.finish_stage(stage_id, "passed", row_count=5)
+    state.record_gate(stage_id, "business_rule", "passed", rows_checked=5, rows_rejected=0,
+                      detail="rule A")
+    state.record_gate(stage_id, "business_rule", "failed", rows_checked=5, rows_rejected=1,
+                      detail="rule B")
+    summary = fixture.gate_summary_for_run(run_id)
+    assert len(summary["curated"]) == 2
+    types_and_status = [(g["type"], g["status"], g["detail"]) for g in summary["curated"]]
+    assert ("business_rule", "passed", "rule A") in types_and_status
+    assert ("business_rule", "failed", "rule B") in types_and_status

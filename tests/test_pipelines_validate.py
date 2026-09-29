@@ -135,6 +135,107 @@ def test_check_dbt_models_covers_every_dbt_stage_not_just_the_first(tmp_path):
     assert "2 model" in result.detail
 
 
+# ---------------------------------------------------------------- check_dbt_dependencies
+
+def test_check_dbt_dependencies_is_skipped_for_a_pipeline_with_no_dbt_stage(tmp_path):
+    pipeline = _pipeline(tmp_path / "pipelines", with_dbt=False)
+    result = validate.check_dbt_dependencies(pipeline)
+    assert result.status == "skipped"
+
+
+def test_check_dbt_dependencies_passes_a_model_using_only_a_literal_table(tmp_path):
+    pipeline = _pipeline(tmp_path / "pipelines", with_procedure=False)
+    # _pipeline()'s own stg_a.sql (written by the shared fixture helper
+    # below) reads from a literal table, never ref()/source().
+    result = validate.check_dbt_dependencies(pipeline)
+    assert result.status == "pass", result.detail
+
+
+def test_check_dbt_dependencies_fails_a_model_using_ref(tmp_path):
+    root = tmp_path / "pipelines"
+    stages = [
+        {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "t", "min": 1}]},
+        {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_a"],
+         "gates": [{"type": "not_null", "table": "stg_a", "columns": ["id"]}]},
+        {"name": "curated", "engine": "dbt", "depends_on": "raw", "models": ["fct_a"],
+         "gates": [{"type": "not_null", "table": "fct_a", "columns": ["id"]}]},
+    ]
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}, "tables": ["t"]},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
+        "stages": stages,
+    }, sort_keys=False))
+    (d / "models").mkdir()
+    (d / "models" / "stg_a.sql").write_text("select 1 as id\n")
+    (d / "models" / "fct_a.sql").write_text("select id from {{ ref('stg_a') }}\n")
+    pipeline = loader.load("demo", root)
+
+    result = validate.check_dbt_dependencies(pipeline)
+    assert result.status == "fail"
+    assert "fct_a.sql" in result.detail
+    assert "ref()" in result.detail
+
+
+def test_check_dbt_dependencies_fails_a_model_using_source(tmp_path):
+    root = tmp_path / "pipelines"
+    stages = [
+        {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "t", "min": 1}]},
+        {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_a"],
+         "gates": [{"type": "not_null", "table": "stg_a", "columns": ["id"]}]},
+    ]
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}, "tables": ["t"]},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
+        "stages": stages,
+    }, sort_keys=False))
+    (d / "models").mkdir()
+    (d / "models" / "stg_a.sql").write_text(
+        "select id from {{ source('demo_landing', 'res_partner') }}\n")
+    pipeline = loader.load("demo", root)
+
+    result = validate.check_dbt_dependencies(pipeline)
+    assert result.status == "fail"
+    assert "source()" in result.detail
+
+
+def test_find_dbt_cross_model_refs_does_not_false_positive_on_a_column_named_source_system(tmp_path):
+    """Word-bounded, not a naive substring match - `source_system` (a
+    plausible real column name) must not trip this."""
+    calls = validate.find_dbt_cross_model_refs(
+        "select source_system, resource_id from demo_landing.res_partner")
+    assert calls == []
+
+
+def test_check_compiles_includes_dbt_dependencies_in_ok(tmp_path):
+    root = tmp_path / "pipelines"
+    stages = [
+        {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "t", "min": 1}]},
+        {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_a"],
+         "gates": [{"type": "not_null", "table": "stg_a", "columns": ["id"]}]},
+    ]
+    d = root / "demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo", "summary": "t",
+        "source": {"connector": "odoo_postgres", "connection": {"host": "x"}, "tables": ["t"]},
+        "warehouse": {"host": "localhost", "database": "warehouse"},
+        "stages": stages,
+    }, sort_keys=False))
+    (d / "models").mkdir()
+    (d / "models" / "stg_a.sql").write_text("select id from {{ ref('other') }}\n")
+    pipeline = loader.load("demo", root)
+
+    report = validate.check_compiles(pipeline)
+    assert report.dbt_dependencies.status == "fail"
+    assert report.ok is False   # even if dbt parse itself happened to pass
+
+
 # ---------------------------------------------------------------- check_procedures
 
 def test_check_procedures_is_skipped_for_a_pipeline_with_no_procedure_stage(tmp_path):
@@ -208,6 +309,28 @@ def test_check_procedures_skips_cleanly_when_role_creation_fails(tmp_path, monke
     result = validate.check_procedures(pipeline)
     assert result.status == "skipped"
     assert "sudo" in result.detail
+
+
+def test_check_procedures_fails_when_teardown_leaves_the_throwaway_database_behind(
+        tmp_path, monkeypatch):
+    """The P0 the M2.4.2 review found: a procedure applying cleanly used
+    to be reported "pass" even when the throwaway database/role used to
+    apply it could not actually be torn down afterward - orphaning it on
+    this real host with nothing anywhere reporting it."""
+    pipeline = _pipeline(tmp_path / "pipelines", with_dbt=False)
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0] == "sudo":
+            sql = cmd[cmd.index("-c") + 1]
+            if sql.startswith("DROP DATABASE"):
+                return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="database is in use")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    result = validate.check_procedures(pipeline)
+    assert result.status == "fail"
+    assert "torn down" in result.detail
+    assert "database is in use" in result.detail
 
 
 # ---------------------------------------------------------------- check_compiles

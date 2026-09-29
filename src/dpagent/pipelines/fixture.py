@@ -38,6 +38,7 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import re
 import subprocess
 import uuid
 from dataclasses import dataclass, field, replace
@@ -402,6 +403,31 @@ class ComparisonResult:
     detail: str = ""
 
 
+_DECIMAL_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
+
+
+def _canon_number(value: object) -> str:
+    """`100`, `100.0`, `100.00`, `Decimal("100.00")`, and the string
+    `"100.00"` all canonicalize identically - `Decimal` throughout, never
+    `float`, so a monetary value with more significant digits than a
+    native `float` can hold (the M2.4.2 review's own "nhiều chữ số thập
+    phân" case) is never silently rounded by this function itself. No
+    exponent, no trailing zeros, so formatting alone never causes a false
+    mismatch."""
+    try:
+        d = Decimal(str(value))
+    except InvalidOperation:
+        return str(value)
+    # format(..., "f") - never str() - forces fixed-point notation:
+    # Decimal.normalize() (and str() of an already-integral Decimal like
+    # Decimal("100.00")) can legitimately produce scientific notation
+    # ("1E+2") for a round number with trailing zeros stripped, which
+    # would silently stop matching a plain "100" on the other side.
+    if d == d.to_integral_value():
+        return format(d.to_integral_value(), "f")
+    return format(d.normalize(), "f")
+
+
 def _canon_value(value: object) -> object:
     """Normalizes one value so two representations of the same real value
     compare equal after JSON-serializing a whole row for comparison -
@@ -411,25 +437,31 @@ def _canon_value(value: object) -> object:
     since `bool` is a subclass of it); a `date`/`datetime` (which YAML
     parses an *unquoted* date-looking scalar into) is rendered
     `.isoformat()`, matching Postgres's own `row_to_json` rendering of a
-    timestamp column; a number is rendered through `Decimal` with no
-    exponent and no trailing zeros, so `100`, `100.0`, and `100.00` all
-    canonicalize identically regardless of which side (the fixture author's
-    YAML, or Postgres's own JSON output) happened to write it which way;
-    anything else becomes its plain string form."""
+    timestamp column; a number (`int`/`float`/`Decimal` - `compare_curated`
+    parses the actual side's JSON with `parse_float=Decimal`, never
+    `float`, specifically so a high-precision monetary value is not
+    silently rounded before this function ever sees it) canonicalizes
+    through `_canon_number`. A plain string that looks like nothing but a
+    decimal number (`^-?\\d+(\\.\\d+)?$`) is *also* canonicalized as a
+    number - this is deliberate, not a loose heuristic: the M2.4.2 review's
+    own recommendation is to author a monetary `expected.yaml` value as a
+    quoted string specifically to protect it from YAML's own float parsing
+    imprecision (`revenue: 100.00` unquoted becomes a lossy Python `float`
+    the moment `yaml.safe_load` reads it, before this function is ever
+    called - `revenue: "100.00"` does not); without this rule, a
+    deliberately-precise quoted string on the expected side would never
+    compare equal to Postgres's own numeric JSON value on the actual side.
+    Anything else becomes its plain string form."""
     if value is None:
         return None
     if isinstance(value, bool):
         return value
     if isinstance(value, (_dt.datetime, _dt.date)):
         return value.isoformat()
-    if isinstance(value, (int, float)):
-        try:
-            d = Decimal(str(value)).normalize()
-        except InvalidOperation:
-            return value
-        if d == d.to_integral_value():
-            return str(d.to_integral_value())
-        return format(d, "f")
+    if isinstance(value, (int, float, Decimal)):
+        return _canon_number(value)
+    if isinstance(value, str) and _DECIMAL_LITERAL.match(value):
+        return _canon_number(value)
     return str(value)
 
 
@@ -474,7 +506,13 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
         return ComparisonResult(False, (proc.stderr or proc.stdout).strip())
 
     try:
-        actual_rows = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+        # parse_float=Decimal, deliberately never the default (float): a
+        # monetary value with more significant digits than a native float
+        # can hold would otherwise already be silently rounded at this
+        # parse step, before _canon_value ever gets a chance to normalize
+        # it (the M2.4.2 review's own "nhiều chữ số thập phân" case).
+        actual_rows = [json.loads(line, parse_float=Decimal)
+                       for line in proc.stdout.splitlines() if line.strip()]
     except json.JSONDecodeError as exc:
         return ComparisonResult(
             False, f"could not parse curated output as JSON ({exc}); raw output: "
@@ -519,6 +557,99 @@ def _temporarily(overrides: dict[str, str]):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+# ------------------------------------------------------------- preflight
+
+@dataclass
+class PreflightResult:
+    ok: bool
+    reasons: list[str] = field(default_factory=list)
+
+    @property
+    def detail(self) -> str:
+        return "; ".join(self.reasons)
+
+
+def _writable(path: Path) -> bool:
+    """`path` itself if it already exists, else the nearest existing
+    ancestor - the same "can this operator actually create/write under
+    here" question `install_pipeline_files()`/`install_dbt_models()` (in
+    deploy.py) answer implicitly by raising `DeployError` when they are not
+    root; this asks it up front, without writing anything."""
+    p = Path(path)
+    while not p.exists():
+        if p.parent == p:
+            return False
+        p = p.parent
+    return os.access(p, os.W_OK)
+
+
+def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
+    """Every real precondition steps 4-5 need, checked *before* this
+    function's caller creates a single throwaway database/role, seeds
+    anything, or deploys a single artifact - "Nếu thiếu điều kiện: Exit 2.
+    Chưa tạo database/role tạm. Chưa seed. Chưa deploy bất cứ artifact nào"
+    (M2.4.2's own review). `run_fixture()` calls this as its very first
+    action, before `make_validation_clone` even.
+
+    Best-effort and host-level, not a promise of eventual success - a check
+    here passing does not guarantee `deploy()` itself will not still fail
+    later for an unrelated reason (a bad manifest value, a network blip);
+    it exists to catch the *common, cheap-to-detect* missing preconditions
+    before any real side effect happens, not to replace deploy()'s own real
+    error handling (which still runs, and is still what actually decides
+    `unavailable_reason` for anything this function does not check)."""
+    from . import deploy as deploy_mod
+    from ..engine import state
+
+    reasons: list[str] = []
+
+    if not (hasattr(os, "geteuid") and os.geteuid() == 0):
+        reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")
+
+    sudo_check = subprocess.run(["sudo", "-n", "-u", "postgres", "true"],
+                                capture_output=True, text=True, timeout=10)
+    if sudo_check.returncode != 0:
+        reasons.append(
+            "cannot sudo -n -u postgres (passwordless sudo to the postgres OS user "
+            "is required, twice over - once for a throwaway source, once for a "
+            "throwaway warehouse)")
+    else:
+        pg_ready = subprocess.run(["sudo", "-n", "-u", "postgres", "pg_isready"],
+                                  capture_output=True, text=True, timeout=10)
+        if pg_ready.returncode != 0:
+            reasons.append(f"PostgreSQL is not accepting connections: "
+                           f"{(pg_ready.stderr or pg_ready.stdout).strip()}")
+
+    if state.get_install("dlt") is None:
+        reasons.append("dlt pack is not recorded as installed")
+
+    needs_dbt = any(s.engine == "dbt" for s in pipeline.stages)
+    if needs_dbt and state.get_install("dbt") is None:
+        reasons.append("dbt pack is not recorded as installed, but this pipeline "
+                       "has a dbt-engine stage")
+
+    if state.get_install("airflow") is None:
+        reasons.append("airflow pack is not recorded as installed")
+    else:
+        venv_bin, _ = deploy_mod._airflow_paths()
+        if not (venv_bin / "airflow").exists():
+            reasons.append(f"airflow CLI binary not found at {venv_bin}")
+        scheduler = subprocess.run(["systemctl", "is-active", "airflow-scheduler"],
+                                   capture_output=True, text=True, timeout=10)
+        if scheduler.stdout.strip() != "active":
+            reasons.append("airflow-scheduler is not active ("
+                           f"{(scheduler.stdout or scheduler.stderr).strip()})")
+
+    checks = [("shared pipelines directory", deploy_mod.SHARED_PIPELINES_DIR)]
+    if needs_dbt:
+        checks.append(("dbt project directory", deploy_mod._dbt_project_dir()))
+    for label, path in checks:
+        if not _writable(path):
+            reasons.append(f"{label} ({path}) is not writable by this operator")
+
+    return PreflightResult(ok=not reasons, reasons=reasons)
 
 
 def _summarize_undeploy(result) -> str:
@@ -650,6 +781,27 @@ def _do_cleanup(report: "FixtureRunReport", clone: Pipeline, deploy_mod) -> None
     report.cleanup_detail = f"{_summarize_undeploy(undeploy_result)} | {detail}"
 
 
+def _record_throwaway_cleanup(report: "FixtureRunReport", src_db, wh_db) -> None:
+    """Reads `database_dropped`/`role_dropped` off the two throwaway
+    `ThrowawayDB` objects *after* the `with pg_throwaway.throwaway_database
+    ():` blocks that yielded them have already exited (never inside - see
+    `pg_throwaway.ThrowawayCleanupError`'s own docstring for why teardown
+    itself never raises). `src_db`/`wh_db` are `None` only when that
+    throwaway database was never even created (e.g. `ThrowawayUnavailable`
+    raised before yielding) - nothing to record in that case, the fields
+    stay at their `False`/"not attempted" defaults."""
+    if src_db is not None:
+        report.source_database_dropped = src_db.database_dropped
+        report.source_role_dropped = src_db.role_dropped
+        report.source_database_drop_error = src_db.database_drop_error
+        report.source_role_drop_error = src_db.role_drop_error
+    if wh_db is not None:
+        report.warehouse_database_dropped = wh_db.database_dropped
+        report.warehouse_role_dropped = wh_db.role_dropped
+        report.warehouse_database_drop_error = wh_db.database_drop_error
+        report.warehouse_role_drop_error = wh_db.role_drop_error
+
+
 @dataclass
 class FixtureRunReport:
     """What actually happened running a fixture through a real, deployed
@@ -668,9 +820,26 @@ class FixtureRunReport:
     comparison_after_run1: ComparisonResult | None = None
     comparison_after_run2: ComparisonResult | None = None
     unavailable_reason: str = ""   # set, not an exception, when root/sudo is missing
-    cleanup_attempted: bool = False
-    cleanup_ok: bool = False
+    cleanup_attempted: bool = False   # the clone's own artifacts (DAG, published
+    cleanup_ok: bool = False          # files, dbt models, dlt state, secrets)
     cleanup_detail: str = ""
+    # The two throwaway databases' own teardown - tracked separately from
+    # `cleanup_ok` above (which is about the *pipeline clone's* artifacts)
+    # because M2.4.2's own review asks for them reported distinctly:
+    # `cleanup: {pipeline_artifacts, source_database, source_role,
+    # warehouse_database, warehouse_role, overall}`. False by default -
+    # "never attempted" and "attempted but failed" both start here, exactly
+    # like `cleanup_ok`'s own default; only a confirmed, real `DROP
+    # DATABASE`/`DROP ROLE` success (`pg_throwaway.ThrowawayDB.
+    # database_dropped`/`role_dropped`) ever sets one of these True.
+    source_database_dropped: bool = False
+    source_role_dropped: bool = False
+    source_database_drop_error: str = ""
+    source_role_drop_error: str = ""
+    warehouse_database_dropped: bool = False
+    warehouse_role_dropped: bool = False
+    warehouse_database_drop_error: str = ""
+    warehouse_role_drop_error: str = ""
 
     @property
     def idempotent(self) -> bool:
@@ -683,19 +852,31 @@ class FixtureRunReport:
                     and self.comparison_after_run2 and self.comparison_after_run2.ok)
 
     @property
+    def throwaway_cleanup_ok(self) -> bool:
+        """Both throwaway databases' role AND database were actually
+        confirmed dropped - "Không được đặt cleanup_ok=True trước khi cả
+        source và warehouse đã được drop thành công" (M2.4.2's own
+        review)."""
+        return (self.source_database_dropped and self.source_role_dropped
+                and self.warehouse_database_dropped and self.warehouse_role_dropped)
+
+    @property
     def ok(self) -> bool:
         """Passing requires cleanup to have actually been attempted *and*
-        to have actually succeeded - a run that got the right numbers but
-        left a validation DAG, published files, or leaked secrets behind is
-        not a clean result (the user's own review: "Validation không được
-        coi là hoàn chỉnh nếu chạy pass nhưng cleanup fail"), and neither is
-        one where cleanup was, for whatever reason, never even attempted -
-        `not self.cleanup_attempted or self.cleanup_ok` would have let that
+        to have actually succeeded - for the clone's own artifacts *and*
+        for both throwaway databases - a run that got the right numbers
+        but left a validation DAG, published files, leaked secrets, or an
+        orphaned throwaway role/database behind is not a clean result (the
+        user's own review: "Validation không được coi là hoàn chỉnh nếu
+        chạy pass nhưng cleanup fail"), and neither is one where cleanup
+        was, for whatever reason, never even attempted - `not
+        self.cleanup_attempted or self.cleanup_ok` would have let that
         second case through silently."""
         return (self.seeded and self.deployed
                 and self.run1_status == "ok" and self.run2_status == "ok"
                 and self.idempotent
-                and self.cleanup_attempted and self.cleanup_ok)
+                and self.cleanup_attempted and self.cleanup_ok
+                and self.throwaway_cleanup_ok)
 
 
 def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResult, *,
@@ -736,6 +917,15 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
 
     report = FixtureRunReport()
 
+    # Every precondition checked up front, before a single throwaway
+    # database/role is created, before anything is seeded, before any
+    # artifact is deployed - "Exit 2. Chưa tạo database/role tạm. Chưa
+    # seed. Chưa deploy bất cứ artifact nào" (M2.4.2's own review).
+    preflight = preflight_fixture_host(pipeline)
+    if not preflight.ok:
+        report.unavailable_reason = f"preflight failed: {preflight.detail}"
+        return report
+
     with tempfile.TemporaryDirectory(prefix="dpagent_validate_clone_") as tmp:
         try:
             clone, suffix = make_validation_clone(pipeline, Path(tmp))
@@ -755,6 +945,8 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                 f"is generated every time)")
             return report
 
+        src_db = None
+        wh_db = None
         try:
             with pg_throwaway.throwaway_database(prefix="dpagent_fixture_src") as src_db, \
                  pg_throwaway.throwaway_database(prefix="dpagent_fixture_wh") as wh_db:
@@ -859,6 +1051,16 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
         except pg_throwaway.ThrowawayUnavailable as exc:
             report.unavailable_reason = str(exc)
             return report
+        finally:
+            # Reads whatever `src_db`/`wh_db` ended up bound to - both
+            # still hold their real, final `database_dropped`/`role_dropped`
+            # state at this point regardless of *how* the `with` block
+            # above was left (an early `return report`, `ThrowawayUnavailable`
+            # caught above, or falling through normally): `with X() as v:`
+            # binds `v` in this enclosing scope, and `__exit__` (where
+            # throwaway_database() records that state) always runs before
+            # control actually leaves the `with` statement, in every case.
+            _record_throwaway_cleanup(report, src_db, wh_db)
 
     return report
 
@@ -882,15 +1084,28 @@ def gate_summary_for_run(run_id: int) -> dict:
     since a stage can pass with rows correctly quarantined (the fixture's
     own deliberately-bad rows are supposed to do exactly that, not fail the
     whole run) and this is what actually proves gate/quarantine behaviour
-    was exercised, the M2.5 "bad data: gate/quarantine hoạt động" case."""
+    was exercised, the M2.5 "bad data: gate/quarantine hoạt động" case.
+
+    Each stage maps to a *list* of gate results, not a `{gate_type:
+    status}` dict - a stage can legitimately declare more than one gate of
+    the same type (two separate `business_rule` checks in one stage, e.g.),
+    and a dict keyed by `gate_type` alone would silently overwrite one with
+    the other (M2.4.2's own review). `rows_checked`/`rows_rejected` are
+    carried through too, not just `status` - the actual count of rows a
+    fixture's deliberately-bad rows caused to be quarantined, not merely
+    "passed"/"failed"."""
     from ..engine import state
 
-    summary: dict[str, dict[str, str]] = {}
+    summary: dict[str, list[dict]] = {}
     for stage_row in state.stages_for_run(run_id):
         gates = state.gates_for_stage(stage_row["id"])
         if not gates:
             continue
-        summary[stage_row["stage"]] = {g["gate_type"]: g["status"] for g in gates}
+        summary[stage_row["stage"]] = [
+            {"type": g["gate_type"], "status": g["status"], "detail": g["detail"],
+             "rows_checked": g["rows_checked"], "rows_rejected": g["rows_rejected"]}
+            for g in gates
+        ]
     return summary
 
 
@@ -912,8 +1127,19 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
     def _gates(run_id: int | None) -> dict:
         return gate_summary_for_run(run_id) if run_id is not None else {}
 
+    def _drop_status(attempted: bool, dropped: bool, error: str) -> str:
+        if not attempted:
+            return "not_attempted"
+        return "pass" if dropped else f"fail: {error}"
+
     run1_id = report.run_ids[0] if len(report.run_ids) > 0 else None
     run2_id = report.run_ids[1] if len(report.run_ids) > 1 else None
+
+    # A throwaway database was "attempted" whenever cleanup of the
+    # pipeline's own artifacts was (both happen inside the same `with
+    # pg_throwaway...` block in run_fixture) - distinct from "dropped",
+    # which is only true once DROP DATABASE/DROP ROLE actually succeeded.
+    attempted = report.cleanup_attempted
 
     if report.unavailable_reason:
         overall = "unavailable"
@@ -934,10 +1160,22 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
                        "run_2": _cmp_status(report.comparison_after_run2),
                        "idempotent": report.idempotent},
         "gates": {"run_1": _gates(run1_id), "run_2": _gates(run2_id)},
-        "cleanup": {"attempted": report.cleanup_attempted,
-                    "status": ("pass" if report.cleanup_ok else
-                              "fail" if report.cleanup_attempted else "not_attempted"),
-                    "detail": report.cleanup_detail},
+        "cleanup": {
+            "pipeline_artifacts": ("pass" if report.cleanup_ok else
+                                   "fail" if report.cleanup_attempted else "not_attempted"),
+            "pipeline_artifacts_detail": report.cleanup_detail,
+            "source_database": _drop_status(attempted, report.source_database_dropped,
+                                            report.source_database_drop_error),
+            "source_role": _drop_status(attempted, report.source_role_dropped,
+                                        report.source_role_drop_error),
+            "warehouse_database": _drop_status(attempted, report.warehouse_database_dropped,
+                                               report.warehouse_database_drop_error),
+            "warehouse_role": _drop_status(attempted, report.warehouse_role_dropped,
+                                           report.warehouse_role_drop_error),
+            "overall": "pass" if (report.cleanup_attempted and report.cleanup_ok
+                                  and report.throwaway_cleanup_ok) else
+                      "fail" if attempted else "not_attempted",
+        },
         "unavailable_reason": report.unavailable_reason,
         "overall": overall,
     }

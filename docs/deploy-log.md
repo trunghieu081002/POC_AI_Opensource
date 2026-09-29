@@ -3499,3 +3499,98 @@ original P0s/two P1s from the first M2.4 review, and the five additional
 items above. Still not proceeding to M2.5 (real verification on a
 disposable host with root + passwordless sudo), Layer 2.5, or live LLM
 evaluation - unchanged from the standing decision.
+
+## 2026-09-29 - Layer 3 M2.4.2: closing the validation harness's remaining false-pass risks
+
+A third review pass on the fixture-validation harness, focused on a single
+question: can `dpagent pipeline validate --fixture` ever report a pass or
+a complete cleanup when it should not, and can it ever leave something
+real behind on this host. Seven changes, all in `fixture.py`/
+`validate.py`/`pg_throwaway.py` - full writeup in docs/layer2.md's own
+"M2.4.2" subsection; summarized here with what was actually run.
+
+1. **`preflight_fixture_host()`** - every real precondition (root, `sudo -n
+   -u postgres`, PostgreSQL actually up, airflow pack + CLI + scheduler
+   active, dlt/dbt installed as needed, shared directories writable),
+   checked before `run_fixture()` creates a single throwaway database,
+   seeds anything, or deploys anything. Real-verified on this host: a real
+   `dpagent pipeline validate quickstart --fixture ... --expected ...` run
+   now exits 2 with the multi-reason preflight message (root, sudo, and
+   `/opt/dpagent/pipelines` not writable, all three at once) *without even
+   printing a clone id* - confirming `make_validation_clone()` itself
+   never runs, not just that nothing gets deployed. `/opt/dpagent/pipelines`
+   confirmed to hold only the three real pipelines afterward.
+2. **Real teardown verification for both throwaway databases** -
+   `pg_throwaway.throwaway_database()` checks `DROP DATABASE`/`DROP ROLE`'s
+   own `returncode` (an earlier version issued both unchecked) and records
+   the result on the yielded object (`database_dropped`/`role_dropped`) -
+   never raised from `__exit__` itself (a new `ThrowawayCleanupError`,
+   raised only by a caller after its own `with` block already exited, to
+   avoid masking whatever that block's body was already returning/raising).
+   `validate.check_procedures()` now downgrades "pass" to "fail" if either
+   drop failed even when every procedure itself applied cleanly.
+   `FixtureRunReport`/the CLI's exit-4 check both require all four flags
+   (source db/role, warehouse db/role) true, not just the pipeline clone's
+   own artifact cleanup.
+3. **`validate.check_dbt_dependencies()`** - a new step-3 check (gates
+   `--fixture` exactly like the existing dbt/procedure checks) that refuses
+   outright if any dbt-engine model's SQL contains a `ref()`/`source()`
+   Jinja call - closes the real risk that a validation clone's dbt models,
+   published into the dbt pack's *shared* real project, could silently
+   resolve such a call against a real, already-deployed pipeline's own
+   model instead of the clone's own fixture data. `synth_pipeline.md`
+   updated to tell the model the same rule up front.
+4. **`Decimal`, not `float`, throughout `compare_curated()`** -
+   `json.loads(..., parse_float=Decimal)` on the actual side;
+   `_canon_value`/`_canon_number` canonicalize `int`/`float`/`Decimal` *and*
+   a numeric-looking string (the documented convention for authoring a
+   precise monetary value in `expected.yaml`, protecting it from YAML's own
+   lossy float parsing) identically. Caught and fixed a real bug in this
+   round's own tests before it shipped: `Decimal.normalize()` can render a
+   round number in scientific notation (`Decimal("100.00").normalize()` →
+   `Decimal("1E+2")`) - `_canon_number` now uses `format(d, "f")` (forces
+   fixed-point), never `str(d)`.
+5. **`gate_summary_for_run()` returns a list per stage, not a dict keyed by
+   gate type** - a dict silently overwrote one gate's result with another's
+   when a stage declares two gates of the same type (two separate
+   `business_rule` checks, e.g.); a list keeps both, with `rows_checked`/
+   `rows_rejected` carried through too.
+6. **Exit codes, precisely**: 0 both runs matched + idempotent + *every*
+   cleanup verified; 1 seed/run/comparison failure; 2 preflight failed,
+   zero mutation; 3 timeout, cleanup never claimed complete; 4 data matched
+   but cleanup (pipeline artifacts *or* either throwaway database) did not
+   finish. Every throwaway resource's own drop status is now printed to the
+   CLI directly, never folded into or hidden behind `unavailable_reason`.
+7. **Tests** added for every item above plus the review's own named
+   scenarios: preflight failing with zero downstream calls made (a
+   dedicated test replaces every downstream function with one that raises
+   `AssertionError` if called at all); `DROP DATABASE`/`DROP ROLE` each
+   failing independently; every artifact `_verify_cleanup_complete` checks
+   reported missing on its own, including a still-`running` journal entry;
+   a real, unmocked `PermissionError` from `Path.exists()` (reproduced with
+   a real `chmod 0o000` directory on this host, not simulated) treated as
+   "could not check," never "gone"; a partial deploy still triggering
+   cleanup; two same-type gates both surviving; `ref()`/`source()` refused;
+   high-precision decimal comparison; and all five exit codes.
+
+**Real-verified on this host**: preflight's own multi-reason failure
+message and the fact that nothing downstream runs when it fails (see
+point 1 above - re-run for real against `pipelines/quickstart`, output and
+`/opt/dpagent/pipelines` listing both captured). Everything else in this
+round is unit-tested with subprocess mocked - the actual pass/fail path of
+teardown verification, the dbt-dependency block against a real dbt parse,
+and the Decimal comparison against a real Postgres `row_to_json` output
+still need an operator with both root and passwordless sudo to postgres on
+a disposable host (M2.5, unchanged from the standing decision). Full test
+suite green before this commit.
+
+Definition of done for M2.4.2 (all met, confirmed by the test suite):
+no code path sets a throwaway database's or the pipeline clone's own
+`cleanup_ok` True before its own real teardown/state is confirmed; exit 2
+guarantees zero external mutation (test-confirmed via the
+raise-if-called-at-all fixture); a validation clone cannot resolve a dbt
+model outside itself (unique renamed model files from M2.4, plus
+`ref()`/`source()` refused outright from this round - defense in depth,
+not either alone). Still not proceeding to M2.5, Layer 2.5, or live LLM -
+unchanged from the standing decision; M2.5 (real verification on a
+disposable host with root + passwordless sudo) is next.
