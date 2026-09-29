@@ -16,12 +16,13 @@ import shutil
 import stat
 import subprocess
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import yaml
 
 from ..engine.params import ENV_REF, resolve_refs
+from . import approval as approval_mod
 from .generator import dag_tasks
 from . import loader as loader_mod
 from .loader import Pipeline, Stage
@@ -51,6 +52,7 @@ class DeployResult:
     dag_installed: Path | None = None
     dag_unpaused: bool = False
     dag_unpause_error: str = ""
+    dag_paused_for_draft: bool = False   # --allow-draft: paused on purpose, not a failure
 
 
 def render_dag(pipeline: Pipeline) -> str:
@@ -456,7 +458,41 @@ def install_dbt_models(pipeline: Pipeline) -> list[Path]:
 
 
 def deploy(pipeline: Pipeline, *, apply_db: bool = True,
-          install_dag_to_airflow: bool = True) -> DeployResult:
+          install_dag_to_airflow: bool = True, allow_draft: bool = False) -> DeployResult:
+    """Applies `plan()`'s description for real - schema, procedures, dbt
+    models, Airflow's DAGS_FOLDER, secrets, unpausing - every one of which
+    is a real effect on a shared system, not a local file write. That is
+    why the approval gate below sits here, at the single entry point every
+    caller (CLI, tests, anything else) goes through, rather than in
+    `deploy_cmd` alone: `--no-db --no-airflow` still only writes into this
+    pipeline's own `build/` directory, but an unreviewed or since-edited
+    pipeline is refused even that, so "blocked" always means zero side
+    effects, not "zero side effects unless you happened to pass different
+    flags."
+
+    `allow_draft=True` is for proving a draft on a real host before anyone
+    has reviewed it - explicit per call, never implied by `--yes` (which
+    only skips confirmation prompts, docs/layer2.md). It does not run the
+    pipeline unattended: the rendered DAG is always manual-only
+    (`schedule=None`, regardless of what the manifest declares) and the DAG
+    is never unpaused, because leaving a scheduled draft merely *paused* is
+    not a real guarantee - anyone unpausing it later would let it run on
+    schedule with nothing having actually reviewed it.
+    """
+    approved, reason = approval_mod.is_approved(pipeline)
+    if not approved and not allow_draft:
+        raise DeployError(
+            f"{reason} - deploy refuses to apply an unreviewed pipeline for "
+            f"real. Either `dpagent pipeline promote {pipeline.name}` it, or "
+            f"pass --allow-draft to test it explicitly (manual-only, never "
+            f"unpaused, regardless of the manifest's own schedule:).")
+    if not approved:
+        # allow_draft: force manual-only regardless of the manifest's own
+        # schedule - a paused DAG is one unpause away from running
+        # unreviewed logic on a schedule, which is not the guarantee
+        # --allow-draft is supposed to give.
+        pipeline = replace(pipeline, schedule=None)
+
     result = DeployResult()
     result.written = write_artifacts(pipeline)
     if apply_db:
@@ -473,10 +509,13 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
             # --no-db there is nothing to resolve from yet.
             result.pipeline_secrets_synced = ensure_pipeline_secrets_available(pipeline)
         result.dag_installed = install_dag(pipeline)
-        unpaused = unpause_dag(pipeline.name)
-        result.dag_unpaused = unpaused.returncode == 0
-        if not result.dag_unpaused:
-            result.dag_unpause_error = (unpaused.stderr or unpaused.stdout).strip()
+        if approved:
+            unpaused = unpause_dag(pipeline.name)
+            result.dag_unpaused = unpaused.returncode == 0
+            if not result.dag_unpaused:
+                result.dag_unpause_error = (unpaused.stderr or unpaused.stdout).strip()
+        else:
+            result.dag_paused_for_draft = True
     return result
 
 

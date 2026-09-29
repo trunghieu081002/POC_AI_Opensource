@@ -461,6 +461,34 @@ def test_invalid_schedules_fail_at_lint_naming_the_field(root, schedule, expect)
         _with_schedule(root, schedule)
 
 
+# ---------------------------------------------------------------- maturity
+
+def test_a_manifest_with_no_maturity_key_defaults_to_draft(root):
+    """No migration silently grandfathers an existing pipeline in as
+    reviewed - missing the key means draft, same as it always meant nothing
+    had been promoted yet for a pack (docs/layer2.md, "Authoring pipelines
+    with a model")."""
+    _write(root, "demo", _minimal())
+    pipeline = loader.load("demo", root)
+    assert pipeline.maturity == "draft"
+    assert pipeline.is_draft is True
+
+
+@pytest.mark.parametrize("maturity", ["draft", "reviewed"])
+def test_valid_maturities_load(root, maturity):
+    _write(root, "demo", _minimal(maturity=maturity))
+    pipeline = loader.load("demo", root)
+    assert pipeline.maturity == maturity
+    assert pipeline.is_draft == (maturity != "reviewed")
+
+
+@pytest.mark.parametrize("maturity", ["stable", "Reviewed", "approved", "", None])
+def test_invalid_maturities_fail_at_load(root, maturity):
+    _write(root, "demo", _minimal(maturity=maturity))
+    with pytest.raises(loader.PipelineError, match="maturity"):
+        loader.load("demo", root)
+
+
 # ---------------------------------------------------------------- DPAGENT_PIPELINES hint
 
 def test_a_missing_pipeline_names_a_leftover_dpagent_pipelines_override(root, monkeypatch):

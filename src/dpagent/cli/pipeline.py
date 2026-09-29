@@ -6,6 +6,7 @@ before anything is generated or run against a real warehouse.
 """
 from __future__ import annotations
 
+import getpass
 import os
 import sys
 import time
@@ -16,6 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ..engine import state
+from ..pipelines import approval as approval_mod
 from ..pipelines import deploy as deploy_mod
 from ..pipelines import extract as extract_mod
 from ..pipelines import generator as generator_mod
@@ -101,6 +103,48 @@ def lint_cmd(name):
     console.print("[green]lint clean[/green]")
 
 
+@pipeline_group.command("promote")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True)
+@click.option("--approved-by", default="",
+              help="Who is approving this (defaults to the OS user running the command).")
+def promote_cmd(name, yes, approved_by):
+    """Mark this pipeline's current manifest/procedures/models as reviewed.
+
+    `deploy()` refuses to apply an unreviewed pipeline for real
+    (docs/layer2.md, "Authoring pipelines with a model") - this is what
+    actually clears that: it hashes the manifest plus every procedure/dbt
+    model it references right now, records that hash next to the pipeline
+    (`.approved.yaml`, git-tracked - review it in a PR like anything else
+    here), and sets `maturity: reviewed`. Editing any of those files again
+    afterward - even without touching `maturity` - invalidates this and
+    `deploy` refuses again, until promote runs once more.
+    """
+    pipeline = _load_or_fail(name)
+    approved, reason = approval_mod.is_approved(pipeline)
+    if approved:
+        console.print(f"[dim]{name} is already reviewed and matches its approval[/dim]")
+        return
+
+    paths = approval_mod.hashed_paths(pipeline)
+    console.print(Panel(
+        "\n".join(f"  · {p}" for p in paths),
+        title=f"approving {name} means having read every line of these {len(paths)} file(s)",
+        border_style="yellow", expand=False))
+    if not pipeline.is_draft:
+        console.print(f"[yellow]note:[/yellow] {reason}")
+
+    if not yes and not confirm(f"Have you read every line above for {name!r}?",
+                               default=False):
+        sys.exit(1)
+
+    approver = approved_by or getpass.getuser()
+    approval = approval_mod.promote(pipeline, approver)
+    console.print(f"[green]{name} is now maturity: reviewed[/green] "
+                 f"(approved by {approval.approved_by!r} at {approval.approved_at}) - "
+                 f"`dpagent pipeline deploy {name}` will apply it for real.")
+
+
 @pipeline_group.command("list")
 def list_cmd():
     """Every pipeline: its connector, whether it is deployed, and its last run.
@@ -110,7 +154,7 @@ def list_cmd():
     """
     deployed = set(deploy_mod.deployed_names())
     table = Table(box=None)
-    for column in ("pipeline", "connector", "schedule", "deployed", "last run"):
+    for column in ("pipeline", "connector", "maturity", "schedule", "deployed", "last run"):
         table.add_column(column, style="bold" if column == "pipeline" else "")
 
     def last_run(name):
@@ -120,17 +164,23 @@ def list_cmd():
         colour = {"ok": "green", "failed": "red"}.get(run["status"], "yellow")
         return f"[{colour}]{run['status']}[/{colour}] [dim]#{run['id']} {run['started_at']}[/dim]"
 
+    def maturity_cell(p):
+        approved, _ = approval_mod.is_approved(p)
+        if approved:
+            return "[green]reviewed[/green]"
+        return "[yellow]draft[/yellow]" if p.is_draft else "[yellow]stale[/yellow]"
+
     in_checkout = pipelines_mod.available()
     for name in in_checkout:
         yes_no = "[green]yes[/green]" if name in deployed else "[dim]no[/dim]"
         try:
             p = pipelines_mod.load(name)
         except pipelines_mod.PipelineError as exc:
-            table.add_row(name, "[red]invalid[/red]", str(exc).split(": ")[-1][:40],
+            table.add_row(name, "[red]invalid[/red]", "", str(exc).split(": ")[-1][:40],
                           yes_no, last_run(name))
             continue
-        table.add_row(name, p.source.connector, p.schedule or "[dim]manual[/dim]",
-                      yes_no, last_run(name))
+        table.add_row(name, p.source.connector, maturity_cell(p),
+                      p.schedule or "[dim]manual[/dim]", yes_no, last_run(name))
     orphans = sorted(deployed - set(in_checkout))
     if not (in_checkout or orphans):
         console.print("[dim]no pipelines in this checkout and none deployed[/dim]")
@@ -198,22 +248,42 @@ def plan_cmd(name):
                    "migrations and publishing dbt models.")
 @click.option("--no-airflow", is_flag=True,
               help="Skip installing the DAG into Airflow's real DAGS_FOLDER.")
-def deploy_cmd(name, yes, no_db, no_airflow):
+@click.option("--allow-draft", is_flag=True,
+              help="Deploy a pipeline that has not been promoted (or whose approved "
+                   "content has since changed) - manual-only regardless of its own "
+                   "schedule:, and never unpaused. For proving a draft on a real host "
+                   "before anyone has reviewed it, never for production use.")
+def deploy_cmd(name, yes, no_db, no_airflow, allow_draft):
     """Write the DAG + dbt schema, apply procedures, publish dbt models, install the DAG.
 
-    Writing files under pipelines/<name>/build/ is always safe to repeat
-    (each run overwrites the last). The rest happens against a real
-    system, so it asks first unless --yes: applying a procedure runs
-    `CREATE OR REPLACE PROCEDURE` against `warehouse:` (idempotent by
-    construction) and a dbt-engine stage's models are copied into the dbt
-    pack's own real project (needs root; `dbt run` only ever looks inside
-    its own project, never at this pipeline's directory) - both under
-    --no-db; and installing the DAG copies it into Airflow's DAGS_FOLDER
-    as the airflow OS user (needs root) so `dpagent pipeline run` has
-    something real to trigger - under --no-airflow.
+    Refuses a pipeline that is `maturity: draft`, or whose approved content
+    no longer matches what is on disk, unless --allow-draft is given
+    explicitly (docs/layer2.md, "Authoring pipelines with a model") -
+    `dpagent pipeline promote NAME` is the real fix. Writing files under
+    pipelines/<name>/build/ is always safe to repeat (each run overwrites
+    the last), but this refusal happens before even that: --allow-draft is
+    the only way past it, not --yes.
+
+    The rest happens against a real system, so it asks first unless --yes:
+    applying a procedure runs `CREATE OR REPLACE PROCEDURE` against
+    `warehouse:` (idempotent by construction) and a dbt-engine stage's
+    models are copied into the dbt pack's own real project (needs root;
+    `dbt run` only ever looks inside its own project, never at this
+    pipeline's directory) - both under --no-db; and installing the DAG
+    copies it into Airflow's DAGS_FOLDER as the airflow OS user (needs
+    root) so `dpagent pipeline run` has something real to trigger - under
+    --no-airflow.
     """
     pipeline = _load_or_fail(name)
     _require_layer2_prerequisites(pipeline)
+
+    approved, reason = approval_mod.is_approved(pipeline)
+    if not approved and not allow_draft:
+        fail(f"{reason}\n\nEither `dpagent pipeline promote {name}` it, or pass "
+             f"--allow-draft to test it explicitly (manual-only, never unpaused).")
+    if not approved:
+        console.print(f"[yellow]--allow-draft:[/yellow] {reason} - deploying anyway, "
+                      f"manual-only, DAG will stay paused")
 
     if not no_db and not yes and not confirm(
             f"Apply {name}'s procedure migration(s) against "
@@ -236,7 +306,8 @@ def deploy_cmd(name, yes, no_db, no_airflow):
 
     try:
         result = deploy_mod.deploy(pipeline, apply_db=not no_db,
-                                   install_dag_to_airflow=not no_airflow)
+                                   install_dag_to_airflow=not no_airflow,
+                                   allow_draft=allow_draft)
     except deploy_mod.DeployError as exc:
         fail(str(exc))
 
@@ -264,7 +335,14 @@ def deploy_cmd(name, yes, no_db, no_airflow):
                      "own environment, airflow-scheduler restarted")
     if result.dag_installed:
         console.print(f"[bold]DAG installed:[/bold] {result.dag_installed}")
-        if result.dag_unpaused:
+        if result.dag_paused_for_draft:
+            console.print(
+                "[yellow]DAG left paused on purpose[/yellow] - this is an "
+                "--allow-draft deploy of an unreviewed pipeline, and it stays "
+                "manual-only until it is promoted and deployed again. Do NOT "
+                f"unpause it by hand. `dpagent pipeline run {name}` still works "
+                "for a manual test.")
+        elif result.dag_unpaused:
             console.print(
                 f"[bold]DAG unpaused:[/bold] runs on schedule {pipeline.schedule!r} (UTC)"
                 if pipeline.schedule else

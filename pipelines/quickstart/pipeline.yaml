@@ -81,3 +81,4 @@ stages:
         # rows it just cast from orders_raw (already deduplicated by raw's
         # own gate) - a null here would mean the procedure itself is wrong,
         # which should halt the run, not quietly quarantine.
+maturity: reviewed
