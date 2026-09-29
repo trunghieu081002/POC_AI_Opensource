@@ -41,6 +41,8 @@ def _pipeline(root, stages_extra=None):
     (d / "pipeline.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
     (d / "procedures").mkdir()
     (d / "procedures" / "convert.sql").write_text("-- stub\n")
+    (d / "models").mkdir()
+    (d / "models" / "stg_t.sql").write_text("select 1\n")
     return loader.load("demo", root)
 
 

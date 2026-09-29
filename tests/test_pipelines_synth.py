@@ -73,11 +73,39 @@ def test_synth_refuses_to_run_without_a_verified_source_schema(root):
         synth.synth(_request(source_schema=""), pipelines_dir=root)
 
 
-def test_synth_refuses_to_overwrite_an_existing_pipeline(root, monkeypatch):
+def test_synth_refuses_to_overwrite_an_existing_pipeline_by_default(root, monkeypatch):
     (root / "monthly_sales").mkdir()
     monkeypatch.setattr(llm, "chat_json", FakeReply({"files": VALID_FILES}))
     with pytest.raises(FileExistsError):
         synth.synth(_request(), pipelines_dir=root)
+
+
+def test_synth_overwrite_redrafts_an_existing_draft(root, monkeypatch):
+    d = root / "monthly_sales"
+    d.mkdir()
+    (d / "pipeline.yaml").write_text("name: monthly_sales\nstages: []\n")   # a broken earlier draft
+    monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
+
+    result = synth.synth(_request(), pipelines_dir=root, overwrite=True)
+
+    assert result.structurally_valid is True
+    assert set(result.files) == {"pipeline.yaml", "models/stg_sale_order.sql"}
+
+
+def test_synth_overwrite_refuses_outright_against_a_reviewed_pipeline(root, monkeypatch):
+    """The guard that matters most here: even with overwrite=True, real
+    promoted work must never be silently clobbered by a redraft - the
+    operator has to choose a different name instead."""
+    monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
+    synth.synth(_request(), pipelines_dir=root)
+    pipeline = loader.load("monthly_sales", root)
+    synth.approval_mod.promote(pipeline, "alice")
+
+    with pytest.raises(ValueError, match="reviewed"):
+        synth.synth(_request(), pipelines_dir=root, overwrite=True)
+
+    # untouched - still there, still reviewed
+    assert loader.load("monthly_sales", root).maturity == "reviewed"
 
 
 def test_synth_returns_blockers_without_writing_anything(root, monkeypatch):

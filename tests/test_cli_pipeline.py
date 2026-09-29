@@ -699,7 +699,7 @@ def test_synth_prints_blockers_and_exits_nonzero_without_calling_synth_mod(
     brd, schema = _brd_and_schema_files(tmp_path)
     monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
     from dpagent.pipelines.synth import Blocker, SynthResult
-    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request: SynthResult(
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request, **k: SynthResult(
         name="monthly_sales", root=Path("/x"),
         blockers=[Blocker(question="Ngày đặt hay ngày xác nhận?", why_it_matters="đổi số liệu")]))
 
@@ -716,7 +716,7 @@ def test_synth_reports_the_written_files_and_mapping_on_success(db, tmp_path, mo
     monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
     from dpagent.pipelines.synth import SynthResult
     captured = {}
-    def fake_synth(request):
+    def fake_synth(request, **kwargs):
         captured["request"] = request
         return SynthResult(name="monthly_sales", root=Path("/x/monthly_sales"),
                            files=["pipeline.yaml", "models/stg_sale_order.sql"],
@@ -743,7 +743,7 @@ def test_synth_reports_a_load_error_instead_of_hiding_it(db, tmp_path, monkeypat
     brd, schema = _brd_and_schema_files(tmp_path)
     monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
     from dpagent.pipelines.synth import SynthResult
-    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request: SynthResult(
+    monkeypatch.setattr(pipeline_cli.synth_mod, "synth", lambda request, **k: SynthResult(
         name="monthly_sales", root=Path("/x"), files=["pipeline.yaml"],
         load_error="pipeline.yaml: gate 'made_up_gate_type' is not one of [...]"))
 
@@ -768,7 +768,7 @@ def test_synth_rejects_a_malformed_secret_flag(db, tmp_path, monkeypatch):
 def test_synth_surfaces_file_exists_error_cleanly(db, tmp_path, monkeypatch):
     brd, schema = _brd_and_schema_files(tmp_path)
     monkeypatch.setattr(pipeline_cli.llm, "available", lambda: True)
-    def boom(request):
+    def boom(request, **kwargs):
         raise FileExistsError("already exists")
     monkeypatch.setattr(pipeline_cli.synth_mod, "synth", boom)
 

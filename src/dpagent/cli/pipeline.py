@@ -98,7 +98,11 @@ _STANDARD_WAREHOUSE_REFS = {
               help="This pipeline's own warehouse schema - defaults to NAME, same "
                    "convention every hand-written pipeline in this repo uses.")
 @click.option("--hint", default="", help="Anything else the model should know.")
-def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint):
+@click.option("--overwrite", is_flag=True,
+              help="Redraft over an existing draft pipeline of the same name. Refused "
+                   "outright if that pipeline is maturity: reviewed - choose a "
+                   "different name instead of clobbering real, promoted work.")
+def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, overwrite):
     """Draft a pipeline from a BRD - a model writes pipeline.yaml + its SQL.
 
     Writes a DRAFT (docs/layer2.md, "Authoring pipelines with a model") -
@@ -129,7 +133,7 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint):
         hint=hint,
     )
     try:
-        result = synth_mod.synth(request)
+        result = synth_mod.synth(request, overwrite=overwrite)
     except (FileExistsError, ValueError, llm.LLMError) as exc:
         fail(str(exc))
 

@@ -15,6 +15,19 @@ def _write(root, name, data, *, procedure_files=()):
         path = d / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("-- test stub\n")
+    # Every dbt-engine stage's declared models get a real stub file by
+    # default - loader.load() now checks these exist (the same real gap
+    # procedure files were already checked for), so a test not otherwise
+    # concerned with that would break for the wrong reason without this.
+    # test_dbt_engine_needs_its_declared_model_files_to_actually_exist below
+    # deletes one after the fact to cover the negative case.
+    for stage in data.get("stages") or []:
+        if isinstance(stage, dict) and stage.get("engine") == "dbt":
+            for model in stage.get("models") or []:
+                path = d / "models" / f"{model}.sql"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if not path.exists():
+                    path.write_text("select 1\n")
     return d
 
 
@@ -134,6 +147,19 @@ def test_procedure_engine_needs_the_file_to_actually_exist(root):
     }
     _write(root, "demo", data)   # deliberately not creating procedures/missing.sql
     with pytest.raises(loader.PipelineError, match="does not exist"):
+        loader.load("demo", root)
+
+
+def test_dbt_engine_needs_its_declared_model_files_to_actually_exist(root):
+    """The same real gap procedure files were already checked for
+    (docs/deploy-log.md, Layer 3 M2 review): deploy_mod.install_dbt_models()
+    had its own late check for this, but loader.load()/`pipeline lint` did
+    not - a typo'd or never-committed model name surfaced as a DeployError
+    mid-`deploy`, not at lint time where every other authoring mistake in
+    this manifest is caught."""
+    d = _write(root, "demo", _minimal())   # _write() auto-creates models/stg_partners.sql
+    (d / "models" / "stg_partners.sql").unlink()
+    with pytest.raises(loader.PipelineError, match="stg_partners.*does not exist"):
         loader.load("demo", root)
 
 

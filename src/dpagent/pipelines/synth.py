@@ -120,15 +120,36 @@ def _user_message(request: SynthRequest) -> str:
     )
 
 
-def synth(request: SynthRequest, pipelines_dir: Path | None = None) -> SynthResult:
+def synth(request: SynthRequest, pipelines_dir: Path | None = None,
+          overwrite: bool = False) -> SynthResult:
     """Drafts `pipelines/<name>/` from a BRD, or returns blockers instead of
-    guessing. Never overwrites an existing pipeline directory - a draft that
-    needs redoing is a `--overwrite`-style operator decision, same as pack
-    synth, not implemented here yet because nothing has needed it."""
+    guessing.
+
+    Refuses an existing pipeline directory unless `overwrite=True` (mirrors
+    pack synth's own `--overwrite`) - and even then, refuses outright if
+    what is there is `maturity: reviewed`: a reviewed pipeline is real,
+    promoted, possibly deployed work, never something a redraft should be
+    able to silently clobber. Pick a different name instead. A `draft` (or
+    a directory `loader.load()` cannot even parse - a previous synth
+    attempt's near-miss) is safe to overwrite.
+    """
     root = (pipelines_dir or loader_mod.PIPELINES_DIR) / request.name
     if root.exists():
-        raise FileExistsError(
-            f"{root} already exists - remove it or choose a different name")
+        if not overwrite:
+            raise FileExistsError(
+                f"{root} already exists - pass overwrite=True (CLI: --overwrite) "
+                f"to redraft it, or choose a different name")
+        try:
+            existing = loader_mod.load(request.name, pipelines_dir or loader_mod.PIPELINES_DIR)
+            existing_is_reviewed = not existing.is_draft
+        except loader_mod.PipelineError:
+            existing_is_reviewed = False   # an unparseable leftover draft is safe to redo
+        if existing_is_reviewed:
+            raise ValueError(
+                f"{root} is maturity: reviewed - refusing to overwrite real, promoted "
+                f"work even with overwrite=True. Draft under a different name instead.")
+        import shutil
+        shutil.rmtree(root)
     if not request.source_schema.strip():
         raise ValueError(
             "no verified source schema given - synth refuses to draft blind "
