@@ -3594,3 +3594,87 @@ model outside itself (unique renamed model files from M2.4, plus
 not either alone). Still not proceeding to M2.5, Layer 2.5, or live LLM -
 unchanged from the standing decision; M2.5 (real verification on a
 disposable host with root + passwordless sudo) is next.
+
+## 2026-09-30 - Layer 3 M2.4.3: dbt's throwaway connection, and a numeric/text comparison bug
+
+A fourth review pass of the fixture-validation harness, after M2.4.2 merged
+(PR #20). It found a real, unhandled isolation gap specific to the dbt
+engine, plus a separate data-comparison correctness bug - six changes, in
+`runtime.py`/`fixture.py`/`pg_throwaway.py`/`loader.py`/`extract.py`. Full
+detail and rationale: docs/layer2.md, "M2.4.3: dbt actually connects to the
+throwaway warehouse, and the comparison stops guessing at column types".
+
+1. **dbt's own connection was never actually isolated.** Confirmed by
+   reading `packs/dbt/steps/30-project.sh`: it writes exactly one
+   `profiles.yml`, host-wide, at `dpagent install dbt` time, and
+   `runtime.run_transform()`'s dbt branch called `dbt run` with no
+   `--profiles-dir` of its own at all - meaning a validation clone's own
+   renamed/overridden `warehouse.*` refs (the entire point of
+   `fixture.make_validation_clone`) were silently ignored for any
+   dbt-engine stage, and `dbt run` always hit the real, shared warehouse
+   regardless. Fixed by generating a throwaway `profiles.yml` fresh for
+   every `dbt run`, resolved from the pipeline's own `warehouse.*` fields
+   (`runtime._dbt_profiles_dir()`), and calling the dbt pack's own venv
+   binary directly with an explicit `--profiles-dir` - never the
+   `/usr/local/bin/dbt` wrapper, which only sets `DBT_PROFILES_DIR` as a
+   default.
+2. **Landing dataset name mismatch for a dbt-engine clone.** A validation
+   clone's own landing dataset is `f"{clone.name}_landing"` by the existing
+   convention - but every real model's own copied SQL reads landing by the
+   *original* pipeline's literal, schema-qualified name (this project's own
+   no-`ref()`/`source()` convention), so the clone's dlt extract and its
+   dbt model were writing/reading two different dataset names. Fixed with a
+   new, narrowly-scoped `Pipeline.landing_dataset_name` override, `None` for
+   every hand-authored pipeline, set by `make_validation_clone()` to the
+   original pipeline's own landing dataset name.
+3. **Renamed model file, but not its own output table name.** dbt's default
+   materialized table name is the model *file's* own stem - renamed for
+   collision-avoidance in the shared project directory - which used to
+   leave the clone's actual output table mismatched from what every gate/
+   procedure/`expected.yaml` still names it. Fixed by prepending a single
+   `{{ config(alias='<original model name>') }}` line to the copied model's
+   SQL, never touching the model's own body otherwise.
+4. **Numeric/text comparison bug, real and reproduced**: `_canon_value()`
+   used to coerce any string that merely *looked* like a decimal number
+   into a canonical number, regardless of the actual column's type -
+   confirmed with a test: a text-typed customer-code column's `"00123"`
+   compared equal to `"123"`. Fixed by querying the curated table's real
+   column types from `information_schema.columns` first
+   (`fixture._column_types()`) and only applying the numeric-string rule to
+   a column Postgres itself reports numeric.
+5. **`_canon_number()` still rounded past 28 significant digits.** M2.4.2's
+   own fix removed `str(d)`'s scientific-notation risk but still called
+   `d.normalize()` first, which rounds to the *current thread's context
+   precision* - reproduced with a test: two Decimals differing only beyond
+   28 significant digits normalized to the identical string and compared
+   equal. Fixed by stripping trailing zeros via plain string manipulation
+   on `format(d, "f")`'s own exact output instead, never calling
+   `normalize()` at all.
+6. **`pg_throwaway` teardown could skip `DROP ROLE` entirely on a
+   timeout.** An uncaught `subprocess.TimeoutExpired` from the first `DROP`
+   call inside `throwaway_database()`'s own `finally` used to propagate
+   straight out, past the second `DROP` call and past this module's own
+   stated "teardown never raises" promise - reproduced with a test that
+   makes `DROP DATABASE` raise `TimeoutExpired` and confirms `DROP ROLE`
+   still ran anyway. `_run_as_postgres()` now returns `None` (never raises)
+   on a timeout; `CREATE DATABASE`'s own role rollback is now checked and
+   named in the raised `ThrowawayUnavailable` if it also fails, rather than
+   being fire-and-forgotten.
+
+**Real-verified on this host**: re-ran `dpagent pipeline validate
+quickstart_dbt --fixture ... --expected ...` for real against the project's
+own dbt-engine reference pipeline - `dbt ref()/source() check: pass` (its
+one model reads landing by a literal table name, confirming the
+no-`ref()`/`source()` convention still holds after the model-alias change),
+preflight still fails for the same real reason as before (no root, no
+passwordless sudo, `/opt/dpagent/pipelines` and `/opt/dbt/project` not
+writable by this operator), no clone id printed, and `/opt/dpagent/pipelines`
+still lists only the 3 real pipelines afterward. The dbt throwaway-profile
+connection itself (item 1) and the real pass/fail path of items 2-6 inside
+one real `dbt run` against a real Postgres/Airflow remain unit-tested with
+subprocess mocked - unchanged M2.5 boundary (root + passwordless sudo to
+postgres on a disposable host), not attempted or worked around here. Full
+test suite green before this commit.
+
+Still not proceeding to M2.5, Layer 2.5, or live LLM - unchanged from the
+standing decision.

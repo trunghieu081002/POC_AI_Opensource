@@ -78,10 +78,30 @@ class ThrowawayDB:
         }
 
 
-def _run_as_postgres(sql: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
-        capture_output=True, text=True, timeout=30)
+def _run_as_postgres(sql: str, *, timeout: int = 30) -> subprocess.CompletedProcess | None:
+    """`None`, never a raised `subprocess.TimeoutExpired`, when the command
+    itself did not finish within `timeout` - a distinct outcome from a
+    `returncode != 0` (the command ran and refused), and one every caller
+    must be able to tell apart, especially inside `throwaway_database()`'s
+    own teardown `finally`: an uncaught `TimeoutExpired` there used to
+    propagate straight out of the `finally` block, which - for the *first*
+    of the two DROP calls - skipped the second one entirely and broke this
+    module's own stated promise that teardown never raises past it (M2.4.3
+    review: reproduced by mocking `subprocess.run` to raise
+    `TimeoutExpired` for `DROP DATABASE` and observing `DROP ROLE` never
+    even ran)."""
+    try:
+        return subprocess.run(
+            ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
+            capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def _detail_of(proc: subprocess.CompletedProcess | None, *, timeout: int) -> str:
+    if proc is None:
+        return f"timed out after {timeout}s"
+    return (proc.stderr or proc.stdout).strip()
 
 
 @contextmanager
@@ -93,13 +113,17 @@ def throwaway_database(prefix: str = "dpagent_throwaway"):
     tear down in that case.
 
     Teardown (`DROP DATABASE` then `DROP ROLE`) checks each command's own
-    `returncode` and records the result onto the yielded object itself
+    `returncode` (or a `None` from `_run_as_postgres` on a timeout) and
+    records the result onto the yielded object itself
     (`database_dropped`/`role_dropped`/the matching `*_drop_error`) rather
     than assuming a command that was merely *issued* actually succeeded -
     an earlier version did not check either, so a failed DROP could leave
     a role/database on the real host with nothing anywhere reporting it.
-    Never raises from here on a teardown failure - see
-    `ThrowawayCleanupError`'s own docstring for exactly why.
+    The two drops are independent - each gets its own outcome recorded
+    before the other runs, so a timeout/failure on `DROP DATABASE` can
+    never skip `DROP ROLE` (M2.4.3 review). Never raises from here on a
+    teardown failure - see `ThrowawayCleanupError`'s own docstring for
+    exactly why.
     """
     suffix = uuid.uuid4().hex[:10]
     role = f"{prefix}_{suffix}"
@@ -107,15 +131,28 @@ def throwaway_database(prefix: str = "dpagent_throwaway"):
     password = uuid.uuid4().hex
 
     created_role = _run_as_postgres(f"CREATE ROLE {role} LOGIN PASSWORD '{password}';")
-    if created_role.returncode != 0:
+    if created_role is None or created_role.returncode != 0:
         raise ThrowawayUnavailable(
             f"could not provision a throwaway Postgres role (needs passwordless "
-            f"sudo to the postgres user): {created_role.stderr.strip()}")
+            f"sudo to the postgres user): {_detail_of(created_role, timeout=30)}")
     created_db = _run_as_postgres(f"CREATE DATABASE {db} OWNER {role};")
-    if created_db.returncode != 0:
-        _run_as_postgres(f"DROP ROLE IF EXISTS {role};")
+    if created_db is None or created_db.returncode != 0:
+        # The role this branch already created must still be rolled back -
+        # checked for real, not fire-and-forgotten: a failed/timed-out
+        # rollback here leaves a role on the host with no `ThrowawayDB`
+        # object for any caller to ever learn that from (provisioning
+        # failed before one was even created), so the only place left to
+        # say so is this exception's own message.
+        rollback = _run_as_postgres(f"DROP ROLE IF EXISTS {role};")
+        rollback_note = (
+            "" if (rollback is not None and rollback.returncode == 0) else
+            f" - WARNING: role {role!r} could not be confirmed dropped during "
+            f"rollback either ({_detail_of(rollback, timeout=30)}); it may still "
+            f"exist on this host and need manual cleanup"
+        )
         raise ThrowawayUnavailable(
-            f"could not provision a throwaway Postgres database: {created_db.stderr.strip()}")
+            f"could not provision a throwaway Postgres database: "
+            f"{_detail_of(created_db, timeout=30)}{rollback_note}")
 
     db_obj = ThrowawayDB(host="localhost", port="5432", database=db,
                          user=role, password=password)
@@ -123,11 +160,11 @@ def throwaway_database(prefix: str = "dpagent_throwaway"):
         yield db_obj
     finally:
         drop_db = _run_as_postgres(f"DROP DATABASE IF EXISTS {db};")
-        db_obj.database_dropped = drop_db.returncode == 0
+        db_obj.database_dropped = drop_db is not None and drop_db.returncode == 0
         if not db_obj.database_dropped:
-            db_obj.database_drop_error = (drop_db.stderr or drop_db.stdout).strip()
+            db_obj.database_drop_error = _detail_of(drop_db, timeout=30)
 
         drop_role = _run_as_postgres(f"DROP ROLE IF EXISTS {role};")
-        db_obj.role_dropped = drop_role.returncode == 0
+        db_obj.role_dropped = drop_role is not None and drop_role.returncode == 0
         if not db_obj.role_dropped:
-            db_obj.role_drop_error = (drop_role.stderr or drop_role.stdout).strip()
+            db_obj.role_drop_error = _detail_of(drop_role, timeout=30)

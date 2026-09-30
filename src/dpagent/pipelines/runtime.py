@@ -6,12 +6,17 @@ into its own Python, and this keeps that shape.
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
 import os
 import subprocess
+import tempfile
+from pathlib import Path
 from urllib.parse import quote
+
+import yaml
 
 from ..engine import state
 from ..engine.params import redact, register_secret, resolve_refs
@@ -407,16 +412,26 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
 
     state.event("transform.start", f"{pipeline_name}/{stage} via {target.engine}", run_id=run_id)
     if target.engine == "dbt":
-        # `dbt` is the wrapper packs/dbt/steps/40-symlink.sh installs at
-        # /usr/local/bin/dbt - it already sets DBT_PROFILES_DIR itself, so
-        # only --project-dir is needed here. Runs against
-        # install_dbt_models()'s published copy under the dbt pack's own
-        # project (deploy.py) - pipeline.root itself has no dbt_project.yml
-        # and never did; `dbt run` from there always failed before this,
-        # confirmed the first time this branch actually ran for real.
-        proc = _run(["dbt", "run", "--select", *target.models,
-                     "--project-dir", _dbt_project_dir()],
-                    pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
+        # Never the pack's own shared, host-wide profile
+        # (packs/dbt/steps/30-project.sh's profiles.yml, fixed at `dpagent
+        # install dbt` time) - a throwaway profile generated fresh from
+        # *this pipeline's own* `warehouse.*` fields, resolved the same way
+        # `_warehouse_conn()` already resolves them for the procedure
+        # engine. For a real, promoted pipeline these values already point
+        # at the same shared warehouse the static profile also names, so
+        # this changes nothing observable; for a validation clone
+        # (fixture.make_validation_clone) they point at a throwaway
+        # database instead - which is the point: without this, `dbt run`
+        # ignored a validation clone's own renamed/overridden warehouse
+        # refs entirely and always ran against the real, shared warehouse
+        # regardless (M2.4.3 review: "Validation có thể đọc/ghi ngoài DB
+        # thử" - confirmed for real, this pack's static profiles.yml has no
+        # per-pipeline indirection of any kind).
+        with _dbt_profiles_dir(pipeline) as profiles_dir:
+            proc = _run([_dbt_bin(), "run", "--select", *target.models,
+                        "--project-dir", _dbt_project_dir(),
+                        "--profiles-dir", profiles_dir],
+                       pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
         if proc.returncode != 0:
             detail = _detail(proc.stderr or proc.stdout)
             state.event("transform.failed", f"dbt run failed for {stage!r}: {detail}",
@@ -438,6 +453,13 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
 
 _DLT_DEFAULT_INSTALL_DIR = "/opt/dlt"   # must match packs/dlt/pack.yaml's own default
 _DBT_DEFAULT_PROJECT_DIR = "/opt/dbt/project"   # must match packs/dbt/pack.yaml's own default
+_DBT_DEFAULT_INSTALL_DIR = "/opt/dbt"   # must match packs/dbt/pack.yaml's own default
+_DBT_DEFAULT_PROFILE_NAME = "default"   # must match packs/dbt/pack.yaml's own default
+
+
+def _dbt_install_record() -> dict:
+    record = state.get_install("dbt")
+    return json.loads(record["params_json"]) if record else {}
 
 
 def _dbt_project_dir() -> str:
@@ -445,12 +467,85 @@ def _dbt_project_dir() -> str:
     task's own process, so it must not touch packs_mod/PACKS_DIR - only a
     plain SQLite read of what was actually recorded at install time, with a
     hard-coded fallback matching the pack's own default."""
-    project_dir = _DBT_DEFAULT_PROJECT_DIR
-    record = state.get_install("dbt")
-    if record:
-        supplied = json.loads(record["params_json"])
-        project_dir = supplied.get("project_dir", project_dir)
-    return project_dir
+    return _dbt_install_record().get("project_dir", _DBT_DEFAULT_PROJECT_DIR)
+
+
+def _dbt_bin() -> str:
+    """The dbt pack's own venv binary directly - same resolution
+    `validate._dbt_bin()` already uses, duplicated rather than imported
+    (this module's own `_dlt_python()` docstring explains why: a DAG task's
+    own process, never packs_mod/PACKS_DIR). Deliberately not
+    `/usr/local/bin/dbt` (the wrapper `packs/dbt/steps/40-symlink.sh`
+    installs, which only sets `DBT_PROFILES_DIR` as a *default* - i.e. only
+    when the caller has not already set it): calling the venv binary
+    directly and always passing an explicit `--profiles-dir` (see
+    `_dbt_profiles_dir`) removes any dependency on that wrapper or its
+    default entirely, for every dbt run this module makes, not just a
+    validation clone's."""
+    install_dir = _dbt_install_record().get("install_dir", _DBT_DEFAULT_INSTALL_DIR)
+    return f"{install_dir}/.venv/bin/dbt"
+
+
+def _dbt_profile_name() -> str:
+    """The exact `profile:` name the real, shared dbt_project.yml under
+    `_dbt_project_dir()` declares (`packs/dbt/steps/30-project.sh`'s own
+    `PROFILE_NAME` param, `default` if never overridden at install time) -
+    the throwaway profiles.yml `_dbt_profiles_dir` generates must declare a
+    profile of this exact same name, or dbt refuses with "could not find
+    profile named ...", since `--project-dir` still points at that same
+    real project file."""
+    return _dbt_install_record().get("profile_name", _DBT_DEFAULT_PROFILE_NAME)
+
+
+@contextlib.contextmanager
+def _dbt_profiles_dir(pipeline: loader.Pipeline):
+    """A throwaway `profiles.yml`, generated fresh for *this* `dbt run`
+    from `pipeline.warehouse`'s own resolved connection - never the dbt
+    pack's one, shared, host-wide profile (`packs/dbt/steps/30-project.sh`),
+    which is fixed at `dpagent install dbt` time and knows nothing about any
+    individual pipeline's own `warehouse.*` fields. Same resolution
+    `_warehouse_conn()` already uses for the procedure engine, so a real,
+    promoted pipeline's dbt run connects to exactly the same database its
+    procedure-engine stages already do - and a validation clone's dbt run
+    (whose `warehouse.*` fields `fixture.make_validation_clone` already
+    renamed to point at a throwaway database) now actually connects there
+    too, instead of silently ignoring the override the way the pack's one
+    static profile always did (see `run_transform`'s own comment for the
+    real bug this closes, M2.4.3 review).
+
+    The temp directory (and the profile's password inside it) never
+    outlives this one `dbt run` - `tempfile.TemporaryDirectory` cleans it up
+    on exit, and its own default mode (0700, created by `mkdtemp`) keeps it
+    unreadable to any other unprivileged user on this host in the
+    meantime."""
+    resolved = resolve_refs(
+        {"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
+         "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
+         "password": pipeline.warehouse.password},
+        path=f"{pipeline.name}.warehouse",
+    )
+    _register_secrets(resolved)
+    profile_name = _dbt_profile_name()
+    content = {
+        profile_name: {
+            "target": "run",
+            "outputs": {
+                "run": {
+                    "type": "postgres",
+                    "host": resolved["host"],
+                    "port": int(resolved["port"]),
+                    "user": resolved["user"],
+                    "password": resolved["password"],
+                    "dbname": resolved["database"],
+                    "schema": pipeline.warehouse.schema,
+                    "threads": 4,
+                },
+            },
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="dpagent_dbt_profile_") as tmp:
+        (Path(tmp) / "profiles.yml").write_text(yaml.safe_dump(content), encoding="utf-8")
+        yield tmp
 
 
 def _dlt_python() -> str:

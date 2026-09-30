@@ -62,8 +62,16 @@ def landing_dataset(pipeline: Pipeline) -> str:
     convention (docs/layer2.md: "dlt writes each table as-received into
     demo_landing.<table>"), independent of warehouse.schema (which is what
     the *dbt/procedure*-produced raw/curated stages share - landing is dlt's
-    own output, not a choice, same as it has no engine to choose)."""
-    return f"{pipeline.name}_landing"
+    own output, not a choice, same as it has no engine to choose).
+
+    `pipeline.landing_dataset_name` overrides the convention when set -
+    None for every hand-authored pipeline (its own docstring in loader.py);
+    only `fixture.make_validation_clone()` ever sets it, to the *original*
+    pipeline's own landing dataset name, so a validation clone's dbt
+    models - which read landing by a literal, schema-qualified name baked
+    into their own copied SQL - can still find the data the clone's own
+    dlt extract just landed under its differently-named clone."""
+    return pipeline.landing_dataset_name or f"{pipeline.name}_landing"
 
 
 def _render_extract_body(pipeline: Pipeline) -> str:

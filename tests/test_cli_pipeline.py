@@ -889,8 +889,8 @@ def test_validate_fixture_reports_success(db, tmp_path, monkeypatch):
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
         comparison_after_run2=ComparisonResult(True, "1 row matched"),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
-        source_database_dropped=True, source_role_dropped=True,
-        warehouse_database_dropped=True, warehouse_role_dropped=True)
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=True, warehouse_role_dropped=True)
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [
@@ -965,9 +965,9 @@ def test_validate_fixture_exits_4_when_a_throwaway_database_is_not_dropped(
         comparison_after_run1=ComparisonResult(True, "matched"),
         comparison_after_run2=ComparisonResult(True, "matched"),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
-        source_database_dropped=True, source_role_dropped=True,
-        warehouse_database_dropped=False, warehouse_database_drop_error="in use",
-        warehouse_role_dropped=True)
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=False,
+        warehouse_database_drop_error="in use", warehouse_role_dropped=True)
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: dirty_report)
 
     result = _runner().invoke(pipeline_group, [
@@ -988,8 +988,8 @@ def test_validate_fixture_writes_the_fixture_section_into_the_report(db, tmp_pat
         comparison_after_run1=ComparisonResult(True, "1 row matched"),
         comparison_after_run2=ComparisonResult(True, "1 row matched"),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
-        source_database_dropped=True, source_role_dropped=True,
-        warehouse_database_dropped=True, warehouse_role_dropped=True)
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=True, warehouse_role_dropped=True)
     monkeypatch.setattr(pipeline_cli.fixture_mod, "run_fixture", lambda *a, **k: ok_report)
 
     result = _runner().invoke(pipeline_group, [

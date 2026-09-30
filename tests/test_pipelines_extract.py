@@ -47,6 +47,18 @@ def test_landing_dataset_is_pipeline_name_plus_landing_suffix(root):
     assert extract.landing_dataset(pipeline) == "demo_landing"
 
 
+def test_landing_dataset_honours_an_explicit_override(root):
+    """`landing_dataset_name` - only ever set by
+    `fixture.make_validation_clone()`, never a hand-authored manifest key in
+    practice - overrides the `<name>_landing` convention when present
+    (M2.4.3 review: a validation clone's dbt models read landing by the
+    *original* pipeline's own dataset name, baked literally into their
+    copied SQL, not the clone's own renamed one)."""
+    _write(root, "demo", _base(landing_dataset_name="quickstart_landing"))
+    pipeline = loader.load("demo", root)
+    assert extract.landing_dataset(pipeline) == "quickstart_landing"
+
+
 def test_odoo_postgres_script_is_valid_python(root):
     _write(root, "demo", _base())
     pipeline = loader.load("demo", root)
