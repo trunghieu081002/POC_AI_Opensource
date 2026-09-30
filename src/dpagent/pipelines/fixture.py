@@ -49,6 +49,7 @@ import yaml
 
 from ..engine.params import ENV_REF
 from . import pg_throwaway
+from .extract import landing_dataset as _landing_dataset
 from .loader import Pipeline, Stage, Warehouse
 from .pg_throwaway import ThrowawayDB
 
@@ -169,6 +170,28 @@ def _model_alias(model: str, suffix: str) -> str:
     return f"{model}__validate_{suffix}"
 
 
+def _alias_model_content(content: str, original_model: str) -> str:
+    """Prepends a `{{ config(alias=...) }}` line pinning this renamed
+    model's *materialized table name* back to `original_model` - the
+    model's own copied SQL body is otherwise untouched (never rewritten;
+    the dbt_dependencies check's own docstring already documents that
+    constraint for `ref()`/`source()`, and this keeps it for every other
+    line too).
+
+    Without this, dbt's own default output table name is the *file's* own
+    stem - which `_model_alias` deliberately renames to stay collision-free
+    in the shared project directory - so the clone's dbt run would silently
+    materialize under `<model>__validate_<suffix>` while every gate,
+    procedure, and `expected.yaml` written against this pipeline still
+    names the table `<model>` (M2.4.3 review: "File model dbt đổi tên
+    nhưng chưa giữ alias bảng đầu ra, trong khi gate/procedure vẫn tham
+    chiếu tên cũ"). A model that already sets its own `alias=` via a later
+    `config()` call in its own body is unaffected either way - dbt applies
+    the *last* config() call's value for a key both declare, and the
+    original file's own SQL is appended after this line unchanged."""
+    return f"{{{{ config(alias='{original_model}') }}}}\n" + content
+
+
 def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, str]:
     """Builds a complete, on-disk, throwaway clone of `pipeline` under a
     unique name - `<name>__validate__<suffix>` - with its own renamed
@@ -200,7 +223,9 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
                 model_alias[model] = alias
                 aliased.append(alias)
                 content = pipeline.path(f"models/{model}.sql").read_text(encoding="utf-8")
-                (clone_root / "models" / f"{alias}.sql").write_text(content, encoding="utf-8")
+                aliased_content = _alias_model_content(content, model)
+                (clone_root / "models" / f"{alias}.sql").write_text(
+                    aliased_content, encoding="utf-8")
             new_stages.append(replace(stage, models=aliased))
         elif stage.engine == "procedure":
             # Procedures are applied straight against `pipeline.warehouse`
@@ -226,6 +251,14 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
         schedule=None,
         timeouts=dict(pipeline.timeouts),
         maturity="draft",
+        # The *original* pipeline's own landing dataset name, not the
+        # clone's - every real model in this project reads landing by a
+        # literal, schema-qualified name baked into its own copied SQL
+        # (loader.Pipeline.landing_dataset_name's own docstring).
+        # `_landing_dataset(pipeline)`, not a hardcoded f-string, so this
+        # still does the right thing on the rare/future case of validating
+        # a pipeline that already carries its own override.
+        landing_dataset_name=_landing_dataset(pipeline),
     )
     _write_clone_manifest(clone, clone_root)
     return clone, suffix
@@ -278,6 +311,8 @@ def _write_clone_manifest(clone: Pipeline, root: Path) -> None:
         "stages": [_stage_to_dict(s) for s in clone.stages],
         "maturity": "draft",
     }
+    if clone.landing_dataset_name:
+        data["landing_dataset_name"] = clone.landing_dataset_name
     if clone.timeouts:
         data["timeouts"] = dict(clone.timeouts)
     (root / "pipeline.yaml").write_text(
@@ -413,22 +448,37 @@ def _canon_number(value: object) -> str:
     native `float` can hold (the M2.4.2 review's own "nhiều chữ số thập
     phân" case) is never silently rounded by this function itself. No
     exponent, no trailing zeros, so formatting alone never causes a false
-    mismatch."""
+    mismatch.
+
+    Never calls `Decimal.normalize()` (or anything else the `decimal`
+    module documents as "uses the context"): `normalize()` rounds to the
+    *current thread's context precision* - 28 significant digits by
+    default - so two genuinely different values that only differ beyond
+    that many significant digits used to `normalize()` down to the exact
+    same string and compare equal (M2.4.3 review, reproduced for real:
+    `Decimal("100.123456789012345678901234567890123")` and the same value
+    with a trailing `...124` both normalized to
+    `Decimal("100.1234567890123456789012346")`). `format(d, "f")` is exact
+    - fixed-point, every digit `Decimal(str(value))` itself was given,
+    no context involved - trailing zeros are then stripped by plain string
+    manipulation instead, which cannot round anything."""
     try:
         d = Decimal(str(value))
     except InvalidOperation:
         return str(value)
-    # format(..., "f") - never str() - forces fixed-point notation:
-    # Decimal.normalize() (and str() of an already-integral Decimal like
-    # Decimal("100.00")) can legitimately produce scientific notation
-    # ("1E+2") for a round number with trailing zeros stripped, which
-    # would silently stop matching a plain "100" on the other side.
-    if d == d.to_integral_value():
-        return format(d.to_integral_value(), "f")
-    return format(d.normalize(), "f")
+    text = format(d, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    if text in ("", "-0"):
+        # "-0.00" strips down to "-0" (or "" for a bare "0.00") by the
+        # rstrip above - neither of which a plain "0"/"0.0" on the other
+        # side would ever produce, so a genuine zero must canonicalize
+        # identically regardless of the sign/precision it was written with.
+        text = "0"
+    return text
 
 
-def _canon_value(value: object) -> object:
+def _canon_value(value: object, *, numeric: bool) -> object:
     """Normalizes one value so two representations of the same real value
     compare equal after JSON-serializing a whole row for comparison -
     `None` (Postgres `NULL`) stays distinct from `""` (an actual empty
@@ -441,16 +491,29 @@ def _canon_value(value: object) -> object:
     parses the actual side's JSON with `parse_float=Decimal`, never
     `float`, specifically so a high-precision monetary value is not
     silently rounded before this function ever sees it) canonicalizes
-    through `_canon_number`. A plain string that looks like nothing but a
-    decimal number (`^-?\\d+(\\.\\d+)?$`) is *also* canonicalized as a
-    number - this is deliberate, not a loose heuristic: the M2.4.2 review's
-    own recommendation is to author a monetary `expected.yaml` value as a
+    through `_canon_number`.
+
+    `numeric` - whether Postgres itself reports *this column* as a numeric
+    type (`compare_curated`'s own `information_schema.columns` lookup) -
+    decides whether a plain *string* that merely looks like a decimal
+    number (`^-?\\d+(\\.\\d+)?$`) also gets canonicalized as one: only when
+    the column really is numeric, never otherwise. This is deliberate for a
+    numeric column, not a loose heuristic - the M2.4.2 review's own
+    recommendation is to author a monetary `expected.yaml` value as a
     quoted string specifically to protect it from YAML's own float parsing
     imprecision (`revenue: 100.00` unquoted becomes a lossy Python `float`
     the moment `yaml.safe_load` reads it, before this function is ever
     called - `revenue: "100.00"` does not); without this rule, a
     deliberately-precise quoted string on the expected side would never
     compare equal to Postgres's own numeric JSON value on the actual side.
+    But applying that same rule to a *text* column would be wrong in the
+    other direction: a customer code column typed `text` whose real values
+    include both `"00123"` and `"123"` must keep comparing them as
+    different rows - collapsing both to the number 123 (the M2.4.2 code's
+    own former behaviour) silently hides a real data bug instead of
+    catching it (M2.4.3 review: "_canon_value() ép mọi chuỗi giống số
+    thành số... mã khách hàng '00123' khớp với '123'"). A string on a
+    non-numeric column is always compared exactly, whatever it looks like.
     Anything else becomes its plain string form."""
     if value is None:
         return None
@@ -460,14 +523,42 @@ def _canon_value(value: object) -> object:
         return value.isoformat()
     if isinstance(value, (int, float, Decimal)):
         return _canon_number(value)
-    if isinstance(value, str) and _DECIMAL_LITERAL.match(value):
+    if numeric and isinstance(value, str) and _DECIMAL_LITERAL.match(value):
         return _canon_number(value)
     return str(value)
 
 
-def _canon_row(row: dict) -> str:
-    return json.dumps({k: _canon_value(v) for k, v in row.items()},
-                      sort_keys=True, ensure_ascii=False)
+def _canon_row(row: dict, numeric_columns: set[str]) -> str:
+    return json.dumps(
+        {k: _canon_value(v, numeric=k in numeric_columns) for k, v in row.items()},
+        sort_keys=True, ensure_ascii=False)
+
+
+# Postgres's own information_schema.columns.data_type spellings for every
+# type this harness treats as "numeric" for comparison purposes - anything
+# else (text, character varying, boolean, date/timestamp*, uuid, ...) is
+# left as an exact string/its own already-typed JSON form, never coerced.
+_NUMERIC_COLUMN_TYPES = {
+    "smallint", "integer", "bigint", "numeric", "decimal",
+    "real", "double precision",
+}
+
+
+def _column_types(warehouse: ThrowawayDB, schema: str, table: str) -> dict[str, str]:
+    """`{column_name: data_type}` for every column of `schema.table`, from
+    Postgres's own `information_schema.columns` - what `compare_curated`
+    needs to decide, per column, whether a numeric-looking *string* value
+    should be canonicalized as a number or compared as exact text (see
+    `_canon_value`'s own docstring for why this cannot be a blanket rule)."""
+    query = (
+        "SELECT json_agg(row_to_json(t)) FROM (SELECT column_name, data_type "
+        f"FROM information_schema.columns WHERE table_schema = {_quote_literal(schema)} "
+        f"AND table_name = {_quote_literal(table)}) t;")
+    proc = _psql(warehouse, "-c", query, "-A", "-t")
+    if proc.returncode != 0:
+        raise ValueError((proc.stderr or proc.stdout).strip())
+    rows = json.loads(proc.stdout.strip() or "null") or []
+    return {r["column_name"]: r["data_type"] for r in rows}
 
 
 def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: str) -> ComparisonResult:
@@ -487,6 +578,14 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
     of Postgres - through the identical function before comparing, so
     "same value, different representation" on either side cannot produce a
     false mismatch (or, worse, a false match)."""
+    try:
+        column_types = _column_types(warehouse, schema, expected.table)
+    except ValueError as exc:
+        return ComparisonResult(
+            False, f"could not read {schema}.{expected.table}'s own column types "
+                  f"(needed to compare numeric and text columns correctly): {exc}")
+    numeric_columns = {c for c, t in column_types.items() if t in _NUMERIC_COLUMN_TYPES}
+
     if expected.rows:
         column_sets = {frozenset(row.keys()) for row in expected.rows}
         if len(column_sets) > 1:
@@ -522,8 +621,8 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
         return ComparisonResult(
             False, f"expected {expected.row_count} row(s), got {len(actual_rows)}")
 
-    actual_sorted = sorted(_canon_row(r) for r in actual_rows)
-    expected_sorted = sorted(_canon_row(r) for r in expected.rows)
+    actual_sorted = sorted(_canon_row(r, numeric_columns) for r in actual_rows)
+    expected_sorted = sorted(_canon_row(r, numeric_columns) for r in expected.rows)
     if actual_sorted != expected_sorted:
         return ComparisonResult(
             False, f"expected rows:\n  {expected_sorted}\nactual rows:\n  {actual_sorted}")
@@ -791,11 +890,13 @@ def _record_throwaway_cleanup(report: "FixtureRunReport", src_db, wh_db) -> None
     raised before yielding) - nothing to record in that case, the fields
     stay at their `False`/"not attempted" defaults."""
     if src_db is not None:
+        report.source_db_created = True
         report.source_database_dropped = src_db.database_dropped
         report.source_role_dropped = src_db.role_dropped
         report.source_database_drop_error = src_db.database_drop_error
         report.source_role_drop_error = src_db.role_drop_error
     if wh_db is not None:
+        report.warehouse_db_created = True
         report.warehouse_database_dropped = wh_db.database_dropped
         report.warehouse_role_dropped = wh_db.role_dropped
         report.warehouse_database_drop_error = wh_db.database_drop_error
@@ -840,6 +941,21 @@ class FixtureRunReport:
     warehouse_role_dropped: bool = False
     warehouse_database_drop_error: str = ""
     warehouse_role_drop_error: str = ""
+    # Whether `pg_throwaway.throwaway_database()` ever actually yielded a
+    # `ThrowawayDB` for this one (i.e. provisioning itself succeeded) -
+    # `fixture_report_dict()` uses *this*, not `cleanup_attempted` (which is
+    # specifically about the pipeline clone's own artifacts and only
+    # becomes True once `deploy()` is even reached), to decide whether a
+    # throwaway resource's own drop outcome is "not_attempted" or a real
+    # pass/fail. Without this distinction, a fixture that failed to *seed*
+    # (returns before `deploy()` is ever called, so `cleanup_attempted`
+    # stays False) but whose two throwaway databases were still correctly
+    # created-and-dropped by their own `with` block regardless, used to be
+    # reported as "not_attempted" for both - hiding a real, already-known
+    # drop outcome (M2.4.3 review: "seed lỗi có thể đã drop DB nhưng báo
+    # not_attempted").
+    source_db_created: bool = False
+    warehouse_db_created: bool = False
 
     @property
     def idempotent(self) -> bool:
@@ -1135,11 +1251,16 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
     run1_id = report.run_ids[0] if len(report.run_ids) > 0 else None
     run2_id = report.run_ids[1] if len(report.run_ids) > 1 else None
 
-    # A throwaway database was "attempted" whenever cleanup of the
-    # pipeline's own artifacts was (both happen inside the same `with
-    # pg_throwaway...` block in run_fixture) - distinct from "dropped",
-    # which is only true once DROP DATABASE/DROP ROLE actually succeeded.
-    attempted = report.cleanup_attempted
+    # A throwaway database was "attempted" whenever it was actually created
+    # (`report.source_db_created`/`warehouse_db_created`) - not whenever
+    # the *pipeline clone's own* cleanup was (`report.cleanup_attempted`),
+    # which only becomes True once `deploy()` is reached and says nothing
+    # about a fixture that failed to seed, where both throwaway databases
+    # were still created and torn down regardless (M2.4.3 review's own
+    # "seed lỗi có thể đã drop DB nhưng báo not_attempted" finding).
+    # Distinct from "dropped", which is only true once DROP DATABASE/DROP
+    # ROLE actually succeeded.
+    attempted = report.cleanup_attempted   # still what "pipeline_artifacts"/"overall" use
 
     if report.unavailable_reason:
         overall = "unavailable"
@@ -1164,13 +1285,16 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
             "pipeline_artifacts": ("pass" if report.cleanup_ok else
                                    "fail" if report.cleanup_attempted else "not_attempted"),
             "pipeline_artifacts_detail": report.cleanup_detail,
-            "source_database": _drop_status(attempted, report.source_database_dropped,
+            "source_database": _drop_status(report.source_db_created,
+                                            report.source_database_dropped,
                                             report.source_database_drop_error),
-            "source_role": _drop_status(attempted, report.source_role_dropped,
+            "source_role": _drop_status(report.source_db_created, report.source_role_dropped,
                                         report.source_role_drop_error),
-            "warehouse_database": _drop_status(attempted, report.warehouse_database_dropped,
+            "warehouse_database": _drop_status(report.warehouse_db_created,
+                                               report.warehouse_database_dropped,
                                                report.warehouse_database_drop_error),
-            "warehouse_role": _drop_status(attempted, report.warehouse_role_dropped,
+            "warehouse_role": _drop_status(report.warehouse_db_created,
+                                           report.warehouse_role_dropped,
                                            report.warehouse_role_drop_error),
             "overall": "pass" if (report.cleanup_attempted and report.cleanup_ok
                                   and report.throwaway_cleanup_ok) else

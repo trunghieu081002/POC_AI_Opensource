@@ -152,3 +152,67 @@ def test_throwaway_database_never_raises_from_teardown_even_when_both_drops_fail
     with pg_throwaway.throwaway_database() as db:
         pass   # no exception escapes here, despite both drops failing below
     assert db.cleanup_ok is False
+
+
+def test_throwaway_database_teardown_never_raises_on_a_timeout_and_still_drops_the_role(
+        monkeypatch):
+    """The M2.4.3 review's own P1: an earlier version let a bare
+    `subprocess.TimeoutExpired` from `DROP DATABASE` propagate straight out
+    of the teardown `finally` block - which skipped `DROP ROLE` entirely
+    (never reached) and broke this module's own promise that teardown
+    never raises past it."""
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("DROP DATABASE"):
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 30))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pg_throwaway.throwaway_database() as db:
+        pass   # no TimeoutExpired escapes here
+    assert db.database_dropped is False
+    assert "timed out" in db.database_drop_error
+    assert db.role_dropped is True   # DROP ROLE still ran and succeeded despite the timeout
+    assert db.cleanup_ok is False
+
+
+def test_throwaway_database_teardown_timeout_on_both_drops_still_reports_each_separately(
+        monkeypatch):
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("DROP"):
+            raise subprocess.TimeoutExpired(cmd, 30)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.database_dropped is False and "timed out" in db.database_drop_error
+    assert db.role_dropped is False and "timed out" in db.role_drop_error
+    assert db.cleanup_ok is False
+
+
+def test_throwaway_database_rollback_failure_on_create_database_is_named_in_the_message(
+        monkeypatch):
+    """CREATE DATABASE failing rolls back the role it already created - the
+    M2.4.3 review's own finding: that rollback used to be fire-and-forgotten,
+    so a role left behind on this specific failure path had nothing anywhere
+    reporting it. There is no `ThrowawayDB` object on this path at all
+    (provisioning never got that far), so the only place left to say so is
+    this exception's own message."""
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("CREATE DATABASE"):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="disk full")
+        if sql.startswith("DROP ROLE"):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="role has dependents")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(pg_throwaway.ThrowawayUnavailable) as exc_info:
+        with pg_throwaway.throwaway_database():
+            pass   # pragma: no cover
+    message = str(exc_info.value)
+    assert "disk full" in message
+    assert "could not be confirmed dropped" in message
+    assert "role has dependents" in message

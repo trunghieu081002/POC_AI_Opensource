@@ -228,9 +228,28 @@ def _json_lines(*rows: dict) -> str:
     return "\n".join(json.dumps(r) for r in rows) + ("\n" if rows else "")
 
 
+def _mock_compare_curated(monkeypatch, column_types: dict[str, str], data_stdout: str, *,
+                          returncode: int = 0, stderr: str = ""):
+    """Mocks the two real `psql` calls `compare_curated` now makes -
+    `_column_types`'s `information_schema.columns` lookup (M2.4.3: needed
+    to decide, per column, whether a numeric-looking string should be
+    canonicalized as a number - see `_canon_value`'s own docstring) and the
+    `row_to_json` data query - dispatched by which SQL text each call
+    carries, not by call order, so this stays correct regardless of which
+    one `compare_curated` issues first."""
+    def fake_run(cmd, **k):
+        sql = " ".join(str(c) for c in cmd)
+        if "information_schema.columns" in sql:
+            rows = [{"column_name": c, "data_type": t} for c, t in column_types.items()]
+            return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(rows), stderr="")
+        return subprocess.CompletedProcess(cmd, returncode, stdout=data_stdout, stderr=stderr)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+
 def test_compare_curated_passes_when_rows_match_exactly(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 1500000}), stderr=""))
+    _mock_compare_curated(
+        monkeypatch, {"month": "text", "revenue": "integer"},
+        _json_lines({"month": "2026-01", "revenue": 1500000}))
     expected = fixture.ExpectedResult(
         table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 1500000}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
@@ -238,8 +257,9 @@ def test_compare_curated_passes_when_rows_match_exactly(monkeypatch):
 
 
 def test_compare_curated_fails_when_a_row_differs(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 9999999}), stderr=""))
+    _mock_compare_curated(
+        monkeypatch, {"month": "text", "revenue": "integer"},
+        _json_lines({"month": "2026-01", "revenue": 9999999}))
     expected = fixture.ExpectedResult(
         table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 1500000}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
@@ -247,9 +267,9 @@ def test_compare_curated_fails_when_a_row_differs(monkeypatch):
 
 
 def test_compare_curated_fails_on_a_row_count_mismatch(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"month": "2026-01", "revenue": 100},
-                                   {"month": "2026-02", "revenue": 200}), stderr=""))
+    _mock_compare_curated(
+        monkeypatch, {"month": "text", "revenue": "integer"},
+        _json_lines({"month": "2026-01", "revenue": 100}, {"month": "2026-02", "revenue": 200}))
     expected = fixture.ExpectedResult(
         table="fct_monthly_sales", rows=[{"month": "2026-01", "revenue": 100}], row_count=1)
     result = fixture.compare_curated(expected, _DB, schema="demo")
@@ -258,9 +278,9 @@ def test_compare_curated_fails_on_a_row_count_mismatch(monkeypatch):
 
 
 def test_compare_curated_is_order_independent(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"month": "2026-02", "revenue": 200},
-                                   {"month": "2026-01", "revenue": 100}), stderr=""))
+    _mock_compare_curated(
+        monkeypatch, {"month": "text", "revenue": "integer"},
+        _json_lines({"month": "2026-02", "revenue": 200}, {"month": "2026-01", "revenue": 100}))
     expected = fixture.ExpectedResult(table="fct_x", rows=[
         {"month": "2026-01", "revenue": 100}, {"month": "2026-02", "revenue": 200}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
@@ -268,8 +288,9 @@ def test_compare_curated_is_order_independent(monkeypatch):
 
 
 def test_compare_curated_surfaces_a_real_query_failure(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 1, stdout="", stderr='relation "fct_x" does not exist'))
+    _mock_compare_curated(
+        monkeypatch, {"month": "text", "revenue": "integer"}, "",
+        returncode=1, stderr='relation "fct_x" does not exist')
     expected = fixture.ExpectedResult(table="fct_x", rows=[])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is False
@@ -279,22 +300,21 @@ def test_compare_curated_surfaces_a_real_query_failure(monkeypatch):
 def test_compare_curated_distinguishes_null_from_empty_string(monkeypatch):
     """The exact ambiguity the old tab-separated-text approach had: a
     Postgres NULL and a real empty string both rendered as "" there."""
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"note": None}), stderr=""))
+    _mock_compare_curated(monkeypatch, {"note": "text"}, _json_lines({"note": None}))
     expected = fixture.ExpectedResult(table="t", rows=[{"note": ""}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is False   # NULL != "" - must not be treated as a match
 
 
 def test_compare_curated_treats_equivalent_decimal_formatting_as_equal(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"total": 100.00}), stderr=""))
+    _mock_compare_curated(monkeypatch, {"total": "numeric"}, _json_lines({"total": 100.00}))
     expected = fixture.ExpectedResult(table="t", rows=[{"total": 100}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is True
 
 
 def test_compare_curated_rejects_expected_rows_with_different_column_sets(monkeypatch):
+    _mock_compare_curated(monkeypatch, {"id": "integer", "amount": "integer"}, "")
     expected = fixture.ExpectedResult(table="t", rows=[
         {"id": 1, "amount": 100}, {"id": 2}])   # second row is missing "amount"
     result = fixture.compare_curated(expected, _DB, schema="demo")
@@ -305,8 +325,7 @@ def test_compare_curated_rejects_expected_rows_with_different_column_sets(monkey
 def test_compare_curated_handles_a_value_containing_a_literal_tab(monkeypatch):
     """The other real failure mode the old tab-separated-text approach
     had - JSON round-trips this correctly with no special-case code."""
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=_json_lines({"note": "a\tb"}), stderr=""))
+    _mock_compare_curated(monkeypatch, {"note": "text"}, _json_lines({"note": "a\tb"}))
     expected = fixture.ExpectedResult(table="t", rows=[{"note": "a\tb"}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is True
@@ -320,28 +339,97 @@ def test_compare_curated_does_not_round_a_high_precision_decimal(monkeypatch):
     with more significant digits than a native float can represent, typed
     directly here (not built through `json.dumps` of a Python float, which
     would already lose the precision this test exists to catch, before
-    compare_curated ever runs)."""
+    compare_curated ever runs). "revenue" is reported numeric by Postgres,
+    so the expected side's quoted string is canonicalized as a number too."""
     raw = '{"revenue": 123456789012345.123456789}\n'
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(
-        cmd, 0, stdout=raw, stderr=""))
+    _mock_compare_curated(monkeypatch, {"revenue": "numeric"}, raw)
     expected = fixture.ExpectedResult(
         table="t", rows=[{"revenue": "123456789012345.123456789"}])
     result = fixture.compare_curated(expected, _DB, schema="demo")
     assert result.ok is True, result.detail
 
 
+def test_compare_curated_does_not_confuse_two_decimals_differing_only_past_28_sig_figs(
+        monkeypatch):
+    """The exact regression `Decimal.normalize()` used to cause (M2.4.3
+    review): normalize() rounds to the current thread's context precision
+    (28 significant digits by default), so two genuinely different values
+    that only differ beyond that many significant digits used to compare
+    equal. `_canon_number` must never call it."""
+    from decimal import Decimal
+    a = Decimal("100.123456789012345678901234567890123")
+    b = Decimal("100.123456789012345678901234567890124")
+    assert a != b
+    assert fixture._canon_number(a) != fixture._canon_number(b)
+    _mock_compare_curated(monkeypatch, {"revenue": "numeric"},
+                         json.dumps({"revenue": str(a)}) + "\n")
+    expected = fixture.ExpectedResult(table="t", rows=[{"revenue": str(b)}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is False, "two distinct high-precision decimals must not compare equal"
+
+
+def test_compare_curated_does_not_coerce_a_leading_zero_text_code_to_a_number(monkeypatch):
+    """M2.4.3 review's own repro: a customer code column typed `text`
+    whose real value is "00123" must not silently compare equal to "123" -
+    only a column Postgres itself reports as numeric gets that treatment."""
+    _mock_compare_curated(monkeypatch, {"code": "text"}, _json_lines({"code": "00123"}))
+    expected = fixture.ExpectedResult(table="t", rows=[{"code": "123"}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is False
+
+
+def test_compare_curated_still_matches_a_quoted_numeric_string_on_a_numeric_column(monkeypatch):
+    """The other side of the same fix: a numeric column must still treat
+    `"100.00"` (quoted, e.g. to protect precision) and `100` as equal."""
+    _mock_compare_curated(monkeypatch, {"revenue": "numeric"}, _json_lines({"revenue": 100}))
+    expected = fixture.ExpectedResult(table="t", rows=[{"revenue": "100.00"}])
+    result = fixture.compare_curated(expected, _DB, schema="demo")
+    assert result.ok is True, result.detail
+
+
+def test_canon_number_never_calls_normalize_so_high_precision_values_stay_distinct():
+    """format(d, "f") is exact - no context precision involved - unlike
+    Decimal.normalize(), which rounds to the current thread's context
+    precision (28 significant digits by default)."""
+    from decimal import Decimal
+    a = Decimal("100.123456789012345678901234567890123")
+    b = Decimal("100.123456789012345678901234567890124")
+    assert a.normalize() == b.normalize()   # the bug this guards against
+    assert fixture._canon_number(a) != fixture._canon_number(b)
+
+
+def test_canon_number_treats_positive_and_negative_zero_identically():
+    from decimal import Decimal
+    assert fixture._canon_number(Decimal("-0.00")) == fixture._canon_number(0) == "0"
+
+
 def test_canon_value_normalizes_decimal_int_float_and_precise_string_identically():
     from decimal import Decimal
-    assert (fixture._canon_value(Decimal("100.00")) == fixture._canon_value(100)
-           == fixture._canon_value(100.0) == fixture._canon_value("100.00") == "100")
-    assert fixture._canon_value("123456789012345.123456789") == "123456789012345.123456789"
-    assert fixture._canon_value(Decimal("123456789012345.123456789")) == \
-        fixture._canon_value("123456789012345.123456789")
+    assert (fixture._canon_value(Decimal("100.00"), numeric=True)
+           == fixture._canon_value(100, numeric=True)
+           == fixture._canon_value(100.0, numeric=True)
+           == fixture._canon_value("100.00", numeric=True) == "100")
+    assert fixture._canon_value("123456789012345.123456789", numeric=True) == \
+        "123456789012345.123456789"
+    assert fixture._canon_value(Decimal("123456789012345.123456789"), numeric=True) == \
+        fixture._canon_value("123456789012345.123456789", numeric=True)
 
 
 def test_canon_value_leaves_a_non_numeric_string_untouched():
-    assert fixture._canon_value("Acme Corp") == "Acme Corp"
-    assert fixture._canon_value("2026-01") == "2026-01"   # not a pure decimal literal
+    assert fixture._canon_value("Acme Corp", numeric=True) == "Acme Corp"
+    assert fixture._canon_value("2026-01", numeric=True) == "2026-01"   # not a decimal literal
+
+
+def test_canon_value_never_coerces_a_numeric_looking_string_on_a_non_numeric_column():
+    """The M2.4.3 review's own repro: `numeric=False` must leave "00123"
+    exactly as written, even though it matches the decimal-literal regex -
+    a text column's leading zeros are business-meaningful, never a number
+    formatted with extra precision."""
+    assert fixture._canon_value("00123", numeric=False) == "00123"
+    assert fixture._canon_value("00123", numeric=False) != fixture._canon_value(
+        "123", numeric=False)
+    assert fixture._canon_value("00123", numeric=True) == fixture._canon_value(
+        "123", numeric=True)
 
 
 # ---------------------------------------------------------------- _temporarily
@@ -1062,6 +1150,57 @@ def test_make_validation_clone_renames_dbt_model_files_uniquely(tmp_path):
     assert (d / "models" / "stg_orders.sql").exists()
 
 
+def test_make_validation_clone_pins_the_renamed_models_output_table_back_to_the_original(
+        tmp_path):
+    """M2.4.3 review: the renamed *file* must not change the *materialized
+    table name* dbt actually writes - gates/procedures/expected.yaml all
+    still reference the model by its original name."""
+    root = tmp_path / "pipelines"
+    d = root / "demo_dbt"
+    (d / "models").mkdir(parents=True)
+    (d / "models" / "stg_orders.sql").write_text(
+        "{{ config(materialized='table', schema='demo_dbt') }}\nselect 1 as id")
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "demo_dbt", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/o.csv"}},
+        "warehouse": {"host": "h", "database": "d", "schema": "demo_dbt"},
+        "stages": [
+            {"name": "landing", "gates": [{"type": "row_count_bounds", "table": "o", "min": 1}]},
+            {"name": "raw", "engine": "dbt", "depends_on": "landing", "models": ["stg_orders"]},
+        ],
+    }, sort_keys=False))
+    pipeline = loader.load("demo_dbt", root)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+
+    model_file = (tmp_path / "clones" / clone.name / "models"
+                 / f"stg_orders__validate_{suffix}.sql")
+    content = model_file.read_text()
+    assert content.startswith("{{ config(alias='stg_orders') }}\n")
+    assert "select 1 as id" in content   # the model's own SQL body, untouched
+
+
+def test_alias_model_content_only_prepends_never_rewrites_the_body():
+    content = fixture._alias_model_content("select 1 as id\n", "stg_orders")
+    assert content == "{{ config(alias='stg_orders') }}\nselect 1 as id\n"
+
+
+def test_make_validation_clone_uses_the_original_pipelines_landing_dataset_name(tmp_path):
+    """M2.4.3 review: every real model in this project reads landing by a
+    literal, schema-qualified name baked into its own copied SQL - the
+    clone's own dlt extract must land data under that same name, not the
+    clone's differently-named one, or the model finds nothing."""
+    pipeline = _real_pipeline(tmp_path)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    assert clone.landing_dataset_name == f"{pipeline.name}_landing"
+    assert clone.landing_dataset_name != f"{clone.name}_landing"
+
+    from dpagent.pipelines import extract as extract_mod
+    assert extract_mod.landing_dataset(clone) == clone.landing_dataset_name
+
+    reloaded = loader.load(clone.name, tmp_path / "clones")
+    assert reloaded.landing_dataset_name == clone.landing_dataset_name
+
+
 def test_make_validation_clone_manifest_round_trips_through_loader(tmp_path):
     """What deploy.install_pipeline_files() actually publishes and what a
     DAG task later reloads via loader.load(clone_name) must be this exact
@@ -1120,8 +1259,8 @@ def test_fixture_report_dict_shape_on_a_full_pass():
         comparison_after_run1=fixture.ComparisonResult(True, "1 row matched"),
         comparison_after_run2=fixture.ComparisonResult(True, "1 row matched"),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
-        source_database_dropped=True, source_role_dropped=True,
-        warehouse_database_dropped=True, warehouse_role_dropped=True,
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=True, warehouse_role_dropped=True,
     )
     data = fixture.fixture_report_dict(
         report, pipeline_hash="sha256:p", fixture_hash="sha256:f", expected_hash="sha256:e")
@@ -1166,9 +1305,9 @@ def test_fixture_report_dict_reports_each_throwaway_resource_separately():
         seeded=True, deployed=True, run1_status="ok", run2_status="ok",
         comparison_after_run1=fixture.ComparisonResult(True), comparison_after_run2=fixture.ComparisonResult(True),
         cleanup_attempted=True, cleanup_ok=True, cleanup_detail="DAG removed",
-        source_database_dropped=True, source_role_dropped=True,
-        warehouse_database_dropped=False, warehouse_database_drop_error="permission denied",
-        warehouse_role_dropped=True,
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=False,
+        warehouse_database_drop_error="permission denied", warehouse_role_dropped=True,
     )
     data = fixture.fixture_report_dict(report)
     assert data["cleanup"]["source_database"] == "pass"

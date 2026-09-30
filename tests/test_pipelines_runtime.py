@@ -120,6 +120,111 @@ def test_dlt_python_honours_a_recorded_install_dir_override(monkeypatch, tmp_pat
     assert runtime._dlt_python() == "/srv/dlt/.venv/bin/python"
 
 
+# ------------------------------------------------------------ dbt: per-pipeline profile (M2.4.3)
+
+def test_dbt_bin_defaults_and_honours_a_recorded_install_dir_override(monkeypatch, tmp_path):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    assert runtime._dbt_bin() == "/opt/dbt/.venv/bin/dbt"
+    state.record_install("dbt", "1.8.0", {"install_dir": "/srv/dbt"}, "hash",
+                         "rhel", "installed")
+    assert runtime._dbt_bin() == "/srv/dbt/.venv/bin/dbt"
+
+
+def test_dbt_profile_name_defaults_and_honours_a_recorded_override(monkeypatch, tmp_path):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    assert runtime._dbt_profile_name() == "default"
+    state.record_install("dbt", "1.8.0", {"profile_name": "acme"}, "hash",
+                         "rhel", "installed")
+    assert runtime._dbt_profile_name() == "acme"
+
+
+def test_dbt_profiles_dir_writes_a_profile_resolved_from_this_pipelines_own_warehouse(
+        monkeypatch, tmp_path):
+    """The M2.4.3 review's own P0: dbt used to always connect through the
+    dbt pack's one, shared, host-wide profile - never any individual
+    pipeline's own `warehouse.*` fields - so a validation clone's renamed/
+    overridden warehouse refs were silently ignored and `dbt run` always
+    hit the real, shared warehouse regardless. This generates a throwaway
+    profile from `pipeline.warehouse` instead, every time."""
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    state.record_install("dbt", "1.8.0", {"profile_name": "acme"}, "hash", "rhel", "installed")
+    monkeypatch.setenv("WH_PASSWORD", "s3cret")
+    pipeline = loader.Pipeline(
+        name="fd_demo", summary="", root=tmp_path,
+        source=loader.Source(connector="csv"),
+        warehouse=loader.Warehouse(host="throwaway-host", port="5555", database="throwaway-db",
+                                   user="throwaway-user", password="${WH_PASSWORD}",
+                                   schema="curated"),
+        stages=[loader.Stage(name="landing")])
+
+    with runtime._dbt_profiles_dir(pipeline) as profiles_dir:
+        content = yaml.safe_load((Path(profiles_dir) / "profiles.yml").read_text())
+
+    assert set(content) == {"acme"}
+    out = content["acme"]["outputs"][content["acme"]["target"]]
+    assert out["host"] == "throwaway-host"
+    assert out["port"] == 5555
+    assert out["dbname"] == "throwaway-db"
+    assert out["user"] == "throwaway-user"
+    assert out["password"] == "s3cret"
+    assert out["schema"] == "curated"
+
+
+def test_run_transform_dbt_branch_passes_an_explicit_profiles_dir_and_venv_binary(
+        monkeypatch, tmp_path):
+    """Wires the full run_transform() path: never the shared `dbt` wrapper
+    (which only sets DBT_PROFILES_DIR as a *default*), always the venv
+    binary plus an explicit --profiles-dir pointing at a profile this
+    pipeline's own warehouse resolved to."""
+    state = _state_in(tmp_path, monkeypatch)
+    state.record_install("dbt", "1.8.0", {"install_dir": "/opt/dbt",
+                                          "project_dir": "/opt/dbt/project"},
+                         "hash", "rhel", "installed")
+    pipeline = loader.Pipeline(
+        name="dbt_demo", summary="", root=tmp_path,
+        source=loader.Source(connector="csv"),
+        warehouse=loader.Warehouse(host="wh", database="d", user="u", password="p",
+                                   schema="curated"),
+        stages=[loader.Stage(name="landing"),
+               loader.Stage(name="raw", engine="dbt", depends_on="landing",
+                            models=["stg_orders"])])
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        # Checked *while* still inside dbt's own subprocess.run call, not
+        # after run_transform() returns: _dbt_profiles_dir's own
+        # TemporaryDirectory has already cleaned the file up again by then
+        # (its whole point - the profile's password never outlives this one
+        # `dbt run`), so this is the only point the file is guaranteed to
+        # still exist on disk.
+        captured["profile_existed_during_dbt_run"] = (
+            Path(cmd[cmd.index("--profiles-dir") + 1], "profiles.yml").exists())
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    runtime.run_transform(pipeline_name="dbt_demo", stage="raw")
+
+    cmd = captured["cmd"]
+    assert cmd[0] == "/opt/dbt/.venv/bin/dbt"
+    assert "--select" in cmd and "stg_orders" in cmd
+    assert "--project-dir" in cmd and "/opt/dbt/project" in cmd
+    assert "--profiles-dir" in cmd
+    assert captured["profile_existed_during_dbt_run"] is True
+    profiles_dir = cmd[cmd.index("--profiles-dir") + 1]
+    # cleaned up again once run_transform returns - never left on disk
+    assert not Path(profiles_dir).exists()
+
+
 def test_finish_pipeline_run_moves_the_run_past_running(tmp_path, monkeypatch):
     """The P0 regression this guards: nothing previously called
     state.finish_run() when a DAG actually completed - dpagent pipeline

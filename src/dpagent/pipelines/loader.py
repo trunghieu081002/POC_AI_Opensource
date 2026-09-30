@@ -143,6 +143,23 @@ class Pipeline:
     # an operator actually runs `dpagent pipeline promote` on it - no
     # migration silently grandfathers existing pipelines in as reviewed.
     maturity: str = "draft"
+    # None for every hand-authored pipeline (the overwhelmingly common
+    # case) - `extract.landing_dataset()` then falls back to its own
+    # `f"{name}_landing"` convention exactly as before this field existed.
+    # Set only by `fixture.make_validation_clone()`, to the *original*
+    # pipeline's own landing dataset name: a validation clone's dbt models
+    # are copied byte-for-byte, and every real model in this project reads
+    # its landing input from a literal, schema-qualified name baked into
+    # its own SQL (`from demo_landing.res_partner`, e.g., never a
+    # dynamically-resolved one) - the clone's own renamed name
+    # (`<name>__validate__<suffix>_landing`) would leave every such model
+    # unable to find the very data the clone's own dlt extract just landed
+    # (M2.4.3 review, "Clone đổi tên pipeline nên landing dataset đổi theo;
+    # SQL giữ tên landing cũ"). Safe to point at the same name as the real
+    # pipeline's own landing dataset specifically because a clone always
+    # runs against a throwaway *database*, never the real shared warehouse -
+    # the name coinciding does not mean the data does.
+    landing_dataset_name: str | None = None
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -535,6 +552,11 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         raise PipelineError(
             f"{where}: maturity {maturity!r} is not one of {MATURITIES}")
 
+    landing_dataset_name = data.get("landing_dataset_name")
+    if landing_dataset_name is not None and (
+            not isinstance(landing_dataset_name, str) or not landing_dataset_name.strip()):
+        raise PipelineError(f"{where}: landing_dataset_name must be a non-empty string")
+
     pipeline = Pipeline(
         name=name,
         summary=data.get("summary", ""),
@@ -545,6 +567,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         schedule=_validate_schedule(data.get("schedule"), where),
         timeouts=_validate_timeouts(data.get("timeouts"), where),
         maturity=maturity,
+        landing_dataset_name=landing_dataset_name,
     )
 
     for stage in pipeline.stages:

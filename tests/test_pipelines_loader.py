@@ -515,6 +515,29 @@ def test_invalid_maturities_fail_at_load(root, maturity):
         loader.load("demo", root)
 
 
+# ---------------------------------------------------------------- landing_dataset_name (M2.4.3)
+
+def test_no_landing_dataset_name_key_defaults_to_none(root):
+    """None for every hand-authored pipeline - the overwhelmingly common
+    case; only `fixture.make_validation_clone()` ever sets this key."""
+    _write(root, "demo", _minimal())
+    pipeline = loader.load("demo", root)
+    assert pipeline.landing_dataset_name is None
+
+
+def test_landing_dataset_name_is_parsed_when_present(root):
+    _write(root, "demo", _minimal(landing_dataset_name="quickstart_landing"))
+    pipeline = loader.load("demo", root)
+    assert pipeline.landing_dataset_name == "quickstart_landing"
+
+
+@pytest.mark.parametrize("bad", ["", "   ", 123, [], {}])
+def test_invalid_landing_dataset_name_fails_at_load(root, bad):
+    _write(root, "demo", _minimal(landing_dataset_name=bad))
+    with pytest.raises(loader.PipelineError, match="landing_dataset_name"):
+        loader.load("demo", root)
+
+
 # ---------------------------------------------------------------- DPAGENT_PIPELINES hint
 
 def test_a_missing_pipeline_names_a_leftover_dpagent_pipelines_override(root, monkeypatch):

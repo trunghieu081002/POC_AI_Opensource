@@ -271,19 +271,14 @@ def validate_cmd(name, fixture_path, expected_path):
     report.fixture = fixture_section
     validate_mod.write_validation_report(pipeline.root, report)
 
-    if result.unavailable_reason:
-        console.print(f"[yellow]steps 4-5 unavailable:[/yellow] {result.unavailable_reason}")
-        console.print("[dim](its absence says nothing about the pipeline's own "
-                      "correctness - it means this operator/host could not run it)[/dim]")
-        sys.exit(2)
-
-    if result.seed_error:
-        # A validation failure, not "unavailable": the fixture itself (or
-        # the throwaway database) rejected it - exit 1, same as a real
-        # mismatch, never exit 2 (which means "could not even attempt it").
-        console.print(f"[red]fixture seed failed:[/red] {result.seed_error}")
-        sys.exit(1)
-
+    # Comparisons and cleanup are always printed *before* any exit path
+    # below, unconditionally - an earlier version exited (unavailable_reason
+    # or seed_error) before ever reaching this, which hid a real cleanup
+    # outcome whenever unavailable_reason was set *after* deploy() already
+    # ran (e.g. "could not unpause validation DAG"): cleanup_attempted/
+    # cleanup_ok/the throwaway drop flags were already correct on the
+    # result by then, just never printed (M2.4.3 review: "CLI thoát sớm khi
+    # unavailable_reason hoặc seed lỗi, trước phần in cleanup").
     for label, comparison in (("run 1", result.comparison_after_run1),
                               ("run 2", result.comparison_after_run2)):
         if comparison is None:
@@ -298,17 +293,53 @@ def validate_cmd(name, fixture_path, expected_path):
         console.print(f"[bold]cleanup (pipeline artifacts):[/bold] [{colour}]"
                      f"{'complete' if result.cleanup_ok else 'FAILED'}[/{colour}]"
                      f" - {result.cleanup_detail}")
-        for label, dropped, error in (
-            ("source database", result.source_database_dropped, result.source_database_drop_error),
-            ("source role", result.source_role_dropped, result.source_role_drop_error),
-            ("warehouse database", result.warehouse_database_dropped,
-             result.warehouse_database_drop_error),
-            ("warehouse role", result.warehouse_role_dropped, result.warehouse_role_drop_error),
-        ):
-            colour = "green" if dropped else "red"
-            console.print(f"[bold]cleanup ({label}):[/bold] [{colour}]"
-                         f"{'dropped' if dropped else 'FAILED'}[/{colour}]"
-                         + (f" - {error}" if error and not dropped else ""))
+    # Gated on whether each throwaway database was actually *created*, not
+    # on cleanup_attempted (pipeline-artifact cleanup, a different thing
+    # that never even starts on a seed failure) - a seed failure still
+    # creates and tears down both throwaway databases, and that real
+    # outcome must still be visible here (same M2.4.3 finding as above).
+    for label, created, dropped, error in (
+        ("source database", result.source_db_created, result.source_database_dropped,
+         result.source_database_drop_error),
+        ("source role", result.source_db_created, result.source_role_dropped,
+         result.source_role_drop_error),
+        ("warehouse database", result.warehouse_db_created, result.warehouse_database_dropped,
+         result.warehouse_database_drop_error),
+        ("warehouse role", result.warehouse_db_created, result.warehouse_role_dropped,
+         result.warehouse_role_drop_error),
+    ):
+        if not created:
+            continue
+        colour = "green" if dropped else "red"
+        console.print(f"[bold]cleanup ({label}):[/bold] [{colour}]"
+                     f"{'dropped' if dropped else 'FAILED'}[/{colour}]"
+                     + (f" - {error}" if error and not dropped else ""))
+
+    if result.unavailable_reason:
+        console.print(f"[yellow]steps 4-5 unavailable:[/yellow] {result.unavailable_reason}")
+        if not result.clone_name:
+            # Only the preflight branch (run_fixture's very first action,
+            # before make_validation_clone is even called) can actually
+            # back this claim - every other unavailable_reason fires after
+            # some real side effect already happened, whose own outcome is
+            # exactly what was just printed above (M2.4.3 review: "Giới
+            # hạn cam kết zero-mutation đúng nhánh preflight").
+            console.print("[dim](preflight failed before anything was created - no "
+                          "database/role, no seed, no deployed artifact)[/dim]")
+        else:
+            console.print("[dim](its absence says nothing about the pipeline's own "
+                          "correctness - it means this operator/host could not finish "
+                          "running it; see the cleanup lines above for what, if "
+                          "anything, was already created and whether it was torn "
+                          "down)[/dim]")
+        sys.exit(2)
+
+    if result.seed_error:
+        # A validation failure, not "unavailable": the fixture itself (or
+        # the throwaway database) rejected it - exit 1, same as a real
+        # mismatch, never exit 2 (which means "could not even attempt it").
+        console.print(f"[red]fixture seed failed:[/red] {result.seed_error}")
+        sys.exit(1)
 
     data_ok = (result.seeded and result.deployed
               and result.run1_status == "ok" and result.run2_status == "ok"
