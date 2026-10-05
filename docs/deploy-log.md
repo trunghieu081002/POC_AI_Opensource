@@ -3727,3 +3727,63 @@ worked around here. Full test suite green before this commit.
 
 Still not proceeding to M2.5, Layer 2.5, or live LLM - unchanged from the
 standing decision.
+
+## 2026-10-05 - Layer 3 M2.5 prep: preflight hardening, csv refused for --fixture, reference pipeline ready
+
+Step 1 of the user's own M2.5 plan ("Chốt phạm vi và điều kiện chạy M2.5") -
+everything in it that does not itself require a disposable host with root
+and passwordless sudo. Full detail: docs/layer2.md, "M2.5 prep", and the
+new docs/m25-acceptance.md.
+
+1. **preflight_fixture_host() can no longer crash.** Every `subprocess.run`
+   call and every `Path.exists()` check in it was unguarded - a hung
+   `sudo -n`/`pg_isready`/`systemctl`, or a `PermissionError` reading an
+   ancestor directory, used to propagate straight out and crash the whole
+   fixture run with a raw traceback instead of a clean, reported
+   `unavailable_reason` (exit 2). New `_run_preflight_check()` (returns
+   `(None, <reason>)`, never raises, on a timeout/missing binary) and
+   `_safe_exists()`/`_writable()` (return `None` - "could not even check,"
+   never "assumed gone/present" - on a real `PermissionError`) close this
+   for every check in the function. Covered by dedicated tests, including
+   two real, unmocked `chmod 0o000` reproductions (not simulated).
+2. **`--fixture` now refuses `csv` too.** `_unsupported_source_connector_reason`
+   gained a `strict` flag; `preflight_fixture_host` (the entry gate for
+   `--fixture` itself) always uses the strict default, which now also
+   refuses any purely file-based connector - a csv pipeline's own extract
+   step never reads from the throwaway source database `seed_source()`
+   seeds, so its `--fixture` run was silently ignoring the
+   operator-authored fixture and validating only its own already-shipped
+   sample file. `make_validation_clone()`'s own defense-in-depth use stays
+   non-strict (csv has nothing unsafe to leak, only nothing
+   fixture-meaningful), so every existing test that builds a csv clone
+   directly for an unrelated reason (dbt model renaming, procedure file
+   copying, ...) is unaffected. This is a limit of fixture validation
+   only - a normal deploy/run for csv is completely unaffected.
+3. **A real reference pipeline + acceptance matrix, ready for Step 2.**
+   `pipelines/m25_monthly_sales/` (odoo_postgres source, Postgres
+   warehouse, through both dbt and procedure, small enough to
+   hand-calculate) plus `docs/m25-acceptance.md` (exact reproducible
+   command, stack versions, the nine-scenario matrix, and the
+   control-database isolation check). Confirmed on this host (no root
+   needed): `dpagent pipeline lint`/`validate` (step 3, no `--fixture`)
+   both pass clean, including the dbt ref()/source() check - caught and
+   fixed one of my own authoring mistakes along the way: a comment in the
+   model's own SQL literally contained the text "ref()/source()"
+   explaining the convention, which the check's own word-bounded regex
+   correctly (if awkwardly) flagged as a real cross-model call; reworded,
+   not a harness bug.
+
+**Real-verified on this host**: re-ran `dpagent pipeline validate
+m25_monthly_sales --fixture/--expected` for real - preflight still fails
+for the same honest reason as every prior round (no root/sudo), zero
+mutation. Re-ran the same against `pipelines/quickstart_dbt` (csv) and
+confirmed its refusal now names csv specifically, not a host-level reason -
+the new strict check is reached and working. Full test suite green before
+this commit.
+
+**Not done, explicitly**: Step 2 (running the nine-scenario matrix for
+real) needs a disposable host with root and passwordless sudo that does
+not exist here - not attempted, not simulated, not claimed. Steps 3
+(automating the proven matrix into an acceptance suite) and 4 (gating
+`approval.promote()` on a still-valid validation report) are explicitly
+later, per the same plan, and were not started.
