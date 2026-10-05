@@ -873,6 +873,66 @@ unit-tested with subprocess mocked, not run against a real Postgres/Airflow**
 postgres, the same M2.5 boundary already documented above. Full test suite
 green before this was committed.
 
+### M2.4.4: a literal connection value still escaped the throwaway database
+
+A fifth review pass found that M2.4.3's own dbt-profile fix still had a
+real gap one level up - the clone's own connection fields - plus a second,
+independent bug in how the overall cleanup status was computed. Two
+changes, both in `fixture.py`:
+
+1. **A literal host/database/user/password was never redirected at all.**
+   `_clone_connection()`/`_clone_warehouse()` only ever renamed a field that
+   was *already* a `${VAR}` ref - a literal value (nothing requires `${VAR}`
+   indirection; a manifest can name its host/database/user/password
+   directly) was left completely untouched. `env_overrides_for_source`/
+   `_warehouse` only ever override a *ref*, so a clone built from a
+   manifest with a literal production host/database had nothing left to
+   point it at the throwaway database at all - `env_overrides_for_*`
+   returned `{}`, and the clone's extract/dbt/procedure stages connected to
+   the real, literal source/warehouse regardless of whatever
+   `seed_source()`/`pg_throwaway` had just provisioned. Reproduced for real
+   with a test before the fix. `_clone_connection`/`_clone_warehouse` now
+   force *every* present connection field into a brand-new throwaway-only
+   ref unconditionally - literal or already a ref, it no longer matters;
+   there is no "the author didn't use `${VAR}`" escape hatch left.
+   `warehouse` is always Postgres by design, so this applies to every
+   pipeline unconditionally; the source side only ever had Postgres-shaped
+   fields for `odoo_postgres` in the first place, so a second change closes
+   the one connector this harness's throwaway Postgres source database
+   genuinely cannot stand in for: `sql_server` (a different dialect,
+   pymssql) and any other connector with a non-empty `connection`
+   (`rest_api`/`elasticsearch`/`google_sheets` - `base_url`/`hosts`/
+   `spreadsheet_id`/a token or service-account JSON, never a Postgres
+   connection) is now refused by `preflight_fixture_host()` *before* any
+   provisioning (`_unsupported_source_connector_reason()`, a pure, zero-I/O
+   check on the manifest itself) - and, in defense in depth,
+   `make_validation_clone()` itself refuses the same way
+   (`ValidationCloneError`) for any caller that builds a clone directly.
+   `csv` (and any other purely file-based connector) has no `connection` at
+   all, so nothing changes for it.
+2. **`cleanup.overall` could report "not_attempted" over a real, known
+   failure.** It was computed from `cleanup_attempted` (the *pipeline
+   clone's* own cleanup) alone - which stays `False` on a seed failure,
+   since `deploy()` is never reached - so a seed error whose throwaway
+   database then genuinely failed to drop still reported
+   `"overall": "not_attempted"`, even with `"source_database": "fail: ..."`
+   sitting right next to it in the very same dict. Fixed: `overall` now
+   considers every resource actually *touched* (the pipeline clone's own
+   cleanup, or either throwaway database having been created at all) -
+   `"not_attempted"` only when nothing was touched; `"pass"` only when
+   everything touched actually succeeded; `"fail"` otherwise.
+
+**Status: both real-verified as far as this host allows.** A real smoke
+test against `pipelines/quickstart_dbt` confirms the new connector check
+does not change anything for a `csv`-connector pipeline (still the exact
+same preflight failure, zero mutation, as before). The literal-connection
+redirect and the `cleanup.overall` fix are both confirmed with dedicated
+tests (a reproduced-then-fixed literal warehouse/odoo_postgres source, and
+a reproduced-then-fixed seed-error-with-a-failed-drop); the real pass/fail
+path of a redirected literal connection against a real Postgres/Airflow run
+remains unit-tested with subprocess mocked - unchanged M2.5 boundary. Full
+test suite green before this was committed.
+
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite

@@ -115,31 +115,83 @@ def _renamed_ref(kind: str, suffix: str, key: str) -> str:
     return f"DPAGENT_VALIDATE_{suffix.upper()}_{kind}_{key.upper()}"
 
 
+# The only source connector whose `connection` is a Postgres host/port/
+# database/user/password connection AND whose data `pg_throwaway`'s own
+# throwaway source database (always Postgres - `seed_source()`/`_psql()`
+# never speak anything else) can actually stand in for. Every other
+# connector with a non-empty `connection` (sql_server - a different dialect
+# entirely, pymssql, that a Postgres throwaway cannot answer for; rest_api/
+# elasticsearch/google_sheets - base_url/hosts/spreadsheet_id/a bearer
+# token or service-account JSON, never a Postgres connection in the first
+# place) has no fixture adapter and is refused before any provisioning
+# (`_unsupported_source_connector_reason`, M2.4.4 review: "Connector chưa
+# có fixture adapter thì từ chối trước provisioning"). csv (and any other
+# purely file-based connector) has no `connection` at all - nothing to
+# isolate, nothing to refuse.
+_FIXTURE_SOURCE_CONNECTORS = {"odoo_postgres"}
+
+
+def _unsupported_source_connector_reason(pipeline: Pipeline) -> str | None:
+    """`None` when this pipeline's source connector is one the fixture
+    harness can actually redirect into a throwaway Postgres database -
+    a reason string otherwise. Called from both `preflight_fixture_host`
+    (so an unsupported connector is refused *before* a single throwaway
+    database/role is created - exit 2, zero mutation) and
+    `make_validation_clone` itself (defense in depth: raises
+    `ValidationCloneError` for any caller building a clone directly,
+    bypassing `run_fixture`'s own preflight)."""
+    connector = pipeline.source.connector
+    if connector in _FIXTURE_SOURCE_CONNECTORS or not pipeline.source.connection:
+        return None
+    return (f"source connector {connector!r} has a live connection "
+           f"(host/credentials) this fixture harness cannot redirect into a "
+           f"throwaway database - only {sorted(_FIXTURE_SOURCE_CONNECTORS)} is "
+           f"supported for --fixture today (pg_throwaway's own throwaway "
+           f"source is Postgres-only); refusing rather than silently leaving "
+           f"this connector's real connection pointed at whatever the "
+           f"manifest literally says")
+
+
 def _clone_connection(connection: dict, suffix: str) -> dict:
-    """Every `${VAR}`/`${VAR:-default}` field in a source connection dict,
-    renamed to a `DPAGENT_VALIDATE_<suffix>_SRC_<KEY>` ref unique to this
-    one validation run - a literal (non-ref) value is left untouched, same
-    rule `_ref_name` already applies everywhere else. This is what keeps a
-    validation run's throwaway credentials out of the *shared*
-    `pipelines.env` file's real secret names (`ODOO_DB_PASSWORD`, e.g.) -
-    without it, `ensure_pipeline_secrets_available()` would merge the
-    throwaway source's password in under the same key a real, currently-
-    deployed pipeline also reads, and dropping it again at cleanup would
-    take that real pipeline's own credential down with it."""
+    """Every host/port/database/user/password field *present* in a source
+    connection dict - literal or a `${VAR}`/`${VAR:-default}` ref,
+    unconditionally - replaced with a `DPAGENT_VALIDATE_<suffix>_SRC_<KEY>`
+    ref unique to this one validation run.
+
+    An earlier version only renamed a field that was already a `${VAR}`
+    ref, leaving a *literal* value completely untouched - and
+    `env_overrides_for_source` only ever overrides a ref, never a literal -
+    so a manifest authored with a literal host/database/user/password (no
+    rule requires `${VAR}` indirection) made the validation clone's extract
+    step read from the real, literal source regardless of whatever fixture
+    data `seed_source()` had just loaded into the throwaway one (M2.4.4
+    review, reproduced for real: a clone built from a manifest with a
+    literal production host/database kept both values verbatim, and
+    `env_overrides_for_source()` returned `{}` - nothing left to point it
+    at the throwaway database at all). Forcing every present field into a
+    *new* ref regardless of its original shape closes this for good: there
+    is no "the author didn't use `${VAR}`" escape hatch left.
+
+    Only ever reached for a connector `_FIXTURE_SOURCE_CONNECTORS` supports -
+    every other connector with a non-empty connection is refused by
+    `_unsupported_source_connector_reason` before this function (or any
+    provisioning) is ever reached."""
     new_conn = dict(connection)
     for key in _CONN_KEYS:
-        ref = _ref_name(connection.get(key))
-        if ref:
+        if key in connection:
             new_conn[key] = f"${{{_renamed_ref('SRC', suffix, key)}}}"
     return new_conn
 
 
 def _clone_warehouse(warehouse: Warehouse, suffix: str) -> Warehouse:
-    kwargs = {}
-    for key in _CONN_KEYS:
-        value = getattr(warehouse, key)
-        ref = _ref_name(value)
-        kwargs[key] = f"${{{_renamed_ref('WH', suffix, key)}}}" if ref else value
+    """Every connection field - literal or `${VAR}`, unconditionally -
+    replaced with a throwaway-only ref (same fix, same reasoning, as
+    `_clone_connection` above). `warehouse` is always Postgres by design
+    (`loader.Warehouse`'s own docstring) and `pg_throwaway`'s own warehouse
+    throwaway is provisioned for every pipeline this harness runs - unlike
+    the source side, there is no connector to check here; this applies
+    every time."""
+    kwargs = {key: f"${{{_renamed_ref('WH', suffix, key)}}}" for key in _CONN_KEYS}
     # Schema is deliberately NOT renamed here for a dbt-engine stage: a
     # model's own `{{ config(schema='...') }}` is a literal string baked
     # into its .sql file (dpagent never parses/rewrites model SQL - the
@@ -204,6 +256,10 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
     it publishes (and the DAG task later reloads via `loader.load()`) must
     itself already be the clone's own manifest, not the original's.
     """
+    reason = _unsupported_source_connector_reason(pipeline)
+    if reason:
+        raise ValidationCloneError(reason)
+
     suffix = _validation_suffix()
     clone_name = f"{pipeline.name}__validate__{suffix}"
     clone_root = workdir / clone_name
@@ -692,17 +748,28 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     (M2.4.2's own review). `run_fixture()` calls this as its very first
     action, before `make_validation_clone` even.
 
-    Best-effort and host-level, not a promise of eventual success - a check
-    here passing does not guarantee `deploy()` itself will not still fail
-    later for an unrelated reason (a bad manifest value, a network blip);
-    it exists to catch the *common, cheap-to-detect* missing preconditions
-    before any real side effect happens, not to replace deploy()'s own real
-    error handling (which still runs, and is still what actually decides
-    `unavailable_reason` for anything this function does not check)."""
+    Not purely host-level any more as of M2.4.4: also refuses a pipeline
+    whose source connector this harness has no fixture adapter for
+    (`_unsupported_source_connector_reason`) - a pure, zero-I/O check on the
+    manifest itself, but the same "refuse before any mutation" guarantee
+    applies to it as to every other reason here.
+
+    Best-effort and host-level otherwise, not a promise of eventual success
+    - a check here passing does not guarantee `deploy()` itself will not
+    still fail later for an unrelated reason (a bad manifest value, a
+    network blip); it exists to catch the *common, cheap-to-detect* missing
+    preconditions before any real side effect happens, not to replace
+    deploy()'s own real error handling (which still runs, and is still what
+    actually decides `unavailable_reason` for anything this function does
+    not check)."""
     from . import deploy as deploy_mod
     from ..engine import state
 
     reasons: list[str] = []
+
+    connector_reason = _unsupported_source_connector_reason(pipeline)
+    if connector_reason:
+        reasons.append(connector_reason)
 
     if not (hasattr(os, "geteuid") and os.geteuid() == 0):
         reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")
@@ -1260,7 +1327,32 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
     # "seed lỗi có thể đã drop DB nhưng báo not_attempted" finding).
     # Distinct from "dropped", which is only true once DROP DATABASE/DROP
     # ROLE actually succeeded.
-    attempted = report.cleanup_attempted   # still what "pipeline_artifacts"/"overall" use
+
+    # "cleanup.overall" must reflect *every* resource that was actually
+    # touched - not just the pipeline clone's own (`cleanup_attempted`),
+    # which stays False on a seed failure even when both throwaway
+    # databases were created and torn down regardless. An earlier version
+    # computed this from `cleanup_attempted` alone, so a seed failure whose
+    # throwaway database then genuinely failed to drop - "source_database":
+    # "fail: ..." right there in the same dict - still reported
+    # "overall": "not_attempted", silently hiding a real, already-known
+    # failure (M2.4.4 review, reproduced: seed error + a failed DROP on one
+    # throwaway database). "pass" requires every resource that was touched
+    # to have actually succeeded; "not_attempted" is reserved for when
+    # nothing was touched at all.
+    resources_touched = (report.cleanup_attempted or report.source_db_created
+                         or report.warehouse_db_created)
+    if not resources_touched:
+        cleanup_overall = "not_attempted"
+    else:
+        all_touched_ok = (
+            (not report.cleanup_attempted or report.cleanup_ok)
+            and (not report.source_db_created or
+                 (report.source_database_dropped and report.source_role_dropped))
+            and (not report.warehouse_db_created or
+                 (report.warehouse_database_dropped and report.warehouse_role_dropped))
+        )
+        cleanup_overall = "pass" if all_touched_ok else "fail"
 
     if report.unavailable_reason:
         overall = "unavailable"
@@ -1296,9 +1388,7 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
             "warehouse_role": _drop_status(report.warehouse_db_created,
                                            report.warehouse_role_dropped,
                                            report.warehouse_role_drop_error),
-            "overall": "pass" if (report.cleanup_attempted and report.cleanup_ok
-                                  and report.throwaway_cleanup_ok) else
-                      "fail" if attempted else "not_attempted",
+            "overall": cleanup_overall,
         },
         "unavailable_reason": report.unavailable_reason,
         "overall": overall,
