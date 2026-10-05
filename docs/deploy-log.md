@@ -3678,3 +3678,52 @@ test suite green before this commit.
 
 Still not proceeding to M2.5, Layer 2.5, or live LLM - unchanged from the
 standing decision.
+
+## 2026-10-05 - Layer 3 M2.4.4: a literal connection value still escaped the throwaway database
+
+A fifth review pass of the fixture-validation harness after M2.4.3 (PR #21)
+merged. Found that a literal connection value (never a `${VAR}` ref) still
+completely bypassed the clone's own isolation, plus a separate bug in how
+"cleanup.overall" was computed. Both in `fixture.py`. Full detail and
+rationale: docs/layer2.md, "M2.4.4: a literal connection value still
+escaped the throwaway database".
+
+1. **Literal host/database/user/password never redirected.**
+   `_clone_connection()`/`_clone_warehouse()` only renamed a field that was
+   already a `${VAR}` ref - a literal value (no rule requires `${VAR}`
+   indirection) was left completely untouched, and
+   `env_overrides_for_source`/`_warehouse` only ever override a ref -
+   reproduced for real with a test: a clone built from a manifest with a
+   literal production host/database kept both values verbatim, and the
+   override set came back empty. Fixed by forcing every present connection
+   field into a brand-new throwaway-only ref unconditionally, whether the
+   manifest wrote it as a literal, a `${VAR}` ref, or a mix. The warehouse
+   side applies to every pipeline (always Postgres by design); the source
+   side only to `odoo_postgres` (the one connector whose connection is
+   genuinely Postgres-shaped and that `pg_throwaway`'s own Postgres-only
+   throwaway source can stand in for) - every other connector with a
+   non-empty `connection` (`sql_server`, `rest_api`, `elasticsearch`,
+   `google_sheets`) is now refused by `preflight_fixture_host()` before any
+   provisioning, and by `make_validation_clone()` itself as defense in
+   depth. `csv` (no `connection` at all) is unaffected.
+2. **`cleanup.overall` could say "not_attempted" over a real, known
+   failure.** It only consulted `cleanup_attempted` (the pipeline clone's
+   own cleanup, which stays False on a seed failure since `deploy()` is
+   never reached) - so a seed error whose throwaway database then failed to
+   drop still reported "not_attempted" for `overall`, right next to a
+   `"fail: ..."` for that same resource in the same dict. Fixed to consider
+   every resource actually created, not just the pipeline clone's own.
+
+**Real-verified on this host**: re-ran `dpagent pipeline validate
+quickstart_dbt --fixture ... --expected ...` for real - confirms the new
+connector check changes nothing for this `csv`-connector pipeline (same
+preflight failure, same zero mutation, as every prior round).
+Literal-connection redirection and the cleanup.overall fix are both
+reproduced-then-fixed with dedicated unit tests; the real pass/fail path of
+a redirected literal connection against a real Postgres/Airflow run remains
+unit-tested with subprocess mocked - unchanged M2.5 boundary (root +
+passwordless sudo to postgres on a disposable host), not attempted or
+worked around here. Full test suite green before this commit.
+
+Still not proceeding to M2.5, Layer 2.5, or live LLM - unchanged from the
+standing decision.

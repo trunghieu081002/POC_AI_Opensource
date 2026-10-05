@@ -16,7 +16,7 @@ import subprocess
 import pytest
 import yaml
 
-from dpagent.pipelines import fixture, loader
+from dpagent.pipelines import fixture, loader, pg_throwaway
 from dpagent.pipelines.pg_throwaway import ThrowawayDB
 
 
@@ -1105,21 +1105,170 @@ def test_make_validation_clone_renames_every_ref_uniquely(tmp_path):
     assert clone.warehouse.host != pipeline.warehouse.host
 
 
-def test_make_validation_clone_leaves_literal_values_untouched(tmp_path):
+def test_make_validation_clone_redirects_a_literal_warehouse_into_the_throwaway_too(tmp_path):
+    """M2.4.4 review's own P0, reproduced: an earlier version only renamed
+    a `${VAR}` ref, leaving a *literal* warehouse host/database completely
+    untouched - env_overrides_for_warehouse() then had nothing to override
+    (no ref to match), so the clone's dbt/procedure stages connected to the
+    real, literal warehouse regardless of whatever throwaway database
+    run_fixture() had just provisioned. Every connection field must be
+    forced into a throwaway-only ref whether the manifest wrote it as a
+    literal, a ${VAR} ref, or a mix of both."""
     root = tmp_path / "pipelines"
     d = root / "quickstart"
     d.mkdir(parents=True)
     (d / "pipeline.yaml").write_text(yaml.safe_dump({
         "name": "quickstart", "summary": "t",
         "source": {"connector": "csv", "files": {"path": "data/orders.csv"}},
-        "warehouse": {"host": "literal-host", "database": "literal-db", "schema": "quickstart"},
+        "warehouse": {"host": "literal-host", "port": "5432", "database": "literal-db",
+                     "user": "literal-user", "password": "literal-pw",
+                     "schema": "quickstart"},
         "stages": [{"name": "landing", "gates": [
             {"type": "row_count_bounds", "table": "orders", "min": 1}]}],
     }, sort_keys=False))
     pipeline = loader.load("quickstart", root)
     clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
-    assert clone.warehouse.host == "literal-host"   # not a ${VAR} ref - left alone
-    assert clone.warehouse.database == "literal-db"
+    prefix = f"DPAGENT_VALIDATE_{suffix.upper()}_WH_"
+    assert clone.warehouse.host == f"${{{prefix}HOST}}"
+    assert clone.warehouse.database == f"${{{prefix}DATABASE}}"
+    assert clone.warehouse.user == f"${{{prefix}USER}}"
+    assert clone.warehouse.password == f"${{{prefix}PASSWORD}}"
+    # None of the literal production values survive anywhere on the clone.
+    for value in (clone.warehouse.host, clone.warehouse.database,
+                 clone.warehouse.user, clone.warehouse.password):
+        assert value not in ("literal-host", "literal-db", "literal-user", "literal-pw")
+    assert clone.warehouse.schema == "quickstart"   # schema is deliberately not renamed
+
+    # And the overrides built from these refs actually cover every one of
+    # them - the whole point of forcing them into refs in the first place.
+    db = ThrowawayDB(host="tw-host", port="5433", database="tw-db",
+                     user="tw-user", password="tw-pw")
+    overrides = fixture.env_overrides_for_warehouse(clone, db)
+    assert overrides == {
+        f"{prefix}HOST": "tw-host", f"{prefix}PORT": "5433", f"{prefix}DATABASE": "tw-db",
+        f"{prefix}USER": "tw-user", f"{prefix}PASSWORD": "tw-pw",
+    }
+
+
+def test_make_validation_clone_redirects_a_literal_odoo_postgres_source_too(tmp_path):
+    """Same fix, source side: a literal odoo_postgres connection must be
+    forced into the throwaway source, not left pointed at the real one."""
+    root = tmp_path / "pipelines"
+    d = root / "odoo_demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "odoo_demo", "summary": "t",
+        "source": {"connector": "odoo_postgres",
+                  "connection": {"host": "prod-odoo-host", "database": "prod_odoo_db",
+                                "user": "prod_user", "password": "prod_pw"},
+                  "tables": ["res_partner"]},
+        "warehouse": {"host": "h", "database": "d", "schema": "odoo_demo"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "res_partner", "min": 1}]}],
+    }, sort_keys=False))
+    pipeline = loader.load("odoo_demo", root)
+    clone, suffix = fixture.make_validation_clone(pipeline, tmp_path / "clones")
+    prefix = f"DPAGENT_VALIDATE_{suffix.upper()}_SRC_"
+    assert clone.source.connection["host"] == f"${{{prefix}HOST}}"
+    assert clone.source.connection["database"] == f"${{{prefix}DATABASE}}"
+    assert clone.source.connection["user"] == f"${{{prefix}USER}}"
+    assert clone.source.connection["password"] == f"${{{prefix}PASSWORD}}"
+    for value in clone.source.connection.values():
+        assert value not in ("prod-odoo-host", "prod_odoo_db", "prod_user", "prod_pw")
+
+
+# ------------------------------------------------ unsupported source connectors (M2.4.4)
+
+def _sql_server_pipeline(tmp_path):
+    root = tmp_path / "pipelines"
+    d = root / "mssql_demo"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "mssql_demo", "summary": "t",
+        "source": {"connector": "sql_server",
+                  "connection": {"host": "mssql-host", "user": "u", "password": "p",
+                                "database": "d"},
+                  "tables": ["orders"]},
+        "warehouse": {"host": "h", "database": "d", "schema": "mssql_demo"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "orders", "min": 1}]}],
+    }, sort_keys=False))
+    return loader.load("mssql_demo", root)
+
+
+def test_unsupported_source_connector_reason_is_none_for_odoo_postgres(tmp_path):
+    pipeline = _real_pipeline(tmp_path)
+    assert fixture._unsupported_source_connector_reason(pipeline) is None
+
+
+def test_unsupported_source_connector_reason_is_none_for_csv_with_no_connection(tmp_path):
+    root = tmp_path / "pipelines"
+    d = root / "quickstart"
+    d.mkdir(parents=True)
+    (d / "pipeline.yaml").write_text(yaml.safe_dump({
+        "name": "quickstart", "summary": "t",
+        "source": {"connector": "csv", "files": {"path": "data/orders.csv"}},
+        "warehouse": {"host": "h", "database": "d", "schema": "quickstart"},
+        "stages": [{"name": "landing", "gates": [
+            {"type": "row_count_bounds", "table": "orders", "min": 1}]}],
+    }, sort_keys=False))
+    pipeline = loader.load("quickstart", root)
+    assert fixture._unsupported_source_connector_reason(pipeline) is None
+
+
+def test_unsupported_source_connector_reason_refuses_sql_server(tmp_path):
+    """sql_server has a live, host/port/database/user/password-shaped
+    connection - but pg_throwaway's own throwaway source is Postgres-only
+    (seed_source()/_psql() never speak pymssql), so there is no fixture
+    adapter for it (M2.4.4 review's own "Connector chưa có fixture adapter
+    thì từ chối trước provisioning")."""
+    pipeline = _sql_server_pipeline(tmp_path)
+    reason = fixture._unsupported_source_connector_reason(pipeline)
+    assert reason is not None
+    assert "sql_server" in reason
+
+
+def test_make_validation_clone_refuses_an_unsupported_connector_directly(tmp_path):
+    """Defense in depth: make_validation_clone() itself refuses, not just
+    preflight_fixture_host() - a caller building a clone directly (bypassing
+    run_fixture's own preflight) cannot accidentally build one for a
+    connector this harness cannot isolate."""
+    pipeline = _sql_server_pipeline(tmp_path)
+    with pytest.raises(fixture.ValidationCloneError, match="sql_server"):
+        fixture.make_validation_clone(pipeline, tmp_path / "clones")
+
+
+def test_preflight_fixture_host_refuses_an_unsupported_connector_before_anything_else(
+        tmp_path):
+    """Zero mutation, same guarantee every other preflight reason already
+    has - checked before root/sudo/anything else that touches the host."""
+    pipeline = _sql_server_pipeline(tmp_path)
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "sql_server" in result.detail
+
+
+def test_run_fixture_refuses_an_unsupported_connector_with_zero_mutation(tmp_path, monkeypatch):
+    """Wires the full run_fixture() path: an unsupported connector is
+    refused before make_validation_clone, throwaway_database, seed_source,
+    or deploy are ever reached."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _sql_server_pipeline(tmp_path)
+    for target, name in ((fixture, "make_validation_clone"), (pg_throwaway, "throwaway_database"),
+                        (fixture, "seed_source"), (deploy_mod, "deploy")):
+        def _boom(*a, _name=name, **k):
+            raise AssertionError(f"{_name} must never be called - connector is unsupported")
+        monkeypatch.setattr(target, name, _boom)
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="t", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[])
+
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert "sql_server" in report.unavailable_reason
+    assert report.clone_name == ""   # make_validation_clone() was never even called
+    assert report.seeded is False
 
 
 def test_make_validation_clone_renames_dbt_model_files_uniquely(tmp_path):
@@ -1316,6 +1465,52 @@ def test_fixture_report_dict_reports_each_throwaway_resource_separately():
     assert data["cleanup"]["warehouse_role"] == "pass"
     assert data["cleanup"]["overall"] == "fail"   # one of the four still failed
     assert data["overall"] == "fail"
+
+
+def test_fixture_report_dict_cleanup_overall_fails_on_a_seed_error_with_a_bad_drop(tmp_path):
+    """M2.4.4 review's own P1, reproduced: a seed failure means
+    `cleanup_attempted` (the *pipeline clone's* own cleanup) stays False -
+    deploy() is never even reached - but both throwaway databases are still
+    created and torn down regardless. An earlier version computed
+    `cleanup.overall` from `cleanup_attempted` alone, so a seed error whose
+    throwaway database then genuinely failed to drop still reported
+    "overall": "not_attempted" - silently hiding a real, already-known
+    failure sitting right next to it in the same dict
+    ("source_database": "fail: ...")."""
+    report = fixture.FixtureRunReport(
+        seeded=False, seed_error="CREATE TABLE orders failed: syntax error",
+        source_db_created=True, source_database_dropped=False,
+        source_database_drop_error="database is in use", source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=True, warehouse_role_dropped=True,
+    )
+    data = fixture.fixture_report_dict(report)
+    assert data["cleanup"]["pipeline_artifacts"] == "not_attempted"   # deploy() never reached
+    assert "fail" in data["cleanup"]["source_database"]
+    assert data["cleanup"]["warehouse_database"] == "pass"
+    assert data["cleanup"]["overall"] == "fail"   # not "not_attempted" - a real resource failed
+
+
+def test_fixture_report_dict_cleanup_overall_is_not_attempted_when_truly_nothing_ran():
+    """The other side of the same fix: genuinely nothing touched (e.g. a
+    preflight failure, before even the throwaway databases exist) must
+    still report "not_attempted", not "fail"."""
+    report = fixture.FixtureRunReport(unavailable_reason="preflight failed: not root")
+    data = fixture.fixture_report_dict(report)
+    assert data["cleanup"]["overall"] == "not_attempted"
+
+
+def test_fixture_report_dict_cleanup_overall_passes_when_only_throwaway_dbs_were_touched():
+    """A seed failure whose throwaway databases *both* tore down cleanly
+    must report "pass" for cleanup.overall, even though cleanup_attempted
+    (the pipeline clone's own, never reached here) stays False."""
+    report = fixture.FixtureRunReport(
+        seeded=False, seed_error="bad fixture",
+        source_db_created=True, source_database_dropped=True, source_role_dropped=True,
+        warehouse_db_created=True, warehouse_database_dropped=True, warehouse_role_dropped=True,
+    )
+    data = fixture.fixture_report_dict(report)
+    assert data["cleanup"]["pipeline_artifacts"] == "not_attempted"
+    assert data["cleanup"]["overall"] == "pass"
 
 
 def test_gate_summary_for_run_reads_the_real_journal(isolated_db):
