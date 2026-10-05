@@ -620,6 +620,157 @@ def test_preflight_fixture_host_requires_dbt_only_when_the_pipeline_has_a_dbt_st
     assert "dbt" in result.detail
 
 
+# ----------------------------------------- preflight never crashes (M2.5 prep review)
+
+def test_preflight_fixture_host_reports_a_sudo_timeout_as_a_reason_not_a_crash(
+        tmp_path, monkeypatch):
+    """An uncaught subprocess.TimeoutExpired from any preflight subprocess
+    call used to crash run_fixture() with a raw traceback instead of a
+    clean, reported unavailable_reason (exit 2) - sudo -n can still hang in
+    some configurations despite -n (M2.5-prep review: "lỗi executable/
+    permission/timeout trả unavailable, exit 2, có báo cáo")."""
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:4] == ["sudo", "-n", "-u", "postgres"]:
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 10))
+        return subprocess.CompletedProcess(cmd, 0, stdout="active\n", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)   # must not raise
+    assert result.ok is False
+    assert "timed out" in result.detail
+
+
+def test_preflight_fixture_host_reports_a_systemctl_timeout_as_a_reason_not_a_crash(
+        tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:2] == ["systemctl", "is-active"]:
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 10))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+
+    result = fixture.preflight_fixture_host(pipeline)   # must not raise
+    assert result.ok is False
+    assert "timed out" in result.detail
+
+
+def test_preflight_fixture_host_treats_a_permission_error_on_the_airflow_binary_as_could_not_check(
+        tmp_path, monkeypatch):
+    """Real, not simulated: chmod 0o000 on an ancestor directory reproduces
+    a genuine PermissionError from Path.exists() - the same real failure
+    mode `_verify_cleanup_complete`'s own `_safe_missing` test already
+    confirmed for a different path. preflight must report this as "could
+    not check", never crash, never silently "assumed present/absent"."""
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses permission bits - cannot reproduce as root")
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch)
+    _mock_preflight_installed(monkeypatch)
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    venv_bin = locked / "airflow_venv"
+    venv_bin.mkdir()
+    locked.chmod(0o000)
+    try:
+        monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+        monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", tmp_path)
+        result = fixture.preflight_fixture_host(pipeline)   # must not raise
+    finally:
+        locked.chmod(0o755)
+    assert result.ok is False
+    assert "could not check" in result.detail
+
+
+def test_preflight_fixture_host_treats_a_permission_error_on_a_writable_check_as_could_not_check(
+        tmp_path, monkeypatch):
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses permission bits - cannot reproduce as root")
+    from dpagent.pipelines import deploy as deploy_mod
+    pipeline = _real_pipeline(tmp_path)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    _mock_preflight_subprocess(monkeypatch)
+    _mock_preflight_installed(monkeypatch)
+    venv_bin = tmp_path / "airflow_venv"
+    venv_bin.mkdir()
+    (venv_bin / "airflow").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(deploy_mod, "_airflow_paths", lambda: (venv_bin, tmp_path / "env"))
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    shared = locked / "pipelines"
+    locked.chmod(0o000)
+    try:
+        monkeypatch.setattr(deploy_mod, "SHARED_PIPELINES_DIR", shared)
+        result = fixture.preflight_fixture_host(pipeline)   # must not raise
+    finally:
+        locked.chmod(0o755)
+    assert result.ok is False
+    assert "could not check" in result.detail
+
+
+def test_safe_exists_returns_none_on_a_real_permission_error(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses permission bits - cannot reproduce as root")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "child").mkdir()
+    locked.chmod(0o000)
+    try:
+        assert fixture._safe_exists(locked / "child" / "x") is None
+    finally:
+        locked.chmod(0o755)
+
+
+def test_writable_returns_none_on_a_real_permission_error(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses permission bits - cannot reproduce as root")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o000)
+    try:
+        assert fixture._writable(locked / "child" / "grandchild") is None
+    finally:
+        locked.chmod(0o755)
+
+
+def test_run_preflight_check_returns_none_and_a_reason_on_a_timeout(monkeypatch):
+    def fake_run(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 10))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    proc, detail = fixture._run_preflight_check(["sleep", "99"], timeout=1)
+    assert proc is None
+    assert "timed out" in detail
+
+
+def test_run_preflight_check_returns_none_and_a_reason_when_the_binary_is_missing(monkeypatch):
+    def fake_run(cmd, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    proc, detail = fixture._run_preflight_check(["does-not-exist"])
+    assert proc is None
+    assert "could not be run" in detail
+
+
 # ---------------------------------------------------------------- run_fixture (mocked end to end)
 
 @pytest.fixture
@@ -1201,19 +1352,43 @@ def test_unsupported_source_connector_reason_is_none_for_odoo_postgres(tmp_path)
     assert fixture._unsupported_source_connector_reason(pipeline) is None
 
 
-def test_unsupported_source_connector_reason_is_none_for_csv_with_no_connection(tmp_path):
+def _csv_pipeline(tmp_path, name="quickstart"):
     root = tmp_path / "pipelines"
-    d = root / "quickstart"
+    d = root / name
     d.mkdir(parents=True)
     (d / "pipeline.yaml").write_text(yaml.safe_dump({
-        "name": "quickstart", "summary": "t",
+        "name": name, "summary": "t",
         "source": {"connector": "csv", "files": {"path": "data/orders.csv"}},
-        "warehouse": {"host": "h", "database": "d", "schema": "quickstart"},
+        "warehouse": {"host": "h", "database": "d", "schema": name},
         "stages": [{"name": "landing", "gates": [
             {"type": "row_count_bounds", "table": "orders", "min": 1}]}],
     }, sort_keys=False))
-    pipeline = loader.load("quickstart", root)
-    assert fixture._unsupported_source_connector_reason(pipeline) is None
+    return loader.load(name, root)
+
+
+def test_unsupported_source_connector_reason_refuses_csv_by_default(tmp_path):
+    """M2.5-prep review: `--fixture` now refuses csv too (the strict=True
+    default, what preflight_fixture_host always uses) - a csv-connector
+    pipeline's own extract step reads its literal file directly, never a
+    throwaway database, so a human-authored fixture's rows were being
+    silently ignored rather than actually validated. This is a limit of
+    fixture validation only; a normal deploy/run for csv is unaffected -
+    nothing here touches deploy()/run_extract()."""
+    pipeline = _csv_pipeline(tmp_path)
+    reason = fixture._unsupported_source_connector_reason(pipeline)
+    assert reason is not None
+    assert "csv" in reason
+    assert "fixture" in reason
+
+
+def test_unsupported_source_connector_reason_non_strict_still_allows_csv(tmp_path):
+    """make_validation_clone()'s own defense-in-depth use (strict=False):
+    csv has no live connection to leak, so building a clone of one
+    directly - for a reason unrelated to --fixture, e.g. testing dbt model
+    renaming - stays allowed. Only preflight_fixture_host (the entry gate
+    for --fixture itself) is strict."""
+    pipeline = _csv_pipeline(tmp_path)
+    assert fixture._unsupported_source_connector_reason(pipeline, strict=False) is None
 
 
 def test_unsupported_source_connector_reason_refuses_sql_server(tmp_path):
@@ -1246,6 +1421,16 @@ def test_preflight_fixture_host_refuses_an_unsupported_connector_before_anything
     result = fixture.preflight_fixture_host(pipeline)
     assert result.ok is False
     assert "sql_server" in result.detail
+
+
+def test_preflight_fixture_host_refuses_csv_too(tmp_path):
+    """M2.5-prep review's own explicit ask: refuse --fixture for csv too,
+    not just a connector with a live connection - preflight_fixture_host
+    is the entry gate for --fixture, and must be strict by default."""
+    pipeline = _csv_pipeline(tmp_path)
+    result = fixture.preflight_fixture_host(pipeline)
+    assert result.ok is False
+    assert "csv" in result.detail
 
 
 def test_run_fixture_refuses_an_unsupported_connector_with_zero_mutation(tmp_path, monkeypatch):

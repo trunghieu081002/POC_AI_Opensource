@@ -933,6 +933,68 @@ path of a redirected literal connection against a real Postgres/Airflow run
 remains unit-tested with subprocess mocked - unchanged M2.5 boundary. Full
 test suite green before this was committed.
 
+### M2.5 prep: preflight hardened against crashes, --fixture refuses csv,
+and a real reference pipeline + acceptance matrix are ready
+
+Step 1 of the M2.5 plan ("Chốt phạm vi và điều kiện chạy M2.5") - everything
+in it that does not itself require a disposable host with root and
+passwordless sudo. Three pieces, all in `fixture.py` plus a brand new
+reference pipeline and doc:
+
+1. **`preflight_fixture_host()` itself can no longer crash.** Every
+   `subprocess.run` call (`sudo -n`, `pg_isready`, `systemctl is-active`)
+   and every `Path.exists()` check used to be unguarded - a hung `sudo -n`
+   (it can still block in some configurations despite `-n`), a wedged
+   `pg_isready`/`systemctl`, or a `PermissionError` reading an ancestor
+   directory would propagate straight out of `preflight_fixture_host()`
+   and crash the whole `run_fixture()` call with a raw traceback, not the
+   clean, reported `unavailable_reason` (exit 2) every other precondition
+   here already gets. `_run_preflight_check()` (returns `(None, <reason>)`
+   on a `TimeoutExpired`/`OSError`, never raises) and `_safe_exists()`/
+   `_writable()` (return `None` - "could not even check," never "assumed
+   gone"/"assumed present" - on a `PermissionError`) close this for every
+   check in the function.
+2. **`--fixture` now refuses `csv` too, not just a connector with a live
+   connection it cannot redirect.** `_unsupported_source_connector_reason`
+   gained a `strict` flag - `True` (what `preflight_fixture_host` always
+   uses, the entry gate for `--fixture` itself) now also refuses any purely
+   file-based connector: `csv`'s own extract step reads its literal file
+   directly, never the throwaway Postgres source database `seed_source()`
+   seeds, so a csv pipeline's `--fixture` run was silently ignoring the
+   operator-authored fixture entirely and validating only the pipeline's
+   own already-shipped sample data - which could look like a real pass
+   while never exercising a single scenario the reviewer actually wrote.
+   `strict=False` is `make_validation_clone()`'s own, narrower,
+   defense-in-depth use (for a caller building a clone directly for a
+   reason unrelated to `--fixture`'s own promise - several existing tests
+   do exactly this): it still refuses a connector with a genuinely
+   unsafe-to-leave-untouched live connection, but not `csv`, which has
+   nothing unsafe about it, merely nothing fixture-meaningful. This is a
+   limit of fixture validation only - a normal `dpagent pipeline deploy`/
+   `run` for any connector, csv included, is completely unaffected; nothing
+   here touches `deploy()`/`run_extract()`.
+3. **A real reference pipeline and a full acceptance matrix, ready for
+   Step 2.** [`pipelines/m25_monthly_sales/`](../pipelines/m25_monthly_sales/)
+   - small, `odoo_postgres` source, Postgres warehouse, through both dbt
+   and procedure, with a hand-calculated `fixture.yaml`/`expected.yaml` - and
+   [`docs/m25-acceptance.md`](m25-acceptance.md), the exact reproducible
+   command, required stack versions, and the nine-scenario acceptance
+   matrix (literal/ref/mixed connections, idempotent re-run, a deliberately
+   wrong expected result, gate/quarantine violations above and under
+   threshold, a seed failure, a partial deploy, a real timeout, a real
+   `DROP` failure, and partial provisioning), plus the control-database
+   isolation check the M2.4.x series of fixes was all for.
+
+**Status: items 1 and 2 are real-verified on this host** (a real smoke test
+against `pipelines/m25_monthly_sales` itself, and separately against
+`pipelines/quickstart_dbt`, both still degrade to the same honest
+`unavailable`, exit 2, zero mutation - `quickstart_dbt`'s own refusal now
+names `csv` specifically, confirming the new check reaches it). **Item 3 is
+prepared, not run** - Step 2 (actually executing the nine-scenario matrix)
+needs a disposable host with root and passwordless sudo that does not exist
+on this operator's own host; nothing in this round claims it was run. Full
+test suite green before this was committed.
+
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite

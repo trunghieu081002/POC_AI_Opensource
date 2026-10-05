@@ -119,30 +119,67 @@ def _renamed_ref(kind: str, suffix: str, key: str) -> str:
 # database/user/password connection AND whose data `pg_throwaway`'s own
 # throwaway source database (always Postgres - `seed_source()`/`_psql()`
 # never speak anything else) can actually stand in for. Every other
-# connector with a non-empty `connection` (sql_server - a different dialect
-# entirely, pymssql, that a Postgres throwaway cannot answer for; rest_api/
-# elasticsearch/google_sheets - base_url/hosts/spreadsheet_id/a bearer
-# token or service-account JSON, never a Postgres connection in the first
-# place) has no fixture adapter and is refused before any provisioning
-# (`_unsupported_source_connector_reason`, M2.4.4 review: "Connector chưa
-# có fixture adapter thì từ chối trước provisioning"). csv (and any other
-# purely file-based connector) has no `connection` at all - nothing to
-# isolate, nothing to refuse.
+# connector has no fixture adapter and is refused before any provisioning
+# (`_unsupported_source_connector_reason`) - sql_server (a different
+# dialect entirely, pymssql, that a Postgres throwaway cannot answer for),
+# rest_api/elasticsearch/google_sheets (base_url/hosts/spreadsheet_id/a
+# bearer token or service-account JSON, never a Postgres connection in the
+# first place) for the same reason a *literal* value escaping the clone
+# was closed in M2.4.4; csv (and any other purely file-based connector),
+# as of the M2.5-prep review, for a different reason - see
+# `_unsupported_source_connector_reason`'s own docstring.
 _FIXTURE_SOURCE_CONNECTORS = {"odoo_postgres"}
 
 
-def _unsupported_source_connector_reason(pipeline: Pipeline) -> str | None:
+def _unsupported_source_connector_reason(pipeline: Pipeline, *, strict: bool = True) -> str | None:
     """`None` when this pipeline's source connector is one the fixture
-    harness can actually redirect into a throwaway Postgres database -
-    a reason string otherwise. Called from both `preflight_fixture_host`
-    (so an unsupported connector is refused *before* a single throwaway
-    database/role is created - exit 2, zero mutation) and
-    `make_validation_clone` itself (defense in depth: raises
-    `ValidationCloneError` for any caller building a clone directly,
-    bypassing `run_fixture`'s own preflight)."""
+    harness can actually redirect a human-authored fixture into -
+    `odoo_postgres` today, the only connector whose connection is genuinely
+    Postgres-shaped and that `pg_throwaway`'s own Postgres-only throwaway
+    source database can stand in for.
+
+    `strict=True` (the default, and what `preflight_fixture_host` always
+    uses - the entry gate for `dpagent pipeline validate --fixture` itself)
+    also refuses `csv` and every other purely file-based connector (M2.5
+    prep review: "Tạm từ chối --fixture đối với connector chưa có adapter,
+    kể cả CSV... Đây chỉ là giới hạn của fixture validation; connector
+    chạy bình thường vẫn giữ nguyên" - this function, and everything that
+    calls it, is reached only from the fixture-validation path, never from
+    `deploy()`/`run_extract()`, so a real pipeline's own normal deploy/run
+    through any connector is completely unaffected). `csv` has no
+    `connection` at all, so nothing about it was ever technically
+    "redirected" into a throwaway database - but that is exactly the
+    problem the M2.5-prep review flagged, not a reason to allow it:
+    `seed_source()` seeds a human-authored fixture's rows into a throwaway
+    *Postgres* source database that a csv-connector pipeline's own extract
+    step never reads from at all (it always reads its own literal CSV file
+    instead), so a csv pipeline's `--fixture` run was silently ignoring the
+    operator-authored fixture and validating only the pipeline's own
+    already-shipped sample data - which could look like a real pass while
+    never exercising a single scenario the reviewer actually wrote.
+
+    `strict=False` is `make_validation_clone`'s own defense-in-depth use
+    (for any caller building a clone directly, bypassing `run_fixture`'s
+    own preflight): it still refuses a connector with a *live* connection
+    this harness cannot redirect (the real isolation/safety risk M2.4.4
+    closed), but does not extend that to `csv` - building a clone of a
+    csv pipeline is not unsafe, merely not fixture-meaningful, and other
+    tests/tools build one directly for reasons that have nothing to do
+    with `--fixture`'s own promise (dbt model renaming, procedure file
+    copying, ...)."""
     connector = pipeline.source.connector
-    if connector in _FIXTURE_SOURCE_CONNECTORS or not pipeline.source.connection:
+    if connector in _FIXTURE_SOURCE_CONNECTORS:
         return None
+    if not pipeline.source.connection:
+        if not strict:
+            return None
+        return (f"source connector {connector!r} has no fixture adapter yet - this "
+               f"connector reads its own literal file/endpoint directly, never a "
+               f"throwaway database, so a human-authored fixture's rows would be "
+               f"silently ignored rather than actually validated; only "
+               f"{sorted(_FIXTURE_SOURCE_CONNECTORS)} is supported for --fixture "
+               f"today. This is a limit of fixture validation only - a normal "
+               f"`dpagent pipeline deploy`/`run` for this connector is unaffected")
     return (f"source connector {connector!r} has a live connection "
            f"(host/credentials) this fixture harness cannot redirect into a "
            f"throwaway database - only {sorted(_FIXTURE_SOURCE_CONNECTORS)} is "
@@ -256,7 +293,7 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
     it publishes (and the DAG task later reloads via `loader.load()`) must
     itself already be the clone's own manifest, not the original's.
     """
-    reason = _unsupported_source_connector_reason(pipeline)
+    reason = _unsupported_source_connector_reason(pipeline, strict=False)
     if reason:
         raise ValidationCloneError(reason)
 
@@ -726,18 +763,64 @@ class PreflightResult:
         return "; ".join(self.reasons)
 
 
-def _writable(path: Path) -> bool:
+def _safe_exists(path: Path) -> bool | None:
+    """`path.exists()`, but `None` - never a raised `OSError` - when this
+    operator cannot even check (a `PermissionError` reading an ancestor
+    directory is real on this project's own host for other paths -
+    `_verify_cleanup_complete`'s own `_safe_missing`, which this mirrors).
+    "Cannot tell" must never silently become "assumed missing" (or
+    "assumed present") either way - and, specifically for
+    `preflight_fixture_host`, must never crash the whole fixture run with a
+    raw traceback instead of a clean, reported `unavailable_reason` (M2.5
+    prep review: "lỗi executable/permission/timeout trả unavailable, exit
+    2, có báo cáo")."""
+    try:
+        return path.exists()
+    except OSError:
+        return None
+
+
+def _writable(path: Path) -> bool | None:
     """`path` itself if it already exists, else the nearest existing
     ancestor - the same "can this operator actually create/write under
     here" question `install_pipeline_files()`/`install_dbt_models()` (in
     deploy.py) answer implicitly by raising `DeployError` when they are not
-    root; this asks it up front, without writing anything."""
+    root; this asks it up front, without writing anything.
+
+    `None` - distinct from `False` - when existence itself could not be
+    checked (`_safe_exists` above); a caller must report that as its own
+    reason, never conflate it with "checked, and it is not writable"."""
     p = Path(path)
-    while not p.exists():
+    while True:
+        exists = _safe_exists(p)
+        if exists is None:
+            return None
+        if exists:
+            return os.access(p, os.W_OK)
         if p.parent == p:
             return False
         p = p.parent
-    return os.access(p, os.W_OK)
+
+
+def _run_preflight_check(cmd: list[str], *,
+                         timeout: int = 10) -> tuple[subprocess.CompletedProcess | None, str]:
+    """Runs `cmd` for one `preflight_fixture_host` check - `(None,
+    <reason>)`, never a raised `subprocess.TimeoutExpired`/`OSError`, when
+    `cmd` could not even be run to completion (a hang past `timeout`
+    seconds - `sudo -n` can still block waiting on a TTY/agent in some
+    configurations despite `-n`; a hung `pg_isready`/`systemctl` against a
+    wedged service - or the binary itself missing); `(proc, "")`
+    otherwise. `preflight_fixture_host` must never crash the whole fixture
+    run with a raw traceback over this - a clean, reported
+    `unavailable_reason` (exit 2) every time, same discipline
+    `pg_throwaway._run_as_postgres` already applies to its own teardown
+    (M2.5 prep review)."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout), ""
+    except subprocess.TimeoutExpired:
+        return None, f"{' '.join(cmd)!r} timed out after {timeout}s"
+    except OSError as exc:
+        return None, f"{' '.join(cmd)!r} could not be run: {exc}"
 
 
 def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
@@ -750,9 +833,22 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
 
     Not purely host-level any more as of M2.4.4: also refuses a pipeline
     whose source connector this harness has no fixture adapter for
-    (`_unsupported_source_connector_reason`) - a pure, zero-I/O check on the
-    manifest itself, but the same "refuse before any mutation" guarantee
-    applies to it as to every other reason here.
+    (`_unsupported_source_connector_reason`, called with its strict default
+    - which, as of the M2.5-prep review, also refuses `csv` and every other
+    purely file-based connector, not only one with a live connection it
+    cannot redirect) - a pure, zero-I/O check on the manifest itself, but
+    the same "refuse before any mutation" guarantee applies to it as to
+    every other reason here.
+
+    Every check below - every `subprocess.run` call and every
+    `Path.exists()` - is wrapped (`_run_preflight_check`/`_safe_exists`/
+    `_writable`) so a hung `sudo -n`/`pg_isready`/`systemctl` (a
+    `subprocess.TimeoutExpired`) or an unreadable ancestor directory (a
+    `PermissionError`) becomes its own reason string, never an uncaught
+    exception - this function must always return a clean `PreflightResult`,
+    never crash the whole fixture run with a raw traceback (M2.5-prep
+    review: "lỗi executable/permission/timeout trả unavailable, exit 2, có
+    báo cáo").
 
     Best-effort and host-level otherwise, not a promise of eventual success
     - a check here passing does not guarantee `deploy()` itself will not
@@ -774,17 +870,19 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     if not (hasattr(os, "geteuid") and os.geteuid() == 0):
         reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")
 
-    sudo_check = subprocess.run(["sudo", "-n", "-u", "postgres", "true"],
-                                capture_output=True, text=True, timeout=10)
-    if sudo_check.returncode != 0:
+    sudo_check, detail = _run_preflight_check(["sudo", "-n", "-u", "postgres", "true"])
+    if sudo_check is None:
+        reasons.append(detail)
+    elif sudo_check.returncode != 0:
         reasons.append(
             "cannot sudo -n -u postgres (passwordless sudo to the postgres OS user "
             "is required, twice over - once for a throwaway source, once for a "
             "throwaway warehouse)")
     else:
-        pg_ready = subprocess.run(["sudo", "-n", "-u", "postgres", "pg_isready"],
-                                  capture_output=True, text=True, timeout=10)
-        if pg_ready.returncode != 0:
+        pg_ready, detail = _run_preflight_check(["sudo", "-n", "-u", "postgres", "pg_isready"])
+        if pg_ready is None:
+            reasons.append(detail)
+        elif pg_ready.returncode != 0:
             reasons.append(f"PostgreSQL is not accepting connections: "
                            f"{(pg_ready.stderr or pg_ready.stdout).strip()}")
 
@@ -800,11 +898,16 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
         reasons.append("airflow pack is not recorded as installed")
     else:
         venv_bin, _ = deploy_mod._airflow_paths()
-        if not (venv_bin / "airflow").exists():
+        airflow_bin_exists = _safe_exists(venv_bin / "airflow")
+        if airflow_bin_exists is None:
+            reasons.append(f"could not check for the airflow CLI binary at {venv_bin} "
+                           f"(permission denied reading an ancestor directory?)")
+        elif not airflow_bin_exists:
             reasons.append(f"airflow CLI binary not found at {venv_bin}")
-        scheduler = subprocess.run(["systemctl", "is-active", "airflow-scheduler"],
-                                   capture_output=True, text=True, timeout=10)
-        if scheduler.stdout.strip() != "active":
+        scheduler, detail = _run_preflight_check(["systemctl", "is-active", "airflow-scheduler"])
+        if scheduler is None:
+            reasons.append(detail)
+        elif scheduler.stdout.strip() != "active":
             reasons.append("airflow-scheduler is not active ("
                            f"{(scheduler.stdout or scheduler.stderr).strip()})")
 
@@ -812,7 +915,11 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     if needs_dbt:
         checks.append(("dbt project directory", deploy_mod._dbt_project_dir()))
     for label, path in checks:
-        if not _writable(path):
+        writable = _writable(path)
+        if writable is None:
+            reasons.append(f"could not check whether {label} ({path}) is writable "
+                           f"(permission denied reading an ancestor directory?)")
+        elif not writable:
             reasons.append(f"{label} ({path}) is not writable by this operator")
 
     return PreflightResult(ok=not reasons, reasons=reasons)
