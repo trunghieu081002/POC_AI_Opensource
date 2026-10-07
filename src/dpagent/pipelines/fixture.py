@@ -1089,6 +1089,7 @@ class FixtureRunReport:
     seed_error: str = ""   # the fixture itself failed to load - a validation
                            # failure (exit 1), never unavailable_reason (exit 2)
     deployed: bool = False
+    deploy_error: str = ""
     run_ids: list[int] = field(default_factory=list)
     run1_status: str = ""
     run2_status: str = ""
@@ -1272,6 +1273,10 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                             deploy_mod.deploy(clone, allow_draft=True)
                         except deploy_mod.DeployError as exc:
                             report.unavailable_reason = f"deploy() failed (needs root): {exc}"
+                            return report
+                        except OSError as exc:
+                            report.deploy_error = (
+                                f"{type(exc).__name__}: {exc}")
                             return report
                         report.deployed = True
 
@@ -1473,6 +1478,7 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
         "pipeline_hash": pipeline_hash,
         "fixture_hash": fixture_hash,
         "expected_hash": expected_hash,
+        "deploy_error": report.deploy_error,
         "run_ids": list(report.run_ids),
         "run_status": {"run_1": report.run1_status or "not_run",
                       "run_2": report.run2_status or "not_run"},

@@ -30,6 +30,10 @@ def run_preflight(tmp_path, *, getenforce_output: str | None) -> subprocess.Comp
     # unprivileged and still reach the SELinux check further down the script.
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
+    # Provide the package manager expected by the simulated RHEL host.
+    dnf = fake_bin / "dnf"
+    dnf.write_text("#!/bin/sh\nexit 0\n")
+    dnf.chmod(0o755)
     if getenforce_output is not None:
         shim = fake_bin / "getenforce"
         shim.write_text(textwrap.dedent(f"""\

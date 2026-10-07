@@ -12,11 +12,15 @@ import pytest
 from dpagent.pipelines import pg_throwaway
 
 
-def test_throwaway_database_is_really_unavailable_on_this_host():
-    """Not mocked - the real `sudo -n` failure this host actually has."""
+def test_throwaway_database_reports_missing_sudo(monkeypatch):
+    """Deterministic missing-sudo test; independent of host permissions."""
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda cmd, **kwargs: subprocess.CompletedProcess(
+            cmd, 1, stdout="", stderr="sudo: a password is required"))
     with pytest.raises(pg_throwaway.ThrowawayUnavailable, match="sudo"):
         with pg_throwaway.throwaway_database():
-            pass   # pragma: no cover - never reached on this host
+            pass   # pragma: no cover - mocked sudo failure prevents entry
 
 
 def test_throwaway_database_yields_real_looking_connection_info(monkeypatch):
