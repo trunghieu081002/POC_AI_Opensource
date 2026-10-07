@@ -459,9 +459,14 @@ def test_temporarily_restores_even_when_the_block_raises():
 
 # ---------------------------------------------------------------- preflight_fixture_host
 
-def test_preflight_fixture_host_is_really_unavailable_on_this_host(tmp_path):
-    """Real, not mocked - this operator has neither root nor passwordless
-    sudo to postgres on this host."""
+def test_preflight_fixture_host_reports_missing_sudo(isolated_db, tmp_path, monkeypatch):
+    """Deterministic missing-sudo test; independent of host permissions."""
+    monkeypatch.setattr(fixture.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda cmd, **kwargs: subprocess.CompletedProcess(
+            cmd, 1, stdout="", stderr="sudo: a password is required"))
+
     pipeline = _real_pipeline(tmp_path)
     result = fixture.preflight_fixture_host(pipeline)
     assert result.ok is False
@@ -1001,8 +1006,14 @@ class _FakeUndeployResult:
         self.runs_cancelled = []
 
 
-def test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing(tmp_path):
-    """Real on this host, not mocked - no passwordless sudo to postgres."""
+def test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing(isolated_db, tmp_path, monkeypatch):
+    """Deterministic missing-sudo test; independent of host permissions."""
+    monkeypatch.setattr(fixture.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda cmd, **kwargs: subprocess.CompletedProcess(
+            cmd, 1, stdout="", stderr="sudo: a password is required"))
+
     pipeline = _real_pipeline(tmp_path)
     fx = fixture.Fixture(tables=[fixture.FixtureTable(
         name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
@@ -1728,3 +1739,46 @@ def test_gate_summary_for_run_keeps_two_gates_of_the_same_type_separate(isolated
     types_and_status = [(g["type"], g["status"], g["detail"]) for g in summary["curated"]]
     assert ("business_rule", "passed", "rule A") in types_and_status
     assert ("business_rule", "failed", "rule B") in types_and_status
+
+
+def test_run_fixture_records_filesystem_deploy_error_and_cleanup(
+        isolated_db, tmp_path, monkeypatch):
+    from dpagent.pipelines import deploy as deploy_mod
+
+    pipeline = _real_pipeline(tmp_path)
+    src = ThrowawayDB(
+        host="h1", port="5432", database="src", user="u1", password="p1")
+    wh = ThrowawayDB(
+        host="h2", port="5432", database="wh", user="u2", password="p2")
+    monkeypatch.setattr(
+        fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src, wh))
+    monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
+    _mock_deploy_isolation(monkeypatch, tmp_path)
+
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_text("blocker")
+
+    def fail_deploy(pipeline, **kwargs):
+        blocker.mkdir()
+
+    monkeypatch.setattr(deploy_mod, "deploy", fail_deploy)
+
+    fx = fixture.Fixture(tables=[fixture.FixtureTable(
+        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+    expected = fixture.ExpectedResult(table="fct_x", rows=[])
+
+    report = fixture.run_fixture(pipeline, fx, expected)
+
+    assert report.seeded
+    assert not report.deployed
+    assert "FileExistsError" in report.deploy_error
+    assert not report.unavailable_reason
+    assert report.run_ids == []
+    assert report.cleanup_attempted
+    assert report.cleanup_ok
+    assert report.throwaway_cleanup_ok
+
+    data = fixture.fixture_report_dict(report)
+    assert data["deploy_error"] == report.deploy_error
+    assert data["overall"] == "fail"
+    assert data["cleanup"]["overall"] == "pass"

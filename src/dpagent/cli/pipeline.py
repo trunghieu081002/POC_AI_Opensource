@@ -334,6 +334,11 @@ def validate_cmd(name, fixture_path, expected_path):
                           "down)[/dim]")
         sys.exit(2)
 
+    if result.deploy_error:
+        console.print("fixture deploy failed: "
+                      + result.deploy_error, markup=False)
+        sys.exit(1)
+
     if result.seed_error:
         # A validation failure, not "unavailable": the fixture itself (or
         # the throwaway database) rejected it - exit 1, same as a real

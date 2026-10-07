@@ -539,6 +539,7 @@ def test_run_transform_calls_a_deployed_procedure(tmp_path, throwaway_warehouse,
         "$$ BEGIN CREATE TABLE IF NOT EXISTS mark_ran (n int); "
         "INSERT INTO mark_ran VALUES (1); END; $$;\n")
     pipeline = loader.load("rt", root)
+    monkeypatch.setattr(loader, "PIPELINES_DIR", root)
 
     deploy.apply_procedures(pipeline)
     runtime.run_transform(pipeline_name="rt", stage="curated")
