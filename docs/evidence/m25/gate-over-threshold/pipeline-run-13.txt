@@ -1,0 +1,23 @@
+m25_monthly_sales__validate__298791e8 · run 13 · failed
+
+landing passed · 3 rows
+  row_count_bounds
+
+raw failed
+  not_null — 1/3 (33.3%) row(s) in stg_sale_order quarantined for not_null, exceeding the 25.0% threshold
+  unique
+
+events
+ time            actor   kind             message                                                                                                   
+ 10:44:12+00:00  engine  extract.start    m25_monthly_sales__validate__298791e8 via odoo_postgres                                                   
+ 10:44:17+00:00  engine  extract.done     m25_monthly_sales__validate__298791e8 extract complete: sale_order +3                                     
+ 10:44:20+00:00  engine  gate.passed      m25_monthly_sales__validate__298791e8/landing row_count_bounds: ok                                        
+ 10:44:20+00:00  engine  stage.passed     m25_monthly_sales__validate__298791e8/landing gates passed                                                
+ 10:44:23+00:00  engine  transform.start  m25_monthly_sales__validate__298791e8/raw via dbt                                                         
+ 10:44:37+00:00  engine  transform.done   m25_monthly_sales__validate__298791e8/raw transform complete                                              
+ 10:44:41+00:00  engine  gate.failed      m25_monthly_sales__validate__298791e8/raw not_null: 1/3 (33.3%) row(s) in stg_sale_order quarantined for  
+                                          not_null, exceeding the 25.0% threshold                                                                   
+ 10:44:42+00:00  engine  gate.passed      m25_monthly_sales__validate__298791e8/raw unique: ok                                                      
+ 10:44:42+00:00  engine  stage.failed     m25_monthly_sales__validate__298791e8/raw halted: not_null: 1/3 (33.3%) row(s) in stg_sale_order          
+                                          quarantined for not_null, exceeding the 25.0% threshold                                                   
+ 10:44:44+00:00  engine  pipeline.failed  DAG run 13 reached terminal state: failed                                                                 

@@ -1,21 +1,17 @@
 # M2.5 — real-verification acceptance matrix
 
-**Status: prepared, not yet run.** Everything in this file is ready to execute
-the moment an operator has a disposable host with root, passwordless `sudo`
-to the `postgres` OS user, and the `postgres`/`dlt`/`dbt`/`airflow` packs
-installed and running. This operator's own host has none of root or
-passwordless sudo, so Step 2 below has not been attempted here, is not
-claimed as done, and must not be inferred from the rest of this repo's
-"real-verified" language for Layer 3 M2 — that language is specifically
-about the *harness itself* (its code paths, preflight behaviour, cleanup
-bookkeeping), unit-tested with subprocess mocked, never a real end-to-end
-`dbt run`/Airflow DAG run against a real Postgres. This file is what closes
-that gap, once a suitable host exists.
+**Status: manually executed on a disposable Ubuntu VM; automation pending.**
 
-This is Step 1 ("Chốt phạm vi và điều kiện chạy M2.5") of the plan under
-which this file was written; Steps 2-4 (actually running the matrix below,
-automating it, and gating `promote()` on it) are explicitly later, in that
-order, per the same plan.
+The matrix below specifies the acceptance requirements. Observed manual results
+are recorded in [m25-vm-results.md](m25-vm-results.md), with a representative
+[retained evidence subset](evidence/m25/README.md). Timeout required manual
+recovery and remains a failed validation; see [timeout policy](m25-timeout-policy.md).
+This does not claim automatic worker cancellation or a completed acceptance suite.
+
+Step 1 prepared the scope; Step 2 was manually executed with the recorded limits.
+Step 3 (automated disposable-host acceptance) and Step 4 (promotion gating) remain
+subsequent work, in that order. The earlier host lacked prerequisites; the later
+Ubuntu VM provided the real execution environment.
 
 ## The pipeline
 
@@ -198,8 +194,8 @@ chạy, không chỉ nhìn manifest đã đổi ref."
 
 ## What this file does not claim
 
-- Steps 2's matrix has not been run. Every cell above is a requirement, not
-  a result.
+- The matrix above specifies requirements, not new results. Manual results and
+  their limits are recorded separately in m25-vm-results.md and the retained evidence index.
 - Step 3 (packaging the above into an automated acceptance suite — unit/
   regression tests per PR, integration tests on a disposable environment,
   every infrastructure gap named rather than silently skipped, commit SHA +

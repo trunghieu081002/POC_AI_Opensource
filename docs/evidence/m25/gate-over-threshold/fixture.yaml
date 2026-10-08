@@ -1,0 +1,10 @@
+tables:
+  - name: sale_order
+    columns:
+      id: bigint
+      write_date: timestamp
+      amount_total: numeric
+    rows:
+      - {id: 1, write_date: "2026-01-05 10:00:00", amount_total: 100.00}
+      - {id: 2, write_date: "2026-01-20 15:30:00", amount_total: 250.50}
+      - {id: null, write_date: "2026-02-02 09:00:00", amount_total: 75.25}

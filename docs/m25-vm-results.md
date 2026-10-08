@@ -1,8 +1,9 @@
 # M2.5 — Ubuntu VM verification results
 
 Executed on a local disposable Ubuntu VirtualBox VM with real
-PostgreSQL, dlt, dbt and Airflow. Evidence is retained on that VM
-under ~/m25-evidence/.
+PostgreSQL, dlt, dbt and Airflow. A representative evidence subset is now retained in
+[docs/evidence/m25](evidence/m25/README.md). The original full evidence was also
+exported to the operator's Windows machine.
 
 ## Observed results
 
@@ -48,5 +49,13 @@ It does not claim to handle every possible deploy exception.
 
 This records manual verification. Packaging the acceptance suite and
 tightening promotion requirements remain subsequent work.
-Raw evidence currently resides on the VM, not in this repository.
-2f966241d193465b22b53b7a40a3256c3cb2f682
+The retained subset covers literal connections, gate above threshold and timeout,
+including separate manual recovery logs and final resource listings. Other cases'
+raw logs remain outside this subset. See its index for missing baselines, versions
+and per-run provenance limits.
+
+Recorded VM base commit: 2f966241d193465b22b53b7a40a3256c3cb2f682.
+Local changes are preserved in the evidence patch; this is not a per-run attestation.
+
+Current decision: [manual timeout recovery](m25-timeout-policy.md). A timeout
+report cannot support human promotion; code enforcement remains Step 4.

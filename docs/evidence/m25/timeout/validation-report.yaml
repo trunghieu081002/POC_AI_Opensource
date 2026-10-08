@@ -1,0 +1,98 @@
+generated_at: '2026-10-07T16:30:31+00:00'
+generator: dpagent pipeline validate
+model: ''
+content_hash: sha256:2c587b36cdc19ceacb3cfec529f29c5c4b8e3305bdad77c2f61cf06eed1e5920
+steps:
+  structure:
+    status: pass
+  load:
+    status: pass
+  dbt_compile:
+    status: pass
+    detail: 1 model(s) parsed clean
+    method: dbt project/Jinja parse only - structure, Jinja rendering, ref()/config
+      resolution; no live database, so it does NOT confirm the SQL itself is valid
+      Postgres (a typo like 'SELEC ...' still parses clean). Not dbt compile/run.
+      The SQL is only actually proven by steps 4-5 (dbt run against a real fixture
+      database).
+  procedures:
+    status: pass
+    detail: 1 procedure(s) applied clean
+  dbt_dependencies:
+    status: pass
+    detail: 1 model(s), no ref()/source() dependency
+    checks_for: ref()/source() Jinja calls - not supported by this validation harness
+      (see check_dbt_dependencies's own docstring); models must read from a fully-schema-qualified
+      physical table instead
+  fixture:
+    clone_name: m25_monthly_sales__validate__6c2fba1e
+    pipeline_hash: sha256:2c587b36cdc19ceacb3cfec529f29c5c4b8e3305bdad77c2f61cf06eed1e5920
+    fixture_hash: sha256:086a1eb8d8481d2acfc0f5ebbef40f7b007e0d7d52395434b2d70ffd427d4164
+    expected_hash: sha256:fd27b7fe8d72bc246555ab8d064cec351c6875a65bd59d7242d547ffb145bed2
+    deploy_error: ''
+    run_ids:
+    - 26
+    run_status:
+      run_1: timeout
+      run_2: not_run
+    comparison:
+      run_1: not_run
+      run_2: not_run
+      idempotent: false
+    gates:
+      run_1:
+        landing:
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 3
+          rows_rejected: null
+        raw:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 3
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 3
+          rows_rejected: 0
+      run_2: {}
+    cleanup:
+      pipeline_artifacts: fail
+      pipeline_artifacts_detail: 'DAG removed; DAG delete FAILED: airflow.exceptions.AirflowException:
+        TaskInstances still running; published files removed; dbt models removed;
+        dlt state removed; secrets released: DPAGENT_VALIDATE_6C2FBA1E_SRC_DATABASE,
+        DPAGENT_VALIDATE_6C2FBA1E_SRC_HOST, DPAGENT_VALIDATE_6C2FBA1E_SRC_PASSWORD,
+        DPAGENT_VALIDATE_6C2FBA1E_SRC_PORT, DPAGENT_VALIDATE_6C2FBA1E_SRC_USER, DPAGENT_VALIDATE_6C2FBA1E_WH_DATABASE,
+        DPAGENT_VALIDATE_6C2FBA1E_WH_HOST, DPAGENT_VALIDATE_6C2FBA1E_WH_PASSWORD,
+        DPAGENT_VALIDATE_6C2FBA1E_WH_PORT, DPAGENT_VALIDATE_6C2FBA1E_WH_USER | DAG
+        still registered in Airflow: airflow.exceptions.AirflowException: TaskInstances
+        still running; run timed out - this host cannot confirm the Airflow worker
+        actually stopped before cleanup ran (undeploy() does not kill an already-running
+        task), so this is never reported as a complete cleanup even when every artifact
+        checked here is gone'
+      source_database: pass
+      source_role: pass
+      warehouse_database: 'fail: could not change directory to "/home/m25/POC_AI_Opensource":
+        Permission denied
+
+        ERROR:  database "dpagent_fixture_wh_12156b1cd0" is being accessed by other
+        users
+
+        DETAIL:  There is 1 other session using the database.'
+      warehouse_role: 'fail: could not change directory to "/home/m25/POC_AI_Opensource":
+        Permission denied
+
+        ERROR:  role "dpagent_fixture_wh_12156b1cd0" cannot be dropped because some
+        objects depend on it
+
+        DETAIL:  owner of database dpagent_fixture_wh_12156b1cd0
+
+        9 objects in database dpagent_fixture_wh_12156b1cd0'
+      overall: fail
+    unavailable_reason: ''
+    overall: fail
+assumptions: ''
+open_questions: []
