@@ -192,16 +192,51 @@ the control database. This is the real test of isolation this whole M2.4.x
 series of fixes was for — "Cần ghi nhận database/user thực tế từ đường
 chạy, không chỉ nhìn manifest đã đổi ref."
 
+## Update - Steps 2 and 3, status as of 2026-10-08
+
+**Step 2's own retained evidence and timeout policy** are now in the repo -
+see the status line at the top of this file,
+[`docs/m25-vm-results.md`](m25-vm-results.md),
+[`docs/evidence/m25/`](evidence/m25/) and
+[`docs/m25-timeout-policy.md`](m25-timeout-policy.md). This section is
+about Step 3 only, and does not restate those.
+
+**Step 3 has started, not finished.**
+[`tests/m25_acceptance/run_matrix.py`](../tests/m25_acceptance/run_matrix.py)
+automates 8 of the 12+ scenarios (connection shape × 3, correct-twice,
+wrong-expected, gate under/over threshold, timeout) by calling
+`fixture.run_fixture()` directly against a real stack;
+[`scripts/m25-acceptance-ci.sh`](../scripts/m25-acceptance-ci.sh) builds
+the disposable host itself (a systemd container from
+[`scripts/m25-disposable-host.Dockerfile`](../scripts/m25-disposable-host.Dockerfile),
+not a host that has to already exist), installs postgres+dlt+dbt+airflow
+on it via `examples/layer2-stack.yaml`, runs the driver, and saves
+redacted real output under
+[`docs/evidence/m25-automated/`](evidence/m25-automated/) - a *different*
+run, on a *different* (container, not VM) disposable host, from Step 2's
+own evidence above; that directory's own README says exactly how the two
+relate. A registry (`tests/m25_acceptance/registry.py`, modelled on the
+SourceRegistry/batch_id+watermark pattern in `phulee9/hgmedia`) records
+one batch per scenario per run - commit, host, pipeline/fixture/expected
+hashes, verdict, cleanup status - so a later run can answer "has this
+exact combination already been proven" without re-deriving it, which is
+what Step 4's planned `promote()` gate is meant to query.
+
+**Still not automated** - the 6 scenarios needing host-level fault
+injection the VM run did by hand (seed failure, partial/late deploy
+failure, source/warehouse provisioning failure, a real `DROP` failure).
+`run_matrix.py`'s own `UNIMPLEMENTED_SCENARIOS` names them, and
+`scripts/m25-acceptance-ci.sh` prints that list on every run rather than
+let a clean exit code imply full coverage. Scripting each one needs its
+own deliberate fault (a bad column type, a blocked project directory, a
+disk/role collision, a held-open connection) reproduced safely and
+repeatably inside the container - not yet done.
+
 ## What this file does not claim
 
 - The matrix above specifies requirements, not new results. Manual results and
   their limits are recorded separately in m25-vm-results.md and the retained evidence index.
-- Step 3 (packaging the above into an automated acceptance suite — unit/
-  regression tests per PR, integration tests on a disposable environment,
-  every infrastructure gap named rather than silently skipped, commit SHA +
-  tool versions + reports + redacted logs all retained) starts only after
-  Step 2 has actually passed for real, per the plan this file was written
-  under.
+- Step 3 is partial, stated above - not every scenario is automated, and
+  automating the rest is real remaining work, not an afterthought.
 - Step 4 (gating `approval.promote()` on a still-valid, still-matching
-  fixture/expected validation report before promotion) starts only after
-  Step 3, same plan.
+  fixture/expected validation report before promotion) has not started.

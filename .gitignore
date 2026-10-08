@@ -18,3 +18,7 @@ pipelines/*/.synth-validation.yaml
 *.db
 *.jsonl
 *.dpagent-*.bak
+
+# The M2.5 acceptance-suite ledger is deliberately committed evidence, not
+# a runtime artifact - the one exception to the blanket *.jsonl rule above.
+!docs/evidence/m25-automated/registry.jsonl

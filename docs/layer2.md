@@ -1250,6 +1250,18 @@ Stated from what real runs actually showed, not from the design:
   `--older-than-days 7` had found 0 candidates - not a bug, just nothing in
   the journal was that old at the time; this second run is what actually
   exercises the delete path.)
+- **A run that times out is never automatically cancelled at the worker.**
+  `undeploy()`'s "cancels in-flight runs" (one bullet up) is journal
+  bookkeeping only (`state.finish_run(row, "cancelled")`), never a call
+  that actually stops the Airflow process or terminates its database
+  connection - confirmed on the M2.5 disposable VM: a timed-out run left
+  a still-open connection that blocked its own warehouse `DROP DATABASE`.
+  Decision, real-verified there and not revisited since: require manual
+  cleanup on a timeout and never report it as complete, rather than build
+  automatic worker-kill (the risk of forcibly killing a task mid-write
+  outweighs today's honest failure report) - see
+  [`docs/m25-timeout-policy.md`](m25-timeout-policy.md) for the reasoning
+  and the operator recovery procedure in full.
 - **One run at a time per pipeline.** The generated DAG sets
   `max_active_runs=1`; a second `pipeline run` queues behind the first.
 - **An internet-reaching connector can hang instead of failing fast on a
