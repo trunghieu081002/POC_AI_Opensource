@@ -1,0 +1,60 @@
+{
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_C84A8136_SRC_DATABASE, DPAGENT_VALIDATE_C84A8136_SRC_HOST, DPAGENT_VALIDATE_C84A8136_SRC_PASSWORD, DPAGENT_VALIDATE_C84A8136_SRC_PORT, DPAGENT_VALIDATE_C84A8136_SRC_USER, DPAGENT_VALIDATE_C84A8136_WH_DATABASE, DPAGENT_VALIDATE_C84A8136_WH_HOST, DPAGENT_VALIDATE_C84A8136_WH_PASSWORD, DPAGENT_VALIDATE_C84A8136_WH_PORT, DPAGENT_VALIDATE_C84A8136_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "m25_monthly_sales__validate__c84a8136",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "deploy_error": "",
+  "expected_hash": "sha256:8cfa1d2e3476f04c8e1a0c0e0a5af8731039bd5e216a3e4ab91e7bcfcf9dcb17",
+  "fixture_hash": "sha256:4d0dc378d21c8929ab29c96941fcf438a08dba800f8bae6c37ac5ece643f92ce",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 5,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "raw": [
+        {
+          "detail": "",
+          "rows_checked": 5,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "3/5 (60.0%) row(s) in stg_sale_order quarantined for unique, exceeding the 25.0% threshold",
+          "rows_checked": 5,
+          "rows_rejected": 3,
+          "status": "failed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {}
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
+  "run_ids": [
+    14
+  ],
+  "run_status": {
+    "run_1": "failed",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": ""
+}

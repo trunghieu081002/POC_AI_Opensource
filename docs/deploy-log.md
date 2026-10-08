@@ -3787,3 +3787,71 @@ not exist here - not attempted, not simulated, not claimed. Steps 3
 (automating the proven matrix into an acceptance suite) and 4 (gating
 `approval.promote()` on a still-valid validation report) are explicitly
 later, per the same plan, and were not started.
+
+## 2026-10-08 - Layer 3 M2.5: Step 3 automation started; evidence retention and timeout policy landed in parallel (teammate)
+
+A teammate (not this agent) ran Step 2 for real on a disposable Ubuntu
+VirtualBox VM between the previous entry and this one - PR #24
+(`fix/m25-partial-deploy-report`, merged as `143ebe0`) fixed a real bug
+that run found (a filesystem `OSError` during a partial fixture deploy
+escaped as a raw traceback instead of a reported `deploy_error`), and
+`docs/m25-vm-results.md` records all 12+ scenarios' real results. This
+agent reviewed that PR after merge (re-ran the full test suite
+independently - green except one already-known, confirmed-unrelated
+flaky network test), then started on the two items the user asked for
+next: saving representative VM evidence into the repo, and deciding +
+documenting the timeout policy. **While that was in progress, the same
+teammate merged their own PR for exactly those two items** (commit
+`fd48f5e`, `docs/evidence/m25/` - 33 retained files from the actual VM,
+with SHA256SUMS and a detailed provenance/limits section - and
+`docs/m25-timeout-policy.md`, the same "manual recovery required, never
+auto-cancel the worker" decision this agent had independently reached).
+Rather than duplicate that work, this agent's own draft of those two
+items was dropped; `docs/m25-acceptance.md` and `docs/m25-vm-results.md`
+now point at the teammate's files as the source of record for Step 2's
+evidence and the timeout policy. What this agent actually shipped this
+session:
+
+1. **Step 3 (acceptance-suite automation) started.**
+   `tests/m25_acceptance/run_matrix.py` calls `fixture.run_fixture()`
+   directly for 8 scenarios (connection shape × 3, correct-twice,
+   wrong-expected, gate under/over threshold, timeout);
+   `tests/m25_acceptance/registry.py` is an append-only JSONL ledger of
+   every batch run (commit, host, pipeline/fixture/expected hashes,
+   verdict, cleanup status - modelled on the SourceRegistry/batch_id+
+   watermark pattern in `phulee9/hgmedia`, at the user's explicit
+   request, scoped to exactly this - an idempotent-check ledger for the
+   acceptance suite - not a Layer 2 architecture change);
+   `scripts/m25-acceptance-ci.sh` builds a disposable host itself (a
+   systemd container from the new `scripts/m25-disposable-host.Dockerfile`,
+   not a host assumed to already exist), installs the real stack via
+   `examples/layer2-stack.yaml`, runs the driver, and saves redacted
+   evidence under `docs/evidence/m25-automated/`. Explicitly not done:
+   the other 6 scenarios (seed failure, partial/late deploy failure,
+   source/warehouse provisioning failure, a real `DROP` failure) still
+   need host-level fault injection that is not scripted yet - named in
+   the script's own output every run, not silently dropped.
+2. **Real automated-rerun evidence saved to the repo**, as a second,
+   independent proof alongside the teammate's VM evidence - not a
+   replacement for it: `docs/evidence/m25-automated/*.json` (ref/
+   literal/mixed connection, correct-twice, wrong-expected, gate under/
+   over threshold, timeout) plus `registry.jsonl` - real output from
+   `scripts/m25-acceptance-ci.sh`, run end-to-end from a freshly-built
+   image (not an image that happened to already exist on this host, to
+   prove the script itself is reproducible) against a systemd-in-Docker
+   disposable host, not the original VM - that directory's own README
+   says exactly how it relates to `docs/evidence/m25/`.
+
+**Real-verified this session**: all 4 packs installed and passed their
+own acceptance suites inside a freshly-built container (`dpagent status`:
+6/6 pack checks passed); `pg_isready`, all 3 systemd services active,
+`sudo -n -u postgres` working. The 8 automated scenarios ran for real
+against that stack and produced the results in
+`docs/evidence/m25-automated/`. Full test suite re-run green on this host
+before committing (one pre-existing, confirmed-unrelated flaky network
+test aside, on a different run - not present on the run right before this
+commit).
+
+**Not done, explicitly**: Step 3 covers 8 of 12+ scenarios, not all of
+them - the 6 needing fault injection remain manual-only. Step 4 (gating
+`approval.promote()`) has not started.
