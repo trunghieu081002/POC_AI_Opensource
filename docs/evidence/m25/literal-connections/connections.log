@@ -1,0 +1,568 @@
+2026-10-07 15:25:43.016 UTC [9314] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:43.053 UTC [9314] postgres@postgres LOG:  disconnection: session time: 0:00:00.041 user=postgres database=postgres host=[local]
+2026-10-07 15:25:43.210 UTC [9318] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:43.842 UTC [9318] postgres@postgres LOG:  disconnection: session time: 0:00:00.635 user=postgres database=postgres host=[local]
+2026-10-07 15:25:44.019 UTC [9320] dpagent_validate_89b05e6ee0@dpagent_validate_89b05e6ee0 LOG:  connection authorized: user=dpagent_validate_89b05e6ee0 database=dpagent_validate_89b05e6ee0 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:44.075 UTC [9320] dpagent_validate_89b05e6ee0@dpagent_validate_89b05e6ee0 LOG:  disconnection: session time: 0:00:00.098 user=dpagent_validate_89b05e6ee0 database=dpagent_validate_89b05e6ee0 host=127.0.0.1 port=50160
+2026-10-07 15:25:44.235 UTC [9324] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:44.401 UTC [9324] postgres@postgres LOG:  disconnection: session time: 0:00:00.169 user=postgres database=postgres host=[local]
+2026-10-07 15:25:44.556 UTC [9328] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:44.575 UTC [9328] postgres@postgres LOG:  disconnection: session time: 0:00:00.022 user=postgres database=postgres host=[local]
+2026-10-07 15:25:44.853 UTC [9335] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=pg_isready
+2026-10-07 15:25:44.864 UTC [9335] postgres@postgres LOG:  disconnection: session time: 0:00:00.014 user=postgres database=postgres host=[local]
+2026-10-07 15:25:45.155 UTC [9340] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:45.198 UTC [9340] postgres@postgres LOG:  disconnection: session time: 0:00:00.047 user=postgres database=postgres host=[local]
+2026-10-07 15:25:45.352 UTC [9344] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:45.551 UTC [9344] postgres@postgres LOG:  disconnection: session time: 0:00:00.205 user=postgres database=postgres host=[local]
+2026-10-07 15:25:45.711 UTC [9348] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:45.735 UTC [9348] postgres@postgres LOG:  disconnection: session time: 0:00:00.027 user=postgres database=postgres host=[local]
+2026-10-07 15:25:45.886 UTC [9352] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:25:46.250 UTC [9352] postgres@postgres LOG:  disconnection: session time: 0:00:00.366 user=postgres database=postgres host=[local]
+2026-10-07 15:25:46.413 UTC [9354] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:46.469 UTC [9354] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.098 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=50174
+2026-10-07 15:25:46.629 UTC [9356] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:46.645 UTC [9356] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.058 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=50186
+2026-10-07 15:25:46.803 UTC [9358] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:46.818 UTC [9358] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.052 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=50190
+2026-10-07 15:25:46.976 UTC [9360] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:46.997 UTC [9360] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.069 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=50202
+2026-10-07 15:25:47.192 UTC [9362] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:47.222 UTC [9362] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.064 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=50204
+2026-10-07 15:25:47.382 UTC [9364] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:47.404 UTC [9364] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.075 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=50208
+2026-10-07 15:25:49.884 UTC [9282] airflow@airflow_meta LOG:  disconnection: session time: 0:01:25.315 user=airflow database=airflow_meta host=127.0.0.1 port=39366
+2026-10-07 15:25:49.987 UTC [9280] airflow@airflow_meta LOG:  disconnection: session time: 0:01:27.123 user=airflow database=airflow_meta host=127.0.0.1 port=33518
+2026-10-07 15:25:56.864 UTC [9379] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:56.889 UTC [9380] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:25:58.308 UTC [9380] airflow@airflow_meta LOG:  disconnection: session time: 0:00:01.461 user=airflow database=airflow_meta host=127.0.0.1 port=36518
+2026-10-07 15:25:58.609 UTC [9379] airflow@airflow_meta LOG:  disconnection: session time: 0:00:02.296 user=airflow database=airflow_meta host=127.0.0.1 port=36508
+2026-10-07 15:25:59.413 UTC [9456] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:01.594 UTC [9528] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:02.244 UTC [9533] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:02.403 UTC [9533] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.191 user=airflow database=airflow_meta host=127.0.0.1 port=36540
+2026-10-07 15:26:03.985 UTC [9536] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:04.597 UTC [9536] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.662 user=airflow database=airflow_meta host=127.0.0.1 port=36546
+2026-10-07 15:26:08.940 UTC [9540] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:09.895 UTC [9540] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.998 user=airflow database=airflow_meta host=127.0.0.1 port=50418
+2026-10-07 15:26:10.246 UTC [9542] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:10.583 UTC [9542] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.385 user=airflow database=airflow_meta host=127.0.0.1 port=50426
+2026-10-07 15:26:10.631 UTC [9543] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:10.666 UTC [9543] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=50428
+2026-10-07 15:26:10.694 UTC [9544] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:10.729 UTC [9544] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=50440
+2026-10-07 15:26:10.767 UTC [9545] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:10.803 UTC [9545] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.073 user=airflow database=airflow_meta host=127.0.0.1 port=50452
+2026-10-07 15:26:10.863 UTC [9546] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:10.966 UTC [9546] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.127 user=airflow database=airflow_meta host=127.0.0.1 port=50454
+2026-10-07 15:26:11.051 UTC [9548] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.075 UTC [9548] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.054 user=airflow database=airflow_meta host=127.0.0.1 port=50462
+2026-10-07 15:26:11.117 UTC [9549] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.162 UTC [9549] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.069 user=airflow database=airflow_meta host=127.0.0.1 port=50470
+2026-10-07 15:26:11.192 UTC [9550] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.226 UTC [9550] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.056 user=airflow database=airflow_meta host=127.0.0.1 port=50474
+2026-10-07 15:26:11.278 UTC [9551] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.353 UTC [9551] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.096 user=airflow database=airflow_meta host=127.0.0.1 port=50478
+2026-10-07 15:26:11.433 UTC [9552] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.475 UTC [9552] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.072 user=airflow database=airflow_meta host=127.0.0.1 port=50486
+2026-10-07 15:26:11.519 UTC [9553] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.582 UTC [9553] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.083 user=airflow database=airflow_meta host=127.0.0.1 port=50502
+2026-10-07 15:26:11.623 UTC [9554] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:11.656 UTC [9554] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=50516
+2026-10-07 15:26:14.338 UTC [9557] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:14.482 UTC [9557] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.221 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=36548
+2026-10-07 15:26:14.681 UTC [9558] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:14.697 UTC [9558] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.054 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36552
+2026-10-07 15:26:14.796 UTC [9560] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:14.849 UTC [9560] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.079 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=36556
+2026-10-07 15:26:15.244 UTC [9562] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:15.517 UTC [9562] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.305 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36570
+2026-10-07 15:26:15.562 UTC [9565] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:15.586 UTC [9566] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:15.598 UTC [9565] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.072 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36586
+2026-10-07 15:26:15.620 UTC [9566] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.086 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36590
+2026-10-07 15:26:15.663 UTC [9567] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:15.678 UTC [9567] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.040 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36594
+2026-10-07 15:26:16.049 UTC [9568] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.088 UTC [9568] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=36606
+2026-10-07 15:26:16.130 UTC [9569] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.156 UTC [9569] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.054 user=airflow database=airflow_meta host=127.0.0.1 port=36612
+2026-10-07 15:26:16.616 UTC [9570] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.708 UTC [9570] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.119 user=airflow database=airflow_meta host=127.0.0.1 port=36616
+2026-10-07 15:26:16.773 UTC [9571] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.849 UTC [9571] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.098 user=airflow database=airflow_meta host=127.0.0.1 port=36626
+2026-10-07 15:26:16.879 UTC [9572] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.906 UTC [9572] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=36642
+2026-10-07 15:26:16.929 UTC [9573] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:16.945 UTC [9573] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.034 user=airflow database=airflow_meta host=127.0.0.1 port=36648
+2026-10-07 15:26:17.941 UTC [9575] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.154 UTC [9575] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.230 user=airflow database=airflow_meta host=127.0.0.1 port=36662
+2026-10-07 15:26:18.199 UTC [9576] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.248 UTC [9576] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.072 user=airflow database=airflow_meta host=127.0.0.1 port=36666
+2026-10-07 15:26:18.289 UTC [9577] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.315 UTC [9577] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.056 user=airflow database=airflow_meta host=127.0.0.1 port=36678
+2026-10-07 15:26:18.344 UTC [9578] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.378 UTC [9578] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.052 user=airflow database=airflow_meta host=127.0.0.1 port=36682
+2026-10-07 15:26:18.441 UTC [9579] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.557 UTC [9579] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.139 user=airflow database=airflow_meta host=127.0.0.1 port=36696
+2026-10-07 15:26:18.640 UTC [9581] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.666 UTC [9581] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.069 user=airflow database=airflow_meta host=127.0.0.1 port=36706
+2026-10-07 15:26:18.707 UTC [9582] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.745 UTC [9582] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.060 user=airflow database=airflow_meta host=127.0.0.1 port=36708
+2026-10-07 15:26:18.787 UTC [9583] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.826 UTC [9583] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.065 user=airflow database=airflow_meta host=127.0.0.1 port=36712
+2026-10-07 15:26:18.878 UTC [9584] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:18.949 UTC [9584] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.090 user=airflow database=airflow_meta host=127.0.0.1 port=36728
+2026-10-07 15:26:18.983 UTC [9585] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.026 UTC [9585] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.064 user=airflow database=airflow_meta host=127.0.0.1 port=36740
+2026-10-07 15:26:19.077 UTC [9586] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.138 UTC [9586] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.090 user=airflow database=airflow_meta host=127.0.0.1 port=36744
+2026-10-07 15:26:19.174 UTC [9587] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.214 UTC [9587] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=36760
+2026-10-07 15:26:19.449 UTC [9589] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.462 UTC [9589] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.055 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36764
+2026-10-07 15:26:19.606 UTC [9590] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.660 UTC [9590] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.074 user=airflow database=airflow_meta host=127.0.0.1 port=36778
+2026-10-07 15:26:19.715 UTC [9591] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.807 UTC [9591] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.108 user=airflow database=airflow_meta host=127.0.0.1 port=36792
+2026-10-07 15:26:19.843 UTC [9592] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.872 UTC [9592] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=36800
+2026-10-07 15:26:19.905 UTC [9593] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:19.926 UTC [9593] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.047 user=airflow database=airflow_meta host=127.0.0.1 port=36816
+2026-10-07 15:26:20.417 UTC [9595] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:20.736 UTC [9595] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.344 user=airflow database=airflow_meta host=127.0.0.1 port=36822
+2026-10-07 15:26:20.784 UTC [9596] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:20.850 UTC [9596] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.083 user=airflow database=airflow_meta host=127.0.0.1 port=36826
+2026-10-07 15:26:20.885 UTC [9597] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:20.907 UTC [9597] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=36832
+2026-10-07 15:26:20.941 UTC [9598] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:20.975 UTC [9598] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.055 user=airflow database=airflow_meta host=127.0.0.1 port=36834
+2026-10-07 15:26:21.034 UTC [9599] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.129 UTC [9599] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.112 user=airflow database=airflow_meta host=127.0.0.1 port=36846
+2026-10-07 15:26:21.188 UTC [9601] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.209 UTC [9601] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.046 user=airflow database=airflow_meta host=127.0.0.1 port=36852
+2026-10-07 15:26:21.246 UTC [9602] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.289 UTC [9602] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=36866
+2026-10-07 15:26:21.313 UTC [9603] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.355 UTC [9603] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.060 user=airflow database=airflow_meta host=127.0.0.1 port=36880
+2026-10-07 15:26:21.395 UTC [9604] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.466 UTC [9604] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.087 user=airflow database=airflow_meta host=127.0.0.1 port=36894
+2026-10-07 15:26:21.501 UTC [9605] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.540 UTC [9605] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=36898
+2026-10-07 15:26:21.585 UTC [9606] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.677 UTC [9606] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.114 user=airflow database=airflow_meta host=127.0.0.1 port=36914
+2026-10-07 15:26:21.714 UTC [9607] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:21.747 UTC [9607] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=36918
+2026-10-07 15:26:26.952 UTC [9612] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:27.018 UTC [9612] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.360 user=airflow database=airflow_meta host=127.0.0.1 port=58090
+2026-10-07 15:26:27.076 UTC [9613] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:27.093 UTC [9613] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.044 user=airflow database=airflow_meta host=127.0.0.1 port=58096
+2026-10-07 15:26:30.998 UTC [9617] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:31.023 UTC [9617] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.119 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=58106
+2026-10-07 15:26:31.112 UTC [9619] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:31.189 UTC [9619] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.116 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=58120
+2026-10-07 15:26:31.247 UTC [9620] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:31.300 UTC [9620] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.090 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=58130
+2026-10-07 15:26:31.516 UTC [9628] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:31.714 UTC [9628] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.222 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=58142
+2026-10-07 15:26:31.781 UTC [9629] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:31.803 UTC [9629] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.064 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=58158
+2026-10-07 15:26:32.146 UTC [9630] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:32.183 UTC [9630] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=58170
+2026-10-07 15:26:32.219 UTC [9632] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:32.232 UTC [9632] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.038 user=airflow database=airflow_meta host=127.0.0.1 port=58174
+2026-10-07 15:26:33.440 UTC [9636] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:34.159 UTC [9637] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:34.171 UTC [9636] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.784 user=airflow database=airflow_meta host=127.0.0.1 port=58178
+2026-10-07 15:26:34.282 UTC [9637] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.163 user=airflow database=airflow_meta host=127.0.0.1 port=36142
+2026-10-07 15:26:34.355 UTC [9640] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:34.448 UTC [9640] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.116 user=airflow database=airflow_meta host=127.0.0.1 port=36146
+2026-10-07 15:26:34.485 UTC [9641] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:34.507 UTC [9641] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.052 user=airflow database=airflow_meta host=127.0.0.1 port=36160
+2026-10-07 15:26:34.531 UTC [9642] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:34.545 UTC [9642] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.030 user=airflow database=airflow_meta host=127.0.0.1 port=36162
+2026-10-07 15:26:35.556 UTC [9644] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:35.806 UTC [9644] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.274 user=airflow database=airflow_meta host=127.0.0.1 port=36170
+2026-10-07 15:26:35.854 UTC [9645] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:35.907 UTC [9645] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.076 user=airflow database=airflow_meta host=127.0.0.1 port=36182
+2026-10-07 15:26:35.940 UTC [9646] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:35.962 UTC [9646] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.046 user=airflow database=airflow_meta host=127.0.0.1 port=36188
+2026-10-07 15:26:35.993 UTC [9647] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.024 UTC [9647] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=36204
+2026-10-07 15:26:36.088 UTC [9648] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.194 UTC [9648] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.124 user=airflow database=airflow_meta host=127.0.0.1 port=36210
+2026-10-07 15:26:36.279 UTC [9650] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.311 UTC [9650] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.057 user=airflow database=airflow_meta host=127.0.0.1 port=36220
+2026-10-07 15:26:36.348 UTC [9651] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.390 UTC [9651] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=36222
+2026-10-07 15:26:36.417 UTC [9652] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.469 UTC [9652] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.070 user=airflow database=airflow_meta host=127.0.0.1 port=36226
+2026-10-07 15:26:36.526 UTC [9653] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.621 UTC [9653] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.123 user=airflow database=airflow_meta host=127.0.0.1 port=36230
+2026-10-07 15:26:36.649 UTC [9654] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.684 UTC [9654] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.056 user=airflow database=airflow_meta host=127.0.0.1 port=36238
+2026-10-07 15:26:36.733 UTC [9655] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.806 UTC [9655] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.093 user=airflow database=airflow_meta host=127.0.0.1 port=36246
+2026-10-07 15:26:36.833 UTC [9656] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:36.903 UTC [9656] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.088 user=airflow database=airflow_meta host=127.0.0.1 port=36254
+2026-10-07 15:26:37.147 UTC [9658] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:37.156 UTC [9658] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.045 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36260
+2026-10-07 15:26:37.313 UTC [9660] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:37.350 UTC [9660] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.076 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36264
+2026-10-07 15:26:37.510 UTC [9662] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:37.531 UTC [9662] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.067 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36278
+2026-10-07 15:26:37.770 UTC [9664] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:37.781 UTC [9664] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.065 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36284
+2026-10-07 15:26:38.008 UTC [9666] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.022 UTC [9666] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.059 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36296
+2026-10-07 15:26:38.214 UTC [9668] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.229 UTC [9668] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.067 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36306
+2026-10-07 15:26:38.407 UTC [9670] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.417 UTC [9670] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.068 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36314
+2026-10-07 15:26:38.592 UTC [9671] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.659 UTC [9671] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.084 user=airflow database=airflow_meta host=127.0.0.1 port=36326
+2026-10-07 15:26:38.758 UTC [9672] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.867 UTC [9672] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.134 user=airflow database=airflow_meta host=127.0.0.1 port=36334
+2026-10-07 15:26:38.903 UTC [9673] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.939 UTC [9673] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=36336
+2026-10-07 15:26:38.963 UTC [9674] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:38.986 UTC [9674] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.040 user=airflow database=airflow_meta host=127.0.0.1 port=36338
+2026-10-07 15:26:39.999 UTC [9676] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.342 UTC [9676] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.376 user=airflow database=airflow_meta host=127.0.0.1 port=36350
+2026-10-07 15:26:40.396 UTC [9677] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.439 UTC [9677] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=36358
+2026-10-07 15:26:40.473 UTC [9678] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.498 UTC [9678] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.047 user=airflow database=airflow_meta host=127.0.0.1 port=36366
+2026-10-07 15:26:40.533 UTC [9679] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.571 UTC [9679] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.059 user=airflow database=airflow_meta host=127.0.0.1 port=36382
+2026-10-07 15:26:40.630 UTC [9680] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.738 UTC [9680] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.124 user=airflow database=airflow_meta host=127.0.0.1 port=36394
+2026-10-07 15:26:40.795 UTC [9682] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.822 UTC [9682] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.049 user=airflow database=airflow_meta host=127.0.0.1 port=36400
+2026-10-07 15:26:40.884 UTC [9683] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:40.937 UTC [9683] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.089 user=airflow database=airflow_meta host=127.0.0.1 port=36402
+2026-10-07 15:26:40.970 UTC [9684] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.016 UTC [9684] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.070 user=airflow database=airflow_meta host=127.0.0.1 port=36410
+2026-10-07 15:26:41.071 UTC [9685] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.161 UTC [9685] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.114 user=airflow database=airflow_meta host=127.0.0.1 port=36420
+2026-10-07 15:26:41.193 UTC [9686] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.233 UTC [9686] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=36426
+2026-10-07 15:26:41.277 UTC [9687] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.339 UTC [9687] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.078 user=airflow database=airflow_meta host=127.0.0.1 port=36430
+2026-10-07 15:26:41.377 UTC [9688] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.417 UTC [9688] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.070 user=airflow database=airflow_meta host=127.0.0.1 port=36438
+2026-10-07 15:26:41.677 UTC [9690] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.747 UTC [9690] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.111 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=36454
+2026-10-07 15:26:41.828 UTC [9691] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:41.894 UTC [9691] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.096 user=airflow database=airflow_meta host=127.0.0.1 port=36460
+2026-10-07 15:26:41.942 UTC [9692] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:42.021 UTC [9692] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.102 user=airflow database=airflow_meta host=127.0.0.1 port=36476
+2026-10-07 15:26:42.047 UTC [9693] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:42.079 UTC [9693] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.051 user=airflow database=airflow_meta host=127.0.0.1 port=36480
+2026-10-07 15:26:42.104 UTC [9694] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:42.126 UTC [9694] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.044 user=airflow database=airflow_meta host=127.0.0.1 port=36492
+2026-10-07 15:26:42.726 UTC [9697] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:42.994 UTC [9697] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.290 user=airflow database=airflow_meta host=127.0.0.1 port=36498
+2026-10-07 15:26:43.030 UTC [9698] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.066 UTC [9698] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.052 user=airflow database=airflow_meta host=127.0.0.1 port=36510
+2026-10-07 15:26:43.098 UTC [9699] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.142 UTC [9699] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.064 user=airflow database=airflow_meta host=127.0.0.1 port=36512
+2026-10-07 15:26:43.178 UTC [9700] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.207 UTC [9700] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.049 user=airflow database=airflow_meta host=127.0.0.1 port=36530
+2026-10-07 15:26:43.274 UTC [9701] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.389 UTC [9701] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.136 user=airflow database=airflow_meta host=127.0.0.1 port=36534
+2026-10-07 15:26:43.446 UTC [9703] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.467 UTC [9703] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.048 user=airflow database=airflow_meta host=127.0.0.1 port=36536
+2026-10-07 15:26:43.511 UTC [9704] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.564 UTC [9704] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.077 user=airflow database=airflow_meta host=127.0.0.1 port=36548
+2026-10-07 15:26:43.596 UTC [9705] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.637 UTC [9705] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.061 user=airflow database=airflow_meta host=127.0.0.1 port=56512
+2026-10-07 15:26:43.694 UTC [9706] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.753 UTC [9706] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.082 user=airflow database=airflow_meta host=127.0.0.1 port=56520
+2026-10-07 15:26:43.788 UTC [9707] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.826 UTC [9707] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.059 user=airflow database=airflow_meta host=127.0.0.1 port=56522
+2026-10-07 15:26:43.878 UTC [9708] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:43.935 UTC [9708] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.078 user=airflow database=airflow_meta host=127.0.0.1 port=56528
+2026-10-07 15:26:43.969 UTC [9709] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.001 UTC [9709] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.054 user=airflow database=airflow_meta host=127.0.0.1 port=56538
+2026-10-07 15:26:44.232 UTC [9711] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.246 UTC [9711] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.051 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=56540
+2026-10-07 15:26:44.418 UTC [9713] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.428 UTC [9713] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.048 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=56546
+2026-10-07 15:26:44.566 UTC [9714] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.622 UTC [9714] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.078 user=airflow database=airflow_meta host=127.0.0.1 port=56562
+2026-10-07 15:26:44.712 UTC [9715] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.769 UTC [9715] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.082 user=airflow database=airflow_meta host=127.0.0.1 port=56578
+2026-10-07 15:26:44.794 UTC [9716] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.825 UTC [9716] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=56580
+2026-10-07 15:26:44.849 UTC [9717] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:44.866 UTC [9717] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.034 user=airflow database=airflow_meta host=127.0.0.1 port=56584
+2026-10-07 15:26:45.185 UTC [9721] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:45.495 UTC [9721] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.335 user=airflow database=airflow_meta host=127.0.0.1 port=56600
+2026-10-07 15:26:47.959 UTC [9725] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:47.995 UTC [9725] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.075 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=56616
+2026-10-07 15:26:48.151 UTC [9727] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:48.165 UTC [9727] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.054 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=56630
+2026-10-07 15:26:51.660 UTC [9731] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:52.660 UTC [9731] airflow@airflow_meta LOG:  disconnection: session time: 0:00:01.087 user=airflow database=airflow_meta host=127.0.0.1 port=56634
+2026-10-07 15:26:53.053 UTC [9734] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.354 UTC [9734] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.323 user=airflow database=airflow_meta host=127.0.0.1 port=56646
+2026-10-07 15:26:53.407 UTC [9735] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.473 UTC [9735] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.096 user=airflow database=airflow_meta host=127.0.0.1 port=56660
+2026-10-07 15:26:53.513 UTC [9736] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.563 UTC [9736] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.073 user=airflow database=airflow_meta host=127.0.0.1 port=56676
+2026-10-07 15:26:53.588 UTC [9737] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.623 UTC [9737] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.059 user=airflow database=airflow_meta host=127.0.0.1 port=42966
+2026-10-07 15:26:53.682 UTC [9738] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.832 UTC [9738] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.169 user=airflow database=airflow_meta host=127.0.0.1 port=42974
+2026-10-07 15:26:53.904 UTC [9740] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:53.931 UTC [9740] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.052 user=airflow database=airflow_meta host=127.0.0.1 port=42976
+2026-10-07 15:26:53.974 UTC [9741] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.020 UTC [9741] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.068 user=airflow database=airflow_meta host=127.0.0.1 port=42992
+2026-10-07 15:26:54.054 UTC [9742] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.095 UTC [9742] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.068 user=airflow database=airflow_meta host=127.0.0.1 port=43008
+2026-10-07 15:26:54.146 UTC [9743] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.239 UTC [9743] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.110 user=airflow database=airflow_meta host=127.0.0.1 port=43018
+2026-10-07 15:26:54.277 UTC [9744] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.355 UTC [9744] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.101 user=airflow database=airflow_meta host=127.0.0.1 port=43020
+2026-10-07 15:26:54.399 UTC [9745] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.466 UTC [9745] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.088 user=airflow database=airflow_meta host=127.0.0.1 port=43024
+2026-10-07 15:26:54.501 UTC [9746] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:54.531 UTC [9746] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.051 user=airflow database=airflow_meta host=127.0.0.1 port=43034
+2026-10-07 15:26:56.753 UTC [9748] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:56.903 UTC [9748] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.190 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=43044
+2026-10-07 15:26:57.085 UTC [9749] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:57.105 UTC [9749] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.041 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=43048
+2026-10-07 15:26:57.261 UTC [9750] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  connection authorized: user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:57.308 UTC [9750] dpagent_fixture_src_ae6b186c81@dpagent_fixture_src_ae6b186c81 LOG:  disconnection: session time: 0:00:00.076 user=dpagent_fixture_src_ae6b186c81 database=dpagent_fixture_src_ae6b186c81 host=127.0.0.1 port=43058
+2026-10-07 15:26:57.589 UTC [9752] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:57.677 UTC [9752] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.119 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=43072
+2026-10-07 15:26:57.725 UTC [9754] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:57.743 UTC [9754] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.043 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=43084
+2026-10-07 15:26:57.788 UTC [9755] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:57.804 UTC [9755] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.045 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=43100
+2026-10-07 15:26:58.612 UTC [9756] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:58.698 UTC [9756] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.109 user=airflow database=airflow_meta host=127.0.0.1 port=43108
+2026-10-07 15:26:58.745 UTC [9757] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:58.812 UTC [9757] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.089 user=airflow database=airflow_meta host=127.0.0.1 port=43122
+2026-10-07 15:26:58.849 UTC [9758] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:58.879 UTC [9758] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.055 user=airflow database=airflow_meta host=127.0.0.1 port=43130
+2026-10-07 15:26:58.912 UTC [9759] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:58.935 UTC [9759] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.045 user=airflow database=airflow_meta host=127.0.0.1 port=43132
+2026-10-07 15:26:59.262 UTC [9761] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.483 UTC [9761] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.244 user=airflow database=airflow_meta host=127.0.0.1 port=43136
+2026-10-07 15:26:59.532 UTC [9762] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.587 UTC [9762] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.076 user=airflow database=airflow_meta host=127.0.0.1 port=43142
+2026-10-07 15:26:59.624 UTC [9763] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.647 UTC [9763] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.048 user=airflow database=airflow_meta host=127.0.0.1 port=43146
+2026-10-07 15:26:59.686 UTC [9764] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.719 UTC [9764] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.057 user=airflow database=airflow_meta host=127.0.0.1 port=43150
+2026-10-07 15:26:59.779 UTC [9765] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.881 UTC [9765] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.118 user=airflow database=airflow_meta host=127.0.0.1 port=43156
+2026-10-07 15:26:59.933 UTC [9767] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:26:59.962 UTC [9767] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.054 user=airflow database=airflow_meta host=127.0.0.1 port=43172
+2026-10-07 15:27:00.001 UTC [9768] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.037 UTC [9768] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=43180
+2026-10-07 15:27:00.064 UTC [9769] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.115 UTC [9769] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.069 user=airflow database=airflow_meta host=127.0.0.1 port=43192
+2026-10-07 15:27:00.176 UTC [9770] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.235 UTC [9770] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.082 user=airflow database=airflow_meta host=127.0.0.1 port=43196
+2026-10-07 15:27:00.269 UTC [9771] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.331 UTC [9771] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.084 user=airflow database=airflow_meta host=127.0.0.1 port=43198
+2026-10-07 15:27:00.366 UTC [9772] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.418 UTC [9772] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.068 user=airflow database=airflow_meta host=127.0.0.1 port=43208
+2026-10-07 15:27:00.457 UTC [9773] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.482 UTC [9773] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.048 user=airflow database=airflow_meta host=127.0.0.1 port=43220
+2026-10-07 15:27:00.707 UTC [9775] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.715 UTC [9775] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.043 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=43228
+2026-10-07 15:27:00.861 UTC [9776] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:00.909 UTC [9776] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.066 user=airflow database=airflow_meta host=127.0.0.1 port=43238
+2026-10-07 15:27:00.969 UTC [9777] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.056 UTC [9777] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.105 user=airflow database=airflow_meta host=127.0.0.1 port=43240
+2026-10-07 15:27:01.087 UTC [9778] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.115 UTC [9778] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.049 user=airflow database=airflow_meta host=127.0.0.1 port=43242
+2026-10-07 15:27:01.142 UTC [9779] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.159 UTC [9779] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.038 user=airflow database=airflow_meta host=127.0.0.1 port=43250
+2026-10-07 15:27:01.382 UTC [9781] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.680 UTC [9781] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.324 user=airflow database=airflow_meta host=127.0.0.1 port=43260
+2026-10-07 15:27:01.725 UTC [9782] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.800 UTC [9782] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.096 user=airflow database=airflow_meta host=127.0.0.1 port=43262
+2026-10-07 15:27:01.853 UTC [9783] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.882 UTC [9783] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=43268
+2026-10-07 15:27:01.922 UTC [9784] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:01.979 UTC [9784] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.080 user=airflow database=airflow_meta host=127.0.0.1 port=43276
+2026-10-07 15:27:02.059 UTC [9785] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.195 UTC [9785] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.160 user=airflow database=airflow_meta host=127.0.0.1 port=43282
+2026-10-07 15:27:02.265 UTC [9788] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.289 UTC [9788] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.052 user=airflow database=airflow_meta host=127.0.0.1 port=43284
+2026-10-07 15:27:02.335 UTC [9789] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.378 UTC [9789] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.067 user=airflow database=airflow_meta host=127.0.0.1 port=43294
+2026-10-07 15:27:02.409 UTC [9790] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.451 UTC [9790] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.065 user=airflow database=airflow_meta host=127.0.0.1 port=43300
+2026-10-07 15:27:02.537 UTC [9791] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.614 UTC [9791] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.098 user=airflow database=airflow_meta host=127.0.0.1 port=43314
+2026-10-07 15:27:02.648 UTC [9792] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.703 UTC [9792] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.078 user=airflow database=airflow_meta host=127.0.0.1 port=43324
+2026-10-07 15:27:02.772 UTC [9793] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.843 UTC [9793] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.100 user=airflow database=airflow_meta host=127.0.0.1 port=43328
+2026-10-07 15:27:02.889 UTC [9794] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:02.919 UTC [9794] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.057 user=airflow database=airflow_meta host=127.0.0.1 port=43342
+2026-10-07 15:27:07.712 UTC [9798] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:07.756 UTC [9798] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.068 user=airflow database=airflow_meta host=127.0.0.1 port=57668
+2026-10-07 15:27:07.785 UTC [9799] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:07.802 UTC [9799] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.031 user=airflow database=airflow_meta host=127.0.0.1 port=57684
+2026-10-07 15:27:08.881 UTC [9801] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:08.905 UTC [9801] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.078 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57698
+2026-10-07 15:27:08.990 UTC [9803] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:09.031 UTC [9803] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.075 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57712
+2026-10-07 15:27:09.102 UTC [9804] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:09.157 UTC [9804] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.091 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57714
+2026-10-07 15:27:09.406 UTC [9812] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:09.890 UTC [9812] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.510 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57724
+2026-10-07 15:27:09.955 UTC [9813] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=dbt SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:09.972 UTC [9813] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.050 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57728
+2026-10-07 15:27:12.023 UTC [9814] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:12.081 UTC [9814] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.075 user=airflow database=airflow_meta host=127.0.0.1 port=57738
+2026-10-07 15:27:12.145 UTC [9815] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:12.237 UTC [9815] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.118 user=airflow database=airflow_meta host=127.0.0.1 port=57750
+2026-10-07 15:27:12.272 UTC [9817] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:12.291 UTC [9817] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.050 user=airflow database=airflow_meta host=127.0.0.1 port=57760
+2026-10-07 15:27:12.317 UTC [9818] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:12.328 UTC [9818] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.030 user=airflow database=airflow_meta host=127.0.0.1 port=57764
+2026-10-07 15:27:13.489 UTC [9820] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:13.770 UTC [9820] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.307 user=airflow database=airflow_meta host=127.0.0.1 port=57766
+2026-10-07 15:27:13.823 UTC [9821] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:13.900 UTC [9821] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.099 user=airflow database=airflow_meta host=127.0.0.1 port=39084
+2026-10-07 15:27:13.930 UTC [9822] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:13.953 UTC [9822] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.043 user=airflow database=airflow_meta host=127.0.0.1 port=39094
+2026-10-07 15:27:13.982 UTC [9823] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.021 UTC [9823] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=39098
+2026-10-07 15:27:14.087 UTC [9824] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.206 UTC [9824] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.149 user=airflow database=airflow_meta host=127.0.0.1 port=39106
+2026-10-07 15:27:14.270 UTC [9826] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.301 UTC [9826] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.061 user=airflow database=airflow_meta host=127.0.0.1 port=39108
+2026-10-07 15:27:14.345 UTC [9827] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.383 UTC [9827] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.060 user=airflow database=airflow_meta host=127.0.0.1 port=39112
+2026-10-07 15:27:14.412 UTC [9828] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.461 UTC [9828] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.071 user=airflow database=airflow_meta host=127.0.0.1 port=39116
+2026-10-07 15:27:14.511 UTC [9829] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.609 UTC [9829] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.120 user=airflow database=airflow_meta host=127.0.0.1 port=39124
+2026-10-07 15:27:14.649 UTC [9830] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.706 UTC [9830] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.080 user=airflow database=airflow_meta host=127.0.0.1 port=39126
+2026-10-07 15:27:14.754 UTC [9831] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.813 UTC [9831] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.080 user=airflow database=airflow_meta host=127.0.0.1 port=39138
+2026-10-07 15:27:14.846 UTC [9832] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:14.883 UTC [9832] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.058 user=airflow database=airflow_meta host=127.0.0.1 port=39154
+2026-10-07 15:27:15.129 UTC [9834] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:15.140 UTC [9834] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.055 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39170
+2026-10-07 15:27:15.309 UTC [9836] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:15.317 UTC [9836] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.052 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39178
+2026-10-07 15:27:15.492 UTC [9838] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:15.508 UTC [9838] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.059 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39180
+2026-10-07 15:27:15.727 UTC [9840] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:15.739 UTC [9840] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.061 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39194
+2026-10-07 15:27:15.901 UTC [9842] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:15.912 UTC [9842] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.052 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39206
+2026-10-07 15:27:16.094 UTC [9845] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.106 UTC [9845] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.083 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39218
+2026-10-07 15:27:16.210 UTC [9848] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.318 UTC [9849] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.405 UTC [9849] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.119 user=airflow database=airflow_meta host=127.0.0.1 port=39238
+2026-10-07 15:27:16.472 UTC [9850] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.512 UTC [9848] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.336 user=airflow database=airflow_meta host=127.0.0.1 port=39226
+2026-10-07 15:27:16.557 UTC [9850] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.103 user=airflow database=airflow_meta host=127.0.0.1 port=39242
+2026-10-07 15:27:16.585 UTC [9853] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.615 UTC [9853] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.051 user=airflow database=airflow_meta host=127.0.0.1 port=39256
+2026-10-07 15:27:16.642 UTC [9854] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:16.660 UTC [9854] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.039 user=airflow database=airflow_meta host=127.0.0.1 port=39270
+2026-10-07 15:27:17.531 UTC [9856] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:17.798 UTC [9856] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.287 user=airflow database=airflow_meta host=127.0.0.1 port=39282
+2026-10-07 15:27:17.849 UTC [9857] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:17.930 UTC [9857] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.104 user=airflow database=airflow_meta host=127.0.0.1 port=39296
+2026-10-07 15:27:17.962 UTC [9858] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:17.990 UTC [9858] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.048 user=airflow database=airflow_meta host=127.0.0.1 port=39300
+2026-10-07 15:27:18.031 UTC [9859] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.079 UTC [9859] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.073 user=airflow database=airflow_meta host=127.0.0.1 port=39308
+2026-10-07 15:27:18.153 UTC [9860] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.261 UTC [9860] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.134 user=airflow database=airflow_meta host=127.0.0.1 port=39320
+2026-10-07 15:27:18.324 UTC [9862] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.354 UTC [9862] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.055 user=airflow database=airflow_meta host=127.0.0.1 port=39334
+2026-10-07 15:27:18.392 UTC [9863] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.437 UTC [9863] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.062 user=airflow database=airflow_meta host=127.0.0.1 port=39350
+2026-10-07 15:27:18.476 UTC [9864] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.530 UTC [9864] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.085 user=airflow database=airflow_meta host=127.0.0.1 port=39364
+2026-10-07 15:27:18.581 UTC [9865] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.653 UTC [9865] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.093 user=airflow database=airflow_meta host=127.0.0.1 port=39376
+2026-10-07 15:27:18.687 UTC [9866] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.758 UTC [9866] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.094 user=airflow database=airflow_meta host=127.0.0.1 port=39392
+2026-10-07 15:27:18.801 UTC [9867] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.864 UTC [9867] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.084 user=airflow database=airflow_meta host=127.0.0.1 port=39394
+2026-10-07 15:27:18.913 UTC [9868] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:18.990 UTC [9868] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.101 user=airflow database=airflow_meta host=127.0.0.1 port=39406
+2026-10-07 15:27:19.185 UTC [9870] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:19.227 UTC [9870] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.076 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39416
+2026-10-07 15:27:19.307 UTC [9871] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:19.353 UTC [9871] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.067 user=airflow database=airflow_meta host=127.0.0.1 port=39430
+2026-10-07 15:27:19.425 UTC [9872] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:19.481 UTC [9872] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.073 user=airflow database=airflow_meta host=127.0.0.1 port=39446
+2026-10-07 15:27:19.510 UTC [9873] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:19.545 UTC [9873] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.055 user=airflow database=airflow_meta host=127.0.0.1 port=39462
+2026-10-07 15:27:19.573 UTC [9874] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:19.598 UTC [9874] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.047 user=airflow database=airflow_meta host=127.0.0.1 port=39470
+2026-10-07 15:27:20.228 UTC [9876] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:20.555 UTC [9876] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.364 user=airflow database=airflow_meta host=127.0.0.1 port=39472
+2026-10-07 15:27:20.608 UTC [9877] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:20.684 UTC [9877] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.099 user=airflow database=airflow_meta host=127.0.0.1 port=39486
+2026-10-07 15:27:20.709 UTC [9878] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:20.733 UTC [9878] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.042 user=airflow database=airflow_meta host=127.0.0.1 port=39496
+2026-10-07 15:27:20.761 UTC [9879] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:20.796 UTC [9879] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.063 user=airflow database=airflow_meta host=127.0.0.1 port=39510
+2026-10-07 15:27:20.875 UTC [9880] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.000 UTC [9880] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.148 user=airflow database=airflow_meta host=127.0.0.1 port=39522
+2026-10-07 15:27:21.056 UTC [9882] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.085 UTC [9882] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.053 user=airflow database=airflow_meta host=127.0.0.1 port=39538
+2026-10-07 15:27:21.135 UTC [9883] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.173 UTC [9883] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.064 user=airflow database=airflow_meta host=127.0.0.1 port=39554
+2026-10-07 15:27:21.206 UTC [9884] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.266 UTC [9884] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.082 user=airflow database=airflow_meta host=127.0.0.1 port=39560
+2026-10-07 15:27:21.325 UTC [9885] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.403 UTC [9885] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.119 user=airflow database=airflow_meta host=127.0.0.1 port=39574
+2026-10-07 15:27:21.441 UTC [9886] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.511 UTC [9886] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.092 user=airflow database=airflow_meta host=127.0.0.1 port=39578
+2026-10-07 15:27:21.562 UTC [9887] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.617 UTC [9887] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.082 user=airflow database=airflow_meta host=127.0.0.1 port=39594
+2026-10-07 15:27:21.659 UTC [9888] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.726 UTC [9888] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.096 user=airflow database=airflow_meta host=127.0.0.1 port=39604
+2026-10-07 15:27:21.932 UTC [9890] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:21.938 UTC [9890] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.053 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39614
+2026-10-07 15:27:22.106 UTC [9892] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:22.118 UTC [9892] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.060 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=39624
+2026-10-07 15:27:22.281 UTC [9894] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:22.351 UTC [9894] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.116 user=airflow database=airflow_meta host=127.0.0.1 port=39638
+2026-10-07 15:27:22.439 UTC [9895] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:22.494 UTC [9895] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.081 user=airflow database=airflow_meta host=127.0.0.1 port=39654
+2026-10-07 15:27:22.521 UTC [9896] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:22.544 UTC [9896] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.041 user=airflow database=airflow_meta host=127.0.0.1 port=39668
+2026-10-07 15:27:22.579 UTC [9897] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:22.596 UTC [9897] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.035 user=airflow database=airflow_meta host=127.0.0.1 port=39680
+2026-10-07 15:27:22.791 UTC [9901] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:23.127 UTC [9901] airflow@airflow_meta LOG:  disconnection: session time: 0:00:00.360 user=airflow database=airflow_meta host=127.0.0.1 port=39686
+2026-10-07 15:27:25.184 UTC [9905] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:25.219 UTC [9905] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.070 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57138
+2026-10-07 15:27:25.389 UTC [9907] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  connection authorized: user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 application_name=psql SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:25.398 UTC [9907] dpagent_fixture_wh_06c54c5171@dpagent_fixture_wh_06c54c5171 LOG:  disconnection: session time: 0:00:00.060 user=dpagent_fixture_wh_06c54c5171 database=dpagent_fixture_wh_06c54c5171 host=127.0.0.1 port=57150
+2026-10-07 15:27:29.005 UTC [9911] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:29.996 UTC [9911] airflow@airflow_meta LOG:  disconnection: session time: 0:00:01.020 user=airflow database=airflow_meta host=127.0.0.1 port=57154
+2026-10-07 15:27:31.444 UTC [9528] airflow@airflow_meta LOG:  disconnection: session time: 0:01:29.892 user=airflow database=airflow_meta host=127.0.0.1 port=36532
+2026-10-07 15:27:31.514 UTC [9456] airflow@airflow_meta LOG:  disconnection: session time: 0:01:32.143 user=airflow database=airflow_meta host=127.0.0.1 port=36528
+2026-10-07 15:27:32.931 UTC [9919] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:27:34.654 UTC [9919] postgres@postgres LOG:  disconnection: session time: 0:00:01.726 user=postgres database=postgres host=[local]
+2026-10-07 15:27:34.846 UTC [9923] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:27:34.879 UTC [9923] postgres@postgres LOG:  disconnection: session time: 0:00:00.035 user=postgres database=postgres host=[local]
+2026-10-07 15:27:35.020 UTC [9927] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:27:35.154 UTC [9927] postgres@postgres LOG:  disconnection: session time: 0:00:00.135 user=postgres database=postgres host=[local]
+2026-10-07 15:27:36.080 UTC [9931] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:36.169 UTC [9932] postgres@postgres LOG:  connection authorized: user=postgres database=postgres application_name=psql
+2026-10-07 15:27:36.184 UTC [9932] postgres@postgres LOG:  disconnection: session time: 0:00:00.018 user=postgres database=postgres host=[local]
+2026-10-07 15:27:37.237 UTC [9931] airflow@airflow_meta LOG:  disconnection: session time: 0:00:01.183 user=airflow database=airflow_meta host=127.0.0.1 port=35554
+2026-10-07 15:27:37.877 UTC [10073] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)
+2026-10-07 15:27:38.039 UTC [10076] airflow@airflow_meta LOG:  connection authorized: user=airflow database=airflow_meta SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)

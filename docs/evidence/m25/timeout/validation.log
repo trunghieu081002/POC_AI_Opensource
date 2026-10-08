@@ -1,0 +1,30 @@
+load: pass
+dbt project/Jinja parse: pass - 1 model(s) parsed clean
+  (structure/Jinja/config only, no live database - does NOT confirm the SQL itself is valid Postgres, e.g. a 'SELEC ...' typo still parses clean; 
+not dbt compile/run; the SQL is only actually proven by steps 4-5's real dbt run against a fixture)
+procedures: pass - 1 procedure(s) applied clean
+dbt ref()/source() check: pass - 1 model(s), no ref()/source() dependency
+content hash at validation time: sha256:2c587b36cdc19ceacb3cfec529f29c5c4b8e3305bdad77c2f61cf06eed1e5920
+
+written: /opt/dpagent/pipelines/m25_monthly_sales/.synth-validation.yaml
+
+running fixture through a real, --allow-draft deploy of an isolated validation clone (2 runs, for idempotency)...
+validation clone: m25_monthly_sales__validate__6c2fba1e
+cleanup (pipeline artifacts): FAILED - DAG removed; DAG delete FAILED: airflow.exceptions.AirflowException: TaskInstances still running; published 
+files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_6C2FBA1E_SRC_DATABASE, DPAGENT_VALIDATE_6C2FBA1E_SRC_HOST, 
+DPAGENT_VALIDATE_6C2FBA1E_SRC_PASSWORD, DPAGENT_VALIDATE_6C2FBA1E_SRC_PORT, DPAGENT_VALIDATE_6C2FBA1E_SRC_USER, 
+DPAGENT_VALIDATE_6C2FBA1E_WH_DATABASE, DPAGENT_VALIDATE_6C2FBA1E_WH_HOST, DPAGENT_VALIDATE_6C2FBA1E_WH_PASSWORD, DPAGENT_VALIDATE_6C2FBA1E_WH_PORT, 
+DPAGENT_VALIDATE_6C2FBA1E_WH_USER | DAG still registered in Airflow: airflow.exceptions.AirflowException: TaskInstances still running; run timed out
+- this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is 
+never reported as a complete cleanup even when every artifact checked here is gone
+cleanup (source database): dropped
+cleanup (source role): dropped
+cleanup (warehouse database): FAILED - could not change directory to "/home/m25/POC_AI_Opensource": Permission denied
+ERROR:  database "dpagent_fixture_wh_12156b1cd0" is being accessed by other users
+DETAIL:  There is 1 other session using the database.
+cleanup (warehouse role): FAILED - could not change directory to "/home/m25/POC_AI_Opensource": Permission denied
+ERROR:  role "dpagent_fixture_wh_12156b1cd0" cannot be dropped because some objects depend on it
+DETAIL:  owner of database dpagent_fixture_wh_12156b1cd0
+9 objects in database dpagent_fixture_wh_12156b1cd0
+
+fixture run timed out (run1='timeout', run2='')

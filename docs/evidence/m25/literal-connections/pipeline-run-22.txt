@@ -1,0 +1,28 @@
+m25_monthly_sales__validate__c8c136d7 · run 22 · ok
+
+landing passed · 3 rows
+  row_count_bounds
+
+raw passed
+  not_null
+  unique
+
+curated passed
+  not_null
+
+events
+ time            actor   kind             message                                                               
+ 15:26:11+00:00  engine  extract.start    m25_monthly_sales__validate__c8c136d7 via odoo_postgres               
+ 15:26:16+00:00  engine  extract.done     m25_monthly_sales__validate__c8c136d7 extract complete: sale_order +3 
+ 15:26:19+00:00  engine  gate.passed      m25_monthly_sales__validate__c8c136d7/landing row_count_bounds: ok    
+ 15:26:19+00:00  engine  stage.passed     m25_monthly_sales__validate__c8c136d7/landing gates passed            
+ 15:26:21+00:00  engine  transform.start  m25_monthly_sales__validate__c8c136d7/raw via dbt                     
+ 15:26:34+00:00  engine  transform.done   m25_monthly_sales__validate__c8c136d7/raw transform complete          
+ 15:26:37+00:00  engine  gate.passed      m25_monthly_sales__validate__c8c136d7/raw not_null: ok                
+ 15:26:38+00:00  engine  gate.passed      m25_monthly_sales__validate__c8c136d7/raw unique: ok                  
+ 15:26:38+00:00  engine  stage.passed     m25_monthly_sales__validate__c8c136d7/raw gates passed                
+ 15:26:41+00:00  engine  transform.start  m25_monthly_sales__validate__c8c136d7/curated via procedure           
+ 15:26:41+00:00  engine  transform.done   m25_monthly_sales__validate__c8c136d7/curated transform complete      
+ 15:26:44+00:00  engine  gate.passed      m25_monthly_sales__validate__c8c136d7/curated not_null: ok            
+ 15:26:44+00:00  engine  stage.passed     m25_monthly_sales__validate__c8c136d7/curated gates passed            
+ 15:26:45+00:00  engine  pipeline.ok      DAG run 22 reached terminal state: ok                                 

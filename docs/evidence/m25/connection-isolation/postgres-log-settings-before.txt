@@ -1,0 +1,13 @@
+            name            |            setting             
+----------------------------+--------------------------------
+ log_connections            | off
+ log_destination            | stderr
+ log_directory              | log
+ log_disconnections         | off
+ log_filename               | postgresql-%Y-%m-%d_%H%M%S.log
+ logging_collector          | on
+ log_line_prefix            | %m [%p] %q%u@%d 
+ log_min_duration_statement | 1000
+ log_statement              | none
+(9 rows)
+

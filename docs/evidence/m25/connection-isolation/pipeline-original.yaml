@@ -1,0 +1,70 @@
+# A small, purpose-built reference pipeline for M2.5's real fixture-
+# validation acceptance matrix (docs/m25-acceptance.md) - odoo_postgres
+# source, Postgres warehouse, through *both* engines (raw via dbt, curated
+# via procedure), the same "first hop dbt, second hop procedure" pattern
+# pipelines/demo already documents (docs/layer2.md, Concepts #3).
+#
+# Deliberately smaller than demo (one source table, one gate per stage, no
+# real Odoo schema needed) so a human reviewer can hand-calculate every
+# expected number for every M2.5 scenario from fixture.yaml alone, without
+# needing Odoo's own real, dirty schema to reason about. Never deployed for
+# real against the real demo warehouse - this pipeline exists only to be
+# run `--allow-draft` through `dpagent pipeline validate --fixture`.
+name: m25_monthly_sales
+summary: Minimal odoo_postgres sale_order -> landing -> raw (dbt) -> curated (procedure) monthly revenue, built for M2.5's real fixture-validation acceptance matrix
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${M25_ODOO_HOST}"
+    port: "${M25_ODOO_PORT:-5432}"
+    database: "${M25_ODOO_NAME}"
+    user: "${M25_ODOO_USER}"
+    password: "${M25_ODOO_PASSWORD}"
+  tables: [sale_order]
+  # dlt writes sale_order as-received into m25_monthly_sales_landing.sale_order
+  # (extract.landing_dataset's own f"{name}_landing" convention) - nothing
+  # dropped, nothing cast yet.
+
+warehouse:
+  host: "${M25_WH_HOST:-localhost}"
+  port: "${M25_WH_PORT:-5432}"
+  database: "${M25_WH_NAME:-warehouse}"
+  user: "${M25_WH_USER}"
+  password: "${M25_WH_PASSWORD}"
+  schema: m25_monthly_sales
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: sale_order
+        min: 1
+
+  - name: raw
+    engine: dbt
+    depends_on: landing
+    models: [stg_sale_order]
+    gates:
+      - type: not_null
+        table: stg_sale_order
+        columns: [id, order_month, amount_total]
+      - type: unique
+        table: stg_sale_order
+        columns: [id]
+    quarantine:
+      # One of the M2.5 matrix's own required scenarios ("Dữ liệu vi phạm
+      # gate"): a fixture row with a null id or a duplicate id is quarantined
+      # here, not just rejected outright - above 25% of stg_sale_order's own
+      # rows quarantined halts the run before curated ever runs.
+      reject_threshold_pct: 25
+
+  - name: curated
+    engine: procedure
+    depends_on: raw
+    procedure: procedures/build_monthly_sales.sql
+    gates:
+      - type: not_null
+        table: fct_monthly_sales
+        columns: [month, revenue]
+maturity: draft

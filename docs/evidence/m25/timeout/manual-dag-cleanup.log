@@ -1,0 +1,7 @@
+[[34m2026-10-07T16:37:37.156+0000[0m] {[34m__init__.py:[0m43} INFO[0m - Loaded API auth backend: airflow.api.auth.backend.session[0m
+[[34m2026-10-07T16:37:37.270+0000[0m] {[34mdelete_dag.py:[0m53} INFO[0m - Deleting DAG: m25_monthly_sales__validate__6c2fba1e[0m
+Removed 14 record(s)
+
+/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.
+
+Airflow delete exit: 0

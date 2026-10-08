@@ -1,0 +1,152 @@
+diff --git a/src/dpagent/cli/pipeline.py b/src/dpagent/cli/pipeline.py
+index 4d1ef8b..1cc62bb 100644
+--- a/src/dpagent/cli/pipeline.py
++++ b/src/dpagent/cli/pipeline.py
+@@ -334,6 +334,11 @@ def validate_cmd(name, fixture_path, expected_path):
+                           "down)[/dim]")
+         sys.exit(2)
+ 
++    if result.deploy_error:
++        console.print("fixture deploy failed: "
++                      + result.deploy_error, markup=False)
++        sys.exit(1)
++
+     if result.seed_error:
+         # A validation failure, not "unavailable": the fixture itself (or
+         # the throwaway database) rejected it - exit 1, same as a real
+diff --git a/src/dpagent/pipelines/fixture.py b/src/dpagent/pipelines/fixture.py
+index 68bdf96..d3945ea 100644
+--- a/src/dpagent/pipelines/fixture.py
++++ b/src/dpagent/pipelines/fixture.py
+@@ -1089,6 +1089,7 @@ class FixtureRunReport:
+     seed_error: str = ""   # the fixture itself failed to load - a validation
+                            # failure (exit 1), never unavailable_reason (exit 2)
+     deployed: bool = False
++    deploy_error: str = ""
+     run_ids: list[int] = field(default_factory=list)
+     run1_status: str = ""
+     run2_status: str = ""
+@@ -1273,6 +1274,10 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
+                         except deploy_mod.DeployError as exc:
+                             report.unavailable_reason = f"deploy() failed (needs root): {exc}"
+                             return report
++                        except OSError as exc:
++                            report.deploy_error = (
++                                f"{type(exc).__name__}: {exc}")
++                            return report
+                         report.deployed = True
+ 
+                         # --allow-draft never unpauses (M1's own guarantee
+@@ -1473,6 +1478,7 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
+         "pipeline_hash": pipeline_hash,
+         "fixture_hash": fixture_hash,
+         "expected_hash": expected_hash,
++        "deploy_error": report.deploy_error,
+         "run_ids": list(report.run_ids),
+         "run_status": {"run_1": report.run1_status or "not_run",
+                       "run_2": report.run2_status or "not_run"},
+diff --git a/tests/test_pipelines_fixture.py b/tests/test_pipelines_fixture.py
+index e59fb91..7957001 100644
+--- a/tests/test_pipelines_fixture.py
++++ b/tests/test_pipelines_fixture.py
+@@ -459,9 +459,14 @@ def test_temporarily_restores_even_when_the_block_raises():
+ 
+ # ---------------------------------------------------------------- preflight_fixture_host
+ 
+-def test_preflight_fixture_host_is_really_unavailable_on_this_host(tmp_path):
+-    """Real, not mocked - this operator has neither root nor passwordless
+-    sudo to postgres on this host."""
++def test_preflight_fixture_host_is_really_unavailable_on_this_host(isolated_db, tmp_path, monkeypatch):
++    """Deterministic missing-sudo test; independent of host permissions."""
++    monkeypatch.setattr(fixture.os, "geteuid", lambda: 1000)
++    monkeypatch.setattr(
++        subprocess, "run",
++        lambda cmd, **kwargs: subprocess.CompletedProcess(
++            cmd, 1, stdout="", stderr="sudo: a password is required"))
++
+     pipeline = _real_pipeline(tmp_path)
+     result = fixture.preflight_fixture_host(pipeline)
+     assert result.ok is False
+@@ -1001,8 +1006,14 @@ class _FakeUndeployResult:
+         self.runs_cancelled = []
+ 
+ 
+-def test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing(tmp_path):
+-    """Real on this host, not mocked - no passwordless sudo to postgres."""
++def test_run_fixture_reports_unavailable_when_postgres_throwaway_is_missing(isolated_db, tmp_path, monkeypatch):
++    """Deterministic missing-sudo test; independent of host permissions."""
++    monkeypatch.setattr(fixture.os, "geteuid", lambda: 1000)
++    monkeypatch.setattr(
++        subprocess, "run",
++        lambda cmd, **kwargs: subprocess.CompletedProcess(
++            cmd, 1, stdout="", stderr="sudo: a password is required"))
++
+     pipeline = _real_pipeline(tmp_path)
+     fx = fixture.Fixture(tables=[fixture.FixtureTable(
+         name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
+@@ -1728,3 +1739,46 @@ def test_gate_summary_for_run_keeps_two_gates_of_the_same_type_separate(isolated
+     types_and_status = [(g["type"], g["status"], g["detail"]) for g in summary["curated"]]
+     assert ("business_rule", "passed", "rule A") in types_and_status
+     assert ("business_rule", "failed", "rule B") in types_and_status
++
++
++def test_run_fixture_records_filesystem_deploy_error_and_cleanup(
++        isolated_db, tmp_path, monkeypatch):
++    from dpagent.pipelines import deploy as deploy_mod
++
++    pipeline = _real_pipeline(tmp_path)
++    src = ThrowawayDB(
++        host="h1", port="5432", database="src", user="u1", password="<REDACTED>")
++    wh = ThrowawayDB(
++        host="h2", port="5432", database="wh", user="u2", password="<REDACTED>")
++    monkeypatch.setattr(
++        fixture.pg_throwaway, "throwaway_database", _fake_throwaway(src, wh))
++    monkeypatch.setattr(fixture, "seed_source", lambda fx, db: None)
++    _mock_deploy_isolation(monkeypatch, tmp_path)
++
++    blocker = tmp_path / "not-a-directory"
++    blocker.write_text("blocker")
++
++    def fail_deploy(pipeline, **kwargs):
++        blocker.mkdir()
++
++    monkeypatch.setattr(deploy_mod, "deploy", fail_deploy)
++
++    fx = fixture.Fixture(tables=[fixture.FixtureTable(
++        name="sale_order", columns={"id": "bigint"}, rows=[{"id": 1}])])
++    expected = fixture.ExpectedResult(table="fct_x", rows=[])
++
++    report = fixture.run_fixture(pipeline, fx, expected)
++
++    assert report.seeded
++    assert not report.deployed
++    assert "FileExistsError" in report.deploy_error
++    assert not report.unavailable_reason
++    assert report.run_ids == []
++    assert report.cleanup_attempted
++    assert report.cleanup_ok
++    assert report.throwaway_cleanup_ok
++
++    data = fixture.fixture_report_dict(report)
++    assert data["deploy_error"] == report.deploy_error
++    assert data["overall"] == "fail"
++    assert data["cleanup"]["overall"] == "pass"
+diff --git a/tests/test_pipelines_pg_throwaway.py b/tests/test_pipelines_pg_throwaway.py
+index dd20331..3f696bf 100644
+--- a/tests/test_pipelines_pg_throwaway.py
++++ b/tests/test_pipelines_pg_throwaway.py
+@@ -12,8 +12,12 @@ import pytest
+ from dpagent.pipelines import pg_throwaway
+ 
+ 
+-def test_throwaway_database_is_really_unavailable_on_this_host():
+-    """Not mocked - the real `sudo -n` failure this host actually has."""
++def test_throwaway_database_is_really_unavailable_on_this_host(monkeypatch):
++    """Deterministic missing-sudo test; independent of host permissions."""
++    monkeypatch.setattr(
++        subprocess, "run",
++        lambda cmd, **kwargs: subprocess.CompletedProcess(
++            cmd, 1, stdout="", stderr="sudo: a password is required"))
+     with pytest.raises(pg_throwaway.ThrowawayUnavailable, match="sudo"):
+         with pg_throwaway.throwaway_database():
+             pass   # pragma: no cover - never reached on this host

@@ -1,0 +1,5 @@
+  pid  |            datname            |            usename            | state  | wait_event_type | wait_event |            query            
+-------+-------------------------------+-------------------------------+--------+-----------------+------------+-----------------------------
+ 12618 | dpagent_fixture_wh_12156b1cd0 | dpagent_fixture_wh_12156b1cd0 | active |                 |            | CALL build_monthly_sales();
+(1 row)
+

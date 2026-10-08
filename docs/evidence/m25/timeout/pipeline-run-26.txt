@@ -1,0 +1,22 @@
+m25_monthly_sales__validate__6c2fba1e · run 26 · cancelled
+
+landing passed · 3 rows
+  row_count_bounds
+
+raw passed
+  not_null
+  unique
+
+events
+ time            actor   kind                message                                                                               
+ 16:30:51+00:00  engine  extract.start       m25_monthly_sales__validate__6c2fba1e via odoo_postgres                               
+ 16:30:56+00:00  engine  extract.done        m25_monthly_sales__validate__6c2fba1e extract complete: sale_order +3                 
+ 16:30:58+00:00  engine  gate.passed         m25_monthly_sales__validate__6c2fba1e/landing row_count_bounds: ok                    
+ 16:30:58+00:00  engine  stage.passed        m25_monthly_sales__validate__6c2fba1e/landing gates passed                            
+ 16:31:00+00:00  engine  transform.start     m25_monthly_sales__validate__6c2fba1e/raw via dbt                                     
+ 16:31:12+00:00  engine  transform.done      m25_monthly_sales__validate__6c2fba1e/raw transform complete                          
+ 16:31:15+00:00  engine  gate.passed         m25_monthly_sales__validate__6c2fba1e/raw not_null: ok                                
+ 16:31:15+00:00  engine  gate.passed         m25_monthly_sales__validate__6c2fba1e/raw unique: ok                                  
+ 16:31:15+00:00  engine  stage.passed        m25_monthly_sales__validate__6c2fba1e/raw gates passed                                
+ 16:31:17+00:00  engine  transform.start     m25_monthly_sales__validate__6c2fba1e/curated via procedure                           
+ 16:31:55+00:00  user    pipeline.cancelled  m25_monthly_sales__validate__6c2fba1e was undeployed while this run was still running 
