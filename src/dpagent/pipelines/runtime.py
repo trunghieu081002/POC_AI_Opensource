@@ -88,7 +88,7 @@ def _stage_schema(pipeline: loader.Pipeline, stage: loader.Stage) -> str:
     `<pipeline>_landing`."""
     if stage is pipeline.landing:
         return extract.landing_dataset(pipeline)
-    return pipeline.warehouse.schema
+    return stage.schema or pipeline.warehouse.schema
 
 
 def _warehouse_conn(pipeline: loader.Pipeline, schema: str) -> tuple[list[str], dict[str, str]]:
@@ -427,11 +427,14 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
         # regardless (M2.4.3 review: "Validation có thể đọc/ghi ngoài DB
         # thử" - confirmed for real, this pack's static profiles.yml has no
         # per-pipeline indirection of any kind).
-        with _dbt_profiles_dir(pipeline) as profiles_dir:
-            proc = _run([_dbt_bin(), "run", "--select", *target.models,
-                        "--project-dir", _dbt_project_dir(),
-                        "--profiles-dir", profiles_dir],
-                       pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
+        if pipeline.dbt_project is not None:
+            proc = _run_own_dbt_project(pipeline, target)
+        else:
+            with _dbt_profiles_dir(pipeline) as profiles_dir:
+                proc = _run([_dbt_bin(), "run", "--select", *target.models,
+                            "--project-dir", _dbt_project_dir(),
+                            "--profiles-dir", profiles_dir],
+                           pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
         if proc.returncode != 0:
             detail = _detail(proc.stderr or proc.stdout)
             state.event("transform.failed", f"dbt run failed for {stage!r}: {detail}",
@@ -449,6 +452,74 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
                         run_id=run_id, level="error")
             raise GateFailed(f"CALL {proc_name}() failed for {stage!r}:\n{detail}")
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
+
+
+def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage):
+    """Runs a stage of a pipeline that owns its dbt project (HG's
+    `dwh_dbt/`) - `dbt deps` (if it has packages; the committed lock must
+    survive it unchanged), a check that every selector selects at least one
+    model, `dbt seed` (if it has seeds), then `dbt run --select <the stage's
+    selectors>` - from a private temp COPY of the project, with the same
+    throwaway profile `_dbt_profiles_dir` builds for the shared-project path.
+
+    A copy of exactly the files the approval hash covers
+    (`dbtproject.copy_project`), because the published project directory is
+    root-owned and read-only to the airflow user while dbt writes `target/`,
+    `dbt_packages/` and `logs/` next to `dbt_project.yml`, and because what
+    runs must be what was approved. `--profile`
+    overrides the project's own `profile:` name (HG's is `dwh_hgmedia`) with
+    the one the generated profile defines - the project never needs to know
+    dpagent's connection. Returns the failing CompletedProcess, or the last
+    successful one; `deps` needs network access to the package hub."""
+    from . import dbtproject
+    src = pipeline.root / pipeline.dbt_project.path
+    with tempfile.TemporaryDirectory(prefix="dpagent_dbt_project_") as tmp, \
+            _dbt_profiles_dir(pipeline) as profiles_dir:
+        work = Path(tmp) / "project"
+        try:
+            # Exactly the files the approval hash covers - not a copytree
+            # that would also carry a stale target/ or dbt_packages/.
+            dbtproject.copy_project(src, work)
+        except dbtproject.DbtProjectError as exc:
+            return _failed(f"cannot copy the dbt project: {exc}")
+        dbt = _dbt_bin()
+        base = ["--project-dir", str(work), "--profiles-dir", profiles_dir,
+                "--profile", _dbt_profile_name()]
+        steps: list[tuple[str, list[str]]] = []
+        lock = work / "package-lock.yml"
+        lock_before = lock.read_bytes() if lock.exists() else None
+        if (work / "packages.yml").exists() or (work / "dependencies.yml").exists():
+            steps.append(("deps", ["deps"]))
+        proc = None
+        for label, args in steps:
+            proc = _run([dbt, *args, *base], pipeline=pipeline, kind="transform",
+                        what=f"dbt {label} for {target.name!r}")
+            if proc.returncode != 0:
+                return _failed(proc.stderr or proc.stdout, label=label, rc=proc.returncode)
+        if steps and lock_before is not None and lock.read_bytes() != lock_before:
+            return _failed(
+                "`dbt deps` changed package-lock.yml: the committed (and approved) lock "
+                "does not match what packages.yml resolves to now. Re-resolve, review the "
+                "new lock, and re-promote - running with silently different package "
+                "versions is exactly what the lock exists to prevent", label="deps")
+        # dbt exits 0 and runs NOTHING for a selector that selects nothing -
+        # without this the stage would be reported as a successful transform.
+        problems = dbtproject.check_selectors(dbt, base, [target])
+        if problems:
+            return _failed("\n".join(problems), label="selectors")
+        seeds = work / "seeds"
+        if seeds.is_dir() and any(seeds.glob("*.csv")):
+            proc = _run([dbt, "seed", *base], pipeline=pipeline, kind="transform",
+                        what=f"dbt seed for {target.name!r}")
+            if proc.returncode != 0:
+                return _failed(proc.stderr or proc.stdout, label="seed", rc=proc.returncode)
+        return _run([dbt, "run", "--select", *target.models, *base], pipeline=pipeline,
+                    kind="transform", what=f"dbt run for {target.name!r}")
+
+
+def _failed(message: str, *, label: str = "", rc: int = 1):
+    return subprocess.CompletedProcess(
+        [], rc, stdout="", stderr=(f"[dbt {label}] " if label else "") + message)
 
 
 _DLT_DEFAULT_INSTALL_DIR = "/opt/dlt"   # must match packs/dlt/pack.yaml's own default

@@ -1,0 +1,79 @@
+# The "nối dbt project kiểu HG" milestone (docs/hg-dbt-project.md): the bronze
+# landing from hg_bronze_poc, then a REAL dbt project of HG's shape - its own
+# dbt_project.yml / packages.yml (dbt_utils) / generate_schema_name macro /
+# seed / sources / ref() / silver + gold schemas - run by dpagent from a
+# private copy. `dim_artist.sql`, `dbt_project.yml`, `packages.yml`,
+# `package-lock.yml` and the macro are phulee9/hgmedia's own files, verbatim;
+# `dim_artist_active`, `mart_artist_summary` and the seed are this branch's.
+#
+# One odoo_postgres table (res_partner), full snapshot, never promoted -
+# the same scope hg_bronze_poc has, for the same reason.
+name: hg_dbt_branch
+summary: res_partner -> bronze -> staging -> HG-style dbt project (silver dim_artist, seed-filtered silver, gold summary)
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${HG_POC_SOURCE_HOST}"
+    port: "${HG_POC_SOURCE_PORT:-5432}"
+    database: "${HG_POC_SOURCE_NAME}"
+    user: "${HG_POC_SOURCE_USER}"
+    password: "${HG_POC_SOURCE_PASSWORD}"
+  tables: [res_partner]
+
+warehouse:
+  host: "${HG_POC_WH_HOST:-localhost}"
+  port: "${HG_POC_WH_PORT:-5432}"
+  database: "${HG_POC_WH_NAME:-warehouse}"
+  user: "${HG_POC_WH_USER}"
+  password: "${HG_POC_WH_PASSWORD}"
+  schema: silver        # dbt's target schema (the seed lands here); silver/gold models set their own
+
+# HG's source('staging', 'res_partner') reads schema `staging`.
+landing_dataset_name: staging
+
+bronze_staging: true
+bronze:
+  endpoint: "${HG_POC_BRONZE_ENDPOINT}"
+  bucket: "${HG_POC_BRONZE_BUCKET:-hg-bronze}"
+  access_key: "${HG_POC_BRONZE_ACCESS_KEY}"
+  secret_key: "${HG_POC_BRONZE_SECRET_KEY}"
+  prefix: bronze
+
+dbt_project:
+  path: dwh_dbt
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: res_partner
+        min: 1
+
+  - name: silver
+    engine: dbt
+    depends_on: landing
+    schema: silver
+    models: [dim_artist, dim_artist_active]   # dbt selectors, run inside the project (seed + deps first)
+    gates:
+      - type: not_null
+        table: dim_artist
+        columns: [dim_artist_sk, platform_id, platform_name]
+      - type: unique
+        table: dim_artist
+        columns: [dim_artist_sk]
+      - type: unique
+        table: dim_artist_active
+        columns: [dim_artist_sk]
+
+  - name: gold
+    engine: dbt
+    depends_on: silver
+    schema: gold
+    models: [mart_artist_summary]
+    gates:
+      - type: not_null
+        table: mart_artist_summary
+        columns: [artists, distinct_names]
+
+maturity: draft

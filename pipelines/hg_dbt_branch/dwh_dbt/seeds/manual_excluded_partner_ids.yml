@@ -1,0 +1,9 @@
+version: 2
+
+# Same shape as HG's manual_excluded_stock_codes seed (a hand-maintained
+# exclusion list joined in a silver model) - here a list of res_partner ids.
+seeds:
+  - name: manual_excluded_partner_ids
+    config:
+      column_types:
+        platform_id: text

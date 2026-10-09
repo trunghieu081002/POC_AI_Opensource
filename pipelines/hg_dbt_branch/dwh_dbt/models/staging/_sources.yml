@@ -1,0 +1,11 @@
+version: 2
+
+# Copied from HG's dwh_dbt/models/staging/_sources.yml - TRIMMED to the one
+# table this branch reads. `staging` is the landing dataset (pipeline.yaml's
+# landing_dataset_name: staging), which is how HG's source('staging', ...)
+# calls map onto dpagent's landing schema without touching a model.
+sources:
+  - name: staging
+    schema: staging
+    tables:
+      - name: res_partner   # raw: res_partner (odoo_pg)

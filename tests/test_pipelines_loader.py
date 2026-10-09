@@ -750,3 +750,90 @@ def test_incremental_is_refused_for_connectors_that_cannot_do_it(root, connector
     _write(root, "demo", data)
     with pytest.raises(loader.PipelineError, match="only supported for"):
         loader.load("demo", root)
+
+
+# ---------------------------------------------------------------- dbt_project / Stage.schema
+
+def _own_dbt(root, *, project_yml=True, **overrides):
+    """Writes the pipeline (with the project's dbt_project.yml unless told
+    not to) and removes the stub model files `_write` makes by default - an
+    owned project's `models:` are dbt selectors, so none must be needed."""
+    data = _minimal(dbt_project={"path": "dwh_dbt"}, **overrides)
+    data["stages"][1]["models"] = ["silver", "tag:gold"]
+    _write(root, "demo", data)
+    import shutil
+    shutil.rmtree(root / "demo" / "models", ignore_errors=True)
+    if project_yml:      # a real (minimal) dbt_project.yml - the loader now parses it
+        (root / "demo" / "dwh_dbt").mkdir()
+        (root / "demo" / "dwh_dbt" / "dbt_project.yml").write_text("name: x\nversion: '1.0.0'\n")
+    return data
+
+
+def test_a_pipeline_that_owns_a_dbt_project_needs_no_model_files(root):
+    _own_dbt(root)
+    p = loader.load("demo", root)
+    assert not (root / "demo" / "models").exists()
+    assert p.dbt_project.path == "dwh_dbt"
+    assert p.stages[1].models == ["silver", "tag:gold"]
+
+
+def test_without_dbt_project_a_missing_model_file_is_still_refused(root):
+    _write(root, "demo", _minimal())
+    import shutil
+    shutil.rmtree(root / "demo" / "models")
+    with pytest.raises(loader.PipelineError, match="does not exist"):
+        loader.load("demo", root)
+
+
+def test_dbt_project_without_a_dbt_project_yml_is_refused(root):
+    _own_dbt(root, project_yml=False)
+    with pytest.raises(loader.PipelineError, match="no dbt_project.yml"):
+        loader.load("demo", root)
+
+
+@pytest.mark.parametrize("path", ["../elsewhere", "/etc", "a/../../b"])
+def test_dbt_project_path_may_not_leave_the_pipeline_directory(root, path):
+    _own_dbt(root)
+    data = yaml.safe_load((root / "demo" / "pipeline.yaml").read_text())
+    data["dbt_project"] = {"path": path}
+    (root / "demo" / "pipeline.yaml").write_text(yaml.safe_dump(data))
+    with pytest.raises(loader.PipelineError, match="relative path inside"):
+        loader.load("demo", root)
+
+
+def test_dbt_project_without_any_dbt_stage_is_dead_config(root):
+    data = _minimal(dbt_project={"path": "dwh_dbt"})
+    data["stages"][1] = {"name": "raw", "engine": "procedure", "depends_on": "landing",
+                         "procedure": "p.sql",
+                         "gates": [{"type": "not_null", "table": "t", "columns": ["id"]}]}
+    _write(root, "demo", data, procedure_files=("p.sql",))
+    (root / "demo" / "dwh_dbt").mkdir()
+    (root / "demo" / "dwh_dbt" / "dbt_project.yml").write_text("name: x\n")
+    with pytest.raises(loader.PipelineError, match="dead configuration"):
+        loader.load("demo", root)
+
+
+def test_stage_schema_defaults_to_empty_and_parses_when_given(root):
+    _write(root, "demo", _minimal())
+    assert loader.load("demo", root).stages[1].schema == ""
+    data = _minimal()
+    data["stages"][1]["schema"] = "silver"
+    (root / "demo" / "pipeline.yaml").write_text(yaml.safe_dump(data))
+    assert loader.load("demo", root).stages[1].schema == "silver"
+
+
+@pytest.mark.parametrize("bad", ["a-b", "1abc", "a b", 5, "x;drop"])
+def test_stage_schema_must_be_a_plain_identifier(root, bad):
+    data = _minimal()
+    data["stages"][1]["schema"] = bad
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="plain SQL identifier"):
+        loader.load("demo", root)
+
+
+def test_the_landing_stage_cannot_set_a_schema(root):
+    data = _minimal()
+    data["stages"][0]["schema"] = "staging"
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="landing"):
+        loader.load("demo", root)

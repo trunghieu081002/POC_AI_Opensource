@@ -174,7 +174,10 @@ def dag_tasks(pipeline: Pipeline) -> list[Task]:
 
     for stage in pipeline.stages[1:]:
         transform_id = f"transform_{stage.name}"
-        if stage.engine == "dbt":
+        if stage.engine == "dbt" and pipeline.dbt_project is not None:
+            description = (f"dbt (own project {pipeline.dbt_project.path}/): "
+                           f"deps, seed, run --select {' '.join(stage.models)}")
+        elif stage.engine == "dbt":
             description = f"dbt run --select {' '.join(stage.models)}"
         else:
             description = f"CALL <procedure defined in {stage.procedure}>"
@@ -205,6 +208,8 @@ def artifacts(pipeline: Pipeline) -> list[Artifact]:
                                "in a procedure-only pipeline cannot silently fall back "
                                "to public")]
     for stage in pipeline.stages[1:]:
+        if stage.engine == "dbt" and pipeline.dbt_project is not None:
+            continue   # the project is published whole with the pipeline's files; no generated schema.yml
         if stage.engine == "dbt":
             out.append(Artifact(
                 path=f"models/{pipeline.name}/{stage.name}/schema.yml", kind="dbt_schema",

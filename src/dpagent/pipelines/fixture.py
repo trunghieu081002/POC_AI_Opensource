@@ -135,6 +135,11 @@ _FIXTURE_SOURCE_CONNECTORS = {"odoo_postgres"}
 # `bronze:`) - so a clone of a bronze pipeline would silently validate the
 # *old* single-step dlt path instead of the one the manifest asks for.
 # Refused outright until fixture validation grows a bronze path.
+_OWN_DBT_FIXTURE_REASON = (
+    "pipelines that own a dbt project (dbt_project:) have no fixture-validation "
+    "path yet - make_validation_clone copies a stage's models/<name>.sql, not a "
+    "whole project with its packages, seeds and sources, so a clone would "
+    "silently not contain what this manifest runs")
 _BRONZE_FIXTURE_REASON = (
     "bronze_staging pipelines have no fixture-validation path yet - a "
     "validation clone would run the old dlt extract instead of the bronze "
@@ -308,6 +313,8 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
         raise ValidationCloneError(reason)
     if pipeline.bronze_staging:
         raise ValidationCloneError(_BRONZE_FIXTURE_REASON)
+    if pipeline.dbt_project is not None:
+        raise ValidationCloneError(_OWN_DBT_FIXTURE_REASON)
 
     suffix = _validation_suffix()
     clone_name = f"{pipeline.name}__validate__{suffix}"
@@ -880,6 +887,8 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
         reasons.append(connector_reason)
     if pipeline.bronze_staging:
         reasons.append(_BRONZE_FIXTURE_REASON)
+    if pipeline.dbt_project is not None:
+        reasons.append(_OWN_DBT_FIXTURE_REASON)
 
     if not (hasattr(os, "geteuid") and os.geteuid() == 0):
         reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")

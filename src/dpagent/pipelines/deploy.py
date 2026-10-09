@@ -226,7 +226,7 @@ def artifact_paths(pipeline: Pipeline) -> dict[str, Path]:
     build = pipeline.root / "build"
     paths = {"dag": build / "dags" / f"{pipeline.name}.py"}
     for stage in pipeline.stages[1:]:
-        if stage.engine == "dbt":
+        if stage.engine == "dbt" and pipeline.dbt_project is None:
             paths[f"schema_{stage.name}"] = (
                 build / "models" / pipeline.name / stage.name / "schema.yml")
     return paths
@@ -442,6 +442,12 @@ def install_dbt_models(pipeline: Pipeline) -> list[Path]:
     directory and the shared macro regardless, i.e. stray files under
     /opt/dbt on a host where dbt was never even installed).
     """
+    if pipeline.dbt_project is not None:
+        # The pipeline owns its dbt project; it travels whole with
+        # install_pipeline_files() and runs from a private copy - nothing
+        # goes into the dbt pack's shared project (that isolation is what
+        # makes ref()/source() safe for it).
+        return []
     if not any(stage.engine == "dbt" for stage in pipeline.stages[1:]):
         return []
     if hasattr(os, "geteuid") and os.geteuid() != 0:
