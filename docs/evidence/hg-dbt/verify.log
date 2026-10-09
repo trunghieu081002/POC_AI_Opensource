@@ -1,0 +1,54 @@
+
+== SETUP: clean slate for hg_dbt_branch (undeploy, drop staging/silver/gold, clear its registry rows and bronze objects)
+NOTICE:  drop cascades to table staging.res_partner
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to table silver.manual_excluded_partner_ids
+drop cascades to table silver.dim_artist
+drop cascades to view silver.dim_artist_active
+NOTICE:  drop cascades to table gold.mart_artist_summary
+PASS source has rows
+PASS shared dbt project has no models for hg_dbt_branch before the run (0)
+
+== S1: step-3 validate = a REAL 'dbt deps' + 'dbt parse' of the pipeline's own project
+PASS dbt parse of the owned project passes (packages resolved, ref()/source()/macro/seed all resolved)
+PASS the shared-project ref/source ban is skipped for an owned project, with the reason
+
+== S2: deploy --allow-draft and run the real DAG: extract_bronze -> load_bronze -> gate -> dbt silver -> gate -> dbt gold -> gate
+PASS deploy succeeds
+PASS DAG unpaused (draft deploys never unpause themselves) (0)
+PASS DAG run finishes ok
+PASS landing stage passed
+PASS silver stage passed
+PASS gold stage passed
+PASS tables landed in the schemas HG's own generate_schema_name macro dictates (staging from landing_dataset_name, silver/gold from the project) (gold.mart_artist_summary,silver.dim_artist,silver.dim_artist_active,silver.manual_excluded_partner_ids,staging.res_partner)
+PASS gold summary == an independent calculation from the SOURCE (all rows minus the seed's excluded ids 2,4) (4|4|1|6)
+PASS silver.dim_artist has every source row (6)
+PASS dbt_utils.generate_surrogate_key matches an independent md5 of the id (c4ca4238a0b923820dcc509a6f75849b)
+PASS seed loaded (2,4)
+
+== S3: the pipeline's models never entered the dbt pack's shared project
+PASS no hg_dbt_branch directory under /opt/dbt/project/models (0)
+ls: cannot access '/opt/dbt/project/macros': No such file or directory
+PASS no seed/model of the owned project in the shared project (0)
+
+== S4: a second run replaces, never duplicates
+PASS second DAG run ok
+PASS gold unchanged (4|4|1|6)
+PASS silver.dim_artist not doubled (6)
+
+== S5: a new source row AND a changed seed flow through both hops (gold must change, not just stay equal)
+PASS run after the change ok
+PASS gold actually CHANGED (4|4|3|7) - a stale result could not pass this
+PASS gold == independent calculation with the new row 7 and the seed now excluding 1,2,4 (4|4|3|7)
+PASS the source rename reached silver (Renamed)
+
+== S6: a broken model fails the stage with dbt's own error and leaves the earlier gold untouched
+PASS run with a broken model fails (rc=1)
+PASS gold untouched by the failed run (the gold stage never ran) (4|4|3|7)
+PASS run after restoring the model ok
+PASS gold correct again (4|4|3|7)
+
+== CLEANUP: restore the seed file, undeploy
+
+== ALL 28 ASSERTIONS PASSED
+EXIT=0

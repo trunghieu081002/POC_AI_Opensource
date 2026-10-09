@@ -1,0 +1,14 @@
+version: 2
+
+# HG-style column tests (dbt tests are not run by dpagent's `dbt run`; the
+# pipeline's gates are what enforce these at run time) - kept so `dbt parse`
+# exercises the same schema-yml constructs HG's project uses.
+models:
+  - name: dim_artist
+    columns:
+      - name: dim_artist_sk
+        tests: [unique, not_null]
+  - name: dim_artist_active
+    columns:
+      - name: dim_artist_sk
+        tests: [unique, not_null]

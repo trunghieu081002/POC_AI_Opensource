@@ -48,6 +48,7 @@ GATE_REQUIRED_FIELDS = {
 ROW_LEVEL_GATE_TYPES = {"not_null", "unique", "referential_integrity", "business_rule"}
 
 _DURATION = re.compile(r"^\d+[smhd]$")
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class PipelineError(Exception):
@@ -126,6 +127,18 @@ class BronzeStorage:
     chunk_rows: int = 50000
 
 
+@dataclass
+class DbtProject:
+    """A dbt project the pipeline OWNS (HG's `dwh_dbt/`): its own
+    `dbt_project.yml`, `packages.yml`, macros, seeds, sources, `ref()` and
+    `source()` - run from a private copy, never published into the dbt
+    pack's shared project. That isolation is what makes `ref()`/`source()`
+    safe here at all: they can only resolve inside this directory (the
+    shared-project path forbids them, validate.check_dbt_dependencies).
+    `path` is relative to the pipeline's own directory."""
+    path: str
+
+
 # The only connector the bronze split is built and proven for so far
 # (docs/hg-bronze-staging.md) - a manifest asking for it with any other
 # connector is refused at load, not silently run down the old path.
@@ -141,6 +154,11 @@ class Stage:
     procedure: str = ""
     gates: list[Gate] = field(default_factory=list)
     quarantine: Quarantine | None = None
+    # Where this stage's tables live, for its gates/quarantine/procedure
+    # call. "" = `warehouse.schema` (every existing pipeline). Needed when
+    # the pipeline's own dbt project writes to several schemas (HG's
+    # silver/gold) - gates must look where the models actually put data.
+    schema: str = ""
 
     @property
     def is_row_level(self) -> bool:
@@ -205,6 +223,11 @@ class Pipeline:
     # what Postgres actually loaded". Both enforced at load below.
     bronze_staging: bool = False
     bronze: BronzeStorage | None = None   # required iff bronze_staging
+    # None for every existing pipeline: dbt-engine stages then publish their
+    # `models/<name>.sql` into the dbt pack's shared project exactly as
+    # before. Set: the pipeline owns a whole dbt project (see DbtProject),
+    # and a dbt stage's `models:` are dbt *selectors* run inside it.
+    dbt_project: DbtProject | None = None
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -428,6 +451,29 @@ def _validate_bronze(raw, bronze_staging: bool, source: Source, where: str) -> B
     )
 
 
+def _validate_dbt_project(raw, stages: list, root: Path, where: str) -> DbtProject | None:
+    if raw is None:
+        return None
+    if not any(st.engine == "dbt" for st in stages):
+        raise PipelineError(
+            f"{where}: `dbt_project:` without any engine: dbt stage is dead "
+            f"configuration - refusing it")
+    if not isinstance(raw, dict) or not raw.get("path"):
+        raise PipelineError(f"{where}: dbt_project needs a mapping with a `path:`")
+    rel = str(raw["path"])
+    if rel.startswith("/") or ".." in Path(rel).parts:
+        raise PipelineError(
+            f"{where}: dbt_project.path {rel!r} must be a relative path inside the "
+            f"pipeline's own directory")
+    project = root / rel
+    if not (project / "dbt_project.yml").is_file():
+        raise PipelineError(
+            f"{where}: dbt_project.path {rel!r} has no dbt_project.yml under {root}")
+    if project.resolve().parent != root.resolve() and root.resolve() not in project.resolve().parents:
+        raise PipelineError(f"{where}: dbt_project.path {rel!r} resolves outside the pipeline")
+    return DbtProject(path=rel)
+
+
 def _validate_warehouse(raw: dict, where: str) -> Warehouse:
     if not isinstance(raw, dict):
         raise PipelineError(f"{where}: warehouse must be a mapping")
@@ -585,6 +631,17 @@ def _validate_stage(raw: dict, index: int, is_first: bool,
                 f"{where}: depends_on {depends_on!r} is not an earlier stage "
                 f"(a pipeline is a straight line, no forward references)")
 
+    stage_schema = raw.get("schema", "")
+    if stage_schema != "" and (not isinstance(stage_schema, str)
+                               or not _IDENT.match(stage_schema)):
+        raise PipelineError(
+            f"{where}: schema {stage_schema!r} must be a plain SQL identifier "
+            f"(letters, digits, underscore; not starting with a digit)")
+    if stage_schema and is_first:
+        raise PipelineError(
+            f"{where}: the first stage is dlt's/bronze's own landing output - its "
+            f"schema is the landing dataset (landing_dataset_name), not a stage setting")
+
     gates = [_validate_gate(g, where) for g in (raw.get("gates") or [])]
     quarantine = _validate_quarantine(raw.get("quarantine"), where)
 
@@ -603,6 +660,7 @@ def _validate_stage(raw: dict, index: int, is_first: bool,
         procedure=procedure,
         gates=gates,
         quarantine=quarantine,
+        schema=stage_schema,
     )
 
 
@@ -651,6 +709,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
 
     source = _validate_source(data.get("source") or {}, where)
     bronze = _validate_bronze(data.get("bronze"), bronze_staging, source, where)
+    dbt_project = _validate_dbt_project(data.get("dbt_project"), stages, root, where)
 
     pipeline = Pipeline(
         name=name,
@@ -665,6 +724,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         landing_dataset_name=landing_dataset_name,
         bronze_staging=bronze_staging,
         bronze=bronze,
+        dbt_project=dbt_project,
     )
 
     for stage in pipeline.stages:
@@ -672,7 +732,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
             raise PipelineError(
                 f"{where}: stage {stage.name!r} points at procedure "
                 f"{stage.procedure}, which does not exist under {pipeline.root}")
-        if stage.engine == "dbt":
+        if stage.engine == "dbt" and pipeline.dbt_project is None:
             for model in stage.models:
                 model_path = pipeline.path(f"models/{model}.sql")
                 if not model_path.exists():

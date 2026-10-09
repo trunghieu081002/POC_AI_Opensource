@@ -1,0 +1,22 @@
+name: 'dwh_hgmedia'
+version: '1.0.0'
+config-version: 2
+
+profile: 'dwh_hgmedia'
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+
+models:
+  dwh_hgmedia:
+    silver:
+      dim:
+        +materialized: table
+        +schema: silver
+      fact:
+        +materialized: incremental
+        +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold

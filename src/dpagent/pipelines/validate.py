@@ -113,6 +113,9 @@ def check_dbt_models(pipeline: Pipeline) -> StepResult:
     if not Path(dbt_bin).exists():
         return StepResult("skipped", f"dbt is not installed ({dbt_bin} not found)")
 
+    if pipeline.dbt_project is not None:
+        return _check_own_dbt_project(pipeline, dbt_bin)
+
     with tempfile.TemporaryDirectory(prefix="dpagent-validate-dbt-") as tmp:
         tmp_path = Path(tmp)
         (tmp_path / "models").mkdir()
@@ -138,6 +141,41 @@ def check_dbt_models(pipeline: Pipeline) -> StepResult:
         if proc.returncode != 0:
             return StepResult("fail", (proc.stderr or proc.stdout).strip()[-4000:])
         return StepResult("pass", f"{model_count} model(s) parsed clean")
+
+
+def _check_own_dbt_project(pipeline: Pipeline, dbt_bin: str) -> StepResult:
+    """`dbt deps` (if the project has packages) then `dbt parse` on a private
+    copy of the pipeline's own dbt project, against the same throwaway,
+    unreachable profile the shared-project check uses (`dbt parse` needs the
+    adapter type, not a connection). A real parse of the real project -
+    `ref()`/`source()`/macros/seeds/packages all resolved - not a regex over
+    the SQL. `dbt deps` needs the package hub (network)."""
+    import shutil
+    src = pipeline.root / pipeline.dbt_project.path
+    with tempfile.TemporaryDirectory(prefix="dpagent-validate-dbt-") as tmp:
+        work = Path(tmp) / "project"
+        shutil.copytree(src, work, ignore=shutil.ignore_patterns(
+            "target", "dbt_packages", "logs", ".user.yml", "__pycache__"))
+        (Path(tmp) / "profiles.yml").write_text(_DBT_PROFILES_YML)
+        base = ["--project-dir", str(work), "--profiles-dir", tmp,
+                "--profile", "dpagent_validate"]
+        steps = []
+        if (work / "packages.yml").exists() or (work / "dependencies.yml").exists():
+            steps.append(("deps", ["deps"]))
+        steps.append(("parse", ["parse"]))
+        for label, args in steps:
+            try:
+                proc = subprocess.run([dbt_bin, *args, *base], capture_output=True,
+                                      text=True, timeout=240)
+            except subprocess.TimeoutExpired:
+                return StepResult("fail", f"dbt {label} timed out after 240s")
+            if proc.returncode != 0:
+                return StepResult(
+                    "fail", f"dbt {label} failed:\n"
+                            + (proc.stderr or proc.stdout).strip()[-4000:])
+        n = sum(1 for _ in (work / "models").rglob("*.sql")) if (work / "models").is_dir() else 0
+        return StepResult("pass", f"own dbt project {pipeline.dbt_project.path}/ parsed "
+                                  f"clean ({n} model file(s), packages resolved)")
 
 
 # A dbt Jinja call to `ref(...)` or `source(...)` - cross-model/cross-project
@@ -197,6 +235,12 @@ def check_dbt_dependencies(pipeline: Pipeline) -> StepResult:
     dbt_stages = [s for s in pipeline.stages if s.engine == "dbt"]
     if not dbt_stages:
         return StepResult("skipped", "no dbt-engine stage in this pipeline")
+    if pipeline.dbt_project is not None:
+        return StepResult(
+            "skipped", "models live in the pipeline's own dbt project - ref()/source() "
+                       "resolve only inside it, never against the shared dbt project, "
+                       "so the isolation this check protects does not apply (the real "
+                       "dbt parse in the previous step covers resolution)")
 
     offenders = []
     model_count = 0
