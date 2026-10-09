@@ -588,6 +588,13 @@ def _connection_url(values: dict, scheme: str = "postgresql") -> str:
 def run_extract(*, pipeline_name: str, run_id: int | None = None,
                 full_refresh: bool = False) -> None:
     pipeline = loader.load(pipeline_name)
+    if pipeline.bronze_staging:
+        # The manifest asked for the bronze split - never fall back to the
+        # single dlt extract+load path silently (docs/hg-bronze-staging.md).
+        raise GateFailed(
+            f"{pipeline_name!r} uses bronze_staging: its landing stage runs as "
+            f"extract_bronze + load_bronze (dpagent.pipelines.bronze), not as a "
+            f"dlt extract - redeploy so the DAG has those tasks")
     state.event("extract.start",
                 f"{pipeline_name} via {pipeline.source.connector}"
                 + (" (full refresh)" if full_refresh else ""), run_id=run_id)

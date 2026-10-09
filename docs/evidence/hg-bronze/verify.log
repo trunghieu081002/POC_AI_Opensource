@@ -1,0 +1,98 @@
+
+== SETUP: fresh source container, empty registry/landing, empty bronze prefix
+NOTICE:  drop cascades to table dpagent_meta.bronze_batches
+NOTICE:  drop cascades to table hg_bronze_poc_landing.res_partner
+PASS bronze prefix is empty (0)
+PASS source has 5 typed rows (5)
+
+== S1/S3: EXTRACT, then STOP the source container, then LOAD in a fresh process without any source value
+PASS registry: batch is extracted (extracted)
+PASS 5 rows at chunk_rows=2 -> 3 parquet objects (multi-object manifest) (3)
+PASS manifest published
+PASS source container is stopped (false)
+PASS connecting to the stopped source fails (rc=2): psql: error: connection to server at "172.17.0.4", port 5432 failed: timeout expired
+PASS LOAD (new process, SOURCE vars unset, source down) exits 0 (0)
+PASS LOAD reports 5 rows from 3 objects
+PASS landing == source snapshot, row for row (md5 of every column, all types) (5|98b62d687c33da8b639485142a48d442)
+PASS registry: batch is loaded (loaded)
+
+== S2: re-LOAD of an already-loaded batch changes nothing
+PASS second LOAD says already loaded
+PASS landing unchanged (5|98b62d687c33da8b639485142a48d442)
+PASS loaded_at not rewritten (2026-10-09 03:38:45.176554+00)
+
+== S4: two LOADs of the same batch at the same instant
+PASS both concurrent LOADs exit 0 (00)
+PASS exactly one actually loaded (1)
+PASS the other saw 'already loaded' (1)
+PASS landing == source (6 rows), not doubled (6|30f9cc3b92480dfb9028f5fea8d78939)
+PASS registry: loaded once (1)
+
+== S5: loading an older extracted batch after a newer one is refused
+PASS newer batch loaded (6|b2ae94e29b4520aeaf65b9301ae42cd0)
+PASS older batch LOAD refused (rc=1)
+PASS refusal names the reason
+PASS landing still the newer data (6|b2ae94e29b4520aeaf65b9301ae42cd0)
+PASS older batch stays extracted (not marked loaded) (extracted)
+
+== S6: a corrupted bronze object is refused; fixing it makes a plain retry succeed
+PASS LOAD of a corrupted object fails (rc=1)
+PASS failure names the checksum mismatch
+PASS landing untouched by the failed LOAD (6|b2ae94e29b4520aeaf65b9301ae42cd0)
+PASS batch still extracted, retryable (extracted)
+PASS retry after the object is restored succeeds (0)
+PASS landing == source after the retry (6|2e95aa309b5ddd5648ce4eafe3676cfb)
+
+== S7: a manifest changed after publication is refused
+PASS tampered manifest refused (rc=1)
+PASS failure names the manifest checksum
+PASS landing untouched (6|2e95aa309b5ddd5648ce4eafe3676cfb)
+PASS loads once the manifest is restored (0)
+
+== S8: an empty source snapshot replaces landing with 0 rows (never 'skip and keep old data')
+PASS 0 data objects (0)
+PASS manifest still published
+PASS landing still has the old 6 rows before the LOAD (6)
+PASS empty batch loads (0)
+PASS landing now has exactly 0 rows (0)
+PASS registry records 0 loaded rows (0)
+
+== S9: kill -9 the worker mid-extract: batch stays 'extracting' and is never loadable
+PASS registry has a batch left in 'extracting' (3e299fc5-15a2-4af4-8215-436c0d892511)
+PASS partial objects were written (some)
+PASS but no manifest was ever published (0)
+PASS LOAD of the interrupted batch refused (rc=1)
+PASS refusal names the batch state
+PASS landing untouched (0|)
+
+== S10: source schema drift is refused, landing untouched
+PASS drifted batch refused (rc=1)
+PASS refusal says why
+PASS landing untouched (0|)
+PASS batch stays extracted (extracted)
+
+== S11: a column type that cannot be stored exactly is refused at EXTRACT
+PASS extract of an unsupported type fails (rc=1)
+PASS failure names the type problem
+PASS registry records the failed batch (1)
+
+== S12: deploy --allow-draft and run the real Airflow DAG (extract_bronze -> load_bronze -> gate_landing)
+PASS deploy --allow-draft succeeds
+PASS DAG unpaused (0 /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.)
+PASS DAG run 1 finishes ok
+PASS DAG run 2 finishes ok
+PASS landing == source after two full DAG runs (no duplication) (6|9da4045767c60ec4fdddff3400a35763)
+PASS two more batches loaded via the DAG (XCom handed each batch to its LOAD) (8)
+hg_bronze_poc · run 7 · ok
+landing passed · 6 rows
+                                               'hg_bronze_poc'                  
+ 03:39:46+00:00  engine  bronze.extract.start  hg_bronze_poc: res_partner ->    
+                                               bronze                           
+ 03:39:47+00:00  engine  bronze.extract.done   hg_bronze_poc: batch             
+ 03:39:47+00:00  engine  bronze.load.start     hg_bronze_poc: batch             
+ 03:39:48+00:00  engine  bronze.load.done      hg_bronze_poc: batch             
+ 03:39:49+00:00  engine  gate.passed           hg_bronze_poc/landing            
+ 03:39:49+00:00  engine  stage.passed          hg_bronze_poc/landing gates      
+
+== ALL 59 ASSERTIONS PASSED
+EXIT=0

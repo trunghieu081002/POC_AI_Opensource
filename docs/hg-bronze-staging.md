@@ -36,39 +36,28 @@ parsed from the manifest's own top-level `bronze_staging: true/false`.
 mention it - no existing pipeline's behaviour changes because this field
 exists.
 
-**Decided, not yet implemented.** As of this commit, `extract.py`,
-`runtime.py`, `deploy.py` and the cleanup paths do not branch on this
-field at all - setting it to `true` today has no effect on what actually
-runs, beyond loading successfully. Deciding the field's shape first -
-before B3/B4 write a single line of extract/load code against it - is
-the point: the four places it will eventually need to change are already
-named, so each one's own implementation can be built directly against a
-settled contract instead of a moving one:
+**Built (B2-B5, below), exactly against this contract.** Where the flag
+is read:
 
-- **loader** - done here: parses and validates the flag (must be a real
-  bool), stores it on `Pipeline`.
-- **runtime** (`runtime.run_extract`, or wherever the landing stage's
-  extract actually executes) - will need to branch: `bronze_staging:
-  false` keeps calling dlt's existing single extract+load step
-  unchanged; `true` instead calls a new EXTRACT step (writes to object
-  storage + the batch registry) followed by a new LOAD step (reads the
-  registry + object storage, writes to the landing schema).
-- **DAG generation** (`deploy.render_dag`) - a `bronze_staging: true`
-  pipeline's landing stage becomes *two* Airflow tasks (EXTRACT then
-  LOAD) instead of one; the DAG template needs a second code path, not a
-  parameter on the existing one.
-- **deploy()** - needs to know, at minimum, which object-storage
-  credentials/bucket this pipeline's EXTRACT/LOAD tasks resolve (the
-  same `${VAR}`-secret-name mechanism every other connection field
-  already uses - no new secret-handling primitive expected).
-- **cleanup/undeploy()** - a `bronze_staging: true` pipeline's own
-  teardown will need to also know about (at least) the batch registry
-  rows it owns; whether bronze objects themselves are ever deleted by
-  `undeploy()` or kept as an audit trail is an open question for B2-B5,
-  not decided here.
-
-None of the above is built yet. B2-B5 (next) is where it gets built,
-against exactly this contract.
+- **loader** - `bronze_staging: true` requires a `bronze:` mapping
+  (`endpoint`, `bucket`, `access_key`, `secret_key`, optional `region`,
+  `prefix`, `chunk_rows`), every value a `${VAR}` ref resolved only at run
+  time. Refused at load, not at run time: any connector but `odoo_postgres`,
+  more than one source table, `source.incremental`, and a `bronze:` section
+  without the flag (dead configuration that would read as in effect).
+- **DAG** (`generator.dag_tasks`, `deploy.render_dag`) - the landing stage
+  becomes `extract_bronze` -> `load_bronze` -> `gate_landing`; the batch id
+  travels between the two tasks through Airflow XCom, so a retry of
+  `load_bronze` reloads the same batch. A pipeline without the flag renders
+  byte-for-byte what it did before (a test pins this).
+- **runtime** - `runtime.run_extract` refuses a `bronze_staging` pipeline
+  outright: the old path is never taken silently for a manifest that asked
+  for the new one.
+- **deploy** - the `bronze:` `${VAR}`s are published to `pipelines.env`
+  with the warehouse ones. Fixture validation refuses a bronze pipeline
+  (a clone would silently validate the old dlt path instead).
+- **cleanup** - `undeploy` leaves bronze objects and registry rows alone,
+  like it leaves warehouse data: they are data, and an audit trail.
 
 ## B1 — SeaweedFS proven for real
 
@@ -100,15 +89,86 @@ output is a set of objects, never assumed to be exactly one file** - the
 leader's own correction to this plan's first draft, confirmed from the
 real library, not asserted.
 
+## B2-B5 — the EXTRACT/LOAD split, built and verified for real
+
+Code: `src/dpagent/pipelines/bronze_worker.py` (runs in the dlt pack's venv -
+pyarrow/boto3/psycopg2 - never imported into dpagent), `bronze.py`
+(dpagent's side), CLI `dpagent pipeline bronze-extract|bronze-load`.
+
+**Normalisation level, stated rather than implied.** Not dlt's: no
+`_dlt_load_id`/`_dlt_id` columns, no renaming, no rows added or dropped.
+ints, booleans, floats, text, date, timestamp(tz) are stored natively in
+Parquet; `numeric`, `json/jsonb`, `uuid` are stored as their exact text and
+cast back on LOAD (the manifest records both types). Any other source type
+(bytea, interval, arrays, money...) is **refused at EXTRACT**, not mangled.
+
+**Protocol.** EXTRACT: registry row `extracting` -> one consistent
+`REPEATABLE READ READ ONLY` snapshot read through a server-side cursor,
+`chunk_rows` rows per object -> every object uploaded, read back, checked ->
+manifest (format version, columns + source types, every object's key/size/
+sha256/rows, total rows) published **last**, read back, checked -> registry
+`extracted` with the manifest's own sha256. Any failure -> `failed`. LOAD:
+needs the warehouse, the object store and a batch id - nothing else
+(`bronze.run_load` never resolves or passes a source value, and runs the
+worker with a minimal environment, not the caller's) -> registry must say
+`extracted` -> manifest sha256 checked against the registry -> every object's
+size/sha256/row count checked -> **one transaction**: advisory lock per
+table, row lock on the registry row, re-check status, refuse a batch older
+than one already loaded, rows into a TEMP table, count checked, landing
+columns compared with the manifest (schema drift is refused, not adapted),
+`TRUNCATE` + `INSERT`, registry -> `loaded`, `COMMIT`.
+
+The registry (`dpagent_meta.bronze_batches`) lives in its own schema in the
+warehouse, so a landing replace/truncate can never touch it.
+
+**Real-verified** - `scripts/hg-bronze-poc-verify.sh`, 59 assertions, all
+passing; log in [`evidence/hg-bronze/verify.log`](evidence/hg-bronze/verify.log).
+Source = a Postgres in its **own** container; SeaweedFS; the dlt/Postgres/
+Airflow stack in a dpagent disposable-host container. Nothing mocked:
+
+| | Proven |
+|---|---|
+| S1/S3 | EXTRACT 5 typed rows (bigint, text, boolean, numeric(12,2), timestamp, timestamptz, jsonb, uuid, date, varchar, NULLs, non-ASCII) -> 3 objects (`chunk_rows: 2`; a multi-object manifest, never "one data.parquet"). Then **the source container is stopped**, connecting to it is shown to fail, and LOAD runs in a **fresh process with every source variable unset**: 5 rows loaded, md5 over every column of every row identical to the source |
+| S2 | re-LOAD of a loaded batch: "already loaded", landing and `loaded_at` unchanged |
+| S4 | two LOADs of the same batch started simultaneously: exactly one loads, the other reports already-loaded, landing not doubled |
+| S5 | an older extracted batch cannot overwrite a newer loaded one |
+| S6/S7 | a corrupted object / a manifest changed after publication: LOAD refused naming the checksum, landing untouched, batch stays `extracted`; restoring the bytes makes a plain retry succeed |
+| S8 | empty source snapshot: 0 data objects, manifest still published, LOAD **replaces** landing with exactly 0 rows (was 6) - never "skip and keep old data" |
+| S9 | the worker `kill -9`'d mid-extract: partial objects in storage, **no manifest**, registry stays `extracting`, LOAD refuses it, landing untouched |
+| S10/S11 | source schema drift refused (landing untouched, batch retryable); an unsupported column type refused at EXTRACT, registry records `failed` |
+| S12 | `deploy --allow-draft`, unpause, **two real Airflow DAG runs** (`extract_bronze` -> `load_bronze` -> `gate_landing`, batch id via XCom): both ok, landing == source after both (no duplication), two more batches `loaded` |
+
+Unit tests (`tests/test_pipelines_bronze.py`, loader/generator/deploy
+additions) cover the contract without I/O, including that LOAD's
+environment contains no source value at all and that a non-bronze
+pipeline's DAG is unchanged.
+
+**A product bug found by running it for real** (not by the bronze code):
+with dpagent installed at `/opt/dpagent` (bootstrap's default), its own
+`pipelines/` directory *is* `SHARED_PIPELINES_DIR`, so
+`install_pipeline_files()` did `rmtree(dest)` on the very directory it
+then tried to copy from - `FileNotFoundError`, pipeline gone from disk -
+and `undeploy()` would have deleted the operator's source the same way.
+Both now compare resolved paths and leave a pipeline alone that already
+lives where it would be published (regression tests in
+`tests/test_pipelines_deploy.py`). It never showed up before because
+validation clones live in a temp directory and the operator's own host
+runs from a checkout elsewhere.
+
 ## Not done, explicitly
 
-- B2-B5 (registry schema, EXTRACT task, LOAD task, the transactional
-  swap into landing, idempotency under retry, the real source-
-  disconnected proof) - not started. This file is the foundation they
-  get built on, not a preview of them.
-- No `packs/seaweedfs` yet - today's SeaweedFS instance is a POC
-  container, torn down and rebuilt by hand, not an installed, acceptance-
-  suite-proven pack.
-- dbt project mirroring HG's own (`ref()`/`source()`, macros, packages,
-  seeds, staging mapping) - a separate, later milestone per the plan,
-  after the bronze POC itself is proven end to end.
+- Scope is deliberately narrow: `odoo_postgres`, **one table**, **full
+  snapshot** (no incremental/watermark), no fixture validation for a bronze
+  pipeline. Extending any of those is new work, not a flag away.
+- Bronze objects and registry rows are never garbage-collected (no
+  retention policy; no `rollback` command). Both would be new decisions.
+- No `packs/seaweedfs` - SeaweedFS is still a hand-started container.
+  `packs/dlt` now installs pyarrow + boto3 (new pack step, not yet
+  re-proven by a fresh pack install on its own acceptance suite; the
+  verification above installed them into the same venv by hand).
+- The verification is the script above, run by hand against containers it
+  is told about - not yet part of `scripts/m25-acceptance-ci.sh`'s fully
+  self-provisioning flow.
+- dbt project mirroring HG (`ref()`/`source()`, macros, packages, seeds,
+  staging mapping) - the next milestone, not started.
+- A2 (gate `approval.promote()` on validation evidence) - not started.

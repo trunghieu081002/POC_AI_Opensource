@@ -24,12 +24,11 @@ source:
     user: "${HG_POC_SOURCE_USER}"
     password: "${HG_POC_SOURCE_PASSWORD}"
   tables: [res_partner]
-  # Full snapshot only (write_disposition="replace", the connector's own
-  # default - docs/layer2.md "Known limitations") - no `incremental:` key.
-  # Lands as-received into hg_bronze_poc_landing.res_partner in the no-
-  # bronze (bronze_staging: false) case; once B2-B5 gives bronze_staging
-  # real meaning, the same table lands the same way, just via bronze
-  # object storage first.
+  # Full snapshot only - no `incremental:` key (the loader refuses one
+  # together with bronze_staging). With bronze_staging: true the table
+  # reaches hg_bronze_poc_landing.res_partner via bronze object storage
+  # (extract_bronze -> load_bronze), not dlt's single extract+load step.
+  # Verified for real by scripts/hg-bronze-poc-verify.sh.
 
 warehouse:
   host: "${HG_POC_WH_HOST:-localhost}"
@@ -51,4 +50,14 @@ stages:
                  # failure instead of the real thing being tested.
 
 bronze_staging: true
+bronze:
+  # Any S3-compatible store - SeaweedFS for the POC, not locked to MinIO.
+  endpoint: "${HG_POC_BRONZE_ENDPOINT}"
+  bucket: "${HG_POC_BRONZE_BUCKET:-hg-bronze}"
+  access_key: "${HG_POC_BRONZE_ACCESS_KEY}"
+  secret_key: "${HG_POC_BRONZE_SECRET_KEY}"
+  prefix: bronze
+  # Small on purpose: a 5-row POC table becomes 3 bronze objects, so every
+  # run exercises the multi-object manifest path, never "one data.parquet".
+  chunk_rows: 2
 maturity: draft

@@ -1251,3 +1251,46 @@ def test_dag_extract_task_reads_full_refresh_from_the_run_conf_and_no_other_task
     assert 'full_refresh=bool((dag_run.conf or {}).get("full_refresh"))' in extract_call
     assert sum("full_refresh" in line for line in src.splitlines()) == 1   # only that one line
     ast.parse(src)
+
+
+# ------------------------------------------- published dir == source dir (dpagent at /opt/dpagent)
+
+def test_install_pipeline_files_does_not_delete_a_pipeline_that_already_lives_in_the_shared_dir(
+        tmp_path, monkeypatch):
+    """Found by a real deploy from a disposable host where dpagent is
+    installed at /opt/dpagent: its own pipelines/ directory *is*
+    SHARED_PIPELINES_DIR, so `rmtree(dest)` deleted the very source
+    `copytree(pipeline.root, dest)` was about to read - FileNotFoundError,
+    and the pipeline gone from disk."""
+    shared = tmp_path / "shared"
+    p = _pipeline(shared)            # root == shared / "demo"
+    assert p.root == shared / "demo"
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", shared)
+    dest = deploy.install_pipeline_files(p)
+    assert dest == shared / "demo"
+    assert (dest / "pipeline.yaml").is_file(), "the source manifest must survive"
+    assert oct((dest / "pipeline.yaml").stat().st_mode & 0o777) == "0o644"
+
+
+def test_install_pipeline_files_still_copies_when_source_and_shared_dirs_differ(
+        tmp_path, monkeypatch):
+    p = _pipeline(tmp_path / "checkout")
+    shared = tmp_path / "shared"
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(deploy, "SHARED_PIPELINES_DIR", shared)
+    dest = deploy.install_pipeline_files(p)
+    assert dest == shared / "demo" and (dest / "pipeline.yaml").is_file()
+    assert (tmp_path / "checkout" / "demo" / "pipeline.yaml").is_file()
+
+
+def test_undeploy_never_deletes_the_source_tree_it_shares_with_the_published_dir(
+        deployed, tmp_path):
+    from dpagent.pipelines import loader
+    shared = deploy.SHARED_PIPELINES_DIR
+    shutil.rmtree(shared / "demo")   # the fixture's stand-in; replace with a real source
+    p = _pipeline(shared)            # root == shared / "demo": same directory
+    assert p.root == shared / "demo"
+    result = deploy.undeploy(p)
+    assert (shared / "demo" / "pipeline.yaml").is_file(), "operator's source must survive"
+    assert result.published_files_removed is False

@@ -146,13 +146,30 @@ def compile_gate(gate: Gate, stage: Stage) -> CompiledGate:
 
 def dag_tasks(pipeline: Pipeline) -> list[Task]:
     landing = pipeline.landing
-    tasks = [
-        Task(id="extract", kind="extract",
-             description=f"dlt: {pipeline.source.connector} -> {landing.name}"),
-        Task(id=f"gate_{landing.name}", kind="gate",
-             description=f"{len(landing.gates)} gate(s) on {landing.name}",
-             depends_on=["extract"]),
-    ]
+    if pipeline.bronze_staging:
+        # HG's own split (docs/hg-bronze-staging.md): EXTRACT writes a batch
+        # to object storage and returns its id; LOAD takes only that id (via
+        # XCom, so an Airflow retry of LOAD reloads the same batch).
+        tasks = [
+            Task(id="extract_bronze", kind="extract_bronze",
+                 description=f"{pipeline.source.connector} -> bronze object storage "
+                             f"(one batch, manifest + checksums)"),
+            Task(id="load_bronze", kind="load_bronze",
+                 description=f"bronze batch -> {landing.name} (one transaction, "
+                             f"no source access)",
+                 depends_on=["extract_bronze"]),
+            Task(id=f"gate_{landing.name}", kind="gate",
+                 description=f"{len(landing.gates)} gate(s) on {landing.name}",
+                 depends_on=["load_bronze"]),
+        ]
+    else:
+        tasks = [
+            Task(id="extract", kind="extract",
+                 description=f"dlt: {pipeline.source.connector} -> {landing.name}"),
+            Task(id=f"gate_{landing.name}", kind="gate",
+                 description=f"{len(landing.gates)} gate(s) on {landing.name}",
+                 depends_on=["extract"]),
+        ]
     previous_gate = tasks[-1].id
 
     for stage in pipeline.stages[1:]:

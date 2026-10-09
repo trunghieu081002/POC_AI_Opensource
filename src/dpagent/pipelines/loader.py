@@ -109,6 +109,30 @@ class Warehouse:
 
 
 @dataclass
+class BronzeStorage:
+    """Where a `bronze_staging: true` pipeline's EXTRACT writes and its LOAD
+    reads - any S3-compatible object store (SeaweedFS for the POC; not
+    tied to MinIO or AWS). Credentials are `${VAR}` refs exactly like
+    every other connection field here, resolved only at run time
+    (runtime.resolve_refs), never stored resolved. `chunk_rows` is how
+    many source rows go into one bronze object - a table's bronze output
+    is a *set* of objects, never assumed to be exactly one file."""
+    endpoint: str
+    bucket: str
+    access_key: str
+    secret_key: str
+    region: str = "us-east-1"
+    prefix: str = "bronze"
+    chunk_rows: int = 50000
+
+
+# The only connector the bronze split is built and proven for so far
+# (docs/hg-bronze-staging.md) - a manifest asking for it with any other
+# connector is refused at load, not silently run down the old path.
+BRONZE_CONNECTORS = {"odoo_postgres"}
+
+
+@dataclass
 class Stage:
     name: str
     engine: str = ""                              # "" only for the first (dlt) stage
@@ -170,19 +194,17 @@ class Pipeline:
     # an operator sets it explicitly - no pipeline's real run path changes
     # just because this field exists.
     #
-    # **Decided, not yet implemented**: as of this field's introduction,
-    # `extract.py`/`runtime.py`/`deploy.py`/the cleanup paths do not yet
-    # branch on it at all - setting `true` today has no effect beyond
-    # loading successfully. That is the point of deciding this contract
-    # first (the HG-application plan's own "B0 + opt-in design" step,
-    # ahead of "B3/B4": writing the extract/load split against a moving
-    # target would mean rewriting it once the field's shape settled). The
-    # POC pipeline this was decided for is Postgres-sourced, one table,
-    # full snapshot - no incremental/watermark in this first pass (kept
-    # out of scope deliberately, to avoid compounding "has dlt's own state
-    # advanced past what Postgres actually has loaded" with "does the
-    # bronze split work at all").
+    # Decided first (B0), built in B2-B5 (docs/hg-bronze-staging.md): when
+    # true, `deploy.dag_tasks()` emits `extract_bronze` + `load_bronze`
+    # instead of the single dlt `extract` task, and `runtime.run_extract()`
+    # refuses to run for this pipeline at all (the old path must never be
+    # taken silently for a manifest that asked for the new one). Scope of
+    # what is built: odoo_postgres source, full snapshot only - no
+    # incremental/watermark, kept out on purpose to avoid compounding
+    # "does the bronze split work" with "has extraction state advanced past
+    # what Postgres actually loaded". Both enforced at load below.
     bronze_staging: bool = False
+    bronze: BronzeStorage | None = None   # required iff bronze_staging
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -360,6 +382,49 @@ def _validate_source(raw: dict, where: str) -> Source:
         files=files,
         resources=resources,
         incremental=_validate_incremental(raw.get("incremental"), connector, tables, where),
+    )
+
+
+def _validate_bronze(raw, bronze_staging: bool, source: Source, where: str) -> BronzeStorage | None:
+    if not bronze_staging:
+        if raw is not None:
+            raise PipelineError(
+                f"{where}: a `bronze:` section is only meaningful with "
+                f"`bronze_staging: true` - refusing dead configuration that "
+                f"would read as if it were in effect")
+        return None
+    if source.connector not in BRONZE_CONNECTORS:
+        raise PipelineError(
+            f"{where}: bronze_staging is only built for {sorted(BRONZE_CONNECTORS)} "
+            f"so far, not {source.connector!r}")
+    if len(source.tables) != 1:
+        raise PipelineError(
+            f"{where}: bronze_staging loads exactly one source table per pipeline "
+            f"for now (got {len(source.tables)}) - each LOAD is one transaction "
+            f"on one table, and atomicity across tables is not built")
+    if source.incremental:
+        raise PipelineError(
+            f"{where}: bronze_staging is full-snapshot only for now - remove "
+            f"`source.incremental` (watermark/cursor tracking is deliberately "
+            f"out of scope for the bronze split's first version)")
+    if not isinstance(raw, dict):
+        raise PipelineError(
+            f"{where}: bronze_staging: true needs a `bronze:` mapping "
+            f"(endpoint, bucket, access_key, secret_key)")
+    missing = [k for k in ("endpoint", "bucket", "access_key", "secret_key") if not raw.get(k)]
+    if missing:
+        raise PipelineError(f"{where}: bronze is missing required field(s) {missing}")
+    chunk_rows = raw.get("chunk_rows", 50000)
+    if isinstance(chunk_rows, bool) or not isinstance(chunk_rows, int) or chunk_rows < 1:
+        raise PipelineError(f"{where}: bronze.chunk_rows must be a positive integer")
+    prefix = str(raw.get("prefix", "bronze")).strip("/")
+    if not prefix:
+        raise PipelineError(f"{where}: bronze.prefix must not be empty")
+    return BronzeStorage(
+        endpoint=str(raw["endpoint"]), bucket=str(raw["bucket"]),
+        access_key=str(raw["access_key"]), secret_key=str(raw["secret_key"]),
+        region=str(raw.get("region", "us-east-1")), prefix=prefix,
+        chunk_rows=chunk_rows,
     )
 
 
@@ -584,11 +649,14 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
     if not isinstance(bronze_staging, bool):
         raise PipelineError(f"{where}: bronze_staging must be true or false")
 
+    source = _validate_source(data.get("source") or {}, where)
+    bronze = _validate_bronze(data.get("bronze"), bronze_staging, source, where)
+
     pipeline = Pipeline(
         name=name,
         summary=data.get("summary", ""),
         root=root,
-        source=_validate_source(data.get("source") or {}, where),
+        source=source,
         warehouse=_validate_warehouse(data.get("warehouse") or {}, where),
         stages=stages,
         schedule=_validate_schedule(data.get("schedule"), where),
@@ -596,6 +664,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         maturity=maturity,
         landing_dataset_name=landing_dataset_name,
         bronze_staging=bronze_staging,
+        bronze=bronze,
     )
 
     for stage in pipeline.stages:
