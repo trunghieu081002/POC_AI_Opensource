@@ -538,6 +538,30 @@ def test_invalid_landing_dataset_name_fails_at_load(root, bad):
         loader.load("demo", root)
 
 
+# ---------------------------------------------------------------- bronze_staging
+
+def test_no_bronze_staging_key_defaults_to_false(root):
+    """False for every existing hand-authored pipeline - the opt-in HG
+    bronze-staging split (docs/layer2.md) changes nothing for a manifest
+    that never mentions it."""
+    _write(root, "demo", _minimal())
+    pipeline = loader.load("demo", root)
+    assert pipeline.bronze_staging is False
+
+
+def test_bronze_staging_true_is_parsed(root):
+    _write(root, "demo", _minimal(bronze_staging=True))
+    pipeline = loader.load("demo", root)
+    assert pipeline.bronze_staging is True
+
+
+@pytest.mark.parametrize("bad", ["true", 1, 0, "yes", [], {}, None])
+def test_invalid_bronze_staging_fails_at_load(root, bad):
+    _write(root, "demo", _minimal(bronze_staging=bad))
+    with pytest.raises(loader.PipelineError, match="bronze_staging"):
+        loader.load("demo", root)
+
+
 # ---------------------------------------------------------------- DPAGENT_PIPELINES hint
 
 def test_a_missing_pipeline_names_a_leftover_dpagent_pipelines_override(root, monkeypatch):

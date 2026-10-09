@@ -1,14 +1,14 @@
 {
   "cleanup": {
-    "overall": "pass",
+    "overall": "fail",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_BE43B533_SRC_DATABASE, DPAGENT_VALIDATE_BE43B533_SRC_HOST, DPAGENT_VALIDATE_BE43B533_SRC_PASSWORD, DPAGENT_VALIDATE_BE43B533_SRC_PORT, DPAGENT_VALIDATE_BE43B533_SRC_USER, DPAGENT_VALIDATE_BE43B533_WH_DATABASE, DPAGENT_VALIDATE_BE43B533_WH_HOST, DPAGENT_VALIDATE_BE43B533_WH_PASSWORD, DPAGENT_VALIDATE_BE43B533_WH_PORT, DPAGENT_VALIDATE_BE43B533_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_522042D1_SRC_DATABASE, DPAGENT_VALIDATE_522042D1_SRC_HOST, DPAGENT_VALIDATE_522042D1_SRC_PASSWORD, DPAGENT_VALIDATE_522042D1_SRC_PORT, DPAGENT_VALIDATE_522042D1_SRC_USER, DPAGENT_VALIDATE_522042D1_WH_DATABASE, DPAGENT_VALIDATE_522042D1_WH_HOST, DPAGENT_VALIDATE_522042D1_WH_PASSWORD, DPAGENT_VALIDATE_522042D1_WH_PORT, DPAGENT_VALIDATE_522042D1_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "source_database": "pass",
     "source_role": "pass",
-    "warehouse_database": "pass",
-    "warehouse_role": "pass"
+    "warehouse_database": "fail: ERROR:  database \"dpagent_fixture_wh_27350abb9c\" is being accessed by other users\nDETAIL:  There is 1 other session using the database.",
+    "warehouse_role": "fail: ERROR:  role \"dpagent_fixture_wh_27350abb9c\" cannot be dropped because some objects depend on it\nDETAIL:  owner of database dpagent_fixture_wh_27350abb9c\n10 objects in database dpagent_fixture_wh_27350abb9c"
   },
-  "clone_name": "m25_monthly_sales__validate__be43b533",
+  "clone_name": "m25_monthly_sales__validate__522042d1",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
@@ -91,11 +91,11 @@
       ]
     }
   },
-  "overall": "pass",
+  "overall": "fail",
   "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
   "run_ids": [
-    21,
-    22
+    34,
+    35
   ],
   "run_status": {
     "run_1": "ok",

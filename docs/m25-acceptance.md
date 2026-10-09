@@ -192,20 +192,33 @@ the control database. This is the real test of isolation this whole M2.4.x
 series of fixes was for — "Cần ghi nhận database/user thực tế từ đường
 chạy, không chỉ nhìn manifest đã đổi ref."
 
-## Update - Steps 2 and 3, status as of 2026-10-08
+## Update - Steps 2 and 3, status as of 2026-10-09
 
-**Step 2's own retained evidence and timeout policy** are now in the repo -
+**Step 2's own retained evidence and timeout policy** are in the repo -
 see the status line at the top of this file,
 [`docs/m25-vm-results.md`](m25-vm-results.md),
 [`docs/evidence/m25/`](evidence/m25/) and
 [`docs/m25-timeout-policy.md`](m25-timeout-policy.md). This section is
 about Step 3 only, and does not restate those.
 
-**Step 3 has started, not finished.**
+**Step 3: all 14 scenarios now automated** (the matrix's 12 rows, with
+row 6 and row 9 each split into two - late vs. partial deploy failure,
+source vs. warehouse provisioning failure - matching
+`docs/m25-vm-results.md`'s own split).
 [`tests/m25_acceptance/run_matrix.py`](../tests/m25_acceptance/run_matrix.py)
-automates 8 of the 12+ scenarios (connection shape × 3, correct-twice,
-wrong-expected, gate under/over threshold, timeout) by calling
-`fixture.run_fixture()` directly against a real stack;
+calls `fixture.run_fixture()` directly against a real stack, with real
+fault injection for every negative scenario - no mocking: a genuine
+Postgres name collision for the two provisioning-failure scenarios (a
+pre-created database at the exact name `pg_throwaway` will try next,
+via a scoped `uuid.uuid4` patch), a real held-open `psql` session for
+`drop-failure`, a real pre-existing file blocking `deploy()`'s own
+`mkdir`/`shutil.rmtree` for the two deploy-failure scenarios, a real
+nonsense Postgres type for `seed-failure`. Each scenario's actual outcome
+is checked against an explicit `EXPECTATIONS` entry, not just "ran
+without raising" - see `docs/evidence/m25-automated/README.md`'s "Found
+along the way" for two scenario-design mistakes this caught before they
+were ever reported as the system's own bugs.
+
 [`scripts/m25-acceptance-ci.sh`](../scripts/m25-acceptance-ci.sh) builds
 the disposable host itself (a systemd container from
 [`scripts/m25-disposable-host.Dockerfile`](../scripts/m25-disposable-host.Dockerfile),
@@ -219,24 +232,30 @@ relate. A registry (`tests/m25_acceptance/registry.py`, modelled on the
 SourceRegistry/batch_id+watermark pattern in `phulee9/hgmedia`) records
 one batch per scenario per run - commit, host, pipeline/fixture/expected
 hashes, verdict, cleanup status - so a later run can answer "has this
-exact combination already been proven" without re-deriving it, which is
-what Step 4's planned `promote()` gate is meant to query.
+exact combination already been proven" without re-deriving it. This
+registry is specific to the acceptance suite's own runs - a *different*
+mechanism from whatever Step 4's `promote()` gate ends up reading (see
+"Not done" below); the two are not the same table.
 
-**Still not automated** - the 6 scenarios needing host-level fault
-injection the VM run did by hand (seed failure, partial/late deploy
-failure, source/warehouse provisioning failure, a real `DROP` failure).
-`run_matrix.py`'s own `UNIMPLEMENTED_SCENARIOS` names them, and
-`scripts/m25-acceptance-ci.sh` prints that list on every run rather than
-let a clean exit code imply full coverage. Scripting each one needs its
-own deliberate fault (a bad column type, a blocked project directory, a
-disk/role collision, a held-open connection) reproduced safely and
-repeatably inside the container - not yet done.
+**Full-matrix mode, not silent partial coverage.** `run_matrix.py`'s exit
+code distinguishes "every requested scenario matched its expectation"
+(0) from "ran clean but fewer than all 14 were requested" (3) from "a
+scenario errored or mismatched" (1) - running a subset never prints or
+exits as if the full matrix had been proven (see the module's own
+docstring for the exact contract).
 
 ## What this file does not claim
 
 - The matrix above specifies requirements, not new results. Manual results and
   their limits are recorded separately in m25-vm-results.md and the retained evidence index.
-- Step 3 is partial, stated above - not every scenario is automated, and
-  automating the rest is real remaining work, not an afterthought.
+- Step 3 automates all 14 scenarios, but this is the acceptance *suite*
+  proving the harness itself works - it is not, by itself, evidence that
+  any *real* pipeline may be promoted. A negative scenario (e.g.
+  `wrong-expected`) correctly failing is a PASS for this driver and is
+  never promotion evidence on its own - that distinction is Step 4's job.
 - Step 4 (gating `approval.promote()` on a still-valid, still-matching
-  fixture/expected validation report before promotion) has not started.
+  fixture/expected validation report before promotion) has not started,
+  and does not depend on `tests/m25_acceptance/registry.py` - that table
+  tracks the acceptance *suite's* own runs; Step 4 needs its own
+  product-code mechanism for recording a real pipeline's validation
+  evidence, which the acceptance harness would call into, not duplicate.

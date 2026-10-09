@@ -1,14 +1,16 @@
 """The M2.5 acceptance-matrix driver - Step 3 of the plan docs/m25-acceptance.md
 was written under ("Tự động hóa bộ kiểm thử vừa chứng minh").
 
-Runs a subset of the 12-row matrix for real against whatever disposable
-host this process is executing on (never against this repo's own dev
-host - see scripts/m25-acceptance-ci.sh for how that host gets built).
-Calls `fixture.run_fixture()` directly, the same function
+Runs the 12-row matrix for real against whatever disposable host this
+process is executing on (never against this repo's own dev host - see
+scripts/m25-acceptance-ci.sh for how that host gets built). Calls
+`fixture.run_fixture()` directly, the same function
 `dpagent pipeline validate --fixture` calls - this is not a wrapper
-around the CLI because two of the scenarios (timeout, a short
-`wait_timeout`) need a parameter the CLI does not expose, and driving all
-of them the same way keeps every scenario's result directly comparable.
+around the CLI because several scenarios need either a parameter the CLI
+does not expose (timeout's `wait_timeout`) or in-process fault injection
+(monkeypatching `pg_throwaway.throwaway_database`/`uuid.uuid4` for the
+duration of one scenario) that only works calling the library directly,
+in the same process.
 
 NOT a pytest file on purpose (no `test_` prefix anywhere in this
 directory) - it needs root, passwordless sudo to the postgres OS user,
@@ -19,48 +21,54 @@ refuses to pretend it checked anything). Run explicitly:
 
     /opt/dpagent/.venv/bin/python tests/m25_acceptance/run_matrix.py [SCENARIO ...]
 
-with no arguments to run every implemented scenario.
+with no arguments to run every scenario.
 
-Scope, stated honestly (docs/m25-acceptance.md's own convention - say
-what is not covered rather than let a passing exit code imply more than
-it proved):
-
-  Implemented here  - connection shape (ref/literal/mixed), correct
-                       fixture run twice (idempotent), wrong expected,
-                       gate under/over the quarantine threshold, timeout.
-  NOT implemented   - seed failure, partial/late deploy failure, source/
-                       warehouse provisioning failure, a real DROP
-                       failure. Each needs host-level fault injection
-                       (a bad column type, a blocked project directory, a
-                       disk/role collision, an open connection held
-                       against the throwaway database) that was done by
-                       hand on the M2.5 VM (docs/m25-vm-results.md) and
-                       has not yet been scripted here - tracked, not
-                       silently dropped from this file's own scope
-                       below (`UNIMPLEMENTED_SCENARIOS`).
+Every scenario's REAL outcome is checked against what it is supposed to
+prove (`EXPECTATIONS` below) - not just "did it run without raising."
+This matters because several scenarios are negative tests: `wrong-expected`
+is supposed to fail its comparison, `timeout` is supposed to fail cleanup.
+A negative scenario behaving exactly as expected is a PASS for this
+driver; it is never, by itself, evidence a real pipeline may be promoted
+(that distinction is Step 4's own job - docs/m25-acceptance.md). The
+final summary line never claims "full acceptance" while any scenario
+mismatched its expectation or was skipped - see `main()`'s own exit code
+table.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from dpagent.pipelines import deploy as deploy_mod  # noqa: E402
 from dpagent.pipelines import fixture, loader  # noqa: E402
+from dpagent.pipelines import pg_throwaway  # noqa: E402
 import registry  # noqa: E402
 
 PIPELINE_DIR = REPO_ROOT / "pipelines" / "m25_monthly_sales"
 OUT_DIR = Path("/root/m25-evidence")   # on whatever host this runs on, not this repo
 
-UNIMPLEMENTED_SCENARIOS = [
-    "seed-failure", "partial-deploy-failure", "late-deploy-failure",
-    "source-provisioning-failure", "warehouse-provisioning-failure",
-    "drop-failure",
-]
+
+@contextlib.contextmanager
+def _patched(obj, name: str, value):
+    """Monkeypatches `obj.name` for the duration of one scenario, restored
+    in `finally` regardless of how the block exits - the same discipline
+    `pytest`'s own `monkeypatch` fixture gives, reimplemented here because
+    this file runs as a plain script, not under pytest (see module
+    docstring for why it cannot)."""
+    original = getattr(obj, name)
+    setattr(obj, name, value)
+    try:
+        yield
+    finally:
+        setattr(obj, name, original)
 
 
 def _git_commit() -> str:
@@ -81,10 +89,10 @@ def _git_commit() -> str:
         return "unknown"
 
 
-def _fixture_rows(rows: list[dict]) -> fixture.Fixture:
+def _fixture_rows(rows: list[dict], *, id_type: str = "bigint") -> fixture.Fixture:
     return fixture.Fixture(tables=[fixture.FixtureTable(
         name="sale_order",
-        columns={"id": "bigint", "write_date": "timestamp", "amount_total": "numeric"},
+        columns={"id": id_type, "write_date": "timestamp", "amount_total": "numeric"},
         rows=rows,
     )])
 
@@ -101,7 +109,7 @@ _CORRECT_EXPECTED = fixture.ExpectedResult(
 )
 
 
-def _pipeline(connection_shape: str, tmp_path: Path) -> loader.Pipeline:
+def _pipeline(connection_shape: str, tmp_path: Path) -> tuple[loader.Pipeline, Path]:
     """`connection_shape` in {"ref", "literal", "mixed"} - the M2.5
     matrix's row 1. "ref" is the checked-in pipeline.yaml verbatim
     (every connection field a ${VAR}); "literal" replaces every field
@@ -157,6 +165,8 @@ def _result(report: fixture.FixtureRunReport, manifest: Path,
         expected_hash=_hash_rows(expected.rows),
     )
 
+
+# ------------------------------------------------------- the 8 scenarios from PR #26
 
 def run_connection_shape(shape: str, tmp_path: Path) -> dict:
     pipeline, manifest = _pipeline(shape, tmp_path)
@@ -214,6 +224,167 @@ def run_timeout(tmp_path: Path) -> dict:
     return _result(report, manifest, _CORRECT_ROWS, _CORRECT_EXPECTED)
 
 
+# -------------------------------------------- the 6 scenarios added this round
+
+def run_seed_failure(tmp_path: Path) -> dict:
+    """A column type `seed_source()`'s own `CREATE TABLE` genuinely cannot
+    apply - no mock, a real Postgres parse error on a nonsense type name."""
+    pipeline, manifest = _pipeline("ref", tmp_path)
+    fx = _fixture_rows(_CORRECT_ROWS, id_type="not_a_real_pg_type")
+    report = fixture.run_fixture(pipeline, fx, _CORRECT_EXPECTED)
+    return _result(report, manifest, _CORRECT_ROWS, _CORRECT_EXPECTED)
+
+
+def _deploy_failure(tmp_path: Path, *, late: bool) -> dict:
+    """Blocks a real path `deploy()` itself tries to create with a
+    pre-existing plain file - `mkdir()`/`shutil.rmtree()` both raise a real
+    `OSError` subclass on that regardless of root (a filesystem TYPE
+    conflict, not a permission check root can bypass - the exact gap the
+    M2.5-prep review flagged plain `chmod` fault injection would miss).
+
+    `late=False` blocks `write_artifacts()`'s very first `mkdir` - deploy()
+    fails before a single real side effect. `late=True` blocks
+    `install_pipeline_files()`'s `dest` (the clone's own publish
+    directory) - by the time this runs, schema/procedures/dbt models have
+    already been applied for real, so this is a failure *after* real
+    artifacts exist, not before.
+
+    The blocker is removed in a `finally` *around the single faulting call
+    only* - found the hard way (first version of this scenario) that
+    leaving it in place through `run_fixture()`'s own cleanup makes
+    `undeploy()` hit the exact same obstruction trying to remove the very
+    path that failed to be created, so cleanup "fails" for a reason that
+    has nothing to do with what this scenario is supposed to prove, and -
+    worse - leaves a real clone directory (and its dbt model, aliased to
+    the plain table name) behind in the shared project, which then breaks
+    the *next* scenario's own dbt compile with an alias collision. A real
+    transient fault (the kind row 6 of the matrix describes - "revoke
+    write access... mid-run") would also typically be gone by the time
+    cleanup runs; this mirrors that, not a permanent obstruction."""
+    pipeline, manifest = _pipeline("ref", tmp_path)
+    fx = _fixture_rows(_CORRECT_ROWS)
+
+    target = "install_pipeline_files" if late else "write_artifacts"
+    original_fn = getattr(deploy_mod, target)
+
+    def faulty(pl):
+        if late:
+            deploy_mod.SHARED_PIPELINES_DIR.mkdir(parents=True, exist_ok=True)
+            blocker = deploy_mod.SHARED_PIPELINES_DIR / pl.name
+        else:
+            blocker = pl.root / "build"
+        blocker.write_text("A1 fault injection - removed again before this call returns")
+        try:
+            return original_fn(pl)
+        finally:
+            if blocker.exists() and blocker.is_file():
+                blocker.unlink()
+
+    with _patched(deploy_mod, target, faulty):
+        report = fixture.run_fixture(pipeline, fx, _CORRECT_EXPECTED)
+    return _result(report, manifest, _CORRECT_ROWS, _CORRECT_EXPECTED)
+
+
+def run_partial_deploy_failure(tmp_path: Path) -> dict:
+    return _deploy_failure(tmp_path, late=False)
+
+
+def run_late_deploy_failure(tmp_path: Path) -> dict:
+    return _deploy_failure(tmp_path, late=True)
+
+
+def _provisioning_failure(tmp_path: Path, *, target_prefix: str) -> dict:
+    """Pre-creates, for real, a Postgres database named exactly what
+    `pg_throwaway.throwaway_database(prefix=target_prefix)` will try to
+    `CREATE DATABASE` next - forcing `CREATE ROLE` to succeed and
+    `CREATE DATABASE` to fail on a real name collision, the specific
+    sub-case the review asked for. The exact name is normally
+    unpredictable (`uuid.uuid4().hex[:10]`); this works only because
+    `uuid.uuid4` is patched, for this one scenario, to a single fixed
+    value - real collision, not a simulated error message."""
+    pipeline, manifest = _pipeline("ref", tmp_path)
+    fx = _fixture_rows(_CORRECT_ROWS)
+
+    fixed = uuid.uuid4()
+    suffix = fixed.hex[:10]
+    colliding_db = f"{target_prefix}_{suffix}"
+
+    created = pg_throwaway._run_as_postgres(f"CREATE DATABASE {colliding_db};")
+    if created is None or created.returncode != 0:
+        raise RuntimeError(
+            f"scenario setup itself failed to pre-create the colliding database "
+            f"{colliding_db!r}: {pg_throwaway._detail_of(created, timeout=30)}")
+    try:
+        with _patched(uuid, "uuid4", lambda: fixed):
+            report = fixture.run_fixture(pipeline, fx, _CORRECT_EXPECTED)
+    finally:
+        pg_throwaway._run_as_postgres(f"DROP DATABASE IF EXISTS {colliding_db};")
+    return _result(report, manifest, _CORRECT_ROWS, _CORRECT_EXPECTED)
+
+
+def run_source_provisioning_failure(tmp_path: Path) -> dict:
+    # Source is entered first in run_fixture()'s nested `with` - colliding
+    # it means the warehouse throwaway is never even attempted.
+    return _provisioning_failure(tmp_path, target_prefix="dpagent_fixture_src")
+
+
+def run_warehouse_provisioning_failure(tmp_path: Path) -> dict:
+    # Source is entered (and succeeds) first; only the warehouse collides -
+    # proves the already-created source is still torn down even though
+    # the *second* context manager in the `with` statement is the one that
+    # raised.
+    return _provisioning_failure(tmp_path, target_prefix="dpagent_fixture_wh")
+
+
+def run_drop_failure(tmp_path: Path) -> dict:
+    """Holds a real, separate `psql` connection open against the
+    warehouse throwaway for the duration of the run - `DROP DATABASE`
+    genuinely cannot proceed while another session holds it, the same
+    real Postgres behaviour `docs/m25-vm-results.md`'s own "timeout and
+    DROP failure" row hit by accident; this forces it on purpose, for the
+    warehouse specifically. Cleans up for real afterward (closes the
+    holder, then drops what the real teardown could not) so this
+    scenario never leaks a database/role onto the host."""
+    pipeline, manifest = _pipeline("ref", tmp_path)
+    fx = _fixture_rows(_CORRECT_ROWS)
+
+    captured: dict = {}
+    original_throwaway = pg_throwaway.throwaway_database
+
+    @contextlib.contextmanager
+    def wrapped(prefix: str = "dpagent_throwaway"):
+        with original_throwaway(prefix) as db:
+            if prefix == "dpagent_fixture_wh":
+                captured["database"] = db.database
+                captured["user"] = db.user
+                captured["proc"] = subprocess.Popen(
+                    ["psql", "-h", db.host, "-U", db.user, "-d", db.database,
+                     "-c", "SELECT pg_sleep(120)"],
+                    env={"PGPASSWORD": db.password, "PATH": "/usr/bin:/bin"},
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            yield db
+
+    try:
+        with _patched(pg_throwaway, "throwaway_database", wrapped):
+            report = fixture.run_fixture(pipeline, fx, _CORRECT_EXPECTED)
+    finally:
+        proc = captured.get("proc")
+        if proc is not None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+        # The real DROP inside run_fixture() ran *while the holder was
+        # still alive* and is expected to have failed - only now that the
+        # holder is gone can this scenario clean up for real.
+        if "database" in captured:
+            pg_throwaway._run_as_postgres(f"DROP DATABASE IF EXISTS {captured['database']};")
+            pg_throwaway._run_as_postgres(f"DROP ROLE IF EXISTS {captured['user']};")
+    return _result(report, manifest, _CORRECT_ROWS, _CORRECT_EXPECTED)
+
+
 SCENARIOS = {
     "ref-connection": lambda tmp: run_connection_shape("ref", tmp),
     "literal-connection": lambda tmp: run_connection_shape("literal", tmp),
@@ -223,17 +394,78 @@ SCENARIOS = {
     "gate-under-threshold": run_gate_under_threshold,
     "gate-over-threshold": run_gate_over_threshold,
     "timeout": run_timeout,
+    "seed-failure": run_seed_failure,
+    "partial-deploy-failure": run_partial_deploy_failure,
+    "late-deploy-failure": run_late_deploy_failure,
+    "source-provisioning-failure": run_source_provisioning_failure,
+    "warehouse-provisioning-failure": run_warehouse_provisioning_failure,
+    "drop-failure": run_drop_failure,
 }
+
+# What each scenario is actually supposed to prove - checked against the
+# real `fixture_report_dict()` output, not merely "ran without raising".
+# `overall` is "pass" | "fail" | "unavailable" (fixture.py's own three
+# values - never "fail" when it means "could not even attempt it").
+# Each entry: a callable(result_dict) -> (matched: bool, detail: str).
+
+def _expect(overall: str, cleanup_overall: str | None = None, **extra):
+    def check(result: dict) -> tuple[bool, str]:
+        if result.get("overall") != overall:
+            return False, f"expected overall={overall!r}, got {result.get('overall')!r}"
+        if cleanup_overall is not None:
+            actual_cleanup = result.get("cleanup", {}).get("overall")
+            if actual_cleanup != cleanup_overall:
+                return False, f"expected cleanup.overall={cleanup_overall!r}, got {actual_cleanup!r}"
+        for key, expected_value in extra.items():
+            path = key.split("__")
+            node = result
+            for part in path:
+                node = node.get(part, {}) if isinstance(node, dict) else None
+            if node != expected_value:
+                return False, f"expected {key}={expected_value!r}, got {node!r}"
+        return True, "matched expectation"
+    return check
+
+
+EXPECTATIONS = {
+    "ref-connection": _expect("pass", "pass"),
+    "literal-connection": _expect("pass", "pass"),
+    "mixed-connection": _expect("pass", "pass"),
+    "correct-twice": _expect("pass", "pass", comparison__idempotent=True),
+    "wrong-expected": _expect("fail", "pass"),
+    "gate-under-threshold": _expect("pass", "pass"),
+    "gate-over-threshold": _expect("fail", "pass"),
+    "timeout": _expect("fail", "fail", run_status__run_1="timeout"),
+    "seed-failure": _expect("fail", "pass"),
+    "partial-deploy-failure": _expect("fail", "pass"),
+    "late-deploy-failure": _expect("fail", "pass"),
+    "source-provisioning-failure": _expect(
+        "unavailable", cleanup__warehouse_database="not_attempted"),
+    "warehouse-provisioning-failure": _expect(
+        "unavailable", cleanup__source_database="pass",
+        cleanup__warehouse_database="not_attempted"),
+    # Not "pass" despite both real runs succeeding with the right numbers -
+    # `FixtureRunReport.ok` requires `throwaway_cleanup_ok` too, by design
+    # ("a run that got the right numbers but left... an orphaned throwaway
+    # role/database behind is not a clean result" - fixture.py's own
+    # `ok` docstring). Found the hard way: this scenario's first version
+    # asserted "pass" here and was simply wrong about what the system
+    # promises, not a bug in the system.
+    "drop-failure": _expect("fail", "fail"),
+}
+
+assert set(EXPECTATIONS) == set(SCENARIOS), (
+    "every scenario needs an expectation - a scenario nobody checks the "
+    "outcome of proves nothing (see module docstring)")
 
 
 def main(argv: list[str]) -> int:
     import tempfile
 
     wanted = argv or list(SCENARIOS)
-    unknown = sorted(set(wanted) - set(SCENARIOS) - set(UNIMPLEMENTED_SCENARIOS))
+    unknown = sorted(set(wanted) - set(SCENARIOS))
     if unknown:
-        print(f"unknown scenario(s): {unknown} - known: {sorted(SCENARIOS)}, "
-             f"not yet implemented: {UNIMPLEMENTED_SCENARIOS}", file=sys.stderr)
+        print(f"unknown scenario(s): {unknown} - known: {sorted(SCENARIOS)}", file=sys.stderr)
         return 2
 
     pre = fixture.preflight_fixture_host(loader.load("m25_monthly_sales", REPO_ROOT / "pipelines"))
@@ -243,18 +475,18 @@ def main(argv: list[str]) -> int:
 
     commit = _git_commit()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    failures = []
+    errored, mismatched, matched = [], [], []
     for name in wanted:
-        if name in UNIMPLEMENTED_SCENARIOS:
-            print(f"SKIP  {name} - not yet automated (see module docstring)")
-            continue
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 result = SCENARIOS[name](Path(tmp))
             except Exception as exc:
-                print(f"ERROR {name} - driver itself raised: {exc!r}")
-                failures.append(name)
+                print(f"ERROR {name:28} driver itself raised: {exc!r}")
+                errored.append(name)
                 continue
+        ok, detail = EXPECTATIONS[name](result)
+        (matched if ok else mismatched).append(name)
+
         redacted = registry.redact_report(result)
         report_path = OUT_DIR / f"{name}.json"
         report_path.write_text(json.dumps(redacted, indent=2, sort_keys=True))
@@ -268,12 +500,28 @@ def main(argv: list[str]) -> int:
             report_path=str(report_path),
         )
         registry.append_batch(batch, registry_path=OUT_DIR / "registry.jsonl")
-        print(f"{'ok' if result.get('overall') in ('pass', 'fail') else 'ERROR':5} {name:24} "
-             f"overall={result.get('overall')} cleanup={result.get('cleanup', {}).get('overall')}")
+        tag = "ok  " if ok else "FAIL"
+        print(f"{tag}  {name:28} overall={result.get('overall')} "
+             f"cleanup={result.get('cleanup', {}).get('overall')} - {detail}")
 
-    if failures:
-        print(f"\n{len(failures)} scenario(s) raised instead of producing a result: {failures}")
+    total = len(SCENARIOS)
+    requested = len(wanted)
+    print(f"\n{len(matched)}/{requested} requested scenarios matched their expectation "
+         f"({total} known in total).")
+    if errored:
+        print(f"{len(errored)} scenario(s) raised instead of producing a result: {errored}")
+    if mismatched:
+        print(f"{len(mismatched)} scenario(s) ran but did NOT match their expectation: {mismatched}")
+    if requested < total:
+        print(f"{total - requested} known scenario(s) were not requested this run: "
+             f"{sorted(set(SCENARIOS) - set(wanted))}")
+    # Never print a bare "all good" - the exit code table below is the
+    # actual contract, and nothing here should let a partial run read as
+    # full acceptance.
+    if errored or mismatched:
         return 1
+    if requested < total:
+        return 3   # ran clean, but this was not the full matrix
     return 0
 
 

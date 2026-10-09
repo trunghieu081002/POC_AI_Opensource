@@ -160,6 +160,29 @@ class Pipeline:
     # runs against a throwaway *database*, never the real shared warehouse -
     # the name coinciding does not mean the data does.
     landing_dataset_name: str | None = None
+    # Opt-in, per pipeline, decided *before* any of extract/runtime/deploy/
+    # cleanup is built against it - the HG (phulee9/hgmedia) pattern this
+    # field exists for: `landing`'s own extract/load split into an
+    # intermediate S3-compatible "bronze" object-storage stage, instead of
+    # dlt's current single extract+load step straight into the landing
+    # Postgres schema. `False` for every existing pipeline (demo/
+    # quickstart/quickstart_dbt/m25_monthly_sales) and stays that way until
+    # an operator sets it explicitly - no pipeline's real run path changes
+    # just because this field exists.
+    #
+    # **Decided, not yet implemented**: as of this field's introduction,
+    # `extract.py`/`runtime.py`/`deploy.py`/the cleanup paths do not yet
+    # branch on it at all - setting `true` today has no effect beyond
+    # loading successfully. That is the point of deciding this contract
+    # first (the HG-application plan's own "B0 + opt-in design" step,
+    # ahead of "B3/B4": writing the extract/load split against a moving
+    # target would mean rewriting it once the field's shape settled). The
+    # POC pipeline this was decided for is Postgres-sourced, one table,
+    # full snapshot - no incremental/watermark in this first pass (kept
+    # out of scope deliberately, to avoid compounding "has dlt's own state
+    # advanced past what Postgres actually has loaded" with "does the
+    # bronze split work at all").
+    bronze_staging: bool = False
 
     def path(self, relative: str) -> Path:
         return self.root / relative
@@ -557,6 +580,10 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
             not isinstance(landing_dataset_name, str) or not landing_dataset_name.strip()):
         raise PipelineError(f"{where}: landing_dataset_name must be a non-empty string")
 
+    bronze_staging = data.get("bronze_staging", False)
+    if not isinstance(bronze_staging, bool):
+        raise PipelineError(f"{where}: bronze_staging must be true or false")
+
     pipeline = Pipeline(
         name=name,
         summary=data.get("summary", ""),
@@ -568,6 +595,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         timeouts=_validate_timeouts(data.get("timeouts"), where),
         maturity=maturity,
         landing_dataset_name=landing_dataset_name,
+        bronze_staging=bronze_staging,
     )
 
     for stage in pipeline.stages:

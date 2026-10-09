@@ -2,13 +2,13 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_C84A8136_SRC_DATABASE, DPAGENT_VALIDATE_C84A8136_SRC_HOST, DPAGENT_VALIDATE_C84A8136_SRC_PASSWORD, DPAGENT_VALIDATE_C84A8136_SRC_PORT, DPAGENT_VALIDATE_C84A8136_SRC_USER, DPAGENT_VALIDATE_C84A8136_WH_DATABASE, DPAGENT_VALIDATE_C84A8136_WH_HOST, DPAGENT_VALIDATE_C84A8136_WH_PASSWORD, DPAGENT_VALIDATE_C84A8136_WH_PORT, DPAGENT_VALIDATE_C84A8136_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_81EC9EAD_SRC_DATABASE, DPAGENT_VALIDATE_81EC9EAD_SRC_HOST, DPAGENT_VALIDATE_81EC9EAD_SRC_PASSWORD, DPAGENT_VALIDATE_81EC9EAD_SRC_PORT, DPAGENT_VALIDATE_81EC9EAD_SRC_USER, DPAGENT_VALIDATE_81EC9EAD_WH_DATABASE, DPAGENT_VALIDATE_81EC9EAD_WH_HOST, DPAGENT_VALIDATE_81EC9EAD_WH_PASSWORD, DPAGENT_VALIDATE_81EC9EAD_WH_PORT, DPAGENT_VALIDATE_81EC9EAD_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__c84a8136",
+  "clone_name": "m25_monthly_sales__validate__81ec9ead",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -50,7 +50,7 @@
   "overall": "fail",
   "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
   "run_ids": [
-    14
+    32
   ],
   "run_status": {
     "run_1": "failed",
