@@ -130,6 +130,16 @@ def _renamed_ref(kind: str, suffix: str, key: str) -> str:
 # `_unsupported_source_connector_reason`'s own docstring.
 _FIXTURE_SOURCE_CONNECTORS = {"odoo_postgres"}
 
+# A validation clone carries no bronze storage of its own (nothing here
+# provisions a throwaway bucket, and `_write_clone_manifest` does not copy
+# `bronze:`) - so a clone of a bronze pipeline would silently validate the
+# *old* single-step dlt path instead of the one the manifest asks for.
+# Refused outright until fixture validation grows a bronze path.
+_BRONZE_FIXTURE_REASON = (
+    "bronze_staging pipelines have no fixture-validation path yet - a "
+    "validation clone would run the old dlt extract instead of the bronze "
+    "EXTRACT/LOAD split this manifest asks for (docs/hg-bronze-staging.md)")
+
 
 def _unsupported_source_connector_reason(pipeline: Pipeline, *, strict: bool = True) -> str | None:
     """`None` when this pipeline's source connector is one the fixture
@@ -296,6 +306,8 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
     reason = _unsupported_source_connector_reason(pipeline, strict=False)
     if reason:
         raise ValidationCloneError(reason)
+    if pipeline.bronze_staging:
+        raise ValidationCloneError(_BRONZE_FIXTURE_REASON)
 
     suffix = _validation_suffix()
     clone_name = f"{pipeline.name}__validate__{suffix}"
@@ -866,6 +878,8 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     connector_reason = _unsupported_source_connector_reason(pipeline)
     if connector_reason:
         reasons.append(connector_reason)
+    if pipeline.bronze_staging:
+        reasons.append(_BRONZE_FIXTURE_REASON)
 
     if not (hasattr(os, "geteuid") and os.geteuid() == 0):
         reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")

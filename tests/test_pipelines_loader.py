@@ -549,10 +549,70 @@ def test_no_bronze_staging_key_defaults_to_false(root):
     assert pipeline.bronze_staging is False
 
 
+_BRONZE = {"endpoint": "${BRONZE_URL}", "bucket": "b", "access_key": "${AK}",
+           "secret_key": "${SK}"}
+
+
 def test_bronze_staging_true_is_parsed(root):
-    _write(root, "demo", _minimal(bronze_staging=True))
+    _write(root, "demo", _minimal(bronze_staging=True, bronze=_BRONZE))
     pipeline = loader.load("demo", root)
     assert pipeline.bronze_staging is True
+    assert pipeline.bronze.endpoint == "${BRONZE_URL}"   # never resolved at load
+    assert pipeline.bronze.chunk_rows == 50000
+    assert pipeline.bronze.prefix == "bronze"
+
+
+def test_bronze_staging_true_without_a_bronze_section_fails(root):
+    _write(root, "demo", _minimal(bronze_staging=True))
+    with pytest.raises(loader.PipelineError, match="needs a `bronze:` mapping"):
+        loader.load("demo", root)
+
+
+@pytest.mark.parametrize("missing", ["endpoint", "bucket", "access_key", "secret_key"])
+def test_bronze_section_missing_a_required_field_fails(root, missing):
+    bronze = {k: v for k, v in _BRONZE.items() if k != missing}
+    _write(root, "demo", _minimal(bronze_staging=True, bronze=bronze))
+    with pytest.raises(loader.PipelineError, match=missing):
+        loader.load("demo", root)
+
+
+def test_a_bronze_section_without_bronze_staging_is_refused_as_dead_config(root):
+    _write(root, "demo", _minimal(bronze=_BRONZE))
+    with pytest.raises(loader.PipelineError, match="only meaningful with"):
+        loader.load("demo", root)
+
+
+def test_bronze_staging_refuses_a_connector_it_was_not_built_for(root):
+    data = _minimal(bronze_staging=True, bronze=_BRONZE)
+    data["source"] = {"connector": "sql_server", "connection": {"host": "${H}"},
+                      "tables": ["t"]}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="only built for"):
+        loader.load("demo", root)
+
+
+def test_bronze_staging_refuses_incremental(root):
+    data = _minimal(bronze_staging=True, bronze=_BRONZE)
+    data["source"]["incremental"] = {"res_partner": {"cursor": "write_date",
+                                                     "primary_key": "id"}}
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="full-snapshot only"):
+        loader.load("demo", root)
+
+
+def test_bronze_staging_refuses_more_than_one_table(root):
+    data = _minimal(bronze_staging=True, bronze=_BRONZE)
+    data["source"]["tables"] = ["res_partner", "sale_order"]
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="exactly one source table"):
+        loader.load("demo", root)
+
+
+@pytest.mark.parametrize("bad", [0, -1, "10", True, 1.5])
+def test_bronze_chunk_rows_must_be_a_positive_int(root, bad):
+    _write(root, "demo", _minimal(bronze_staging=True, bronze={**_BRONZE, "chunk_rows": bad}))
+    with pytest.raises(loader.PipelineError, match="chunk_rows"):
+        loader.load("demo", root)
 
 
 @pytest.mark.parametrize("bad", ["true", 1, 0, "yes", [], {}, None])

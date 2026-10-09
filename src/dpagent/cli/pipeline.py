@@ -856,6 +856,46 @@ def _render_status(name, run) -> None:
                           f"dpagent pipeline audit {run['id']}")
 
 
+@pipeline_group.command("bronze-extract")
+@click.argument("name")
+def bronze_extract_cmd(name):
+    """Run a bronze_staging pipeline's EXTRACT by hand: one full snapshot of
+    its source table into object storage. Prints the new batch id - the only
+    thing `bronze-load` needs."""
+    from ..pipelines import bronze as bronze_mod
+    pipeline = _load_or_fail(name)
+    if not pipeline.bronze_staging:
+        fail(f"{name!r} does not use bronze_staging (docs/hg-bronze-staging.md)")
+    try:
+        batch_id = bronze_mod.run_extract(pipeline_name=name)
+    except bronze_mod.BronzeFailed as exc:
+        fail(str(exc))
+    console.print(f"extracted batch [bold]{batch_id}[/bold]")
+    console.print(f"[dim]load it: dpagent pipeline bronze-load {name} --batch {batch_id}[/dim]")
+
+
+@pipeline_group.command("bronze-load")
+@click.argument("name")
+@click.option("--batch", "batch_id", required=True, help="Batch id printed by bronze-extract.")
+def bronze_load_cmd(name, batch_id):
+    """Run a bronze_staging pipeline's LOAD by hand for one batch. Uses only
+    the warehouse and the object store - never the source - so it works
+    with the source gone. Loading an already-loaded batch changes nothing."""
+    from ..pipelines import bronze as bronze_mod
+    pipeline = _load_or_fail(name)
+    if not pipeline.bronze_staging:
+        fail(f"{name!r} does not use bronze_staging (docs/hg-bronze-staging.md)")
+    try:
+        result = bronze_mod.run_load(pipeline_name=name, batch_id=batch_id)
+    except bronze_mod.BronzeFailed as exc:
+        fail(str(exc))
+    if result["outcome"] == "already_loaded":
+        console.print(f"batch {batch_id} was already loaded - nothing changed")
+    else:
+        console.print(f"loaded batch {batch_id}: {result['rows']} row(s) from "
+                      f"{result['objects']} object(s) into {result['table']}")
+
+
 @pipeline_group.command("status")
 @click.argument("name")
 def status_cmd(name):

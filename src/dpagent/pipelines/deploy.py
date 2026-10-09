@@ -148,8 +148,23 @@ def render_dag(pipeline: Pipeline) -> str:
         ") as dag:",
     ]
 
+    if pipeline.bronze_staging:
+        # Only bronze DAGs import this - every other pipeline's rendered DAG
+        # stays exactly what it was before the bronze split existed.
+        lines.insert(lines.index("from dpagent.pipelines import runtime") + 1,
+                     "from dpagent.pipelines import bronze")
+
     for task in tasks:
-        if task.kind == "extract":
+        if task.kind == "extract_bronze":
+            # The return value is the batch id - PythonOperator pushes it to
+            # XCom, which is how load_bronze (and any retry of it) gets the
+            # exact same batch.
+            call = (f'return bronze.run_extract(pipeline_name="{pipeline.name}", '
+                    f'run_id=run_id)')
+        elif task.kind == "load_bronze":
+            call = (f'bronze.run_load(pipeline_name="{pipeline.name}", '
+                    f'batch_id=ti.xcom_pull(task_ids="extract_bronze"), run_id=run_id)')
+        elif task.kind == "extract":
             call = (f'runtime.run_extract(pipeline_name="{pipeline.name}", run_id=run_id, '
                     f'full_refresh=bool((dag_run.conf or {{}}).get("full_refresh")) '
                     f'if dag_run else False)')
@@ -165,7 +180,10 @@ def render_dag(pipeline: Pipeline) -> str:
         # pipeline run` before it triggers this DAG - passed through
         # dag_run.conf so every task's stage_runs/gate_runs/events row ties
         # back to that one run, the same run `dpagent audit <run>` reads.
-        lines.append(f'    def _{task.id}(dag_run=None, **_):')
+        if task.kind == "load_bronze":
+            lines.append(f'    def _{task.id}(dag_run=None, ti=None, **_):')
+        else:
+            lines.append(f'    def _{task.id}(dag_run=None, **_):')
         lines.append(f'        run_id = runtime.resolve_run_id("{pipeline.name}", dag_run)')
         lines.append(f'        {call}')
         lines.append(f'')
@@ -319,6 +337,13 @@ def apply_procedures(pipeline: Pipeline) -> list[str]:
     return applied
 
 
+def _same_dir(a: Path, b: Path) -> bool:
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except OSError:
+        return False
+
+
 def install_pipeline_files(pipeline: Pipeline) -> Path:
     """Publishes this pipeline's manifest + procedures to
     `SHARED_PIPELINES_DIR/<name>` - world-readable (root:root, 755/644), so
@@ -338,10 +363,19 @@ def install_pipeline_files(pipeline: Pipeline) -> Path:
             "publishing pipeline files to a host-wide-readable location "
             "needs root - re-run as sudo -E dpagent pipeline deploy ...")
     dest = SHARED_PIPELINES_DIR / pipeline.name
-    if dest.exists():
-        shutil.rmtree(dest)
-    SHARED_PIPELINES_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(pipeline.root, dest, ignore=shutil.ignore_patterns("build"))
+    if _same_dir(dest, pipeline.root):
+        # dpagent is installed at /opt/dpagent (bootstrap.sh's default
+        # prefix) and its own pipelines/ directory *is* SHARED_PIPELINES_DIR:
+        # the pipeline already lives where it would be published. Found by
+        # a real deploy from a disposable host - the unconditional
+        # rmtree(dest) below deleted the very source the copytree then
+        # tried to read (FileNotFoundError, and the pipeline gone).
+        SHARED_PIPELINES_DIR.chmod(0o755)
+    else:
+        if dest.exists():
+            shutil.rmtree(dest)
+        SHARED_PIPELINES_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(pipeline.root, dest, ignore=shutil.ignore_patterns("build"))
     SHARED_PIPELINES_DIR.chmod(0o755)
     dest.chmod(0o755)
     for path in dest.rglob("*"):
@@ -665,6 +699,13 @@ def _pipeline_env_refs(pipeline: Pipeline) -> dict[str, str | None]:
     scan({"host": pipeline.warehouse.host, "port": pipeline.warehouse.port,
          "database": pipeline.warehouse.database, "user": pipeline.warehouse.user,
          "password": pipeline.warehouse.password})
+    if pipeline.bronze is not None:
+        # The DAG's bronze tasks resolve these at run time inside Airflow,
+        # exactly like the warehouse refs above - so they must be published
+        # to pipelines.env the same way.
+        b = pipeline.bronze
+        scan({"endpoint": b.endpoint, "bucket": b.bucket, "access_key": b.access_key,
+             "secret_key": b.secret_key, "region": b.region, "prefix": b.prefix})
     return refs
 
 
@@ -951,7 +992,9 @@ def undeploy(pipeline: Pipeline) -> UndeployResult:
             result.dag_delete_note = _last_line(output)
 
     published = SHARED_PIPELINES_DIR / name
-    if published.exists():
+    if published.exists() and not _same_dir(published, pipeline.root):
+        # Never delete the operator's own source tree: when dpagent runs
+        # from /opt/dpagent, "published" and "source" are the same directory.
         shutil.rmtree(published)
         result.published_files_removed = True
 

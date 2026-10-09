@@ -3918,3 +3918,38 @@ disconnected proof) have not started - this session only decided the
 opt-in contract and proved the object-storage layer underneath it. No
 `packs/seaweedfs` yet. A2 (gate `approval.promote()`) has not started.
 The dbt-project-mirroring-HG milestone has not started.
+
+## 2026-10-09 - HG bronze-staging B2-B5: EXTRACT/LOAD split built and verified for real
+
+Built against the opt-in contract decided in B0: `bronze_worker.py` +
+`bronze.py` + `dpagent pipeline bronze-extract|bronze-load`, the DAG split
+(`extract_bronze` -> `load_bronze` -> `gate_landing`, batch id via XCom),
+a registry in its own warehouse schema, a multi-object checksummed manifest
+published last, and a LOAD that is one Postgres transaction and receives no
+source value at all. Design, protocol and normalisation level:
+`docs/hg-bronze-staging.md`.
+
+**Real-verified**: `scripts/hg-bronze-poc-verify.sh`, 59 assertions, against a
+source Postgres in its own container, SeaweedFS, and the dlt/Postgres/Airflow
+stack in a disposable-host container (`docs/evidence/hg-bronze/verify.log`):
+the source container **stopped** (connection shown to fail) with LOAD still
+loading all 5 typed rows in a fresh process with no source variable set, md5
+identical to the source; idempotent re-LOAD; two simultaneous LOADs of one
+batch loading once; an older batch refused; a corrupted object and a tampered
+manifest refused and retryable once restored; an empty snapshot loading
+exactly 0 rows; a `kill -9` mid-extract leaving an unloadable `extracting`
+batch; schema drift and an unsupported type refused; two real Airflow DAG
+runs with no duplication.
+
+**A product bug found by it** (not in the bronze code): with dpagent at
+`/opt/dpagent` its `pipelines/` directory is `SHARED_PIPELINES_DIR`, so
+`install_pipeline_files()` deleted the directory it was about to copy from,
+and `undeploy()` would have deleted the operator's source. Fixed
+(`deploy._same_dir`), with regression tests.
+
+**Not done, explicitly**: odoo_postgres / one table / full snapshot only; no
+retention or rollback for bronze objects; no `packs/seaweedfs`; the new
+pyarrow+boto3 step in `packs/dlt` not re-proven by a fresh pack install; the
+verify script is not yet wired into the self-provisioning CI script; no
+fixture validation for bronze pipelines; the dbt-project-mirroring-HG
+milestone and A2 (`promote()` gate) have not started.

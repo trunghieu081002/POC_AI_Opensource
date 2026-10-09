@@ -47,6 +47,11 @@ dp_run "$PIP" install --quiet "elasticsearch>=8,<9"
 # interactive OAuth flow, which cannot run unattended inside an Airflow
 # task).
 dp_run "$PIP" install --quiet "google-api-python-client>=2,<3" "google-auth>=2,<3"
+# The bronze EXTRACT/LOAD worker (src/dpagent/pipelines/bronze_worker.py,
+# docs/hg-bronze-staging.md) runs in this same venv: Parquet objects via
+# pyarrow, any S3-compatible store (SeaweedFS, MinIO, AWS) via boto3.
+# Only used by a pipeline with bronze_staging: true.
+dp_run "$PIP" install --quiet "pyarrow>=14" "boto3>=1.28,<2"
 
 INSTALLED="$("${INSTALL_DIR}/.venv/bin/dlt" --version 2>/dev/null | head -1 || true)"
 dp_ok "installed: ${INSTALLED:-dlt (version string unavailable)}"
