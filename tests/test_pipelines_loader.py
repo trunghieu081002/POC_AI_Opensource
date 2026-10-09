@@ -760,10 +760,12 @@ def _own_dbt(root, *, project_yml=True, **overrides):
     owned project's `models:` are dbt selectors, so none must be needed."""
     data = _minimal(dbt_project={"path": "dwh_dbt"}, **overrides)
     data["stages"][1]["models"] = ["silver", "tag:gold"]
-    _write(root, "demo", data,
-           procedure_files=("dwh_dbt/dbt_project.yml",) if project_yml else ())
+    _write(root, "demo", data)
     import shutil
     shutil.rmtree(root / "demo" / "models", ignore_errors=True)
+    if project_yml:      # a real (minimal) dbt_project.yml - the loader now parses it
+        (root / "demo" / "dwh_dbt").mkdir()
+        (root / "demo" / "dwh_dbt" / "dbt_project.yml").write_text("name: x\nversion: '1.0.0'\n")
     return data
 
 
@@ -804,7 +806,9 @@ def test_dbt_project_without_any_dbt_stage_is_dead_config(root):
     data["stages"][1] = {"name": "raw", "engine": "procedure", "depends_on": "landing",
                          "procedure": "p.sql",
                          "gates": [{"type": "not_null", "table": "t", "columns": ["id"]}]}
-    _write(root, "demo", data, procedure_files=("p.sql", "dwh_dbt/dbt_project.yml"))
+    _write(root, "demo", data, procedure_files=("p.sql",))
+    (root / "demo" / "dwh_dbt").mkdir()
+    (root / "demo" / "dwh_dbt" / "dbt_project.yml").write_text("name: x\n")
     with pytest.raises(loader.PipelineError, match="dead configuration"):
         loader.load("demo", root)
 
