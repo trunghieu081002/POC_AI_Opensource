@@ -26,6 +26,7 @@ from pathlib import Path
 
 import yaml
 
+from . import dbtproject
 from .loader import Pipeline
 
 APPROVAL_FILENAME = ".approved.yaml"
@@ -66,12 +67,24 @@ def _hashed_files(pipeline: Pipeline) -> list[tuple[str, bytes]]:
     files: dict[str, bytes] = {
         "pipeline.yaml": _manifest_bytes_for_hash(pipeline),
     }
+    if pipeline.dbt_project is not None:
+        # A pipeline that owns a dbt project: every authored file in it -
+        # dbt_project.yml, models, macros, seeds, tests, analyses, snapshots,
+        # sources/schema yml, packages.yml AND package-lock.yml - minus dbt's
+        # generated output (target/, dbt_packages/, logs/). The stages'
+        # `models:` are selectors here, not files, so the per-model loop
+        # below must not run (it would hash a stray models/<selector>.sql
+        # that the run never reads). Pipelines without `dbt_project:` take
+        # exactly the code path they always did - their hash is unchanged.
+        for rel, content in dbtproject.project_files(
+                pipeline.path(pipeline.dbt_project.path)):
+            files[f"{pipeline.dbt_project.path}/{rel}"] = content
     for stage in pipeline.stages:
         if stage.engine == "procedure" and stage.procedure:
             path = pipeline.path(stage.procedure)
             if path.exists():
                 files[stage.procedure] = path.read_bytes()
-        if stage.engine == "dbt":
+        if stage.engine == "dbt" and pipeline.dbt_project is None:
             for model in stage.models:
                 rel = f"models/{model}.sql"
                 path = pipeline.path(rel)

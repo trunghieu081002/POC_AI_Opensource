@@ -3982,3 +3982,32 @@ package hub on every run.
 project; incremental models, other sources and `dbt test` execution untouched;
 no fixture-validation path for these pipelines; not in the self-provisioning
 CI; A2 (`promote()` gate) not started.
+
+## 2026-10-09 - HG dbt project (PR #29, before merge): approval hash, scope refusals, selector checks
+
+Review of PR #29 asked for the owned dbt project to be inside the approval and
+inside the pipeline's allowed scope, and for selectors to be proven. Done:
+`approval.content_hash` now covers every authored file in an owned project
+(config, models, macros, seeds, tests, analyses, snapshots, sources/schema yml,
+packages, lock; not `target/`, `dbt_packages/`, `logs/`, `.user.yml`,
+`__pycache__`, `.DS_Store`) - and pipelines without `dbt_project:` hash exactly as
+before (the committed `.approved.yaml` of demo/quickstart/quickstart_dbt still
+match, in a unit test and in the real verification). New `pipelines/dbtproject.py`:
+refuses symlinks, absolute / `..` path settings, output redirected onto authored
+content, local packages outside the project, remote packages without a lock;
+`copy_project` makes a run execute exactly the hashed files; a lock rewritten by
+`dbt deps` fails the run; every selector of every dbt stage must select >= 1 model
+(`dbt ls` and `dbt run` both exit 0 and do nothing for a selector that matches
+nothing - shown with the real dbt).
+
+Checked: 65 new unit tests (`tests/test_pipelines_dbtproject.py`), mutation-tested
+(breaking the hash coverage, the selector check, or the generated-output exclusion
+each makes tests fail); `scripts/hg-dbt-branch-verify.sh` now 53 assertions against
+a real DAG (S7-S10 new: empty selector fails the run and step 3, symlinks refused,
+promote/edit-a-macro invalidates approval while generated output does not,
+quickstart_dbt still runs through the unchanged shared-project path).
+
+**Not done, explicitly**: no `promote()` gate (A2), no incremental, no dbt upgrade;
+git/tarball packages are not refused (only local ones are checked); the project is
+not sandboxed from the task environment; scope checks cover the dbt project, not
+other symlinks in the pipeline directory.

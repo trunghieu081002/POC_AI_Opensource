@@ -33,6 +33,13 @@ gold()    { wh "select artists||'|'||distinct_names||'|'||min_platform_id||'|'||
 expect_gold() {   # independent of dbt: straight from the source table, minus the given excluded ids
   src -c "select count(*)||'|'||count(distinct name)||'|'||min(id)||'|'||max(id) from res_partner where id not in ($1)"; }
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PUB="/opt/dpagent/pipelines/$PIPE"
+say "SETUP: pristine pipeline files from this checkout (an aborted earlier run may have edited the published copy) and a known source state"
+docker exec "$DEV" rm -rf "$PUB" && docker cp "$REPO_ROOT/pipelines/$PIPE" "$DEV:/opt/dpagent/pipelines/$PIPE" || fail "could not restore $PIPE into $DEV"
+docker exec "$DEV" find "$PUB" \( -name .approved.yaml -o -name .synth-validation.yaml \) -delete
+src -c "delete from res_partner where id >= 7; update res_partner set name='Alice 5' where id=1" >/dev/null
+
 say "SETUP: clean slate for $PIPE (undeploy, drop staging/silver/gold, clear its registry rows and bronze objects)"
 dev "dpagent pipeline undeploy $PIPE --yes" >/dev/null
 wh "DROP SCHEMA IF EXISTS staging CASCADE; DROP SCHEMA IF EXISTS silver CASCADE; DROP SCHEMA IF EXISTS gold CASCADE; DELETE FROM dpagent_meta.bronze_batches WHERE pipeline='$PIPE'" >/dev/null
@@ -92,6 +99,76 @@ eq "$(gold)" "$BEFORE" "gold untouched by the failed run (the gold stage never r
 docker exec "$DEV" bash -c "cp /tmp/dim_artist_active.sql.good /opt/dpagent/pipelines/$PIPE/dwh_dbt/models/silver/dim_artist_active.sql"
 OUT="$(run_dag)"; [ $? -eq 0 ] && pass "run after restoring the model ok" || fail "run after restore failed"
 eq "$(gold)" "$(expect_gold 1,2,4)" "gold correct again"
+
+# The published copy and the source are the same directory inside DEV (/opt/dpagent),
+# so editing it there is what a real operator editing the pipeline would do.
+backup_manifest() { docker exec "$DEV" cp "$PUB/pipeline.yaml" /tmp/hg_pipeline.yaml.good; }
+restore_manifest() { docker exec "$DEV" cp /tmp/hg_pipeline.yaml.good "$PUB/pipeline.yaml"; }
+
+say "S7: a selector that selects nothing never produces a 'successful' transform"
+backup_manifest
+GOLD_BEFORE="$(gold)"
+docker exec "$DEV" sed -i 's/models: \[mart_artist_summary\]/models: [mart_artist_summry]/' "$PUB/pipeline.yaml"
+OUT="$(dev "dpagent pipeline validate $PIPE")"
+contains "$OUT" "selector 'mart_artist_summry' selects 0 models" "step 3 validate names the empty selector"
+contains "$OUT" "dbt project/Jinja parse: fail" "step 3 reports a failure, not a pass"
+# The hazard itself, shown with the real dbt: it exits 0 and builds nothing.
+docker exec "$DEV" bash -c "rm -rf /tmp/hz && mkdir /tmp/hz && cd /opt/dpagent/pipelines/$PIPE/dwh_dbt && cp -r . /tmp/hz/ && printf 'dpagent_validate:\n  target: parse\n  outputs:\n    parse: {type: postgres, host: 127.0.0.1, port: 5432, user: u, password: p, dbname: d, schema: public, threads: 1}\n' > /tmp/hz/profiles.yml && /opt/dbt/.venv/bin/dbt deps --project-dir /tmp/hz --profiles-dir /tmp/hz --profile dpagent_validate >/dev/null 2>&1; /opt/dbt/.venv/bin/dbt run --select mart_artist_summry --project-dir /tmp/hz --profiles-dir /tmp/hz --profile dpagent_validate > /tmp/hz.out 2>&1; echo rc=\$? >> /tmp/hz.out"
+HZ="$(docker exec "$DEV" cat /tmp/hz.out)"
+contains "$HZ" "rc=0" "plain 'dbt run --select <typo>' exits 0 ..."
+contains "$HZ" "Nothing to do" "... having run nothing (this is what used to look like success)"
+OUT="$(run_dag)"; RC=$?
+[ $RC -ne 0 ] && pass "the DAG run FAILS (rc=$RC)" || fail "an empty selector produced a successful run"
+EV="$(dev "dpagent pipeline audit" | tr '\n' ' ' | tr -s ' ')"
+contains "$EV" "selects 0 models" "the failure event names the selector"
+eq "$(gold)" "$GOLD_BEFORE" "gold untouched"
+restore_manifest
+OUT="$(run_dag)"; [ $? -eq 0 ] && pass "run ok again once the selector is fixed" || fail "run failed after restore"
+
+say "S8: a symlink inside the project is refused at lint/deploy time"
+docker exec "$DEV" bash -c "ln -s /etc/passwd $PUB/dwh_dbt/macros/leak.sql"
+OUT="$(dev "dpagent pipeline lint $PIPE")"; RC=$?
+[ $RC -ne 0 ] && pass "lint refuses (rc=$RC)" || fail "lint accepted a symlink"
+contains "$OUT" "is a symlink" "the message names the symlink"
+OUT="$(dev "dpagent pipeline deploy $PIPE --allow-draft --yes")"; RC=$?
+[ $RC -ne 0 ] && pass "deploy refuses too (rc=$RC)" || fail "deploy accepted a symlink"
+docker exec "$DEV" rm -f "$PUB/dwh_dbt/macros/leak.sql"
+docker exec "$DEV" ln -s /tmp "$PUB/dwh_dbt/seeds/ext"
+OUT="$(dev "dpagent pipeline lint $PIPE")"; RC=$?
+[ $RC -ne 0 ] && pass "a symlinked DIRECTORY is refused as well (rc=$RC)" || fail "symlinked dir accepted"
+docker exec "$DEV" rm -f "$PUB/dwh_dbt/seeds/ext"
+dev "dpagent pipeline lint $PIPE" >/dev/null && pass "lint clean again after removing them" || fail "lint still failing"
+
+say "S9: approval covers the owned project; generated output does not invalidate it"
+backup_manifest
+docker exec "$DEV" cp "$PUB/dwh_dbt/macros/generate_schema_name.sql" /tmp/hg_macro.good
+OUT="$(dev "dpagent pipeline promote $PIPE --yes --approved-by verify-script")"; RC=$?
+[ $RC -eq 0 ] && pass "promote succeeds" || { echo "$OUT"; fail "promote failed"; }
+contains "$OUT" "dwh_dbt/macros/generate_schema_name.sql" "promote lists the project's files among what is being approved"
+APPROVED() { dev "/opt/dpagent/.venv/bin/python -c \"from dpagent.pipelines import loader, approval; print(approval.is_approved(loader.load('$PIPE')))\"" | tail -1; }
+eq "$(APPROVED)" "(True, '')" "approved right after promote"
+docker exec "$DEV" bash -c "cd $PUB/dwh_dbt && mkdir -p target logs dbt_packages/x && echo gen > target/c.json && echo gen > logs/dbt.log && echo gen > dbt_packages/x/m.sql && echo '{}' > .user.yml"
+eq "$(APPROVED)" "(True, '')" "target/ logs/ dbt_packages/ .user.yml appeared - still approved"
+docker exec "$DEV" bash -c "cd $PUB/dwh_dbt && rm -rf target logs dbt_packages .user.yml"
+docker exec "$DEV" bash -c "printf '\n-- edited after approval\n' >> $PUB/dwh_dbt/macros/generate_schema_name.sql"
+case "$(APPROVED)" in "(False"*"changed since it was approved"*) pass "editing a macro after promote invalidates the approval";; *) fail "macro edit not detected: $(APPROVED)";; esac
+OUT="$(dev "dpagent pipeline deploy $PIPE --yes")"; RC=$?
+[ $RC -ne 0 ] && pass "a normal (non --allow-draft) deploy is refused (rc=$RC)" || fail "deploy of an edited, once-approved pipeline went through"
+contains "$OUT" "changed since it was approved" "the refusal says why"
+docker exec "$DEV" cp /tmp/hg_macro.good "$PUB/dwh_dbt/macros/generate_schema_name.sql"
+restore_manifest; docker exec "$DEV" rm -f "$PUB/.approved.yaml"
+
+say "S10: pipelines without dbt_project keep working (shared-project dbt path, real run)"
+Q=quickstart_dbt
+OUT="$(dev "dpagent pipeline validate $Q")"; RC=$?
+contains "$OUT" "dbt project/Jinja parse: pass" "quickstart_dbt step 3 still passes (shared-project parse)"
+contains "$OUT" "dbt ref()/source() check: pass" "and the ref()/source() ban still applies to it"
+eq "$(dev "/opt/dpagent/.venv/bin/python -c \"from dpagent.pipelines import loader, approval; print(approval.is_approved(loader.load('$Q')))\"" | tail -1)" "(True, '')" "its committed approval hash still matches"
+docker exec "$DEV" bash -c "source /root/hgenv.sh; export WAREHOUSE_DB_HOST=localhost WAREHOUSE_DB_NAME=hgwh WAREHOUSE_DB_USER=hgwh WAREHOUSE_DB_PASSWORD=whpw; cd /opt/dpagent; dpagent pipeline undeploy $Q --yes >/dev/null 2>&1; dpagent pipeline deploy $Q --yes 2>&1 | tail -3; dpagent pipeline run $Q --yes --wait --timeout 600 2>&1 | tail -12" > /tmp/hg_q.out
+Q_OUT="$(cat /tmp/hg_q.out)"
+contains "$Q_OUT" "quickstart_dbt · run" "quickstart_dbt ran through the real DAG"
+case "$Q_OUT" in *" ok "*|*"run "*" ok"*) pass "its run finished ok (landing -> dbt raw -> procedure curated, via the unchanged shared-project path)";; *) echo "$Q_OUT"; fail "quickstart_dbt run did not finish ok";; esac
+dev "dpagent pipeline undeploy $Q --yes" >/dev/null 2>&1
 
 say "CLEANUP: restore the seed file, undeploy"
 docker exec -i "$DEV" bash -c "printf 'platform_id\n2\n4\n' > /opt/dpagent/pipelines/$PIPE/dwh_dbt/seeds/manual_excluded_partner_ids.csv"

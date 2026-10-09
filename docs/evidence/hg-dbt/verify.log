@@ -1,4 +1,6 @@
 
+== SETUP: pristine pipeline files from this checkout (an aborted earlier run may have edited the published copy) and a known source state
+
 == SETUP: clean slate for hg_dbt_branch (undeploy, drop staging/silver/gold, clear its registry rows and bronze objects)
 NOTICE:  drop cascades to table staging.res_partner
 NOTICE:  drop cascades to 3 other objects
@@ -48,7 +50,40 @@ PASS gold untouched by the failed run (the gold stage never ran) (4|4|3|7)
 PASS run after restoring the model ok
 PASS gold correct again (4|4|3|7)
 
+== S7: a selector that selects nothing never produces a 'successful' transform
+PASS step 3 validate names the empty selector
+PASS step 3 reports a failure, not a pass
+PASS plain 'dbt run --select <typo>' exits 0 ...
+PASS ... having run nothing (this is what used to look like success)
+PASS the DAG run FAILS (rc=1)
+PASS the failure event names the selector
+PASS gold untouched (4|4|3|7)
+PASS run ok again once the selector is fixed
+
+== S8: a symlink inside the project is refused at lint/deploy time
+PASS lint refuses (rc=1)
+PASS the message names the symlink
+PASS deploy refuses too (rc=1)
+PASS a symlinked DIRECTORY is refused as well (rc=1)
+PASS lint clean again after removing them
+
+== S9: approval covers the owned project; generated output does not invalidate it
+PASS promote succeeds
+PASS promote lists the project's files among what is being approved
+PASS approved right after promote ((True, ''))
+PASS target/ logs/ dbt_packages/ .user.yml appeared - still approved ((True, ''))
+PASS editing a macro after promote invalidates the approval
+PASS a normal (non --allow-draft) deploy is refused (rc=1)
+PASS the refusal says why
+
+== S10: pipelines without dbt_project keep working (shared-project dbt path, real run)
+PASS quickstart_dbt step 3 still passes (shared-project parse)
+PASS and the ref()/source() ban still applies to it
+PASS its committed approval hash still matches ((True, ''))
+PASS quickstart_dbt ran through the real DAG
+PASS its run finished ok (landing -> dbt raw -> procedure curated, via the unchanged shared-project path)
+
 == CLEANUP: restore the seed file, undeploy
 
-== ALL 28 ASSERTIONS PASSED
+== ALL 53 ASSERTIONS PASSED
 EXIT=0

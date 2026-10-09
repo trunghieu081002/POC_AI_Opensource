@@ -150,15 +150,19 @@ def _check_own_dbt_project(pipeline: Pipeline, dbt_bin: str) -> StepResult:
     adapter type, not a connection). A real parse of the real project -
     `ref()`/`source()`/macros/seeds/packages all resolved - not a regex over
     the SQL. `dbt deps` needs the package hub (network)."""
-    import shutil
+    from . import dbtproject
     src = pipeline.root / pipeline.dbt_project.path
     with tempfile.TemporaryDirectory(prefix="dpagent-validate-dbt-") as tmp:
         work = Path(tmp) / "project"
-        shutil.copytree(src, work, ignore=shutil.ignore_patterns(
-            "target", "dbt_packages", "logs", ".user.yml", "__pycache__"))
+        try:
+            dbtproject.copy_project(src, work)
+        except dbtproject.DbtProjectError as exc:
+            return StepResult("fail", f"cannot copy the dbt project: {exc}")
         (Path(tmp) / "profiles.yml").write_text(_DBT_PROFILES_YML)
         base = ["--project-dir", str(work), "--profiles-dir", tmp,
                 "--profile", "dpagent_validate"]
+        lock = work / "package-lock.yml"
+        lock_before = lock.read_bytes() if lock.exists() else None
         steps = []
         if (work / "packages.yml").exists() or (work / "dependencies.yml").exists():
             steps.append(("deps", ["deps"]))
@@ -173,9 +177,19 @@ def _check_own_dbt_project(pipeline: Pipeline, dbt_bin: str) -> StepResult:
                 return StepResult(
                     "fail", f"dbt {label} failed:\n"
                             + (proc.stderr or proc.stdout).strip()[-4000:])
+            if label == "deps" and lock_before is not None and lock.read_bytes() != lock_before:
+                return StepResult(
+                    "fail", "`dbt deps` changed package-lock.yml: the committed lock does "
+                            "not match what packages.yml resolves to - re-resolve, review "
+                            "the new lock, and commit it")
+        dbt_stages = [st for st in pipeline.stages if st.engine == "dbt"]
+        problems = dbtproject.check_selectors(dbt_bin, base, dbt_stages)
+        if problems:
+            return StepResult("fail", "\n".join(problems))
         n = sum(1 for _ in (work / "models").rglob("*.sql")) if (work / "models").is_dir() else 0
         return StepResult("pass", f"own dbt project {pipeline.dbt_project.path}/ parsed "
-                                  f"clean ({n} model file(s), packages resolved)")
+                                  f"clean ({n} model file(s), packages resolved, every "
+                                  f"stage selector selects at least one model)")
 
 
 # A dbt Jinja call to `ref(...)` or `source(...)` - cross-model/cross-project

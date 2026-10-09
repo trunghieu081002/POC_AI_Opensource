@@ -469,8 +469,14 @@ def _validate_dbt_project(raw, stages: list, root: Path, where: str) -> DbtProje
     if not (project / "dbt_project.yml").is_file():
         raise PipelineError(
             f"{where}: dbt_project.path {rel!r} has no dbt_project.yml under {root}")
-    if project.resolve().parent != root.resolve() and root.resolve() not in project.resolve().parents:
+    if project.is_symlink() or (
+            project.resolve() != root.resolve() / rel and root.resolve() not in project.resolve().parents):
         raise PipelineError(f"{where}: dbt_project.path {rel!r} resolves outside the pipeline")
+    from . import dbtproject
+    try:
+        dbtproject.check_project(project)
+    except dbtproject.DbtProjectError as exc:
+        raise PipelineError(f"{where}: dbt_project {rel!r}: {exc}") from None
     return DbtProject(path=rel)
 
 
