@@ -3855,3 +3855,66 @@ commit).
 **Not done, explicitly**: Step 3 covers 8 of 12+ scenarios, not all of
 them - the 6 needing fault injection remain manual-only. Step 4 (gating
 `approval.promote()`) has not started.
+
+## 2026-10-09 - Layer 3 M2.5 Step 3 complete (14/14); HG bronze-staging B0/B1 started
+
+Leader direction: complete Layer 3's remaining M2.5 work and, in
+parallel, start applying HG (phulee9/hgmedia)'s own architecture - the
+EXTRACT/LOAD split via S3-compatible bronze storage - scoped per the
+leader's own detailed correction to the first draft of this plan (kept
+in the conversation, not reproduced here): opt-in design decided before
+any extract/load code, a real object-store proof before building on it,
+A2 kept independent of the acceptance suite's own registry, and A1 not
+assumed low-risk.
+
+**A1 - the 6 remaining fault-injection scenarios, all real, no mocking**:
+`tests/m25_acceptance/run_matrix.py` now drives all 14 scenarios (the
+matrix's 12 rows, rows 6 and 9 each split in two). Seed failure: a real
+nonsense Postgres column type. Partial/late deploy failure: a real
+pre-existing file blocking `deploy()`'s own `mkdir`/`shutil.rmtree` -
+root-proof, unlike a `chmod`, since it is a filesystem *type* conflict,
+not a permission check. Source/warehouse provisioning failure: a real
+Postgres name collision, by patching `uuid.uuid4` (scoped to one
+scenario) to a fixed value and pre-creating a database at the exact name
+`pg_throwaway` will try next. Drop failure: a real held-open `psql`
+session blocking the real `DROP DATABASE`.
+
+Two real findings along the way, both in this driver's own scenario
+design, not in the system under test (`docs/evidence/m25-automated/README.md`
+has the full account): `late-deploy-failure`'s first version left its
+blocker in place through cleanup, so `undeploy()` hit the same
+obstruction and left a real leftover clone whose dbt model (aliased to
+the plain table name) then broke the *next* scenario's dbt compile with
+an alias collision - fixed by scoping the blocker to only the single
+faulting call. `drop-failure`'s first version expected `overall: pass`
+despite a failed cleanup - wrong; `FixtureRunReport.ok` requires
+`throwaway_cleanup_ok` by explicit design, so `overall: fail` here is
+correct - fixed the expectation, not the code. Also added: a full-matrix
+exit-code contract (0 all matched, 1 any mismatch/error, 3 ran clean but
+not the full 14) so a partial run can never read as complete coverage.
+
+**B0/B1 - HG bronze-staging, decided and proven, not yet built**:
+`Pipeline.bronze_staging: bool` (loader.py) - the opt-in field, decided
+before any of extract/runtime/deploy/cleanup branches on it (currently
+none do); `pipelines/hg_bronze_poc/` - the one Postgres-sourced, one-
+table, full-snapshot pipeline this gets built against; SeaweedFS (Docker
+`chrislusf/seaweedfs`, S3 gateway) - real upload/list/download/checksum
+round-trip verified via `boto3`, and dlt 1.31.0's own `filesystem`
+destination confirmed (not assumed) to default to a multi-file-per-table
+layout (`{table_name}/{load_id}.{file_id}.{ext}`). Full detail and
+reasoning: `docs/hg-bronze-staging.md`.
+
+**Real-verified this session**: all 4 packs installed and passed their
+own acceptance suites inside a freshly-built container; all 14
+acceptance-matrix scenarios ran twice (once to surface and fix the two
+design mistakes above, once clean) and matched their expectations both
+times - `docs/evidence/m25-automated/` has both runs' redacted reports
+and registry batches. SeaweedFS S3 round-trip verified for real. Full
+`pytest -q` suite green on this host before committing.
+
+**Not done, explicitly**: B2-B5 (registry schema, EXTRACT task, LOAD
+task, transactional swap, idempotency under retry, the real source-
+disconnected proof) have not started - this session only decided the
+opt-in contract and proved the object-storage layer underneath it. No
+`packs/seaweedfs` yet. A2 (gate `approval.promote()`) has not started.
+The dbt-project-mirroring-HG milestone has not started.

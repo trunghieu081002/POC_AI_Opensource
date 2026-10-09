@@ -11,13 +11,13 @@
 #   bash scripts/m25-acceptance-ci.sh --keep             # leave the container up on exit (debugging)
 #   bash scripts/m25-acceptance-ci.sh --scenarios "literal-connection timeout"
 #
-# What this does NOT do: the 6 scenarios in
-# tests/m25_acceptance/run_matrix.py's own UNIMPLEMENTED_SCENARIOS (seed
-# failure, partial/late deploy failure, source/warehouse provisioning
-# failure, a real DROP failure) - those still need to be run by hand,
-# same as they were on the original M2.5 VM, until someone scripts the
-# host-level fault injection each one needs. This script says so itself
-# (below) rather than let a clean exit code imply full coverage.
+# All 12 scenarios in tests/m25_acceptance/run_matrix.py's own SCENARIOS
+# are driven here. Each one's real outcome is checked against its own
+# EXPECTATIONS entry by the driver itself - this script's exit code is
+# only ever as good as that check (see run_matrix.py's own module
+# docstring for the exact exit-code table: 0 full matrix matched, 1 any
+# mismatch/error, 2 preflight/unknown-scenario, 3 ran clean but not the
+# full matrix requested).
 #
 # Every precondition is checked and named before anything is built -
 # "tự phát hiện thiếu infra và báo rõ, không giả định có sẵn" (M2.5 Step 3
@@ -160,7 +160,5 @@ if docker exec "${CONTAINER}" test -f /root/m25-evidence/registry.jsonl; then
   rm -f "/tmp/m25-registry-$$.jsonl"
 fi
 ok "evidence written under ${RESULTS_DIR}"
-
-say "not automated by this script (run by hand per docs/m25-acceptance.md): seed-failure, partial-deploy-failure, late-deploy-failure, source-provisioning-failure, warehouse-provisioning-failure, drop-failure"
 
 exit "$DRIVER_RC"

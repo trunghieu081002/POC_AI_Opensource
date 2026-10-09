@@ -12,54 +12,69 @@ directory is Step 3's own proof: that the *automation* -
 `tests/m25_acceptance/run_matrix.py` +
 `scripts/m25-acceptance-ci.sh` - actually reproduces the same scenarios
 for real, on a disposable host it builds itself (a systemd container,
-not the VM), without a human running each command by hand. Where the two
-disagree on a detail, `../m25/` is the one closer to what Step 2 actually
-proved; this directory proves the *harness*, run a second time, on a
-different host.
+not the VM), without a human running each command by hand.
 
-## What is here right now
+## All 14 scenarios, matched
 
-Eight scenarios, run end-to-end by `scripts/m25-acceptance-ci.sh` against a
-freshly-built, then-destroyed systemd-in-Docker disposable host (built from
-[`scripts/m25-disposable-host.Dockerfile`](../../scripts/m25-disposable-host.Dockerfile)
-- not the original VirtualBox VM `docs/m25-vm-results.md` describes, and not
-kept running between scenarios):
+Every scenario below is checked by the driver itself against its own
+`EXPECTATIONS` entry (`tests/m25_acceptance/run_matrix.py`) - not just
+"ran without raising." Run twice in this session (once to find and fix
+two scenario-design bugs - see "Found along the way" - once clean after);
+both full runs matched 14/14. `registry.jsonl` has both runs' batches.
 
 | File | Scenario | `overall` | `cleanup.overall` |
 |---|---|---|---|
-| [`ref-connection.json`](ref-connection.json) | every connection field a `${VAR}` ref (the checked-in manifest, unmodified) | pass | pass |
-| [`literal-connection.json`](literal-connection.json) | every connection field a literal value - the M2.4.4 finding, re-proven | pass | pass |
+| [`ref-connection.json`](ref-connection.json) | every connection field a `${VAR}` ref | pass | pass |
+| [`literal-connection.json`](literal-connection.json) | every connection field a literal value (M2.4.4) | pass | pass |
 | [`mixed-connection.json`](mixed-connection.json) | half literal, half `${VAR}` | pass | pass |
-| [`correct-twice.json`](correct-twice.json) | same as `ref-connection` - `run_fixture()` always runs twice; `comparison.idempotent` is the thing being checked here | pass | pass |
-| [`wrong-expected.json`](wrong-expected.json) | `expected.yaml`'s January revenue deliberately changed to a wrong number | fail (correctly - a real mismatch) | pass |
-| [`gate-under-threshold.json`](gate-under-threshold.json) | one row with a null `id` (25% of 4 rows, at the quarantine threshold) | pass (quarantined, not halted) | pass |
-| [`gate-over-threshold.json`](gate-over-threshold.json) | 3 of 5 rows sharing a duplicate `id` (60%, over the 25% threshold) | fail (`curated` correctly never runs) | pass |
-| [`timeout.json`](timeout.json) | `wait_timeout=0.01s` - no real Airflow run finishes that fast | fail (`run_1: "timeout"`) | **fail** - the M2.5-documented limitation ([docs/layer2.md](../layer2.md), "Known limitations"): the worker is never actually stopped, and this is never reported as a complete cleanup |
+| [`correct-twice.json`](correct-twice.json) | same fixture run twice, `comparison.idempotent` checked | pass | pass |
+| [`wrong-expected.json`](wrong-expected.json) | `expected.yaml` deliberately wrong | fail (correct mismatch) | pass |
+| [`gate-under-threshold.json`](gate-under-threshold.json) | 1 bad row of 4 (25%, at threshold) | pass (quarantined) | pass |
+| [`gate-over-threshold.json`](gate-over-threshold.json) | 3 of 5 rows share a duplicate id (60%) | fail (`curated` never runs) | pass |
+| [`timeout.json`](timeout.json) | `wait_timeout=0.01s` | fail (`run_1: "timeout"`) | **fail** (documented limitation, `docs/layer2.md`) |
+| [`seed-failure.json`](seed-failure.json) | a fixture column declared with a nonsense Postgres type | fail (`CREATE TABLE` genuinely fails) | pass |
+| [`partial-deploy-failure.json`](partial-deploy-failure.json) | `write_artifacts()`'s first real mkdir blocked | fail (`deploy_error` set, nothing else happened yet) | pass |
+| [`late-deploy-failure.json`](late-deploy-failure.json) | `install_pipeline_files()` blocked - schema/procedures/dbt models already real by then | fail | pass |
+| [`source-provisioning-failure.json`](source-provisioning-failure.json) | `CREATE DATABASE` collides with a real, pre-created database at the source's predicted name | unavailable | n/a (warehouse never attempted) |
+| [`warehouse-provisioning-failure.json`](warehouse-provisioning-failure.json) | same collision, targeted at the warehouse instead - source still provisioned+dropped first | unavailable | source pass, warehouse not_attempted |
+| [`drop-failure.json`](drop-failure.json) | a held-open `psql` session blocks the real warehouse `DROP DATABASE` | **fail** (both real Airflow runs actually passed - `FixtureRunReport.ok` requires cleanup too, by design) | fail |
 
-All 8 came from one `bash scripts/m25-acceptance-ci.sh` invocation, commit
-`143ebe0a17dcd7d06f07a9318ab6a569518b831a` (see each file's own
-`pipeline_hash`/`fixture_hash`/`expected_hash`, and the matching rows in
-`registry.jsonl`, for exactly what each run's inputs were).
+All real output, commit `143ebe0a17dcd7d06f07a9318ab6a569518b831a` (`M25_ACCEPTANCE_COMMIT`), against a systemd-in-Docker container built from
+[`scripts/m25-disposable-host.Dockerfile`](../../../scripts/m25-disposable-host.Dockerfile).
 
-`registry.jsonl` is the append-only ledger `tests/m25_acceptance/registry.py`
-writes one line to per scenario per run (batch id, commit, host label,
-pipeline/fixture/expected hashes, verdict, cleanup_ok) - see that module's
-own docstring for the full field list and the idempotent-check this enables
-for Step 4's planned `promote()` gate.
+## Found along the way (both fixed, not reported as bugs - see why)
 
-## What is *not* here
+Writing real fault injection surfaced two cases where the *first* version
+of a scenario's own expectation was simply wrong about what the system
+promises - exactly the risk the review that asked for this flagged
+("Fault injection thật cần đúng thời điểm và phục hồi được"):
 
-The 6 scenarios `run_matrix.py` does not yet automate (seed failure,
-partial/late deploy failure, source/warehouse provisioning failure, a real
-`DROP` failure) - still only proven by hand, on the original VM, recorded in
-`docs/m25-vm-results.md`, not re-run here. Re-running the ones that *are*
-automated does not re-prove those.
+- **`late-deploy-failure`**: the first version left its blocking file in
+  place through `run_fixture()`'s own cleanup, so `undeploy()` hit the
+  *same* filesystem obstruction trying to remove the path that had just
+  failed to be created - cleanup "failed" for a reason unrelated to what
+  the scenario means to prove, and left a real leftover clone (with a
+  dbt model aliased to the plain table name) in the shared project,
+  which then broke the *next* scenario's dbt compile with an alias
+  collision. Fixed: the blocker now exists only around the single
+  faulting call, removed again before it returns - mirroring a real
+  transient fault (row 6 of the matrix: "revoke write access... mid-run"),
+  not a permanent one.
+- **`drop-failure`**: expected `overall: pass` (the data was right) with
+  only `cleanup.overall: fail`. Wrong - `FixtureRunReport.ok` requires
+  `throwaway_cleanup_ok` too, by explicit design (its own docstring: "a
+  run that got the right numbers but left... an orphaned throwaway role/
+  database behind is not a clean result"). `overall` is correctly `fail`
+  here. Fixed the expectation, not the code.
+
+Neither was a product bug - both were this driver's own scenario design
+being wrong about the system's real behaviour, caught by actually running
+it rather than assuming.
 
 ## Redaction
 
 Every file here went through `registry.redact_report()` before being
 written - credential-shaped values only (`password`-keyed fields, `user:
 password@host` DSNs). Host/database/user names and table/column contents
-are deliberately left as-is: that is exactly what a reviewer needs to
-confirm isolation (the "control database unchanged" check), not a secret.
-Nothing here was hand-edited after the run that produced it.
+are deliberately left as-is - what a reviewer needs to confirm isolation,
+not a secret. Nothing here was hand-edited after the run that produced it.

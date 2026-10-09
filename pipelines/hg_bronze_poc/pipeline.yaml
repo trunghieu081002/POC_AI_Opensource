@@ -1,0 +1,54 @@
+# B0 of the HG-application plan (docs/layer2.md "HG bronze staging"): the
+# ONE pipeline this round's POC is scoped to - Postgres-sourced
+# (odoo_postgres), one table, full snapshot (no incremental/watermark -
+# deliberately out of scope for this first pass, see `bronze_staging`'s
+# own docstring in loader.py), `bronze_staging: true` opted in explicitly.
+#
+# Never deployed for real against any shared warehouse, never promoted -
+# this pipeline exists only to prove the EXTRACT/LOAD split (bronze
+# object storage in between, instead of dlt's current single
+# extract+load step) end to end, on its own, before that split is ever
+# offered to a real pipeline like demo/quickstart. Landing only, on
+# purpose: proving the split does not need raw/curated stages on top of
+# it, and adding them now would conflate two different things to debug
+# if either broke.
+name: hg_bronze_poc
+summary: One-table, full-snapshot Postgres pipeline - the POC pipeline for the HG (phulee9/hgmedia) bronze/object-storage extract-load split
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${HG_POC_SOURCE_HOST}"
+    port: "${HG_POC_SOURCE_PORT:-5432}"
+    database: "${HG_POC_SOURCE_NAME}"
+    user: "${HG_POC_SOURCE_USER}"
+    password: "${HG_POC_SOURCE_PASSWORD}"
+  tables: [res_partner]
+  # Full snapshot only (write_disposition="replace", the connector's own
+  # default - docs/layer2.md "Known limitations") - no `incremental:` key.
+  # Lands as-received into hg_bronze_poc_landing.res_partner in the no-
+  # bronze (bronze_staging: false) case; once B2-B5 gives bronze_staging
+  # real meaning, the same table lands the same way, just via bronze
+  # object storage first.
+
+warehouse:
+  host: "${HG_POC_WH_HOST:-localhost}"
+  port: "${HG_POC_WH_PORT:-5432}"
+  database: "${HG_POC_WH_NAME:-warehouse}"
+  user: "${HG_POC_WH_USER}"
+  password: "${HG_POC_WH_PASSWORD}"
+  schema: hg_bronze_poc
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: res_partner
+        min: 0   # a POC proving the split must also prove an empty
+                 # snapshot loads as exactly 0 rows, never "skip and keep
+                 # old data" (the leader's own explicit requirement) - a
+                 # min:1 gate would make that case look like a gate
+                 # failure instead of the real thing being tested.
+
+bronze_staging: true
+maturity: draft

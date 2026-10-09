@@ -1,0 +1,32 @@
+{
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "not_attempted",
+    "pipeline_artifacts_detail": "",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "not_attempted",
+    "warehouse_role": "not_attempted"
+  },
+  "clone_name": "m25_monthly_sales__validate__ecb9945f",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "deploy_error": "",
+  "expected_hash": "sha256:8cfa1d2e3476f04c8e1a0c0e0a5af8731039bd5e216a3e4ab91e7bcfcf9dcb17",
+  "fixture_hash": "sha256:416cf9e2bb697dbdf6ed05376be6667b201b2c2fddf07ef01712c72d3df133a9",
+  "gates": {
+    "run_1": {},
+    "run_2": {}
+  },
+  "overall": "unavailable",
+  "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
+  "run_ids": [],
+  "run_status": {
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "could not provision a throwaway Postgres database: ERROR:  database \"dpagent_fixture_wh_ecb9945fe8\" already exists"
+}

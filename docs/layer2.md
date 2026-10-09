@@ -995,6 +995,26 @@ needs a disposable host with root and passwordless sudo that does not exist
 on this operator's own host; nothing in this round claims it was run. Full
 test suite green before this was committed.
 
+### M2.5 Steps 2-3: the matrix run for real (by hand, then automated)
+
+Step 2 ran for real on a disposable Ubuntu VirtualBox VM (a teammate, not
+this agent) - all 12+ rows, `docs/m25-vm-results.md`, with a filesystem
+`OSError` during a partial deploy found and fixed (PR #24) and retained
+evidence/timeout policy landed separately (`docs/evidence/m25/`,
+`docs/m25-timeout-policy.md`).
+
+Step 3 then automated all 14 scenarios (`tests/m25_acceptance/run_matrix.py`
++ `scripts/m25-acceptance-ci.sh`) - real fault injection throughout (a
+genuine Postgres name collision for the provisioning-failure scenarios, a
+real held-open connection for the DROP-failure one, a real pre-existing
+file blocking `deploy()`'s own `mkdir`/`rmtree` for the two deploy-failure
+ones, a real invalid Postgres type for the seed-failure one), each
+scenario's outcome checked against an explicit expectation rather than
+just "ran without raising." Two scenario-design mistakes (not product
+bugs) were caught this way before being reported as anything else -
+`docs/evidence/m25-automated/README.md` has the account. Full detail:
+`docs/m25-acceptance.md`, `docs/deploy-log.md` (2026-10-09).
+
 ## In scope (MVP)
 
 - A `dlt` pack: install, verify, rollback, error catalog, acceptance suite
