@@ -1,4 +1,4 @@
-# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 21 scenarios)
+# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 22 scenarios)
 
 Real, redacted output from `tests/m25_acceptance/run_matrix.py`, written here
 by `scripts/m25-acceptance-ci.sh` so it survives after whatever disposable
@@ -14,7 +14,43 @@ directory is Step 3's own proof: that the *automation* -
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
 
-## Latest run: profile `bronze`, host built from packs (2026-10-10)
+## Latest run: A2 — promote requires sealed evidence (2026-10-10)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze`, host built from packs as below
+(all seven pack suites passed again: airflow 4/4, base 4/4, dbt 4/4, dlt 3/3,
+postgres 6/6, python-modern 2/2, seaweedfs 6/6). **22/22 scenarios matched**, host
+audit **`leaks=0`** ([`leak-audit.txt`](leak-audit.txt), which now also looks for the
+A2 pipeline's DAG/files/secrets and for objects under `a2-promote/`).
+**Which code ran**: [`run-info.txt`](run-info.txt) — commit `ff753bb…`, tree
+`c302b11…`, working tree clean (the script now refuses to build from a dirty tree
+unless `ALLOW_DIRTY=1`); the files in this directory were added by the commit after it.
+
+The run before this one failed twice, usefully: the policy refused a legitimate
+`skipped` step-3 check (an owned dbt project has no procedure stage), and the new
+scenario's secrets were kept by `undeploy` because the host's checkout copy of the same
+pipeline still referenced them (correct behaviour of undeploy; the scenario now uses its
+own `${VAR}` names). Both are fixed in the code this run executed.
+
+New: [`a2-promote-deploy-run.json`](a2-promote-deploy-run.json) —
+(`a2.steps`) promote before any validation: refused, approval untouched ·
+validate through `evidence.run_and_seal`: pass, cleanup pass · promote: accepted,
+`verification: verified`, `maturity: reviewed` · **real deploy of the promoted,
+non-draft pipeline** `hg_a2_promote` and a real Airflow run (journal run 29): `ok`,
+gold + both silver tables match the hand-calculated expected, all gates passed in the
+journal, undeploy verified (DAG, files, models, dlt state, secrets), S3 prefix 0
+remaining, both throwaway databases and roles dropped · then edits in turn: a **seed**
+edit and a **model** edit lose the approval and `deploy` refuses; a **fixture** edit and
+an **expected** edit leave the approval (they are not deployed content) but `promote`
+refuses; in all four `.approved.yaml` is byte-identical afterwards · restoring the
+bytes makes the approval valid again.
+
+The `hg-*` scenarios also try to promote on their own evidence: `hg-correct-twice` is
+accepted and `verified`; `hg-wrong-expected`, `hg-selector-typo`, `hg-timeout` and
+`hg-purge-failure-detected` are refused with the reasons recorded in their JSON
+(`promote.reasons`) and the approval untouched.
+[`docs/promote-evidence.md`](../../promote-evidence.md) has the policy.
+
+## Previous run: profile `bronze`, host built from packs (PR #30, 2026-10-10)
 
 `bash scripts/m25-acceptance-ci.sh --profile bronze` — a fresh container from
 `scripts/m25-disposable-host.Dockerfile`, **every component installed by its pack**

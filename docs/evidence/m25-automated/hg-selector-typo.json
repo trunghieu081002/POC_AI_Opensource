@@ -2,16 +2,16 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "4a8ca1bf-28b5-42de-9fe1-cc2c8e59f163",
+        "batch_id": "8d5b400e-fdfb-443e-8a8c-13fc65af10d5",
         "loaded_rows": 6,
-        "manifest_sha256": "1147a9f8b3c10ccedaf912d430ae573e0b3e8dd24d977d6565a15d4f824a3b64",
+        "manifest_sha256": "70531ba1cf07492bd3599a56917b22adc6ae484ca4a643165783353a264f1fdc",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/c360d6c7",
+    "namespace": "dpagent-validate/58547ae9",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 2,
@@ -22,20 +22,21 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_C360D6C7_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_C360D6C7_BRONZE_BUCKET, DPAGENT_VALIDATE_C360D6C7_BRONZE_ENDPOINT, DPAGENT_VALIDATE_C360D6C7_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_C360D6C7_SRC_DATABASE, DPAGENT_VALIDATE_C360D6C7_SRC_HOST, DPAGENT_VALIDATE_C360D6C7_SRC_PASSWORD, DPAGENT_VALIDATE_C360D6C7_SRC_PORT, DPAGENT_VALIDATE_C360D6C7_SRC_USER, DPAGENT_VALIDATE_C360D6C7_WH_DATABASE, DPAGENT_VALIDATE_C360D6C7_WH_HOST, DPAGENT_VALIDATE_C360D6C7_WH_PASSWORD, DPAGENT_VALIDATE_C360D6C7_WH_PORT, DPAGENT_VALIDATE_C360D6C7_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_58547AE9_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_58547AE9_BRONZE_BUCKET, DPAGENT_VALIDATE_58547AE9_BRONZE_ENDPOINT, DPAGENT_VALIDATE_58547AE9_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_58547AE9_SRC_DATABASE, DPAGENT_VALIDATE_58547AE9_SRC_HOST, DPAGENT_VALIDATE_58547AE9_SRC_PASSWORD, DPAGENT_VALIDATE_58547AE9_SRC_PORT, DPAGENT_VALIDATE_58547AE9_SRC_USER, DPAGENT_VALIDATE_58547AE9_WH_DATABASE, DPAGENT_VALIDATE_58547AE9_WH_HOST, DPAGENT_VALIDATE_58547AE9_WH_PASSWORD, DPAGENT_VALIDATE_58547AE9_WH_PORT, DPAGENT_VALIDATE_58547AE9_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__c360d6c7",
+  "clone_name": "hg_dbt_branch__validate__58547ae9",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
     "run_2": "not_run"
   },
   "deploy_error": "",
+  "evidence_id": "ev-c57ebe6e6f4102da",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -81,6 +82,24 @@
   },
   "overall": "fail",
   "pipeline_hash": "sha256:ff7d65e4a114ea5c19b51c4662513ae5144013b9a09f9afeebebeab5454c0de3",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "step 3 dbt: fail - stage 'gold': selector 'mart_artist_summry' selects 0 models (dbt would exit 0 with 'Nothing to do' and the stage would look successful) - fix the selector or the project",
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
+      "run_1: run 21 finished 'failed' in the journal",
+      "run_1: gated stage 'gold' has no gate verdict in the journal"
+    ]
+  },
   "recovered_after_scenario": {
     "databases": [],
     "failed": [],

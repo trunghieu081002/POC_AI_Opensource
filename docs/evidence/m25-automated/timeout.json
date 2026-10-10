@@ -2,14 +2,14 @@
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "fail",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; secrets released: DPAGENT_VALIDATE_CEB3112F_SRC_DATABASE, DPAGENT_VALIDATE_CEB3112F_SRC_HOST, DPAGENT_VALIDATE_CEB3112F_SRC_PASSWORD, DPAGENT_VALIDATE_CEB3112F_SRC_PORT, DPAGENT_VALIDATE_CEB3112F_SRC_USER, DPAGENT_VALIDATE_CEB3112F_WH_DATABASE, DPAGENT_VALIDATE_CEB3112F_WH_HOST, DPAGENT_VALIDATE_CEB3112F_WH_PASSWORD, DPAGENT_VALIDATE_CEB3112F_WH_PORT, DPAGENT_VALIDATE_CEB3112F_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "pipeline_artifacts_detail": "DAG removed; DAG delete FAILED: airflow.exceptions.AirflowException: TaskInstances still running; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_A4DE4DB4_SRC_DATABASE, DPAGENT_VALIDATE_A4DE4DB4_SRC_HOST, DPAGENT_VALIDATE_A4DE4DB4_SRC_PASSWORD, DPAGENT_VALIDATE_A4DE4DB4_SRC_PORT, DPAGENT_VALIDATE_A4DE4DB4_SRC_USER, DPAGENT_VALIDATE_A4DE4DB4_WH_DATABASE, DPAGENT_VALIDATE_A4DE4DB4_WH_HOST, DPAGENT_VALIDATE_A4DE4DB4_WH_PASSWORD, DPAGENT_VALIDATE_A4DE4DB4_WH_PORT, DPAGENT_VALIDATE_A4DE4DB4_WH_USER | DAG still registered in Airflow: airflow.exceptions.AirflowException: TaskInstances still running; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
     "s3_objects": "not_applicable",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__ceb3112f",
+  "clone_name": "m25_monthly_sales__validate__a4de4db4",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
