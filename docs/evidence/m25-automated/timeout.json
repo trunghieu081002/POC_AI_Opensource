@@ -2,13 +2,14 @@
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "fail",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; secrets released: DPAGENT_VALIDATE_BC00D930_SRC_DATABASE, DPAGENT_VALIDATE_BC00D930_SRC_HOST, DPAGENT_VALIDATE_BC00D930_SRC_PASSWORD, DPAGENT_VALIDATE_BC00D930_SRC_PORT, DPAGENT_VALIDATE_BC00D930_SRC_USER, DPAGENT_VALIDATE_BC00D930_WH_DATABASE, DPAGENT_VALIDATE_BC00D930_WH_HOST, DPAGENT_VALIDATE_BC00D930_WH_PASSWORD, DPAGENT_VALIDATE_BC00D930_WH_PORT, DPAGENT_VALIDATE_BC00D930_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; secrets released: DPAGENT_VALIDATE_CEB3112F_SRC_DATABASE, DPAGENT_VALIDATE_CEB3112F_SRC_HOST, DPAGENT_VALIDATE_CEB3112F_SRC_PASSWORD, DPAGENT_VALIDATE_CEB3112F_SRC_PORT, DPAGENT_VALIDATE_CEB3112F_SRC_USER, DPAGENT_VALIDATE_CEB3112F_WH_DATABASE, DPAGENT_VALIDATE_CEB3112F_WH_HOST, DPAGENT_VALIDATE_CEB3112F_WH_PASSWORD, DPAGENT_VALIDATE_CEB3112F_WH_PORT, DPAGENT_VALIDATE_CEB3112F_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "s3_objects": "not_applicable",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__bc00d930",
+  "clone_name": "m25_monthly_sales__validate__ceb3112f",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -21,14 +22,31 @@
     "run_1": {},
     "run_2": {}
   },
+  "inputs": {
+    "bronze_staging": false,
+    "dbt_project": false
+  },
   "overall": "fail",
   "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
   "run_ids": [
-    33
+    15
   ],
   "run_status": {
     "run_1": "timeout",
     "run_2": "not_run"
   },
-  "unavailable_reason": ""
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
 }

@@ -141,6 +141,24 @@ def copy_project(project: Path, dest: Path) -> int:
     return n
 
 
+def _paths_for(project: Path, key: str) -> list[Path]:
+    """The directories a dbt_project.yml key names (default if unset), as
+    paths under `project` - `seed-paths: [data/seeds]` is a real setting, and
+    code that assumed a literal `seeds/` would skip those seeds and let
+    models read an empty or missing table."""
+    cfg = _config(project)
+    values = [v for v in _as_list(cfg.get(key)) if isinstance(v, str) and _rel_ok(v)]
+    return [Path(project) / v for v in (values or _SOURCE_DEFAULTS.get(key, []))]
+
+
+def has_seeds(project: Path) -> bool:
+    return any(d.is_dir() and any(d.rglob("*.csv")) for d in _paths_for(project, "seed-paths"))
+
+
+def count_models(project: Path) -> int:
+    return sum(1 for d in _paths_for(project, "model-paths") if d.is_dir() for _ in d.rglob("*.sql"))
+
+
 def check_project(project: Path) -> None:
     """Refuses a project that reaches outside the directory it is allowed to
     own, or whose content the approval hash cannot see. Raises

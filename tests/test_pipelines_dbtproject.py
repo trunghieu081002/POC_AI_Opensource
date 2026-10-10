@@ -413,3 +413,67 @@ def test_validate_step_3_fails_on_an_empty_selector_and_passes_otherwise(root, t
     monkeypatch.setattr(validate, "_dbt_bin", lambda: _fake_dbt(tmp_path, {"dim_artist": "x"}))
     r = validate.check_dbt_models(p)
     assert r.status == "fail" and "selects 0 models" in r.detail
+
+
+# ------------------------------------------------------------------ "." and seed-paths
+
+@pytest.mark.parametrize("path", [".", "./", "dwh_dbt/.."])
+def test_the_pipeline_root_itself_is_not_a_valid_dbt_project_path(root, path):
+    import yaml
+    f = root / "hg_dbt_branch" / "pipeline.yaml"
+    data = yaml.safe_load(f.read_text())
+    data["dbt_project"] = {"path": path}
+    f.write_text(yaml.safe_dump(data))
+    with pytest.raises(loader.PipelineError, match="subdirectory|relative path inside"):
+        _load(root)
+
+
+def test_a_trailing_slash_or_dot_segment_names_the_same_subdirectory_and_is_normalised(root):
+    import yaml
+    f = root / "hg_dbt_branch" / "pipeline.yaml"
+    data = yaml.safe_load(f.read_text())
+    for spelling in ("dwh_dbt/", "./dwh_dbt", "dwh_dbt/."):
+        data["dbt_project"] = {"path": spelling}
+        f.write_text(yaml.safe_dump(data, sort_keys=False))
+        p = _load(root)
+        assert p.dbt_project.path == "dwh_dbt"
+        assert all(n.startswith("dwh_dbt/") or n == "pipeline.yaml"
+                   for n in approval.hashed_paths(p)), approval.hashed_paths(p)
+
+
+def test_has_seeds_honours_seed_paths_and_nested_directories(tmp_path):
+    proj = tmp_path / "p"
+    (proj / "data" / "nested").mkdir(parents=True)
+    (proj / "dbt_project.yml").write_text("name: x\nseed-paths: ['data']\n")
+    assert dbtproject.has_seeds(proj) is False
+    (proj / "data" / "nested" / "s.csv").write_text("a\n1\n")
+    assert dbtproject.has_seeds(proj) is True
+    # default location when unset
+    p2 = tmp_path / "p2"
+    (p2 / "seeds").mkdir(parents=True)
+    (p2 / "dbt_project.yml").write_text("name: x\n")
+    (p2 / "seeds" / "s.csv").write_text("a\n1\n")
+    assert dbtproject.has_seeds(p2) is True
+
+
+def test_count_models_honours_model_paths(tmp_path):
+    proj = tmp_path / "p"
+    (proj / "sql" / "a").mkdir(parents=True)
+    (proj / "dbt_project.yml").write_text("name: x\nmodel-paths: ['sql']\n")
+    (proj / "sql" / "a" / "m.sql").write_text("select 1")
+    assert dbtproject.count_models(proj) == 1
+
+
+def test_runtime_runs_dbt_seed_for_seeds_in_a_custom_seed_path(fake_runtime, root):
+    calls, mp, tmp_path = fake_runtime
+    mp.setattr(runtime, "_dbt_bin", lambda: _fake_dbt(
+        tmp_path, {"dim_artist": "dim_artist", "dim_artist_active": "dim_artist_active"}))
+    proj = _p(root)
+    cfg = proj / "dbt_project.yml"
+    cfg.write_text(cfg.read_text() + "\nseed-paths: ['data/seeds']\n")
+    (proj / "data" / "seeds").mkdir(parents=True)
+    shutil.move(str(proj / "seeds" / "manual_excluded_partner_ids.csv"),
+                str(proj / "data" / "seeds" / "manual_excluded_partner_ids.csv"))
+    shutil.rmtree(proj / "seeds")
+    runtime.run_transform(pipeline_name="hg_dbt_branch", stage="silver")
+    assert calls == ["deps", "seed", "run"], calls     # a literal seeds/ lookup would skip seed

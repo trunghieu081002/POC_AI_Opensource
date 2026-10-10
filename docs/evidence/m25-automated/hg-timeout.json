@@ -1,0 +1,62 @@
+{
+  "bronze": {
+    "batches": [],
+    "namespace": "dpagent-validate/d8ab8e70",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 2,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "fail",
+    "pipeline_artifacts": "fail",
+    "pipeline_artifacts_detail": "DAG removed; DAG delete FAILED: airflow.exceptions.AirflowException: TaskInstances still running; published files removed; secrets released: DPAGENT_VALIDATE_D8AB8E70_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_D8AB8E70_BRONZE_BUCKET, DPAGENT_VALIDATE_D8AB8E70_BRONZE_ENDPOINT, DPAGENT_VALIDATE_D8AB8E70_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_D8AB8E70_SRC_DATABASE, DPAGENT_VALIDATE_D8AB8E70_SRC_HOST, DPAGENT_VALIDATE_D8AB8E70_SRC_PASSWORD, DPAGENT_VALIDATE_D8AB8E70_SRC_PORT, DPAGENT_VALIDATE_D8AB8E70_SRC_USER, DPAGENT_VALIDATE_D8AB8E70_WH_DATABASE, DPAGENT_VALIDATE_D8AB8E70_WH_HOST, DPAGENT_VALIDATE_D8AB8E70_WH_PASSWORD, DPAGENT_VALIDATE_D8AB8E70_WH_PORT, DPAGENT_VALIDATE_D8AB8E70_WH_USER | DAG still registered in Airflow: airflow.exceptions.AirflowException: TaskInstances still running; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_dbt_branch__validate__d8ab8e70",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "deploy_error": "",
+  "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
+  "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
+  "gates": {
+    "run_1": {},
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    22
+  ],
+  "run_status": {
+    "run_1": "timeout",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

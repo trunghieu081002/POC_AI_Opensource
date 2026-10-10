@@ -1,0 +1,185 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "cf5a3d47-7577-4ae0-8ca0-5314bf33e27d",
+        "loaded_rows": 6,
+        "manifest_sha256": "aa96c4ea72e46ec7cc14a5f0c7118484aade8ce908a2fe57226cdc1bae70025e",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "64cd0876-af21-49ec-bbfc-4f357aaa0d9f",
+        "loaded_rows": 6,
+        "manifest_sha256": "f02cdd7bb6396b206e208b00da8c8bf7ceda61693b7b916896d8a4fd2dcc5a1f",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "90115bf4-d245-4b3f-a75f-cebf6e4717e5",
+        "loaded_rows": 6,
+        "manifest_sha256": "549b9d569ddc5a5984e3919f1824a0a24960a798c8cb7860ea6522e8b7218013",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      }
+    ],
+    "namespace": "dpagent-validate/652764a7",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 6,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "90115bf4-d245-4b3f-a75f-cebf6e4717e5",
+      "detail": "6 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_42246b187f\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_42246b187f\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_652764A7_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_652764A7_BRONZE_BUCKET, DPAGENT_VALIDATE_652764A7_BRONZE_ENDPOINT, DPAGENT_VALIDATE_652764A7_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_652764A7_SRC_DATABASE, DPAGENT_VALIDATE_652764A7_SRC_HOST, DPAGENT_VALIDATE_652764A7_SRC_PASSWORD, DPAGENT_VALIDATE_652764A7_SRC_PORT, DPAGENT_VALIDATE_652764A7_SRC_USER, DPAGENT_VALIDATE_652764A7_WH_DATABASE, DPAGENT_VALIDATE_652764A7_WH_HOST, DPAGENT_VALIDATE_652764A7_WH_PASSWORD, DPAGENT_VALIDATE_652764A7_WH_PORT, DPAGENT_VALIDATE_652764A7_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_dbt_branch__validate__652764a7",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "deploy_error": "",
+  "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
+  "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
+  "gates": {
+    "run_1": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 1,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 4,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 1,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 4,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    18,
+    19
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

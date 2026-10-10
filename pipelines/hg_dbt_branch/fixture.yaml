@@ -1,0 +1,16 @@
+# Hand-written input for `dpagent pipeline validate hg_dbt_branch --fixture ... --expected ...`
+# (docs/hg-fixture-validation.md): the rows seeded into a THROWAWAY source database's
+# public.res_partner. Six partners; the project's own seed
+# (dwh_dbt/seeds/manual_excluded_partner_ids.csv) excludes ids 2 and 4.
+tables:
+  - name: res_partner
+    columns:
+      id: bigint
+      name: text
+    rows:
+      - {id: 1, name: "Alice"}
+      - {id: 2, name: "Bob"}
+      - {id: 3, name: "Chị Thảo"}
+      - {id: 4, name: "D"}
+      - {id: 5, name: "Eve"}
+      - {id: 6, name: "Alice"}

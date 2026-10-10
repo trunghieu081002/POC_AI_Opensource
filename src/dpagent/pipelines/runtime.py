@@ -507,8 +507,7 @@ def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage):
         problems = dbtproject.check_selectors(dbt, base, [target])
         if problems:
             return _failed("\n".join(problems), label="selectors")
-        seeds = work / "seeds"
-        if seeds.is_dir() and any(seeds.glob("*.csv")):
+        if dbtproject.has_seeds(work):     # honours seed-paths, nested directories included
             proc = _run([dbt, "seed", *base], pipeline=pipeline, kind="transform",
                         what=f"dbt seed for {target.name!r}")
             if proc.returncode != 0:

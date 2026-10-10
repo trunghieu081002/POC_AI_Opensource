@@ -244,6 +244,21 @@ scenario errored or mismatched" (1) - running a subset never prints or
 exits as if the full matrix had been proven (see the module's own
 docstring for the exact contract).
 
+### Profiles: `core` (14) and `bronze` (21)
+
+`scripts/m25-acceptance-ci.sh --profile bronze` builds the host from
+`examples/layer2-bronze-stack.yaml` (the layer2 stack + the `seaweedfs` pack,
+everything installed by packs, each pack's own suite run) and runs the 14
+scenarios above plus 7 for `pipelines/hg_dbt_branch` - a pipeline that is
+`bronze_staging` and owns a dbt project - through the same
+`fixture.run_fixture` path: `docs/hg-fixture-validation.md`. "Full matrix" is
+relative to the profile (exit 3 if fewer than the profile's scenarios were
+requested). After every scenario the driver looks for leaked throwaway
+databases/roles; at the end the script audits the whole host (leak-audit.txt)
+and exits non-zero on any leak. Latest run: all seven pack suites passed,
+21/21 scenarios matched, `leaks=0` -
+`docs/evidence/m25-automated/README.md`.
+
 ## What this file does not claim
 
 - The matrix above specifies requirements, not new results. Manual results and

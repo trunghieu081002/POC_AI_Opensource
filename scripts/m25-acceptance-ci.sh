@@ -10,6 +10,10 @@
 #   bash scripts/m25-acceptance-ci.sh                   # build+run+teardown
 #   bash scripts/m25-acceptance-ci.sh --keep             # leave the container up on exit (debugging)
 #   bash scripts/m25-acceptance-ci.sh --scenarios "literal-connection timeout"
+#   bash scripts/m25-acceptance-ci.sh --profile bronze   # + SeaweedFS (installed by its pack) and the
+#                                                       # hg_dbt_branch scenarios: bronze_staging +
+#                                                       # an owned dbt project, through the real
+#                                                       # fixture-validation path
 #
 # All 12 scenarios in tests/m25_acceptance/run_matrix.py's own SCENARIOS
 # are driven here. Each one's real outcome is checked against its own
@@ -28,10 +32,12 @@ set -euo pipefail
 
 KEEP=0
 SCENARIOS=""
+PROFILE=core
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --scenarios) SCENARIOS="$2"; shift 2 ;;
+    --profile) PROFILE="$2"; shift 2 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
   esac
@@ -58,6 +64,18 @@ fi
 
 COMMIT="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$COMMIT" ] || die "could not resolve the current commit (git rev-parse HEAD failed) - run this from inside the repo's git checkout, not an extracted tarball with .git stripped"
+
+# packs/seaweedfs is still `maturity: draft` - dpagent installs a draft only
+# with --allow-draft "and use a test VM" (docs/deploy.md). This disposable
+# container is exactly that: the install here, its own acceptance suite
+# (suites/seaweedfs) and the matrix on top ARE the proof a human reads before
+# running `dpagent promote seaweedfs`. Promotion is not done by this script.
+ALLOW_DRAFT=""
+case "$PROFILE" in
+  core)   SPEC=/opt/dpagent/examples/layer2-stack.yaml ;;
+  bronze) SPEC=/opt/dpagent/examples/layer2-bronze-stack.yaml; ALLOW_DRAFT="--allow-draft" ;;
+  *) die "unknown --profile ${PROFILE} (core | bronze)" ;;
+esac
 
 say "preconditions ok - commit ${COMMIT}, building/reusing image ${IMAGE}"
 
@@ -108,7 +126,9 @@ docker exec "${CONTAINER}" bash -lc '
   export AIRFLOW_DB_PASSWORD="$(openssl rand -hex 16)"
   export AIRFLOW_ADMIN_PASSWORD="$(openssl rand -hex 16)"
   export DLT_DB_PASSWORD="$(openssl rand -hex 16)"
-  dpagent spec /opt/dpagent/examples/layer2-stack.yaml --yes
+  export BRONZE_S3_ACCESS_KEY="$(openssl rand -hex 10)"
+  export BRONZE_S3_SECRET_KEY="$(openssl rand -hex 20)"
+  dpagent spec '"${SPEC}"' --yes '"${ALLOW_DRAFT}"'
 ' || die "bootstrap/install failed - see output above; nothing in this repo was touched, only the now-discarded container"
 
 # ----------------------------------------------------------- re-verify
@@ -120,7 +140,14 @@ for svc in postgresql airflow-scheduler airflow-webserver; do
 done
 docker exec "${CONTAINER}" bash -c 'sudo -n -u postgres true' \
   || die "passwordless sudo to postgres is not working inside the container - should be automatic for root via pam_rootok; something about this image changed that"
-ok "postgres+dlt+dbt+airflow installed and verified running"
+if [ "$PROFILE" = bronze ]; then
+  state="$(docker exec "${CONTAINER}" systemctl is-active seaweedfs 2>/dev/null || true)"
+  [ "$state" = "active" ] || die "seaweedfs is not active post-install (got: ${state:-<none>})"
+  docker exec "${CONTAINER}" bash -c 'test -f /opt/seaweedfs/credentials.env' || die "the seaweedfs pack did not write its credentials file"
+  docker exec "${CONTAINER}" /opt/dlt/.venv/bin/python -c 'import pyarrow, boto3, psycopg2' \
+    || die "the dlt venv cannot import pyarrow/boto3/psycopg2 - packs/dlt did not install the bronze worker's dependencies"
+fi
+ok "postgres+dlt+dbt+airflow${PROFILE:+ (profile: ${PROFILE})} installed and verified running"
 
 # -------------------------------------------------------------- run matrix
 
@@ -131,9 +158,36 @@ docker cp "${REPO_ROOT}/tests/m25_acceptance/run_matrix.py" "${CONTAINER}:/opt/d
 say "running the acceptance matrix driver"
 set +e
 docker exec -e "M25_ACCEPTANCE_COMMIT=${COMMIT}" "${CONTAINER}" \
-  bash -c "cd /opt/dpagent && .venv/bin/python tests/m25_acceptance/run_matrix.py ${SCENARIOS}"
+  bash -c "cd /opt/dpagent && .venv/bin/python tests/m25_acceptance/run_matrix.py --profile ${PROFILE} ${SCENARIOS}"
 DRIVER_RC=$?
 set -e
+
+# ----------------------------------------------------------- final leak audit
+
+# Whatever the scenarios did - including the ones that fail on purpose - the
+# host must end with nothing of theirs on it. Looked at directly, not trusted
+# from the reports: databases, roles, published clones, shared-dbt models,
+# registered DAGs, clone secrets, and (bronze profile) every object under the
+# validation namespace.
+LEAK_AUDIT="$(mktemp)"
+docker exec "${CONTAINER}" bash -c '
+leaks=0
+section() { printf "== %s\n" "$1"; }
+found()   { if [ -n "$1" ]; then printf "%s\n" "$1"; leaks=$((leaks+1)); else echo "(none)"; fi; }
+section "databases named dpagent_fixture_*";  found "$(sudo -n -u postgres psql -At -c "select datname from pg_database where datname like '"'"'dpagent_fixture_%'"'"'")"
+section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql -At -c "select rolname from pg_roles where rolname like '"'"'dpagent_fixture_%'"'"'")"
+section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep __validate__ || true)"
+section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
+section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep __validate__ || true)"
+section "clone secrets in pipelines.env";     found "$(grep DPAGENT_VALIDATE /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
+if [ -f /opt/seaweedfs/credentials.env ]; then
+  . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY
+  section "S3 objects under dpagent-validate/"; found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze dpagent-validate/ || true)"
+fi
+echo; echo "leaks=${leaks}"
+' > "${LEAK_AUDIT}" 2>&1 || true
+cat "${LEAK_AUDIT}"
+LEAKS="$(grep -oE '^leaks=[0-9]+' "${LEAK_AUDIT}" | cut -d= -f2)"
 
 # --------------------------------------------------------- collect evidence
 
@@ -159,6 +213,11 @@ if docker exec "${CONTAINER}" test -f /root/m25-evidence/registry.jsonl; then
   cat "/tmp/m25-registry-$$.jsonl" >> "${RESULTS_DIR}/registry.jsonl"
   rm -f "/tmp/m25-registry-$$.jsonl"
 fi
+cp "${LEAK_AUDIT}" "${RESULTS_DIR}/leak-audit.txt"
 ok "evidence written under ${RESULTS_DIR}"
+if [ "${LEAKS:-x}" != "0" ]; then
+  echo "XX the host still holds resources of finished scenarios (leaks=${LEAKS:-unknown}) - see leak-audit.txt" >&2
+  [ "$DRIVER_RC" -ne 0 ] || DRIVER_RC=5
+fi
 
 exit "$DRIVER_RC"

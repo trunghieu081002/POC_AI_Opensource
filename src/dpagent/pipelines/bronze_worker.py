@@ -492,14 +492,79 @@ def load(batch_id: str) -> dict:
     return result
 
 
+# ---------------------------------------------- namespace housekeeping (validation)
+
+def _namespace() -> str:
+    ns = _env("BRONZE_NAMESPACE").strip("/")
+    # A namespace operation deletes objects - refuse anything that could be
+    # the bucket root or a bare top-level prefix shared with real data.
+    if not ns or ns in (".", "..") or ".." in ns.split("/") or "/" not in ns:
+        raise BronzeError(f"refusing a namespace operation on {ns!r}: it must name a "
+                          f"dedicated 'a/b' prefix, never the bucket root or a shared top level")
+    return ns + "/"
+
+
+def _list_namespace(s3, ns: str) -> list[str]:
+    keys, token = [], None
+    while True:
+        kwargs = {"Bucket": _env("BRONZE_BUCKET"), "Prefix": ns}
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = s3.list_objects_v2(**kwargs)
+        keys += [o["Key"] for o in page.get("Contents", [])]
+        if not page.get("IsTruncated"):
+            return keys
+        token = page["NextContinuationToken"]
+
+
+def ping() -> dict:
+    s3 = _s3()
+    s3.head_bucket(Bucket=_env("BRONZE_BUCKET"))
+    result = {"bucket": _env("BRONZE_BUCKET"), "reachable": True}
+    _result("PING", result)
+    return result
+
+
+def count_namespace() -> dict:
+    ns = _namespace()
+    keys = _list_namespace(_s3(), ns)
+    result = {"namespace": ns, "objects": len(keys)}
+    _result("COUNT", result)
+    return result
+
+
+def purge_namespace() -> dict:
+    """Deletes every object under the (dedicated) namespace, then LISTS it
+    again: `remaining` is what is still there, read back from the store, not
+    inferred from the delete calls having returned."""
+    ns = _namespace()
+    s3 = _s3()
+    keys = _list_namespace(s3, ns)
+    for i in range(0, len(keys), 1000):
+        batch = keys[i:i + 1000]
+        s3.delete_objects(Bucket=_env("BRONZE_BUCKET"),
+                          Delete={"Objects": [{"Key": k} for k in batch], "Quiet": True})
+    remaining = _list_namespace(s3, ns)
+    result = {"namespace": ns, "deleted": len(keys) - len(remaining), "found": len(keys),
+              "remaining": len(remaining)}
+    _result("PURGE", result)
+    return result
+
+
 def main(argv: list[str]) -> int:
     try:
         if argv[:1] == ["extract"] and len(argv) == 1:
             extract()
         elif argv[:1] == ["load"] and len(argv) == 2:
             load(argv[1])
+        elif argv == ["ping"]:
+            ping()
+        elif argv == ["count"]:
+            count_namespace()
+        elif argv == ["purge"]:
+            purge_namespace()
         else:
-            print("usage: bronze_worker.py extract | load <batch_id>", file=sys.stderr)
+            print("usage: bronze_worker.py extract | load <batch_id> | ping | count | purge", file=sys.stderr)
             return 2
     except BronzeError as exc:
         print(f"bronze: {exc}", file=sys.stderr)

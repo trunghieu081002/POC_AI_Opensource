@@ -1,0 +1,12 @@
+{
+  "cleanup": {
+    "overall": "not_attempted"
+  },
+  "detail": "/tmp/tmpu7h0gci2/hg_dbt_branch/pipeline.yaml: dbt_project 'dwh_dbt': macros/leak.sql is a symlink (-> /etc/passwd) - a dbt project may not contain symlinks: the target is outside what the approval hash covers",
+  "overall": "refused",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  }
+}

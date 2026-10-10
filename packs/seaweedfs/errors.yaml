@@ -1,0 +1,29 @@
+# SeaweedFS-specific failures. Generic ones (apt locks, DNS, disk) live in
+# packs/_lib/errors.yaml. Add an entry only for a failure that actually happened.
+
+- id: seaweedfs-checksum-mismatch
+  match:
+    output: "checksum did not match for"
+  cause: >
+    The downloaded tarball is not the one whose sha256 this pack pins - a
+    changed `version` without its matching sha256_amd64/sha256_arm64, a
+    truncated download, or a tampered mirror. The install refuses to continue
+    rather than run an unverified binary.
+  autofix: []
+  ask_user: >
+    If you changed `version`, also set sha256_amd64 and sha256_arm64 to the
+    digests GitHub publishes for that release's linux_<arch>.tar.gz. Otherwise
+    retry once; a second mismatch is not transient.
+  retry: false
+
+- id: seaweedfs-port-in-use
+  match:
+    output: "address already in use|bind: address already in use"
+  cause: >
+    Another process holds the S3 port (or one of weed's master/volume/filer
+    ports on the same address).
+  autofix: []
+  ask_user: >
+    Free the port or install on a different one: --set s3_port=8334. `ss -ltnp`
+    shows what holds it.
+  retry: false

@@ -54,8 +54,9 @@ is read:
   outright: the old path is never taken silently for a manifest that asked
   for the new one.
 - **deploy** - the `bronze:` `${VAR}`s are published to `pipelines.env`
-  with the warehouse ones. Fixture validation refuses a bronze pipeline
-  (a clone would silently validate the old dlt path instead).
+  with the warehouse ones. Fixture validation supports a bronze pipeline
+  (docs/hg-fixture-validation.md): the clone gets its own renamed object-store
+  refs and its own S3 namespace, and teardown purges and re-lists it.
 - **cleanup** - `undeploy` leaves bronze objects and registry rows alone,
   like it leaves warehouse data: they are data, and an audit trail.
 
@@ -158,8 +159,8 @@ runs from a checkout elsewhere.
 ## Not done, explicitly
 
 - Scope is deliberately narrow: `odoo_postgres`, **one table**, **full
-  snapshot** (no incremental/watermark), no fixture validation for a bronze
-  pipeline. Extending any of those is new work, not a flag away.
+  snapshot** (no incremental/watermark). Extending any of those is new work,
+  not a flag away.
 - Bronze objects and registry rows are never garbage-collected (no
   retention policy; no `rollback` command). Both would be new decisions.
 - No `packs/seaweedfs` - SeaweedFS is still a hand-started container.

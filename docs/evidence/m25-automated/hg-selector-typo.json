@@ -1,0 +1,105 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "4a8ca1bf-28b5-42de-9fe1-cc2c8e59f163",
+        "loaded_rows": 6,
+        "manifest_sha256": "1147a9f8b3c10ccedaf912d430ae573e0b3e8dd24d977d6565a15d4f824a3b64",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      }
+    ],
+    "namespace": "dpagent-validate/c360d6c7",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 2,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_C360D6C7_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_C360D6C7_BRONZE_BUCKET, DPAGENT_VALIDATE_C360D6C7_BRONZE_ENDPOINT, DPAGENT_VALIDATE_C360D6C7_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_C360D6C7_SRC_DATABASE, DPAGENT_VALIDATE_C360D6C7_SRC_HOST, DPAGENT_VALIDATE_C360D6C7_SRC_PASSWORD, DPAGENT_VALIDATE_C360D6C7_SRC_PORT, DPAGENT_VALIDATE_C360D6C7_SRC_USER, DPAGENT_VALIDATE_C360D6C7_WH_DATABASE, DPAGENT_VALIDATE_C360D6C7_WH_HOST, DPAGENT_VALIDATE_C360D6C7_WH_PASSWORD, DPAGENT_VALIDATE_C360D6C7_WH_PORT, DPAGENT_VALIDATE_C360D6C7_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_dbt_branch__validate__c360d6c7",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "deploy_error": "",
+  "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
+  "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 4,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:ff7d65e4a114ea5c19b51c4662513ae5144013b9a09f9afeebebeab5454c0de3",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    21
+  ],
+  "run_status": {
+    "run_1": "failed",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}
