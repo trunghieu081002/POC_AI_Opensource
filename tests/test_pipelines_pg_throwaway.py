@@ -12,6 +12,16 @@ import pytest
 from dpagent.pipelines import pg_throwaway
 
 
+def _catalog_gone(cmd, count="0"):
+    """The teardown's own post-DROP catalog check (`SELECT count(*) FROM
+    pg_database/pg_roles WHERE ...`): answers "0" = confirmed absent."""
+    return subprocess.CompletedProcess(cmd, 0, stdout=f"{count}\n", stderr="")
+
+
+def _is_catalog_check(cmd):
+    return cmd[cmd.index("-c") + 1].startswith("SELECT count(*)")
+
+
 def test_throwaway_database_reports_missing_sudo(monkeypatch):
     """Deterministic missing-sudo test; independent of host permissions."""
     monkeypatch.setattr(
@@ -90,8 +100,9 @@ def test_env_produces_the_shape_a_pipelines_env_refs_expect():
 # ---------------------------------------------------------------- teardown verification (M2.4.2)
 
 def test_throwaway_database_records_a_confirmed_successful_teardown(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
-        a[0] if a else [], 0, stdout="", stderr=""))
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: _catalog_gone(cmd)
+                        if _is_catalog_check(cmd) else subprocess.CompletedProcess(
+                            cmd, 0, stdout="", stderr=""))
     with pg_throwaway.throwaway_database() as db:
         assert db.database_dropped is False   # not yet - teardown hasn't run
         assert db.role_dropped is False
@@ -110,6 +121,8 @@ def test_throwaway_database_records_a_failed_drop_database(monkeypatch):
         sql = cmd[cmd.index("-c") + 1]
         if sql.startswith("DROP DATABASE"):
             return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="database is in use")
+        if sql.startswith("SELECT count(*)"):
+            return _catalog_gone(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -126,6 +139,8 @@ def test_throwaway_database_records_a_failed_drop_role(monkeypatch):
         sql = cmd[cmd.index("-c") + 1]
         if sql.startswith("DROP ROLE"):
             return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="role has dependents")
+        if sql.startswith("SELECT count(*)"):
+            return _catalog_gone(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -169,6 +184,8 @@ def test_throwaway_database_teardown_never_raises_on_a_timeout_and_still_drops_t
         sql = cmd[cmd.index("-c") + 1]
         if sql.startswith("DROP DATABASE"):
             raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 30))
+        if sql.startswith("SELECT count(*)"):
+            return _catalog_gone(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -220,3 +237,53 @@ def test_throwaway_database_rollback_failure_on_create_database_is_named_in_the_
     assert "disk full" in message
     assert "could not be confirmed dropped" in message
     assert "role has dependents" in message
+
+
+# ---------------------------------------------- "dropped" = confirmed absent from the catalog
+
+def _fake_with_catalog(db_count="0", role_count="0", catalog_rc=0):
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("SELECT count(*)"):
+            if catalog_rc:
+                return subprocess.CompletedProcess(cmd, catalog_rc, stdout="", stderr="catalog broke")
+            return _catalog_gone(cmd, db_count if "pg_database" in sql else role_count)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    return fake_run
+
+
+def test_a_drop_that_returned_0_but_left_the_database_in_the_catalog_is_not_dropped(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_with_catalog(db_count="1"))
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.database_dropped is False and "still exists in pg_database" in db.database_drop_error
+    assert db.role_dropped is True and db.cleanup_ok is False
+
+
+def test_a_drop_that_returned_0_but_left_the_role_in_the_catalog_is_not_dropped(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_with_catalog(role_count="1"))
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.role_dropped is False and "still exists in pg_roles" in db.role_drop_error
+    assert db.database_dropped is True and db.cleanup_ok is False
+
+
+def test_when_the_catalog_cannot_be_queried_the_drop_is_unverified_not_assumed(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_with_catalog(catalog_rc=2))
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.cleanup_ok is False
+    assert "could not verify database" in db.database_drop_error
+    assert "could not verify role" in db.role_drop_error
+
+
+def test_a_catalog_query_that_times_out_is_unverified_not_assumed(monkeypatch):
+    def fake_run(cmd, **kwargs):
+        sql = cmd[cmd.index("-c") + 1]
+        if sql.startswith("SELECT count(*)"):
+            raise subprocess.TimeoutExpired(cmd, 30)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pg_throwaway.throwaway_database() as db:
+        pass
+    assert db.cleanup_ok is False and "timed out" in db.database_drop_error

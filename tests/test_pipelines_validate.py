@@ -260,8 +260,12 @@ def test_check_procedures_real_skip_without_passwordless_sudo(tmp_path):
 
 def test_check_procedures_passes_when_every_procedure_applies_cleanly(tmp_path, monkeypatch):
     pipeline = _pipeline(tmp_path / "pipelines", with_dbt=False)
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
-        a[0] if a else [], 0, stdout="", stderr=""))
+    def fake_run(cmd, **kwargs):
+        # the throwaway teardown now asks the catalog whether its database/role
+        # are really gone (pg_throwaway._absent): "0" = confirmed absent
+        stdout = "0\n" if "SELECT count(*)" in " ".join(cmd) else ""
+        return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
     result = validate.check_procedures(pipeline)
     assert result.status == "pass"
     assert "1 procedure" in result.detail
@@ -275,7 +279,8 @@ def test_check_procedures_reports_which_stage_failed(tmp_path, monkeypatch):
         calls["n"] += 1
         if cmd[0] == "psql" and "-f" in cmd:
             return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="syntax error at line 1")
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        stdout = "0\n" if "SELECT count(*)" in " ".join(cmd) else ""
+        return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = validate.check_procedures(pipeline)

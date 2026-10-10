@@ -78,7 +78,8 @@ class ThrowawayDB:
         }
 
 
-def _run_as_postgres(sql: str, *, timeout: int = 30) -> subprocess.CompletedProcess | None:
+def _run_as_postgres(sql: str, *, timeout: int = 30,
+                     tuples_only: bool = False) -> subprocess.CompletedProcess | None:
     """`None`, never a raised `subprocess.TimeoutExpired`, when the command
     itself did not finish within `timeout` - a distinct outcome from a
     `returncode != 0` (the command ran and refused), and one every caller
@@ -92,10 +93,29 @@ def _run_as_postgres(sql: str, *, timeout: int = 30) -> subprocess.CompletedProc
     even ran)."""
     try:
         return subprocess.run(
-            ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
+            ["sudo", "-n", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1",
+             *(["-At"] if tuples_only else []), "-c", sql],
             capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return None
+
+
+def _absent(kind: str, name: str) -> tuple[bool, str]:
+    """(True, "") only when the catalog itself says `name` is gone - a DROP
+    that returned 0 is not the same claim (a `DROP ... IF EXISTS` returns 0
+    for something that was never there, and for nothing that is still there
+    only if the command really ran). `name` is always one of this module's
+    own generated identifiers, never operator input."""
+    catalog, column = ("pg_database", "datname") if kind == "database" else ("pg_roles", "rolname")
+    proc = _run_as_postgres(f"SELECT count(*) FROM {catalog} WHERE {column} = '{name}';",
+                            tuples_only=True)
+    if proc is None:
+        return False, f"could not verify {kind} {name!r} is gone: catalog query timed out"
+    if proc.returncode != 0:
+        return False, f"could not verify {kind} {name!r} is gone: {(proc.stderr or proc.stdout).strip()}"
+    if proc.stdout.strip() != "0":
+        return False, f"{kind} {name!r} still exists in {catalog} after DROP (count={proc.stdout.strip()!r})"
+    return True, ""
 
 
 def _detail_of(proc: subprocess.CompletedProcess | None, *, timeout: int) -> str:
@@ -159,12 +179,23 @@ def throwaway_database(prefix: str = "dpagent_throwaway"):
     try:
         yield db_obj
     finally:
+        # "Dropped" means the DROP succeeded AND the catalog confirms the
+        # object is gone - the command's own exit status alone is not
+        # verification (see `_absent`).
         drop_db = _run_as_postgres(f"DROP DATABASE IF EXISTS {db};")
         db_obj.database_dropped = drop_db is not None and drop_db.returncode == 0
         if not db_obj.database_dropped:
             db_obj.database_drop_error = _detail_of(drop_db, timeout=30)
+        else:
+            gone, why = _absent("database", db)
+            if not gone:
+                db_obj.database_dropped, db_obj.database_drop_error = False, why
 
         drop_role = _run_as_postgres(f"DROP ROLE IF EXISTS {role};")
         db_obj.role_dropped = drop_role is not None and drop_role.returncode == 0
         if not db_obj.role_dropped:
             db_obj.role_drop_error = _detail_of(drop_role, timeout=30)
+        else:
+            gone, why = _absent("role", role)
+            if not gone:
+                db_obj.role_dropped, db_obj.role_drop_error = False, why

@@ -1,0 +1,85 @@
+# Everything examples/layer2-stack.yaml installs (PostgreSQL + dlt + dbt +
+# Airflow), plus SeaweedFS as the S3-compatible bronze object store a pipeline
+# with `bronze_staging: true` extracts into (docs/hg-bronze-staging.md). This
+# is the stack `scripts/m25-acceptance-ci.sh --profile bronze` builds a clean
+# host from, and the one pipelines/hg_dbt_branch is validated on.
+#
+#   export AIRFLOW_DB_PASSWORD='...' DBT_DB_PASSWORD='...' DLT_DB_PASSWORD='...'
+#   export AIRFLOW_ADMIN_PASSWORD='...'
+#   export BRONZE_S3_ACCESS_KEY='...' BRONZE_S3_SECRET_KEY='...'
+#   sudo -E dpagent doctor postgres dbt airflow dlt seaweedfs
+#   sudo -E dpagent spec examples/layer2-bronze-stack.yaml --dry-run
+#   sudo -E dpagent spec examples/layer2-bronze-stack.yaml
+#
+# Why dlt matters twice here: the bronze EXTRACT/LOAD worker runs in dlt's
+# venv (pyarrow + boto3 are installed by packs/dlt's install step), so the
+# Postgres, the S3 endpoint and that venv are three things that must agree.
+# The seaweedfs section below is where the endpoint and keys are decided;
+# pipelines name them through ${...} refs, never literals.
+
+project: layer2-bronze-stack
+
+components:
+  - base:
+      locale: "en_US.UTF-8"
+
+  - postgres:
+      version: "15"
+      port: 5432
+      listen_addresses: "localhost"
+      max_connections: 200
+      databases:
+        - warehouse
+        - airflow_meta
+        - dlt_selftest
+      users:
+        - name: dbt_user
+          password: "${DBT_DB_PASSWORD}"
+          databases: [warehouse]
+        - name: airflow
+          password: "${AIRFLOW_DB_PASSWORD}"
+          databases: [airflow_meta]
+        - name: dlt_user
+          password: "${DLT_DB_PASSWORD}"
+          databases: [dlt_selftest]
+
+  - dbt:
+      adapter: postgres
+      dbt_version: "1.8.*"
+      host: localhost
+      port: 5432
+      database: warehouse
+      db_schema: public
+      db_user: dbt_user
+      db_password: "${DBT_DB_PASSWORD}"
+      threads: 4
+
+  - airflow:
+      version: "2.9.3"
+      executor: LocalExecutor
+      webserver_port: 8090
+      load_examples: false
+      backend_host: localhost
+      backend_port: 5432
+      backend_db: airflow_meta
+      backend_user: airflow
+      backend_password: "${AIRFLOW_DB_PASSWORD}"
+      admin_user: admin
+      admin_password: "${AIRFLOW_ADMIN_PASSWORD}"
+      admin_email: "admin@example.com"
+
+  - dlt:
+      dlt_version: "1.*"
+      host: localhost
+      port: 5432
+      database: dlt_selftest
+      db_user: dlt_user
+      db_password: "${DLT_DB_PASSWORD}"
+
+  - seaweedfs:
+      version: "4.48"
+      s3_port: 8333
+      bind_address: "127.0.0.1"
+      access_key: "${BRONZE_S3_ACCESS_KEY}"
+      secret_key: "${BRONZE_S3_SECRET_KEY}"
+      buckets: [hg-bronze]

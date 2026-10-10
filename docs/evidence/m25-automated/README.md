@@ -1,4 +1,4 @@
-# M2.5 Step 3 — automated-rerun evidence
+# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 21 scenarios)
 
 Real, redacted output from `tests/m25_acceptance/run_matrix.py`, written here
 by `scripts/m25-acceptance-ci.sh` so it survives after whatever disposable
@@ -13,6 +13,45 @@ directory is Step 3's own proof: that the *automation* -
 `scripts/m25-acceptance-ci.sh` - actually reproduces the same scenarios
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
+
+## Latest run: profile `bronze`, host built from packs (2026-10-10)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze` — a fresh container from
+`scripts/m25-disposable-host.Dockerfile`, **every component installed by its pack**
+from `examples/layer2-bronze-stack.yaml` (base, python-modern, postgres, dbt, dlt,
+airflow, and the new `seaweedfs`, the last with `--allow-draft` because that pack
+is still `maturity: draft`), each pack's acceptance suite run as part of the
+install (all seven passed: airflow 4/4, base 4/4, dbt 4/4, dlt 3/3, postgres 6/6,
+python-modern 2/2, seaweedfs 6/6), then `run_matrix.py --profile bronze`:
+**21/21 scenarios matched their expectation** and the final host audit found
+**`leaks=0`** ([`leak-audit.txt`](leak-audit.txt)): no `dpagent_fixture_*` database
+or role, no published clone, no shared-dbt clone model, no registered clone DAG, no
+clone secret, no object under `dpagent-validate/`.
+
+The 14 scenarios below the line are the earlier M2.5 matrix, unchanged (this is the
+no-regression run); the 7 `hg-*` scenarios are new — `hg_dbt_branch` through the
+real fixture path, [`docs/hg-fixture-validation.md`](../../hg-fixture-validation.md)
+has what each proves:
+
+| File | Result |
+|---|---|
+| [`hg-correct-twice.json`](hg-correct-twice.json) | **pass** — runs 18, 19 `ok`; gold + both silver tables match the hand-calculated expected after each run, idempotent; 3 batches all `loaded` (6 rows, 1 object each); source dropped (catalog-confirmed) and unreachable, LOAD without it succeeded and the landing matched the fixture's rows; S3: 6 objects at teardown, 0 remaining; every cleanup line `pass` |
+| [`hg-wrong-expected.json`](hg-wrong-expected.json) | fail on the comparison (run 1), cleanup `pass` incl. `s3_objects` |
+| [`hg-selector-typo.json`](hg-selector-typo.json) | fail — run 1 `failed` at the gold stage, cleanup `pass` incl. S3 |
+| [`hg-symlink-refused.json`](hg-symlink-refused.json) | `refused` before anything ran |
+| [`hg-timeout.json`](hg-timeout.json) | `timeout`, `cleanup: fail` by policy; leaked throwaway resources (none this run) recovered per scenario |
+| [`hg-stray-object-purged.json`](hg-stray-object-purged.json) | pass; **7** objects found at teardown (6 + the stray), 0 remaining |
+| [`hg-purge-failure-detected.json`](hg-purge-failure-detected.json) | fail — a purge that claimed success and deleted nothing was caught by the independent re-list (`cleanup.s3_objects` fails); the driver then removed the objects itself |
+
+`recovered_after_scenario` in each file lists what the driver found left behind
+after that scenario and removed (`drop-failure` had a warehouse database + role to
+recover this run; a `cleanup: pass` scenario with anything recovered would itself
+fail). `registry.jsonl` keeps appending: earlier runs' lines stay.
+
+**Which tree**: the registry's `commit` field is the base commit the run started
+from (`ef4dc90…`); the run executed the working tree of the PR that adds these
+files, which was committed unchanged afterwards. A run on an unrelated tree would
+show a different hash in `pipeline_hash` / `validator`.
 
 ## All 14 scenarios, matched
 

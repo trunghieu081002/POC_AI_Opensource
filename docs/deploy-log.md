@@ -4011,3 +4011,41 @@ quickstart_dbt still runs through the unchanged shared-project path).
 git/tarball packages are not refused (only local ones are checked); the project is
 not sandboxed from the task environment; scope checks cover the dbt project, not
 other symlinks in the pipeline directory.
+
+## 2026-10-10 - HG fixture validation: bronze_staging + owned dbt project through the real fixture path, on a host built from packs
+
+`fixture.run_fixture` / `dpagent pipeline validate --fixture` now supports a pipeline
+that is `bronze_staging` and owns a `dbt_project` (previously refused): the whole
+project is cloned into the clone's workspace by `dbtproject.copy_project`; the clone
+gets renamed object-store refs and its own S3 namespace; `expected.yaml` may name
+more than one table (`schema:` / `also:`); every validation of a bronze pipeline
+proves LOAD works with the source **removed** (database + role dropped, catalog-
+confirmed, connection shown to fail); teardown purges the S3 namespace and lists it
+again, and `pg_throwaway` now asks the catalog whether a "dropped" database/role is
+really gone. The evidence (`REPORT_VERSION` 2) carries input hashes (incl. the dbt
+project), dpagent/PostgreSQL/dbt/manifest-format versions, run and batch ids,
+comparisons, gates and per-resource cleanup. Details: `docs/hg-fixture-validation.md`.
+
+New `packs/seaweedfs` (draft, with `suites/seaweedfs`) and
+`examples/layer2-bronze-stack.yaml`: the S3 store is installed by a pack, with a
+pinned, sha256-verified release and a stdlib SigV4 client (no boto3/curl-version
+dependency). `scripts/m25-acceptance-ci.sh --profile bronze` builds a clean host
+from the Dockerfile, installs everything by packs, runs the matrix (14 earlier + 7
+new scenarios) and audits the host for leaks.
+
+**Real-verified** (`docs/evidence/m25-automated/`): all seven pack suites passed on
+the clean host, 21/21 scenarios matched their expectation, host audit `leaks=0`.
+Getting there took three runs and found real defects: the seaweedfs pack could only
+serve one bucket (default volume slots - fixed, with a suite check that writes to
+twelve), its restart check was too optimistic (now retries the read), a "dropped"
+database could still be in the catalog, and throwaway resources leaked after a
+timeout (now detected per scenario and recovered as the timeout policy says). From
+the earlier milestones: `dbt_project.path: "."` is refused and the path normalised;
+`dbt seed` honours `seed-paths`. Two runs also failed from running the unit suite
+and the host build at the same time on a busy machine; the evidence is the solo run.
+
+**Not done, explicitly**: no `promote()` gate (A2) - the evidence exists, nothing
+requires it; no incremental models, no other connectors; `packs/seaweedfs` is still
+`maturity: draft` (installed with `--allow-draft` on a disposable container; a human
+promotes after reading the evidence); the host is a container on a shared machine,
+not an independent VM.

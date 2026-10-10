@@ -1,0 +1,31 @@
+# Calculated by hand from fixture.yaml and the seed - never read back from the
+# pipeline's own output:
+#   dim_artist        = all 6 partners (platform_id is the id as text)
+#   dim_artist_active = those not in the seed {2, 4} -> ids 1, 3, 5, 6
+#   mart_artist_summary over dim_artist_active:
+#       artists = 4, distinct_names = 3 (Alice appears twice: ids 1 and 6),
+#       min_platform_id = 1, max_platform_id = 6
+table: mart_artist_summary
+schema: gold
+row_count: 1
+rows:
+  - {artists: 4, distinct_names: 3, min_platform_id: 1, max_platform_id: 6}
+also:
+  - table: dim_artist_active
+    schema: silver
+    row_count: 4
+    rows:
+      - {platform_id: "1", platform_name: "Alice"}
+      - {platform_id: "3", platform_name: "Chị Thảo"}
+      - {platform_id: "5", platform_name: "Eve"}
+      - {platform_id: "6", platform_name: "Alice"}
+  - table: dim_artist
+    schema: silver
+    row_count: 6
+    rows:
+      - {platform_id: "1", platform_name: "Alice"}
+      - {platform_id: "2", platform_name: "Bob"}
+      - {platform_id: "3", platform_name: "Chị Thảo"}
+      - {platform_id: "4", platform_name: "D"}
+      - {platform_id: "5", platform_name: "Eve"}
+      - {platform_id: "6", platform_name: "Alice"}

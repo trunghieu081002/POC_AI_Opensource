@@ -3,30 +3,48 @@
     "overall": "pass",
     "pipeline_artifacts": "pass",
     "pipeline_artifacts_detail": "dbt models removed | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "not_applicable",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__b447427e",
+  "clone_name": "m25_monthly_sales__validate__a98bc760",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
     "run_2": "not_run"
   },
-  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: PosixPath('/opt/dpagent/pipelines/m25_monthly_sales__validate__b447427e')",
+  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: PosixPath('/opt/dpagent/pipelines/m25_monthly_sales__validate__a98bc760')",
   "expected_hash": "sha256:8cfa1d2e3476f04c8e1a0c0e0a5af8731039bd5e216a3e4ab91e7bcfcf9dcb17",
   "fixture_hash": "sha256:416cf9e2bb697dbdf6ed05376be6667b201b2c2fddf07ef01712c72d3df133a9",
   "gates": {
     "run_1": {},
     "run_2": {}
   },
+  "inputs": {
+    "bronze_staging": false,
+    "dbt_project": false
+  },
   "overall": "fail",
   "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
   "run_ids": [],
   "run_status": {
     "run_1": "not_run",
     "run_2": "not_run"
   },
-  "unavailable_reason": ""
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
 }

@@ -186,7 +186,7 @@ def _check_own_dbt_project(pipeline: Pipeline, dbt_bin: str) -> StepResult:
         problems = dbtproject.check_selectors(dbt_bin, base, dbt_stages)
         if problems:
             return StepResult("fail", "\n".join(problems))
-        n = sum(1 for _ in (work / "models").rglob("*.sql")) if (work / "models").is_dir() else 0
+        n = dbtproject.count_models(work)
         return StepResult("pass", f"own dbt project {pipeline.dbt_project.path}/ parsed "
                                   f"clean ({n} model file(s), packages resolved, every "
                                   f"stage selector selects at least one model)")

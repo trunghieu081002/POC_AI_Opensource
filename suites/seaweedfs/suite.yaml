@@ -1,0 +1,53 @@
+suite: seaweedfs
+summary: Prove the object store really stores, lists, returns, deletes, persists and refuses what it should
+
+# verify.sh asks whether the service is alive; this asks whether it does its
+# job as the bronze EXTRACT/LOAD split (docs/hg-bronze-staging.md) uses it:
+# objects round-trip byte for byte (including awkward keys), a prefix listing
+# sees exactly its own objects, a wrong key is refused, data survives a
+# restart of the service, and a deleted object is really gone. Everything is
+# confined to one throwaway bucket named after DP_TEST_NS.
+requires: [seaweedfs]
+
+setup:
+  - id: create-bucket
+    script: setup/00-bucket.sh
+    description: Create a throwaway bucket for the checks
+    timeout: 60
+
+checks:
+  - id: write-read-roundtrip
+    script: checks/10-roundtrip.sh
+    description: Objects (incl. a key with spaces and non-ASCII) come back byte-identical
+    critical: true
+    timeout: 120
+
+  - id: prefix-listing
+    script: checks/20-prefix-listing.sh
+    description: A prefix listing returns exactly the objects under that prefix, across pages
+    timeout: 180
+
+  - id: many-buckets
+    script: checks/25-many-buckets.sh
+    description: Twelve buckets can each be written and read (every bucket is its own collection)
+    timeout: 240
+
+  - id: rejects-bad-credentials
+    script: checks/30-rejects-bad-credentials.sh
+    description: A request signed with the wrong secret key is refused (negative)
+    negative: true
+    timeout: 60
+
+  - id: survives-restart
+    script: checks/40-survives-restart.sh
+    description: An object written before a service restart is intact after it
+    timeout: 180
+
+  - id: delete-removes
+    script: checks/50-delete-removes.sh
+    description: A deleted object is gone from reads and from listings
+    timeout: 60
+
+teardown:
+  - id: remove-bucket-contents
+    script: teardown/99-bucket.sh

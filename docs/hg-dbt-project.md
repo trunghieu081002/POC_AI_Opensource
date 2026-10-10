@@ -46,10 +46,11 @@ stages:
 - **Step 3 validate** is a real `dbt deps` + `dbt parse` of the owned project
   (packages resolved, `ref()`/`source()`/macros/seeds all resolved) — not a
   regex over the SQL.
-- **Fixture validation refuses** an owned-project pipeline (like a bronze
-  one): `make_validation_clone` copies per-stage model files, not a project
-  with packages/seeds/sources, so a clone would silently not contain what the
-  manifest runs.
+- **Fixture validation supports it** (since docs/hg-fixture-validation.md): the
+  clone gets the whole project, copied by the same function that defines what
+  the approval hash covers. (An earlier version of this PR series refused such
+  pipelines, because a clone that copied only per-stage model files would have
+  silently not contained what the manifest runs.)
 
 ## Approval hash, scope refusals, selector checks (added before merge)
 
@@ -159,11 +160,12 @@ host), through a real Airflow DAG:
   runs) and are not claimed.
 - dbt tests in the project's yml files are parsed but **not run** by dpagent;
   its gates enforce at run time. Mapping dbt tests to gates is not built.
-- No fixture-validation path for an owned-project pipeline (refused with the
-  reason, above), so `promote()`-style evidence for these does not exist yet —
-  that is A2's territory and is not started.
-- Not wired into the self-provisioning CI script; like the bronze
-  verification it runs by hand against containers it is told about.
+- Fixture validation now covers these pipelines (docs/hg-fixture-validation.md),
+  but nothing yet *requires* that evidence before `promote()` — that is A2,
+  not started.
+- `scripts/hg-dbt-branch-verify.sh` (this document's by-hand verification) is
+  kept as a repro, but the acceptance evidence is the fixture path run by
+  `scripts/m25-acceptance-ci.sh --profile bronze`.
 - **Limits of the scope/approval checks themselves** (so the guarantees are not
   read as stronger than they are):
   - Only *local* packages are covered by file hashing. A **hub** package is

@@ -47,13 +47,18 @@ from pathlib import Path
 
 import yaml
 
-from ..engine.params import ENV_REF
-from . import pg_throwaway
+from ..engine.params import ENV_REF, ParamError, resolve_refs
+from . import dbtproject, pg_throwaway
 from .extract import landing_dataset as _landing_dataset
-from .loader import Pipeline, Stage, Warehouse
+from .loader import BronzeStorage, Pipeline, Stage, Warehouse
 from .pg_throwaway import ThrowawayDB
 
 _CONN_KEYS = ("host", "port", "database", "user", "password")
+
+# Bumped when the shape of the fixture section of .synth-validation.yaml
+# changes, so a consumer (Step 4's promote gate, a reviewer) can tell which
+# fields it may rely on. 2 = bronze / dbt_project / validator / s3 fields.
+REPORT_VERSION = 2
 
 
 def _ref_name(value: object) -> str | None:
@@ -101,6 +106,67 @@ def env_overrides_for_warehouse(pipeline: Pipeline, db: ThrowawayDB) -> dict[str
     return overrides
 
 
+_BRONZE_SECRET_KEYS = ("endpoint", "bucket", "access_key", "secret_key")
+
+
+def env_overrides_for_bronze(clone: Pipeline, original: Pipeline) -> dict[str, str]:
+    """Which environment variables to set so the *clone's* renamed bronze
+    refs resolve to the real object store the original pipeline names - the
+    same store, never the same data: what isolates a validation is the
+    clone's own namespace (`bronze.prefix`, unique per validation), not a
+    separate store. Resolves the ORIGINAL's refs from the operator's
+    environment right now; raises ParamError if one is unset."""
+    if clone.bronze is None or original.bronze is None:
+        return {}
+    values = resolve_refs({k: getattr(original.bronze, k) for k in _BRONZE_SECRET_KEYS},
+                          path=f"{original.name}.bronze")
+    overrides = {}
+    for key in _BRONZE_SECRET_KEYS:
+        ref = _ref_name(getattr(clone.bronze, key))
+        if ref:
+            overrides[ref] = str(values[key])
+    return overrides
+
+
+def _clone_bronze(bronze: BronzeStorage, suffix: str) -> BronzeStorage:
+    """Every bronze field becomes a brand-new ${VAR} ref, literal or not (the
+    M2.4.4 lesson: a literal left in the clone would be the real value
+    again), and the prefix becomes a namespace no real pipeline writes to -
+    `dpagent-validate/<suffix>` - which is exactly what teardown purges and
+    then lists to prove empty."""
+    refs = {key: f"${{{_renamed_ref('BRONZE', suffix, key)}}}" for key in _BRONZE_SECRET_KEYS}
+    return replace(bronze, prefix=f"dpagent-validate/{suffix}", **refs)
+
+
+def _bronze_dbt_preflight_reasons(pipeline: Pipeline) -> list[str]:
+    """Reasons (zero mutation, exit 2) a bronze_staging / dbt_project
+    pipeline cannot be fixture-validated on this host: the object store's
+    refs unset or the store unreachable from the dlt venv, a dbt project the
+    loader would refuse, dbt itself missing."""
+    from . import bronze
+    reasons: list[str] = []
+    if pipeline.bronze_staging and pipeline.bronze is not None:
+        try:
+            resolve_refs({k: getattr(pipeline.bronze, k) for k in _BRONZE_SECRET_KEYS},
+                         path=f"{pipeline.name}.bronze")
+        except ParamError as exc:
+            reasons.append(f"bronze object store is not configured in this environment: {exc}")
+        else:
+            reachable, detail = bronze.check_storage(pipeline)
+            if not reachable:
+                reasons.append(f"bronze object store is not reachable from the dlt "
+                               f"venv's worker: {detail}")
+    if pipeline.dbt_project is not None:
+        try:
+            dbtproject.check_project(pipeline.root / pipeline.dbt_project.path)
+        except dbtproject.DbtProjectError as exc:
+            reasons.append(f"dbt project is not acceptable: {exc}")
+        from . import runtime
+        if not Path(runtime._dbt_bin()).exists():
+            reasons.append(f"dbt binary not found at {runtime._dbt_bin()}")
+    return reasons
+
+
 # ------------------------------------------------------------- isolation
 
 class ValidationCloneError(Exception):
@@ -135,17 +201,6 @@ _FIXTURE_SOURCE_CONNECTORS = {"odoo_postgres"}
 # `bronze:`) - so a clone of a bronze pipeline would silently validate the
 # *old* single-step dlt path instead of the one the manifest asks for.
 # Refused outright until fixture validation grows a bronze path.
-_OWN_DBT_FIXTURE_REASON = (
-    "pipelines that own a dbt project (dbt_project:) have no fixture-validation "
-    "path yet - make_validation_clone copies a stage's models/<name>.sql, not a "
-    "whole project with its packages, seeds and sources, so a clone would "
-    "silently not contain what this manifest runs")
-_BRONZE_FIXTURE_REASON = (
-    "bronze_staging pipelines have no fixture-validation path yet - a "
-    "validation clone would run the old dlt extract instead of the bronze "
-    "EXTRACT/LOAD split this manifest asks for (docs/hg-bronze-staging.md)")
-
-
 def _unsupported_source_connector_reason(pipeline: Pipeline, *, strict: bool = True) -> str | None:
     """`None` when this pipeline's source connector is one the fixture
     harness can actually redirect a human-authored fixture into -
@@ -311,15 +366,26 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
     reason = _unsupported_source_connector_reason(pipeline, strict=False)
     if reason:
         raise ValidationCloneError(reason)
-    if pipeline.bronze_staging:
-        raise ValidationCloneError(_BRONZE_FIXTURE_REASON)
-    if pipeline.dbt_project is not None:
-        raise ValidationCloneError(_OWN_DBT_FIXTURE_REASON)
 
     suffix = _validation_suffix()
     clone_name = f"{pipeline.name}__validate__{suffix}"
     clone_root = workdir / clone_name
-    (clone_root / "models").mkdir(parents=True, exist_ok=True)
+    clone_root.mkdir(parents=True, exist_ok=True)
+    if pipeline.dbt_project is None:
+        (clone_root / "models").mkdir(parents=True, exist_ok=True)
+    else:
+        # The whole owned project goes into the clone's own directory - the
+        # fixed workspace for this one validation - copied by exactly the
+        # function that decides what the approval hash covers, so the clone
+        # runs the same files that were approved and no generated output
+        # (a stale target/, dbt_packages/) rides along. Refused first if the
+        # project reaches outside what it may own.
+        src_project = pipeline.root / pipeline.dbt_project.path
+        try:
+            dbtproject.check_project(src_project)
+            dbtproject.copy_project(src_project, clone_root / pipeline.dbt_project.path)
+        except dbtproject.DbtProjectError as exc:
+            raise ValidationCloneError(f"cannot clone the dbt project: {exc}") from None
 
     new_source = replace(pipeline.source,
                          connection=_clone_connection(pipeline.source.connection, suffix))
@@ -328,7 +394,7 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
     model_alias: dict[str, str] = {}
     new_stages: list[Stage] = []
     for stage in pipeline.stages:
-        if stage.engine == "dbt":
+        if stage.engine == "dbt" and pipeline.dbt_project is None:
             aliased = []
             for model in stage.models:
                 alias = _model_alias(model, suffix)
@@ -371,6 +437,9 @@ def make_validation_clone(pipeline: Pipeline, workdir: Path) -> tuple[Pipeline, 
         # still does the right thing on the rare/future case of validating
         # a pipeline that already carries its own override.
         landing_dataset_name=_landing_dataset(pipeline),
+        bronze_staging=pipeline.bronze_staging,
+        bronze=_clone_bronze(pipeline.bronze, suffix) if pipeline.bronze_staging else None,
+        dbt_project=pipeline.dbt_project,
     )
     _write_clone_manifest(clone, clone_root)
     return clone, suffix
@@ -390,6 +459,8 @@ def _stage_to_dict(stage: Stage) -> dict:
         data["gates"] = [{"type": g.type, **g.params} for g in stage.gates]
     if stage.quarantine:
         data["quarantine"] = {"reject_threshold_pct": stage.quarantine.reject_threshold_pct}
+    if stage.schema:
+        data["schema"] = stage.schema
     return data
 
 
@@ -425,6 +496,14 @@ def _write_clone_manifest(clone: Pipeline, root: Path) -> None:
     }
     if clone.landing_dataset_name:
         data["landing_dataset_name"] = clone.landing_dataset_name
+    if clone.bronze_staging and clone.bronze is not None:
+        b = clone.bronze
+        data["bronze_staging"] = True
+        data["bronze"] = {"endpoint": b.endpoint, "bucket": b.bucket,
+                          "access_key": b.access_key, "secret_key": b.secret_key,
+                          "region": b.region, "prefix": b.prefix, "chunk_rows": b.chunk_rows}
+    if clone.dbt_project is not None:
+        data["dbt_project"] = {"path": clone.dbt_project.path}
     if clone.timeouts:
         data["timeouts"] = dict(clone.timeouts)
     (root / "pipeline.yaml").write_text(
@@ -532,16 +611,33 @@ class ExpectedResult:
     table: str                       # the curated table to query, unqualified
     rows: list[dict]
     row_count: int | None = None     # optional cross-check independent of rows itself
+    # "" = the clone's `warehouse.schema` (every pipeline until a stage could
+    # write somewhere else); set it for a table in another schema (HG's gold).
+    schema: str = ""
+    # More tables that must also match, each hand-written like the main one -
+    # an intermediate layer (HG's silver) checked as well as the final one.
+    also: list["ExpectedResult"] = field(default_factory=list)
+
+
+def _parse_expected(data: dict, where: str) -> ExpectedResult:
+    table = data.get("table")
+    rows = data.get("rows")
+    if not table or rows is None:
+        raise ValueError(f"{where}: needs both `table` and `rows` (rows: [] is a valid, "
+                         f"explicit \"expect nothing\")")
+    schema = data.get("schema", "")
+    if schema and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(schema)):
+        raise ValueError(f"{where}: schema {schema!r} must be a plain SQL identifier")
+    return ExpectedResult(table=table, rows=rows, row_count=data.get("row_count"),
+                          schema=str(schema or ""))
 
 
 def load_expected(path: Path) -> ExpectedResult:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    table = data.get("table")
-    rows = data.get("rows")
-    if not table or rows is None:
-        raise ValueError(f"{path}: needs both `table` and `rows` (rows: [] is a valid, "
-                         f"explicit \"expect nothing\")")
-    return ExpectedResult(table=table, rows=rows, row_count=data.get("row_count"))
+    result = _parse_expected(data, str(path))
+    for i, extra in enumerate(data.get("also") or []):
+        result.also.append(_parse_expected(extra or {}, f"{path}: also[{i}]"))
+    return result
 
 
 @dataclass
@@ -741,6 +837,23 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
     return ComparisonResult(True, f"{len(actual_rows)} row(s) matched exactly")
 
 
+def compare_all(expected: ExpectedResult, warehouse: ThrowawayDB, default_schema: str) -> ComparisonResult:
+    """`compare_curated` for the main expected table and every `also:` table;
+    ok only if every one matched. A failure names the table(s) that did not,
+    with the same expected-vs-actual detail `compare_curated` gives."""
+    checks = [expected, *expected.also]
+    results = []
+    for exp in checks:
+        schema = exp.schema or default_schema
+        results.append((f"{schema}.{exp.table}", compare_curated(exp, warehouse, schema)))
+    if len(results) == 1:
+        return results[0][1]
+    ok = all(r.ok for _, r in results)
+    if ok:
+        return ComparisonResult(True, "; ".join(f"{name}: {r.detail}" for name, r in results))
+    return ComparisonResult(False, "\n".join(f"{name}: {r.detail}" for name, r in results if not r.ok))
+
+
 @contextlib.contextmanager
 def _temporarily(overrides: dict[str, str]):
     """Sets `overrides` in this process's own environment, restoring
@@ -885,10 +998,7 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     connector_reason = _unsupported_source_connector_reason(pipeline)
     if connector_reason:
         reasons.append(connector_reason)
-    if pipeline.bronze_staging:
-        reasons.append(_BRONZE_FIXTURE_REASON)
-    if pipeline.dbt_project is not None:
-        reasons.append(_OWN_DBT_FIXTURE_REASON)
+    reasons.extend(_bronze_dbt_preflight_reasons(pipeline))
 
     if not (hasattr(os, "geteuid") and os.geteuid() == 0):
         reasons.append("not running as root (deploy()'s Airflow-facing steps need it)")
@@ -912,8 +1022,9 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
     if state.get_install("dlt") is None:
         reasons.append("dlt pack is not recorded as installed")
 
-    needs_dbt = any(s.engine == "dbt" for s in pipeline.stages)
-    if needs_dbt and state.get_install("dbt") is None:
+    uses_dbt = any(s.engine == "dbt" for s in pipeline.stages)
+    needs_dbt = uses_dbt and pipeline.dbt_project is None     # shared-project publish
+    if uses_dbt and state.get_install("dbt") is None:
         reasons.append("dbt pack is not recorded as installed, but this pipeline "
                        "has a dbt-engine stage")
 
@@ -946,6 +1057,136 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
             reasons.append(f"{label} ({path}) is not writable by this operator")
 
     return PreflightResult(ok=not reasons, reasons=reasons)
+
+
+@dataclass
+class SourceDownProof:
+    """The bronze split's whole point, proven inside every validation of a
+    bronze_staging pipeline: EXTRACT once with the source up, then REMOVE the
+    source (its throwaway database and role are dropped and the catalog is
+    asked to confirm), show that connecting to it fails, and LOAD that batch
+    in a process that is never given a single source value. `ok` needs every
+    link, including the landing matching the fixture's own rows."""
+    batch_id: str = ""
+    source_dropped: bool = False
+    source_unreachable: bool = False
+    source_probe: str = ""
+    loaded: bool = False
+    landing_matches_fixture: bool = False
+    detail: str = ""
+    error: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return bool(self.batch_id and self.source_dropped and self.source_unreachable
+                    and self.loaded and self.landing_matches_fixture and not self.error)
+
+
+def _source_down_proof(clone: Pipeline, fixture_obj: "Fixture", src_db: ThrowawayDB,
+                       wh_db: ThrowawayDB) -> SourceDownProof:
+    from . import bronze
+    proof = SourceDownProof()
+    try:
+        proof.batch_id = bronze.run_extract(pipeline=clone)
+    except Exception as exc:                     # noqa: BLE001 - recorded, not hidden
+        proof.error = f"the extra EXTRACT (source still up) failed: {exc}"
+        return proof
+
+    # Remove the source for real - the database, then its role - and let the
+    # catalog confirm both are gone before anything below is believed.
+    gone: list[str] = []
+    for kind, ddl, name in (("database", f"DROP DATABASE IF EXISTS {src_db.database};", src_db.database),
+                            ("role", f"DROP ROLE IF EXISTS {src_db.user};", src_db.user)):
+        dropped = pg_throwaway._run_as_postgres(ddl)
+        if dropped is None or dropped.returncode != 0:
+            proof.error = f"could not drop the source {kind}: {pg_throwaway._detail_of(dropped, timeout=30)}"
+            return proof
+        absent, why = pg_throwaway._absent(kind, name)
+        if not absent:
+            proof.error = why
+            return proof
+        gone.append(kind)
+    proof.source_dropped = True
+
+    probe = _psql(src_db, "-c", "SELECT 1;")
+    proof.source_unreachable = probe.returncode != 0
+    proof.source_probe = (probe.stderr or probe.stdout).strip()[-300:]
+    if not proof.source_unreachable:
+        proof.error = "the source still accepted a connection after it was dropped"
+        return proof
+
+    try:
+        bronze.run_load(pipeline=clone, batch_id=proof.batch_id)
+        proof.loaded = True
+    except Exception as exc:                     # noqa: BLE001
+        proof.error = f"LOAD with the source gone failed: {exc}"
+        return proof
+
+    table = clone.source.tables[0]
+    fx_table = next((t for t in fixture_obj.tables if t.name == table), None)
+    if fx_table is None:
+        proof.error = f"the fixture has no table {table!r} to compare the landing against"
+        return proof
+    landing = _landing_dataset(clone)
+    result = compare_curated(ExpectedResult(table=table, rows=fx_table.rows,
+                                            row_count=len(fx_table.rows), schema=landing),
+                             wh_db, landing)
+    proof.landing_matches_fixture = result.ok
+    proof.detail = result.detail
+    return proof
+
+
+def _bronze_batches(wh_db: ThrowawayDB) -> list[dict]:
+    """The batch registry as it stands in the throwaway warehouse - read before
+    that database is dropped, so the evidence names every batch this
+    validation created and what became of it."""
+    proc = _psql(wh_db, "-A", "-t", "-c",
+                 "SELECT row_to_json(t) FROM (SELECT batch_id, table_name, status, "
+                 "object_count, total_rows, loaded_rows, manifest_sha256 "
+                 "FROM dpagent_meta.bronze_batches ORDER BY started_at) t;")
+    if proc.returncode != 0:
+        return []
+    return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _purge_s3_namespace(report: "FixtureRunReport", clone: Pipeline) -> None:
+    """Deletes this validation's whole S3 namespace and then asks the store
+    again, separately, how many objects are left - `s3_remaining` is what
+    the store reports, not the delete call's own say-so."""
+    from . import bronze
+    namespace = clone.bronze.prefix
+    try:
+        purged = bronze.purge_namespace(clone, namespace)
+        report.s3_found = purged.get("found")
+        report.s3_remaining = bronze.count_namespace(clone, namespace)
+        if report.s3_remaining:
+            report.s3_error = (f"{report.s3_remaining} object(s) still under {namespace}/ "
+                               f"after the purge")
+    except Exception as exc:                     # noqa: BLE001
+        report.s3_error = f"could not purge/verify {namespace}/: {exc}"
+
+
+def _collect_versions(wh_db: ThrowawayDB) -> dict:
+    """Best-effort versions of what produced this evidence. A failure to read
+    one is recorded as 'unknown', never raised: evidence about the tools must
+    not be able to fail the validation it describes."""
+    from .. import __version__
+    from . import bronze_worker, runtime
+    versions = {"dpagent": __version__, "report": REPORT_VERSION,
+                "bronze_manifest_format": bronze_worker.FORMAT_VERSION}
+    try:
+        proc = _psql(wh_db, "-A", "-t", "-c", "SELECT version();")
+        versions["postgres"] = proc.stdout.strip().split(" on ")[0] if proc.returncode == 0 else "unknown"
+    except Exception:                            # noqa: BLE001
+        versions["postgres"] = "unknown"
+    try:
+        out = subprocess.run([runtime._dbt_bin(), "--version"], capture_output=True,
+                             text=True, timeout=30)
+        line = next((l for l in out.stdout.splitlines() if "installed" in l), "")
+        versions["dbt"] = line.split(":", 1)[-1].strip() or "unknown"
+    except Exception:                            # noqa: BLE001
+        versions["dbt"] = "unknown"
+    return versions
 
 
 def _summarize_undeploy(result) -> str:
@@ -1057,6 +1298,17 @@ def _do_cleanup(report: "FixtureRunReport", clone: Pipeline, deploy_mod) -> None
     fail/exit 4, không được ghi complete" (the user's own review)."""
     report.cleanup_attempted = True
     try:
+        _undeploy_and_verify(report, clone, deploy_mod)
+    finally:
+        # After the DAG is gone (nothing left to write new objects), and
+        # regardless of whether undeploy itself went well: this validation's
+        # S3 namespace is purged and then listed again.
+        if clone.bronze_staging and clone.bronze is not None:
+            _purge_s3_namespace(report, clone)
+
+
+def _undeploy_and_verify(report: "FixtureRunReport", clone: Pipeline, deploy_mod) -> None:
+    try:
         undeploy_result = deploy_mod.undeploy(clone)
     except Exception as exc:
         report.cleanup_ok = False
@@ -1154,6 +1406,25 @@ class FixtureRunReport:
     # not_attempted").
     source_db_created: bool = False
     warehouse_db_created: bool = False
+    # bronze_staging / owned-dbt-project evidence (REPORT_VERSION 2)
+    bronze_staging: bool = False
+    dbt_project: bool = False
+    bronze_namespace: str = ""
+    bronze_batches: list = field(default_factory=list)
+    source_down: SourceDownProof | None = None
+    s3_found: int | None = None
+    s3_remaining: int | None = None
+    s3_error: str = ""
+    versions: dict = field(default_factory=dict)
+
+    @property
+    def source_down_ok(self) -> bool:
+        return (not self.bronze_staging) or bool(self.source_down and self.source_down.ok)
+
+    @property
+    def s3_cleanup_ok(self) -> bool:
+        """The namespace was purged AND the store, asked again, listed nothing."""
+        return (not self.bronze_staging) or (self.s3_remaining == 0 and not self.s3_error)
 
     @property
     def idempotent(self) -> bool:
@@ -1190,7 +1461,8 @@ class FixtureRunReport:
                 and self.run1_status == "ok" and self.run2_status == "ok"
                 and self.idempotent
                 and self.cleanup_attempted and self.cleanup_ok
-                and self.throwaway_cleanup_ok)
+                and self.throwaway_cleanup_ok
+                and self.source_down_ok and self.s3_cleanup_ok)
 
 
 def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResult, *,
@@ -1247,6 +1519,10 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
             report.unavailable_reason = f"could not build a validation clone: {exc}"
             return report
         report.clone_name = clone.name
+        report.bronze_staging = clone.bronze_staging
+        report.dbt_project = clone.dbt_project is not None
+        if clone.bronze_staging and clone.bronze is not None:
+            report.bronze_namespace = clone.bronze.prefix
 
         # Astronomically unlikely with a random 8-hex suffix, but a real
         # collision (or a stale clone from a previous run that crashed
@@ -1273,9 +1549,15 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                     report.seed_error = str(exc)
                     return report
                 report.seeded = True
+                report.versions = _collect_versions(wh_db)
 
-                overrides = {**env_overrides_for_source(clone, src_db),
-                            **env_overrides_for_warehouse(clone, wh_db)}
+                try:
+                    overrides = {**env_overrides_for_source(clone, src_db),
+                                 **env_overrides_for_warehouse(clone, wh_db),
+                                 **env_overrides_for_bronze(clone, pipeline)}
+                except ParamError as exc:
+                    report.unavailable_reason = f"bronze object store refs: {exc}"
+                    return report
                 with _temporarily(overrides):
                     # `cleanup_needed` is set True *before* deploy() is even
                     # called, not after it returns - deploy() writes several
@@ -1346,12 +1628,20 @@ def run_fixture(pipeline: Pipeline, fixture_obj: Fixture, expected: ExpectedResu
                             if status != "ok":
                                 return report
 
-                            comparison = compare_curated(
-                                expected, wh_db, schema=clone.warehouse.schema)
+                            comparison = compare_all(expected, wh_db, clone.warehouse.schema)
                             setattr(report, f"comparison_after_run{attempt}", comparison)
                             if not comparison.ok:
                                 return report
+
+                        # Both runs matched. For a bronze pipeline the source
+                        # is now removed for real and a fresh batch loaded
+                        # without it - last, because it destroys the source.
+                        if clone.bronze_staging:
+                            report.source_down = _source_down_proof(
+                                clone, fixture_obj, src_db, wh_db)
                     finally:
+                        if clone.bronze_staging and report.deployed:
+                            report.bronze_batches = _bronze_batches(wh_db)
                         # Runs *inside* the throwaway-database `with` block,
                         # deliberately - so undeploy() (and the real-state
                         # verification in `_do_cleanup`) always completes
@@ -1475,6 +1765,10 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
     # throwaway database). "pass" requires every resource that was touched
     # to have actually succeeded; "not_attempted" is reserved for when
     # nothing was touched at all.
+    # The purge happens inside _do_cleanup, so it was needed exactly when the
+    # clone's cleanup was attempted (a seed failure never reached deploy: no
+    # object was ever written, nothing to purge).
+    s3_ok = (not report.bronze_staging) or (not report.cleanup_attempted) or report.s3_cleanup_ok
     resources_touched = (report.cleanup_attempted or report.source_db_created
                          or report.warehouse_db_created)
     if not resources_touched:
@@ -1482,6 +1776,7 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
     else:
         all_touched_ok = (
             (not report.cleanup_attempted or report.cleanup_ok)
+            and s3_ok
             and (not report.source_db_created or
                  (report.source_database_dropped and report.source_role_dropped))
             and (not report.warehouse_db_created or
@@ -1495,6 +1790,15 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
         overall = "pass"
     else:
         overall = "fail"
+
+    if not report.bronze_staging:
+        s3_status = "not_applicable"
+    elif not report.cleanup_attempted:
+        s3_status = "not_attempted"
+    elif report.s3_cleanup_ok:
+        s3_status = "pass"
+    else:
+        s3_status = f"fail: {report.s3_error or 'objects remain'}"
 
     return {
         "clone_name": report.clone_name,
@@ -1524,8 +1828,30 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
             "warehouse_role": _drop_status(report.warehouse_db_created,
                                            report.warehouse_role_dropped,
                                            report.warehouse_role_drop_error),
+            "s3_objects": s3_status,
             "overall": cleanup_overall,
         },
         "unavailable_reason": report.unavailable_reason,
         "overall": overall,
+        "report_version": REPORT_VERSION,
+        "validator": dict(report.versions),
+        "inputs": {"bronze_staging": report.bronze_staging, "dbt_project": report.dbt_project},
+        **({"bronze": _bronze_section(report)} if report.bronze_staging else {}),
+    }
+
+
+def _bronze_section(report: FixtureRunReport) -> dict:
+    sd = report.source_down
+    return {
+        "namespace": report.bronze_namespace,
+        "batches": list(report.bronze_batches),
+        "source_down_load": ({
+            "ok": sd.ok, "batch_id": sd.batch_id, "source_dropped": sd.source_dropped,
+            "source_unreachable": sd.source_unreachable, "source_probe": sd.source_probe,
+            "loaded": sd.loaded, "landing_matches_fixture": sd.landing_matches_fixture,
+            "detail": sd.detail, "error": sd.error,
+        } if sd else None),
+        "s3": {"objects_found_at_teardown": report.s3_found,
+               "objects_remaining_after_purge": report.s3_remaining,
+               "error": report.s3_error},
     }

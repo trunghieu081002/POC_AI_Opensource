@@ -461,6 +461,12 @@ def _validate_dbt_project(raw, stages: list, root: Path, where: str) -> DbtProje
     if not isinstance(raw, dict) or not raw.get("path"):
         raise PipelineError(f"{where}: dbt_project needs a mapping with a `path:`")
     rel = str(raw["path"])
+    if not Path(rel).parts:     # "." or "./": the pipeline's own directory
+        raise PipelineError(
+            f"{where}: dbt_project.path {rel!r} is the pipeline's own directory - it must "
+            f"name a subdirectory. The pipeline root also holds pipeline.yaml, "
+            f".approved.yaml, .synth-validation.yaml and build/, none of which belong to a "
+            f"dbt project (the approval file would end up inside the hash it contains)")
     if rel.startswith("/") or ".." in Path(rel).parts:
         raise PipelineError(
             f"{where}: dbt_project.path {rel!r} must be a relative path inside the "
@@ -477,7 +483,7 @@ def _validate_dbt_project(raw, stages: list, root: Path, where: str) -> DbtProje
         dbtproject.check_project(project)
     except dbtproject.DbtProjectError as exc:
         raise PipelineError(f"{where}: dbt_project {rel!r}: {exc}") from None
-    return DbtProject(path=rel)
+    return DbtProject(path=Path(rel).as_posix())   # normalised: 'dwh_dbt/', './dwh_dbt' -> 'dwh_dbt'
 
 
 def _validate_warehouse(raw: dict, where: str) -> Warehouse:

@@ -315,6 +315,21 @@ def validate_cmd(name, fixture_path, expected_path):
                      f"{'dropped' if dropped else 'FAILED'}[/{colour}]"
                      + (f" - {error}" if error and not dropped else ""))
 
+    sd = result.source_down
+    if result.bronze_staging and sd is not None:
+        colour = "green" if sd.ok else "red"
+        console.print(f"[bold]bronze, source removed:[/bold] [{colour}]"
+                     f"{'LOAD succeeded with the source dropped' if sd.ok else 'FAILED'}[/{colour}]"
+                     f" - batch {sd.batch_id or '-'}; source dropped={sd.source_dropped}, "
+                     f"unreachable={sd.source_unreachable}, loaded={sd.loaded}, landing matches "
+                     f"fixture={sd.landing_matches_fixture}" + (f" - {sd.error}" if sd.error else ""))
+    if result.bronze_staging and result.cleanup_attempted:
+        colour = "green" if result.s3_cleanup_ok else "red"
+        console.print(f"[bold]cleanup (S3 namespace {result.bronze_namespace}/):[/bold] "
+                     f"[{colour}]{'purged and verified empty' if result.s3_cleanup_ok else 'FAILED'}"
+                     f"[/{colour}] - found {result.s3_found}, remaining {result.s3_remaining}"
+                     + (f" - {result.s3_error}" if result.s3_error else ""))
+
     if result.unavailable_reason:
         console.print(f"[yellow]steps 4-5 unavailable:[/yellow] {result.unavailable_reason}")
         if not result.clone_name:
@@ -348,7 +363,7 @@ def validate_cmd(name, fixture_path, expected_path):
 
     data_ok = (result.seeded and result.deployed
               and result.run1_status == "ok" and result.run2_status == "ok"
-              and result.idempotent)
+              and result.idempotent and result.source_down_ok)
 
     if result.run1_status == "timeout" or result.run2_status == "timeout":
         console.print(f"\n[red]fixture run timed out[/red] "
@@ -360,10 +375,11 @@ def validate_cmd(name, fixture_path, expected_path):
                       f"(run1={result.run1_status!r}, run2={result.run2_status!r})")
         sys.exit(1)
 
-    if not (result.cleanup_attempted and result.cleanup_ok and result.throwaway_cleanup_ok):
+    if not (result.cleanup_attempted and result.cleanup_ok and result.throwaway_cleanup_ok
+            and result.s3_cleanup_ok):
         console.print(f"\n[red]fixture data matched, but cleanup did not complete[/red] - "
                       f"a passing comparison does not count as done until cleanup (pipeline "
-                      f"artifacts AND both throwaway databases) does too. Check by hand: "
+                      f"artifacts, both throwaway databases AND the S3 namespace) does too. Check by hand: "
                       f"dpagent pipeline undeploy {result.clone_name}")
         sys.exit(4)
 
