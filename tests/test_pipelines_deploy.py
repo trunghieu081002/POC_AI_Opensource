@@ -17,6 +17,7 @@ import pytest
 import yaml
 
 from dpagent.engine import state
+from approval_helpers import approve_legacy
 from dpagent.pipelines import approval, deploy, loader
 
 requires_psql = pytest.mark.skipif(
@@ -59,7 +60,7 @@ def _pipeline(root):
     # test_deploy_refuses_a_draft_pipeline* for that) - defaulting this
     # fixture to already-reviewed keeps them from all needing --allow-draft
     # just to run at all.
-    approval.promote(loaded, "test-fixture")
+    approve_legacy(loaded, "test-fixture")
     return loader.load("demo", root)
 
 

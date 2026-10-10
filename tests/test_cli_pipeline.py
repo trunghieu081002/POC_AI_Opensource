@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from approval_helpers import approve_legacy
 from dpagent.cli import pipeline as pipeline_cli
 from dpagent.cli.pipeline import pipeline_group
 from dpagent.engine import state
@@ -572,34 +573,30 @@ def _draft_pipeline_dir(tmp_path, monkeypatch, name="demo"):
     return d
 
 
-def test_promote_writes_the_approval_file_and_marks_the_manifest_reviewed(db, tmp_path, monkeypatch):
+def test_promote_without_validation_evidence_is_refused_and_writes_nothing(db, tmp_path, monkeypatch):
+    """Since A2 `promote` is only reachable with a fixture, an expected file and
+    sealed evidence of a real validation (tests/test_pipelines_evidence.py has
+    the accepted-evidence cases and every refusal)."""
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+    fx, ex = d / "fixture.yaml", d / "expected.yaml"
+    fx.write_text("tables: []\n")
+    ex.write_text("table: x\nrows: []\n")
+    before = (d / "pipeline.yaml").read_bytes()
+
+    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes",
+                                               "--fixture", str(fx), "--expected", str(ex)])
+
+    assert result.exit_code == 1
+    assert "validation evidence not accepted" in result.output
+    assert not (d / ".approved.yaml").exists()
+    assert (d / "pipeline.yaml").read_bytes() == before
+
+
+def test_promote_without_fixture_and_expected_is_a_usage_error(db, tmp_path, monkeypatch):
     d = _draft_pipeline_dir(tmp_path, monkeypatch)
     result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
-    assert result.exit_code == 0, result.output
-    assert "reviewed" in result.output
-    assert (d / ".approved.yaml").exists()
-    assert "maturity: reviewed" in (d / "pipeline.yaml").read_text()
-
-
-def test_promote_lists_every_file_being_approved(db, tmp_path, monkeypatch):
-    _draft_pipeline_dir(tmp_path, monkeypatch)
-    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
-    assert "pipeline.yaml" in result.output
-
-
-def test_promote_without_yes_declining_confirmation_writes_nothing(db, tmp_path, monkeypatch):
-    d = _draft_pipeline_dir(tmp_path, monkeypatch)
-    result = _runner().invoke(pipeline_group, ["promote", "demo"], input="n\n")
     assert result.exit_code != 0
     assert not (d / ".approved.yaml").exists()
-
-
-def test_promote_is_a_no_op_when_already_approved_and_unchanged(db, tmp_path, monkeypatch):
-    _draft_pipeline_dir(tmp_path, monkeypatch)
-    _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
-    result = _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
-    assert result.exit_code == 0
-    assert "already reviewed" in result.output
 
 
 def test_deploy_refuses_a_draft_pipeline_and_never_calls_deploy(db, tmp_path, monkeypatch):
@@ -643,8 +640,9 @@ def test_deploy_allow_draft_calls_deploy_with_allow_draft_true(db, tmp_path, mon
 
 def test_deploy_of_a_reviewed_pipeline_calls_deploy_without_allow_draft(db, tmp_path, monkeypatch):
     from dpagent.pipelines.deploy import DeployResult
-    _draft_pipeline_dir(tmp_path, monkeypatch)
-    _runner().invoke(pipeline_group, ["promote", "demo", "--yes"])
+    d = _draft_pipeline_dir(tmp_path, monkeypatch)
+    from dpagent.pipelines import loader as _loader
+    approve_legacy(_loader.load("demo", d.parent), "tester")     # a pre-A2 approval deploys
     calls = []
     monkeypatch.setattr(pipeline_cli.deploy_mod, "deploy",
                         lambda p, **k: calls.append(k) or DeployResult())

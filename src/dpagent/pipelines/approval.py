@@ -23,11 +23,15 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
 from . import dbtproject
 from .loader import Pipeline
+
+if TYPE_CHECKING:
+    from .evidence import AcceptedEvidence
 
 APPROVAL_FILENAME = ".approved.yaml"
 
@@ -39,6 +43,12 @@ class Approval:
     content_hash: str
     approved_by: str
     approved_at: str
+    # The sealed validation evidence promote() accepted (pipelines/evidence.py).
+    # None = an approval written before A2, i.e. a human read the files and
+    # nothing was ever machine-validated for it. Such an approval still lets
+    # `deploy()` run (nothing is revoked behind anyone's back) but is never
+    # reported as verified - see `verification()`.
+    evidence: dict | None = None
 
 
 def _manifest_bytes_for_hash(pipeline: Pipeline) -> bytes:
@@ -127,7 +137,31 @@ def read_approval(pipeline: Pipeline) -> Approval | None:
         content_hash=data["content_hash"],
         approved_by=data.get("approved_by", ""),
         approved_at=data.get("approved_at", ""),
+        evidence=data.get("evidence") if isinstance(data.get("evidence"), dict) else None,
     )
+
+
+def verification(pipeline: Pipeline) -> tuple[str, str]:
+    """(state, explanation) - the label an operator may rely on:
+
+    * `verified`   - approved, hash current, AND approved on the strength of
+                     accepted validation evidence.
+    * `unverified` - approved and current, but the approval carries no
+                     evidence (written before A2, or by hand): a human review,
+                     never a machine-checked one. Not upgraded automatically.
+    * `stale`      - an approval exists but the content changed since.
+    * `none`       - not approved at all.
+    """
+    approved, reason = is_approved(pipeline)
+    if approved:
+        approval = read_approval(pipeline)
+        if approval is not None and approval.evidence:
+            return "verified", f"evidence {approval.evidence.get('id', '?')}"
+        return "unverified", ("approved by human review only - no validation evidence is "
+                              "recorded for this approval (it predates the evidence gate)")
+    if read_approval(pipeline) is not None and not pipeline.is_draft:
+        return "stale", reason
+    return "none", reason
 
 
 def is_approved(pipeline: Pipeline) -> tuple[bool, str]:
@@ -142,41 +176,74 @@ def is_approved(pipeline: Pipeline) -> tuple[bool, str]:
     if approval is None:
         return False, (
             f"{pipeline.name} is maturity: reviewed but has no {APPROVAL_FILENAME} - "
-            f"run `dpagent pipeline promote {pipeline.name}`")
+            f"run `dpagent pipeline validate {pipeline.name} --fixture F --expected E`, "
+            f"then `dpagent pipeline promote {pipeline.name} --fixture F --expected E`")
     current = content_hash(pipeline)
     if approval.content_hash != current:
         return False, (
             f"{pipeline.name}'s manifest/procedures/models changed since it was "
             f"approved ({approval.approved_at} by {approval.approved_by!r}) - "
-            f"re-review and run `dpagent pipeline promote {pipeline.name}` again")
+            f"re-review, validate again and run `dpagent pipeline promote {pipeline.name} "
+            f"--fixture F --expected E` again")
     return True, ""
 
 
-def write_approval(pipeline: Pipeline, approved_by: str) -> Approval:
+def _write_approval(pipeline: Pipeline, approved_by: str,
+                    evidence: "AcceptedEvidence | None" = None) -> Approval:
+    """Private on purpose: the only caller in the product is `promote()`, after
+    the evidence check. (Tests that need an already-approved fixture call this
+    to model a pre-A2 approval.)"""
     approval = Approval(
         content_hash=content_hash(pipeline),
         approved_by=approved_by,
         approved_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        evidence=evidence.to_dict() if evidence is not None else None,
     )
+    body: dict = {
+        "content_hash": approval.content_hash,
+        "approved_by": approval.approved_by,
+        "approved_at": approval.approved_at,
+    }
+    if approval.evidence is not None:
+        body["evidence"] = approval.evidence
     approval_path(pipeline).write_text(
-        yaml.safe_dump({
-            "content_hash": approval.content_hash,
-            "approved_by": approval.approved_by,
-            "approved_at": approval.approved_at,
-        }, sort_keys=False),
-        encoding="utf-8", newline="\n",
-    )
+        yaml.safe_dump(body, sort_keys=False), encoding="utf-8", newline="\n")
     return approval
 
 
-def promote(pipeline: Pipeline, approved_by: str) -> Approval:
-    """Records the approval, then flips the manifest's own label - in that
-    order, though it does not actually matter which comes first: `maturity`
-    is excluded from what gets hashed either way (see
-    `_manifest_bytes_for_hash`), specifically so this can never race itself
-    into an approval that is invalid the instant it is written."""
-    approval = write_approval(pipeline, approved_by)
-    set_maturity_reviewed(pipeline)
+def promote(pipeline: Pipeline, approved_by: str, *, fixture_path: Path | str,
+            expected_path: Path | str, evidence_id: str | None = None) -> Approval:
+    """The only way to approve a pipeline - for Python callers and the CLI
+    alike. Refuses (`evidence.EvidenceRefused`, every reason listed) unless
+    sealed validation evidence for exactly this content, fixture and expected
+    file passes the policy in pipelines/evidence.py; a refusal happens before
+    anything is written, so `.approved.yaml` and `maturity` are untouched.
+
+    Then records the approval (with a link to the accepted evidence) and flips
+    the manifest's label. If the second write fails the first is rolled back:
+    an approval without `reviewed`, or the reverse, is never left behind.
+    `maturity` is excluded from the hash (see `_manifest_bytes_for_hash`), so
+    the order cannot invalidate the approval it just wrote."""
+    from . import evidence as evidence_mod    # evidence imports this module
+
+    accepted = evidence_mod.check_for_promote(
+        pipeline, fixture_path=Path(fixture_path), expected_path=Path(expected_path),
+        evidence_id=evidence_id)
+
+    path = approval_path(pipeline)
+    previous = path.read_bytes() if path.exists() else None
+    manifest = pipeline.path("pipeline.yaml")
+    manifest_before = manifest.read_bytes()
+    try:
+        approval = _write_approval(pipeline, approved_by, accepted)
+        set_maturity_reviewed(pipeline)
+    except BaseException:
+        manifest.write_bytes(manifest_before)
+        if previous is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_bytes(previous)
+        raise
     return approval
 
 
@@ -185,7 +252,7 @@ def set_maturity_reviewed(pipeline: Pipeline) -> None:
     line (or appending it) - a full yaml.safe_dump round-trip, the way
     library/synth.py's pack `promote()` does it, would strip every inline
     comment from a manifest as heavily hand-annotated as pipelines/demo or
-    pipelines/quickstart. Called only after write_approval() has already
+    pipelines/quickstart. Called only after _write_approval() has already
     hashed the pre-edit content - the hash covers the manifest as the
     reviewer actually read it, and this is a label change, not new content
     to approve."""

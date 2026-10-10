@@ -523,7 +523,7 @@ def deploy(pipeline: Pipeline, *, apply_db: bool = True,
     if not approved and not allow_draft:
         raise DeployError(
             f"{reason} - deploy refuses to apply an unreviewed pipeline for "
-            f"real. Either `dpagent pipeline promote {pipeline.name}` it, or "
+            f"real. Either validate and `dpagent pipeline promote {pipeline.name}` it (see docs/promote-evidence.md), or "
             f"pass --allow-draft to test it explicitly (manual-only, never "
             f"unpaused, regardless of the manifest's own schedule:).")
     if not approved:

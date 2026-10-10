@@ -21,6 +21,7 @@ from ..engine import state
 from ..llm import client as llm
 from ..pipelines import approval as approval_mod
 from ..pipelines import deploy as deploy_mod
+from ..pipelines import evidence as evidence_mod
 from ..pipelines import extract as extract_mod
 from ..pipelines import fixture as fixture_mod
 from ..pipelines import generator as generator_mod
@@ -251,25 +252,16 @@ def validate_cmd(name, fixture_path, expected_path):
         fail("step 3 failed - fix that before running the fixture (steps 4-5 would only "
              "confirm the same broken SQL against real data)")
 
-    fx = fixture_mod.load_fixture(Path(fixture_path))
-    expected = fixture_mod.load_expected(Path(expected_path))
     console.print(f"\n[bold]running fixture through a real, --allow-draft deploy of an "
                  f"isolated validation clone (2 runs, for idempotency)...[/bold]")
-    result = fixture_mod.run_fixture(pipeline, fx, expected)
+    # One controlled path: run, hash exactly these files, seal into the
+    # journal (what `promote` later requires), merge into the report.
+    result, _section, evidence_id = evidence_mod.run_and_seal(
+        pipeline, report, Path(fixture_path), Path(expected_path))
     if result.clone_name:
         console.print(f"[dim]validation clone: {result.clone_name}[/dim]")
-
-    # Merge steps 4-5 into the same report step 3 already wrote, hashed
-    # against the exact pipeline/fixture/expected content this run used -
-    # the report is visibly stale the moment any of the three changes.
-    fixture_section = fixture_mod.fixture_report_dict(
-        result,
-        pipeline_hash=report.content_hash,
-        fixture_hash=fixture_mod.hash_file(Path(fixture_path)),
-        expected_hash=fixture_mod.hash_file(Path(expected_path)),
-    )
-    report.fixture = fixture_section
-    validate_mod.write_validation_report(pipeline.root, report)
+    console.print(f"[dim]sealed evidence: {evidence_id} (what `dpagent pipeline promote "
+                  f"{name} --fixture ... --expected ...` checks)[/dim]")
 
     # Comparisons and cleanup are always printed *before* any exit path
     # below, unconditionally - an earlier version exited (unavailable_reason
@@ -426,40 +418,80 @@ def lint_cmd(name):
 @click.option("--yes", "-y", is_flag=True)
 @click.option("--approved-by", default="",
               help="Who is approving this (defaults to the OS user running the command).")
-def promote_cmd(name, yes, approved_by):
-    """Mark this pipeline's current manifest/procedures/models as reviewed.
+@click.option("--fixture", "fixture_path", required=True,
+              type=click.Path(exists=True, dir_okay=False),
+              help="The fixture file the validation used (its hash must match the evidence).")
+@click.option("--expected", "expected_path", required=True,
+              type=click.Path(exists=True, dir_okay=False),
+              help="The expected-result file the validation used (hash must match).")
+@click.option("--evidence", "evidence_id", default=None,
+              help="Evidence id printed by `pipeline validate` (default: the newest sealed "
+                   "evidence for this pipeline on this host).")
+def promote_cmd(name, yes, approved_by, fixture_path, expected_path, evidence_id):
+    """Approve this pipeline - only on the strength of a real, sealed validation.
 
     `deploy()` refuses to apply an unreviewed pipeline for real
-    (docs/layer2.md, "Authoring pipelines with a model") - this is what
-    actually clears that: it hashes the manifest plus every procedure/dbt
-    model it references right now, records that hash next to the pipeline
-    (`.approved.yaml`, git-tracked - review it in a PR like anything else
-    here), and sets `maturity: reviewed`. Editing any of those files again
-    afterward - even without touching `maturity` - invalidates this and
-    `deploy` refuses again, until promote runs once more.
+    (docs/layer2.md, "Authoring pipelines with a model"). This clears that, but
+    only when `dpagent pipeline validate NAME --fixture F --expected E` ran on
+    THIS host for exactly this content: pipeline hash (dbt project and seeds
+    included), fixture and expected file hashes match; both runs ok, compared,
+    idempotent, gates passed in the journal; cleanup proven (and, for bronze,
+    the source-removed proof and an empty S3 namespace). Anything else is
+    refused with every reason, and nothing is changed. See
+    docs/promote-evidence.md.
+
+    On success the approval (`.approved.yaml`, git-tracked) links the accepted
+    evidence, and `maturity: reviewed` is set. Editing any hashed file
+    afterward invalidates the approval; `deploy` refuses until you validate
+    and promote again. Approvals written before this gate stay valid for
+    deploy but are reported `unverified` - run `validate` + `promote` to
+    upgrade one.
     """
     pipeline = _load_or_fail(name)
-    approved, reason = approval_mod.is_approved(pipeline)
-    if approved:
-        console.print(f"[dim]{name} is already reviewed and matches its approval[/dim]")
+    state_label, state_reason = approval_mod.verification(pipeline)
+    if state_label == "verified":
+        console.print(f"[dim]{name} is already reviewed, matches its approval, and its approval "
+                      f"links validation evidence ({state_reason})[/dim]")
         return
+
+    try:
+        evidence_mod.check_for_promote(
+            pipeline, fixture_path=Path(fixture_path), expected_path=Path(expected_path),
+            evidence_id=evidence_id)
+    except evidence_mod.EvidenceRefused as exc:
+        console.print(f"[red]cannot promote {name}: validation evidence not accepted[/red]")
+        for reason in exc.reasons:
+            console.print(f"  · {reason}", markup=False)
+        console.print("[dim]nothing was changed (.approved.yaml and maturity untouched)[/dim]")
+        sys.exit(1)
 
     paths = approval_mod.hashed_paths(pipeline)
     console.print(Panel(
         "\n".join(f"  · {p}" for p in paths),
         title=f"approving {name} means having read every line of these {len(paths)} file(s)",
         border_style="yellow", expand=False))
-    if not pipeline.is_draft:
-        console.print(f"[yellow]note:[/yellow] {reason}")
+    if state_label == "unverified":
+        console.print("[yellow]note:[/yellow] this pipeline has an approval with no validation "
+                      "evidence; it is being replaced by one that has.")
+    elif not pipeline.is_draft:
+        console.print(f"[yellow]note:[/yellow] {state_reason}")
 
     if not yes and not confirm(f"Have you read every line above for {name!r}?",
                                default=False):
         sys.exit(1)
 
     approver = approved_by or getpass.getuser()
-    approval = approval_mod.promote(pipeline, approver)
+    try:
+        approval = approval_mod.promote(
+            pipeline, approver, fixture_path=Path(fixture_path),
+            expected_path=Path(expected_path), evidence_id=evidence_id)
+    except evidence_mod.EvidenceRefused as exc:      # changed between the check and now
+        console.print(f"[red]cannot promote {name}:[/red] " + "; ".join(exc.reasons),
+                      markup=False)
+        sys.exit(1)
     console.print(f"[green]{name} is now maturity: reviewed[/green] "
-                 f"(approved by {approval.approved_by!r} at {approval.approved_at}) - "
+                 f"(approved by {approval.approved_by!r} at {approval.approved_at}, evidence "
+                 f"{(approval.evidence or {}).get('id')}) - "
                  f"`dpagent pipeline deploy {name}` will apply it for real.")
 
 
@@ -483,9 +515,11 @@ def list_cmd():
         return f"[{colour}]{run['status']}[/{colour}] [dim]#{run['id']} {run['started_at']}[/dim]"
 
     def maturity_cell(p):
-        approved, _ = approval_mod.is_approved(p)
-        if approved:
-            return "[green]reviewed[/green]"
+        label, _ = approval_mod.verification(p)
+        if label == "verified":
+            return "[green]reviewed + verified[/green]"
+        if label == "unverified":
+            return "[yellow]reviewed (no evidence)[/yellow]"
         return "[yellow]draft[/yellow]" if p.is_draft else "[yellow]stale[/yellow]"
 
     in_checkout = pipelines_mod.available()
@@ -597,7 +631,7 @@ def deploy_cmd(name, yes, no_db, no_airflow, allow_draft):
 
     approved, reason = approval_mod.is_approved(pipeline)
     if not approved and not allow_draft:
-        fail(f"{reason}\n\nEither `dpagent pipeline promote {name}` it, or pass "
+        fail(f"{reason}\n\nEither validate and `dpagent pipeline promote {name}` it (see docs/promote-evidence.md), or pass "
              f"--allow-draft to test it explicitly (manual-only, never unpaused).")
     if not approved:
         console.print(f"[yellow]--allow-draft:[/yellow] {reason} - deploying anyway, "

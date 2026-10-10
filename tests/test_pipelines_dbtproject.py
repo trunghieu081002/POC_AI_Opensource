@@ -124,7 +124,7 @@ def test_output_redirected_by_config_is_generated_too(root):
 
 def test_editing_the_project_invalidates_an_existing_approval(root):
     p = _load(root)
-    approval.write_approval(p, "reviewer")
+    approval._write_approval(p, "reviewer")
     object.__setattr__(p, "maturity", "reviewed")
     assert approval.is_approved(p) == (True, "")
     f = _p(root, "macros/generate_schema_name.sql")

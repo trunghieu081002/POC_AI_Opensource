@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS gate_runs (
     ts            TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_gate_runs_stage_run ON gate_runs(stage_run_id);
+
 """
 
 
@@ -571,3 +572,52 @@ def stats() -> dict[str, Any]:
         "stages_run": q("SELECT COUNT(*) FROM stage_runs"),
         "gates_failed": q("SELECT COUNT(*) FROM gate_runs WHERE status='failed'"),
     }
+
+
+# ---------------------------------------------------------------- validation evidence
+
+# Created lazily, NOT in SCHEMA: SCHEMA runs on every connection, and on an
+# existing root-owned journal a new table there would make every read-only
+# command run by a non-root user fail with "attempt to write a readonly
+# database" until root happened to open it. Only sealing (which needs root
+# anyway, to run a validation) creates the table; reads tolerate its absence.
+EVIDENCE_SCHEMA = """
+-- Sealed fixture-validation evidence (pipelines/evidence.py). Append-only like
+-- the audit trail: a row is written once, by the validation path itself, with
+-- a MAC over `payload_json` made with a host-local key - promote() recomputes
+-- the MAC, so a report that was typed or edited by hand has no row here.
+CREATE TABLE IF NOT EXISTS validation_evidence (
+    id            TEXT PRIMARY KEY,
+    pipeline      TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    payload_json  TEXT NOT NULL,
+    mac           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_validation_evidence_pipeline ON validation_evidence(pipeline, created_at);
+"""
+
+def record_evidence(evidence_id: str, pipeline: str, payload_json: str, mac: str) -> None:
+    conn().executescript(EVIDENCE_SCHEMA)
+    conn().execute(
+        "INSERT INTO validation_evidence (id, pipeline, created_at, payload_json, mac)"
+        " VALUES (?,?,?,?,?)", (evidence_id, pipeline, now(), payload_json, mac))
+    conn().commit()
+
+
+def _evidence_query(sql: str, params: tuple) -> sqlite3.Row | None:
+    try:
+        return conn().execute(sql, params).fetchone()
+    except sqlite3.OperationalError as exc:
+        if "no such table" in str(exc):          # nothing was ever sealed on this host
+            return None
+        raise
+
+
+def get_evidence(evidence_id: str) -> sqlite3.Row | None:
+    return _evidence_query("SELECT * FROM validation_evidence WHERE id=?", (evidence_id,))
+
+
+def latest_evidence(pipeline: str) -> sqlite3.Row | None:
+    return _evidence_query(
+        "SELECT * FROM validation_evidence WHERE pipeline=? ORDER BY rowid DESC LIMIT 1",
+        (pipeline,))

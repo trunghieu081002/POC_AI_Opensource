@@ -64,6 +64,15 @@ fi
 
 COMMIT="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$COMMIT" ] || die "could not resolve the current commit (git rev-parse HEAD failed) - run this from inside the repo's git checkout, not an extracted tarball with .git stripped"
+TREE="$(git -C "${REPO_ROOT}" rev-parse 'HEAD^{tree}')"
+# The host is built from the working tree, the evidence names a commit/tree:
+# they must be the same thing, or the evidence is about code nobody committed.
+# (docs/evidence is excluded - it is this script's own output.)
+DIRTY="$(git -C "${REPO_ROOT}" status --porcelain --untracked-files=all -- . ':!docs/evidence' || true)"
+if [ -n "$DIRTY" ] && [ "${ALLOW_DIRTY:-0}" != 1 ]; then
+  die "the working tree differs from commit ${COMMIT} - commit first (or ALLOW_DIRTY=1 for a debugging run whose evidence must not be kept):
+${DIRTY}"
+fi
 
 # packs/seaweedfs is still `maturity: draft` - dpagent installs a draft only
 # with --allow-draft "and use a test VM" (docs/deploy.md). This disposable
@@ -176,13 +185,14 @@ section() { printf "== %s\n" "$1"; }
 found()   { if [ -n "$1" ]; then printf "%s\n" "$1"; leaks=$((leaks+1)); else echo "(none)"; fi; }
 section "databases named dpagent_fixture_*";  found "$(sudo -n -u postgres psql -At -c "select datname from pg_database where datname like '"'"'dpagent_fixture_%'"'"'")"
 section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql -At -c "select rolname from pg_roles where rolname like '"'"'dpagent_fixture_%'"'"'")"
-section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep __validate__ || true)"
+section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
-section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep __validate__ || true)"
-section "clone secrets in pipelines.env";     found "$(grep DPAGENT_VALIDATE /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
+section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote" || true)"
+section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY
   section "S3 objects under dpagent-validate/"; found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze dpagent-validate/ || true)"
+  section "S3 objects under a2-promote/";       found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze a2-promote/ || true)"
 fi
 echo; echo "leaks=${leaks}"
 ' > "${LEAK_AUDIT}" 2>&1 || true
@@ -192,6 +202,13 @@ LEAKS="$(grep -oE '^leaks=[0-9]+' "${LEAK_AUDIT}" | cut -d= -f2)"
 # --------------------------------------------------------- collect evidence
 
 mkdir -p "${RESULTS_DIR}"
+{
+  echo "commit=${COMMIT}"
+  echo "tree=${TREE}"
+  echo "working_tree_clean=$([ -z "$DIRTY" ] && echo yes || echo NO)"
+  echo "profile=${PROFILE}"
+  echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} > "${RESULTS_DIR}/run-info.txt"
 docker exec "${CONTAINER}" bash -c 'ls /root/m25-evidence/*.json 2>/dev/null' | while read -r remote_path; do
   name="$(basename "$remote_path")"
   docker cp "${CONTAINER}:${remote_path}" "/tmp/m25-raw-$$-${name}"
