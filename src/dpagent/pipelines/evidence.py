@@ -241,10 +241,21 @@ def _policy_reasons(payload: dict, pipeline: Pipeline, fixture_hash: str,
     step3 = payload.get("step3") or {}
     if not step3.get("load_ok", False):
         r.append("step 3: the manifest did not load")
-    for name in ("dbt", "procedures", "dbt_dependencies"):
+    # A step is *required* when the pipeline has something for it to check;
+    # then only `pass` counts - "skipped" there means the check could not run
+    # (dbt not installed, no sudo to postgres), which is not a verification.
+    # "skipped" for a step with nothing to check ("no procedure-engine stage")
+    # is simply not applicable. `fail` is a reason either way.
+    has_dbt = any(st.engine == "dbt" for st in pipeline.stages)
+    has_proc = any(st.engine == "procedure" for st in pipeline.stages)
+    required = {"dbt": has_dbt, "procedures": has_proc,
+                "dbt_dependencies": has_dbt and pipeline.dbt_project is None}
+    for name, needed in required.items():
         step = step3.get(name)
-        if step is not None and step.get("status") != "pass":
-            r.append(f"step 3 {name}: {step.get('status')} - {step.get('detail')}")
+        status = None if step is None else step.get("status")
+        if status == "fail" or (needed and status != "pass"):
+            detail = "" if step is None else step.get("detail")
+            r.append(f"step 3 {name}: {status or 'not run'} - {detail}")
 
     # --- the validation itself
     if fx.get("unavailable_reason"):

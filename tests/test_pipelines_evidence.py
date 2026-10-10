@@ -107,7 +107,7 @@ def validated(pipeline, *, report_tweak=None, section_tweak=None, step3_tweak=No
         fixture_hash=fixture_hash or fixture.hash_file(fx_path),
         expected_hash=expected_hash or fixture.hash_file(ex_path))
     step3 = {"dbt": {"status": "pass", "detail": ""}, "procedures": {"status": "pass", "detail": ""},
-             "dbt_dependencies": None, "load_ok": True}
+             "dbt_dependencies": {"status": "pass", "detail": ""}, "load_ok": True}
     if step3_tweak:
         step3_tweak(step3)
     if section_tweak:
@@ -356,6 +356,21 @@ def test_a_step3_failure_is_refused(pipeline):
     assert_refused(pipeline, "step 3 dbt: fail")
 
 
+def test_step3_skipped_for_what_the_pipeline_does_not_have_is_accepted_for_hg(hg):
+    """(covered by the bronze/owned-project promote test above: procedures and
+    dbt_dependencies are 'skipped' there, as the real step 3 reports them)"""
+    _hg_validated(hg)
+    _hg_promote(hg)
+
+
+def test_step3_skipped_where_it_applies_is_not_a_verification(pipeline):
+    """dbt not installed / no sudo on the validating host: the check did not run."""
+    validated(pipeline, step3_tweak=lambda s: s.update(
+        dbt={"status": "skipped", "detail": "dbt is not installed"},
+        procedures={"status": "skipped", "detail": "no passwordless sudo"}))
+    assert_refused(pipeline, "step 3 dbt: skipped", "step 3 procedures: skipped")
+
+
 def test_a_failed_negative_validation_cannot_be_promoted(pipeline):
     """The acceptance matrix's deliberately-wrong-expected case yields a sealed
     record too (it is audit history) - and it must never promote."""
@@ -458,8 +473,12 @@ def _hg_validated(hg, *, source_down=True, s3_remaining=0, batches=3, batch_stat
     section = fixture.fixture_report_dict(
         report, pipeline_hash=approval.content_hash(hg),
         fixture_hash=fixture.hash_file(fx), expected_hash=fixture.hash_file(ex))
-    step3 = {"dbt": {"status": "pass", "detail": ""}, "procedures": None,
-             "dbt_dependencies": None, "load_ok": True}
+    # exactly what the real step 3 reports for this pipeline (seen on the clean host)
+    step3 = {"dbt": {"status": "pass", "detail": "own dbt project parsed clean"},
+             "procedures": {"status": "skipped", "detail": "no procedure-engine stage in this pipeline"},
+             "dbt_dependencies": {"status": "skipped",
+                                  "detail": "models live in the pipeline's own dbt project"},
+             "load_ok": True}
     return evidence.seal(hg, section, step3=step3)
 
 
