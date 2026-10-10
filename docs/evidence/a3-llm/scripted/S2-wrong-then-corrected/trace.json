@@ -1,0 +1,135 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "run_1: the output table does not match the independently calculated expected result (not shown to you). Re-read each BRD rule against your SQL.",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-6fbcdf157ff10d81",
+      "fed_back": "run_1: the output table does not match the independently calculated expected result (not shown to you). Re-read each BRD rule against your SQL.",
+      "files": {
+        "models/artist_summary.sql": "sha256:422d7cd5dd57a78baf0608ba772bdf0bf64bed49c83b69e19ef99f8071ba32cd",
+        "pipeline.yaml": "sha256:70d276fe2d818fc3f3eb48a4204b68ee94e7152cb6f13a0c6387f0a124c2e6a8"
+      },
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__1eed1b35",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "fail",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_ids": [
+          6
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        2
+      ],
+      "detail": "",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-176d6e1f4b964b6d",
+      "fed_back": "",
+      "files": {
+        "models/artist_summary.sql": "sha256:4eefc08f5433a97f9b670e22a6284565b74210a79bb95a1bdbd18dbc527a59b3",
+        "pipeline.yaml": "sha256:70d276fe2d818fc3f3eb48a4204b68ee94e7152cb6f13a0c6387f0a124c2e6a8"
+      },
+      "index": 2,
+      "outcome": "validated",
+      "source": "llm-revision",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__411f4149",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          7,
+          8
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 2
+  },
+  "calls": [
+    {
+      "at": "2026-10-10T19:11:03+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:5f96c404bc51580658f388f122f16591a1c0880132d04b7acfa68408cdb71b93",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:feaf12262a82782a34acaf0851d82b5767b44174a03481ec2cdab1506f6e070c"
+    },
+    {
+      "at": "2026-10-10T19:11:50+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 2,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:3c5e659e575e1b5b16e17b5989863a5479122c7aff6ea657183909f447a9298a",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:93d8119b4d744fba763b4fd9cb3afc785f75ee2a6ee6861c2b017f69c6f556b8"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "llm-after-1-revision(s)",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:979f55af0efc41de09e8fd4daebb76cb4936495acd82e6c542b2163c461d9c44",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "/tmp/a3_60r85ann/pipelines/a3_artist_summary",
+  "started_at": "2026-10-10T19:11:03+00:00",
+  "trace_version": 1
+}

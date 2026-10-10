@@ -70,6 +70,7 @@ bash scripts/m25-acceptance-ci.sh --a3 scripted
 # 2. the real model — explicitly opted in and capped
 export DPAGENT_LLM_VERIFY=1 DPAGENT_MODEL=gemini/gemini-2.0-flash GEMINI_API_KEY=...   # any LiteLLM provider
 bash scripts/m25-acceptance-ci.sh --a3 real --max-calls 8 --ambiguous-runs 3
+# or both on one freshly built host:  --a3 both
 ```
 
 Evidence lands in `docs/evidence/a3-llm/{scripted,real}/` with `run-info.txt` (commit, tree, clean

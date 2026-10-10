@@ -102,7 +102,8 @@ def load_case(case_dir: Path) -> Case:
     schema = (case_dir / "source_schema.md").read_text(encoding="utf-8")
     request = synth_mod.SynthRequest(
         name=meta["name"], brd=brd, source_schema=schema,
-        warehouse=dict(_STANDARD_WAREHOUSE_REFS, schema=meta.get("warehouse_schema", meta["name"])),
+        warehouse=dict(meta.get("warehouse_refs") or _STANDARD_WAREHOUSE_REFS,
+                       schema=meta.get("warehouse_schema", meta["name"])),
         secret_refs=dict(meta.get("secrets") or {}), hint=meta.get("hint", ""))
     fx = case_dir / "fixture.yaml"
     ex = case_dir / "expected.yaml"

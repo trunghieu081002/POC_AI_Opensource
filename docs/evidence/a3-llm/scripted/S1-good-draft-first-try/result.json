@@ -1,0 +1,91 @@
+{
+  "approval_file_exists": true,
+  "attempts": [
+    {
+      "evidence_id": "ev-0557a4cc558fba2a",
+      "n": 1,
+      "outcome": "validated",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "llm-first-draft",
+  "deploy_run": {
+    "comparison": {
+      "detail": "1 row(s) matched exactly",
+      "ok": true
+    },
+    "databases_dropped": true,
+    "deployed": true,
+    "error": "",
+    "gates": {
+      "curated": [
+        {
+          "detail": "",
+          "rows_checked": 1,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 10,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ]
+    },
+    "gates_passed": true,
+    "ok": false,
+    "promote": {
+      "accepted": true,
+      "approval_hash": "sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576",
+      "evidence_id": "ev-0557a4cc558fba2a",
+      "maturity": "reviewed",
+      "verification": "verified"
+    },
+    "run_id": 5,
+    "run_status": "ok",
+    "undeploy_detail": "clone secret(s) still in /opt/airflow/home/pipelines.env: WAREHOUSE_DB_HOST, WAREHOUSE_DB_NAME, WAREHOUSE_DB_PASSWORD, WAREHOUSE_DB_PORT, WAREHOUSE_DB_USER",
+    "undeploy_verified": false
+  },
+  "deployed_bytes_are_the_drafted_bytes": false,
+  "expectation_problems": [
+    "deploy/run did not complete: {'promote': {'accepted': True, 'evidence_id': 'ev-0557a4cc558fba2a', 'verification': 'verified', 'maturity': 'reviewed', 'approval_hash': 'sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576'}, 'deployed': True, 'run_status': 'ok', 'comparison': {'ok': True, 'detail': '1 row(s) m",
+    "edit checks: None",
+    "deployed content differs from the drafted content"
+  ],
+  "label": "S1-good-draft-first-try",
+  "last_outcome": "validated",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_artist_summary__validate__a0d8b261",
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "deploy_error": "",
+    "overall": "pass",
+    "run_ids": [
+      3,
+      4
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 18
+}

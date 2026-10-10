@@ -4,6 +4,16 @@
 name: a3_revenue_ambiguous
 kind: ambiguous
 warehouse_schema: a3_revenue_ambiguous
+# The harness deploys the validated draft for real against throwaway databases, so it uses
+# its own warehouse refs: dpagent's standard WAREHOUSE_DB_* are shared by every pipeline on
+# a host and must never be pointed at a throwaway database (undeploy rightly keeps a secret
+# another published pipeline still uses).
+warehouse_refs:
+  host: "${A3_WH_HOST:-localhost}"
+  port: "${A3_WH_PORT:-5432}"
+  database: "${A3_WH_NAME:-warehouse}"
+  user: "${A3_WH_USER}"
+  password: "${A3_WH_PASSWORD}"
 secrets:
   A3_SRC_HOST: source Postgres host
   A3_SRC_PORT: source Postgres port

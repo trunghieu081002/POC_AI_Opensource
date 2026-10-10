@@ -58,11 +58,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IMAGE="dpagent-m25-disposable"
 CONTAINER="dpagent-m25-acceptance-$$"
 RESULTS_DIR="${REPO_ROOT}/docs/evidence/m25-automated"
-case "$A3" in ""|scripted|real) ;; *) echo "--a3 must be scripted or real" >&2; exit 2 ;; esac
+case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
 if [ -n "$A3" ]; then
   RESULTS_DIR="${REPO_ROOT}/docs/evidence/a3-llm"
   PROFILE=core      # A3 needs no object store
-  if [ "$A3" = real ]; then
+  if [ "$A3" = real ] || [ "$A3" = both ]; then
     # fail before building anything if the opt-in is missing
     [ "${DPAGENT_LLM_VERIFY:-}" = 1 ] || { echo "real model calls need DPAGENT_LLM_VERIFY=1 (and a provider key in the environment)" >&2; exit 2; }
     [ -n "${DPAGENT_MODEL:-}" ] || { echo "set DPAGENT_MODEL to the model under test (e.g. gemini/gemini-2.0-flash)" >&2; exit 2; }
@@ -189,14 +189,19 @@ if [ -n "$A3" ]; then
   # Provider credentials are forwarded BY NAME (docker takes the value from this
   # shell); they are never written to a file, a log line or the evidence.
   PASS=(-e DPAGENT_LLM_VERIFY -e DPAGENT_MODEL)
-  if [ "$A3" = real ]; then
+  if [ "$A3" = real ] || [ "$A3" = both ]; then
     for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
       [ -z "${!k:-}" ] || PASS+=(-e "$k")
     done
   fi
+  DRIVER_RC=0
+  MODES="$A3"; [ "$A3" != both ] || MODES="scripted real"
   set +e
-  docker exec "${PASS[@]}" "${CONTAINER}" bash -c "cd /opt/dpagent && .venv/bin/python tests/llm_verification/run_a3.py --mode ${A3} --max-calls ${A3_MAX_CALLS} --ambiguous-runs ${A3_AMBIGUOUS_RUNS}"
-  DRIVER_RC=$?
+  for mode in $MODES; do
+    docker exec "${PASS[@]}" "${CONTAINER}" bash -c "cd /opt/dpagent && .venv/bin/python tests/llm_verification/run_a3.py --mode ${mode} --max-calls ${A3_MAX_CALLS} --ambiguous-runs ${A3_AMBIGUOUS_RUNS}"
+    rc=$?
+    [ "$rc" -eq 0 ] || DRIVER_RC=$rc
+  done
   set -e
 else
 say "running the acceptance matrix driver"
@@ -224,7 +229,7 @@ section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql 
 section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
 section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
-section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_|A3_SRC_|WAREHOUSE_DB_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
+section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_|A3_SRC_|A3_WH_|WAREHOUSE_DB_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY
   section "S3 objects under dpagent-validate/"; found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze dpagent-validate/ || true)"
@@ -246,13 +251,15 @@ mkdir -p "${RESULTS_DIR}"
   echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "${RESULTS_DIR}/run-info.txt"
 if [ -n "$A3" ]; then
-  rm -rf "${RESULTS_DIR:?}/${A3}"
-  docker cp "${CONTAINER}:/root/a3-evidence/${A3}" "${RESULTS_DIR}/${A3}"
+  for mode in $MODES; do
+    rm -rf "${RESULTS_DIR:?}/${mode}"
+    docker cp "${CONTAINER}:/root/a3-evidence/${mode}" "${RESULTS_DIR}/${mode}" || true
+  done
   # belt and braces on top of the driver's own check: no credential value may be in the evidence
   for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
     v="${!k:-}"
-    if [ -n "$v" ] && grep -rqF -- "$v" "${RESULTS_DIR}/${A3}"; then
-      rm -rf "${RESULTS_DIR:?}/${A3}"
+    if [ -n "$v" ] && grep -rqF -- "$v" "${RESULTS_DIR}"; then
+      for mode in $MODES; do rm -rf "${RESULTS_DIR:?}/${mode}"; done
       die "the value of ${k} appears in the A3 evidence - evidence removed, nothing was kept"
     fi
   done

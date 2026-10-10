@@ -294,3 +294,9 @@ def test_the_ambiguous_case_has_no_fixture_and_omits_what_matters():
     brd = case.brd.lower()
     for decisive in ("confirmation", "cancel", "hủy", "tax", "thuế", "currency", "tiền tệ"):
         assert decisive not in brd
+
+
+def test_the_request_hands_the_model_its_own_warehouse_refs(case):
+    wh = case.request.warehouse
+    assert wh["host"] == "${A3_WH_HOST:-localhost}" and wh["schema"] == "a3_artist_summary"
+    assert "WAREHOUSE_DB" not in json.dumps(wh)

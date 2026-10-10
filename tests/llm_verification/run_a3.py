@@ -119,10 +119,19 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
                 last.evidence_id)
             if result["deploy_run"].get("ok"):
                 result["edit_checks"] = _edits_invalidate(case, workdir, last.evidence_id)
-            # the deployed bytes are the drafted bytes
-            drafted = {rel: llm_verify._sha(text) for rel, text in last.drafted_files.items()}
-            on_disk = {rel: llm_verify._sha((workdir / case.name / rel).read_bytes())
-                       for rel in drafted}
+            # the deployed bytes are the drafted bytes - except the one line promote owns
+            def _bytes(rel):
+                text = (workdir / case.name / rel).read_text(encoding="utf-8")
+                if rel == "pipeline.yaml":       # `maturity: reviewed` is promote's label, not content
+                    text = "\n".join(l for l in text.split("\n") if not approval._MATURITY_LINE.match(l))
+                return llm_verify._sha(text)
+
+            def _drafted(rel, text):
+                if rel == "pipeline.yaml":
+                    text = "\n".join(l for l in text.split("\n") if not approval._MATURITY_LINE.match(l))
+                return llm_verify._sha(text)
+            drafted = {rel: _drafted(rel, text) for rel, text in last.drafted_files.items()}
+            on_disk = {rel: _bytes(rel) for rel in drafted}
             result["deployed_bytes_are_the_drafted_bytes"] = (drafted == on_disk)
         elif last.evidence_id:
             # validation ran and did not pass: the sealed record must not promote
