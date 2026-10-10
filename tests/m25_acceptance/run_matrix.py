@@ -618,8 +618,15 @@ def run_a2_promote_deploy_run(tmp_path: Path) -> dict:
     prefix = f"a2-promote/{uuid.uuid4().hex[:8]}"
 
     def retarget(work):
+        # Its own S3 prefix, and its own ${VAR} names: undeploy keeps a secret
+        # another published pipeline still references (the host's checkout copy
+        # of hg_dbt_branch uses HG_POC_*), which is right - so a pipeline that
+        # is to be torn down completely must not share them.
         f = work / "pipeline.yaml"
-        f.write_text(f.read_text().replace("prefix: bronze", f"prefix: {prefix}", 1))
+        text = f.read_text().replace("prefix: bronze", f"prefix: {prefix}", 1)
+        f.write_text(text.replace("HG_POC_", "HG_A2_"))
+        for key in [k for k in os.environ if k.startswith("HG_POC_")]:
+            os.environ[key.replace("HG_POC_", "HG_A2_")] = os.environ[key]
 
     pipeline, fx_path, ex_path = _hg_pipeline(tmp_path, mutate=retarget, name=A2)
     step3 = validate.validate_pipeline(pipeline, generator="dpagent pipeline validate")
@@ -758,6 +765,8 @@ def run_a2_promote_deploy_run(tmp_path: Path) -> dict:
     if steps["restored_is_valid_again"] is not True:
         problems.append("restoring the content did not restore the approval")
 
+    for key in [k for k in os.environ if k.startswith("HG_A2_")]:
+        del os.environ[key]
     result["a2"] = {"steps": steps, "problems": problems}
     result["validation_overall"] = result["overall"]
     result["overall"] = "pass" if not problems else "fail"

@@ -188,7 +188,7 @@ section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql 
 section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
 section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote" || true)"
-section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
+section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY
   section "S3 objects under dpagent-validate/"; found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze dpagent-validate/ || true)"
