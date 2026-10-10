@@ -324,9 +324,11 @@ dpagent pipeline validate <name> # step 3: dbt parse / apply procedures for real
                                  #   curated output against expected - needs root + sudo
 dpagent pipeline lint <name>     # static: manifest, SQL parses, gates well-formed
 dpagent pipeline plan <name>     # print every artifact and command, change nothing
-dpagent pipeline promote <name>  # record approval of this pipeline's current manifest +
-                                 #   procedures/models (hash-pinned); deploy refuses it until
-                                 #   this has run, and again the moment any of them change
+dpagent pipeline promote <name> --fixture F --expected E
+                                 # record approval (hash-pinned) - ONLY on sealed evidence of a
+                                 #   real `validate --fixture` of exactly this content
+                                 #   (docs/promote-evidence.md); deploy refuses it until this has
+                                 #   run, and again the moment any hashed file changes
 dpagent pipeline deploy <name>   # generate the Airflow DAG + dbt tests, install them
                                  #   --allow-draft: apply an unreviewed/stale-approval pipeline
                                  #   anyway, for real - manual-only, never unpaused, regardless
@@ -367,7 +369,10 @@ Airflow install, secrets, unpausing - all of it, not just some of it under
 particular flags) unless the pipeline is `reviewed` *and* its approval is
 still current:
 
-- `dpagent pipeline promote <name>` hashes the manifest plus every
+- `dpagent pipeline promote <name> --fixture F --expected E` first requires
+  sealed evidence of a real validation of exactly this content (A2 -
+  [promote-evidence.md](promote-evidence.md); approvals written before
+  that stay valid but are reported `unverified`), then hashes the manifest plus every
   procedure/dbt model it actually references, records that hash next to
   the pipeline (`.approved.yaml`, git-tracked - reviewed in a PR like
   anything else in this repo), and sets `maturity: reviewed`.

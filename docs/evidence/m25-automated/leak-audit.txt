@@ -12,5 +12,7 @@
 (none)
 == S3 objects under dpagent-validate/
 (none)
+== S3 objects under a2-promote/
+(none)
 
 leaks=0

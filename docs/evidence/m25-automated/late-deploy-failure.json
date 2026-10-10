@@ -9,13 +9,13 @@
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__a98bc760",
+  "clone_name": "m25_monthly_sales__validate__bea8fb51",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
     "run_2": "not_run"
   },
-  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: PosixPath('/opt/dpagent/pipelines/m25_monthly_sales__validate__a98bc760')",
+  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: PosixPath('/opt/dpagent/pipelines/m25_monthly_sales__validate__bea8fb51')",
   "expected_hash": "sha256:8cfa1d2e3476f04c8e1a0c0e0a5af8731039bd5e216a3e4ab91e7bcfcf9dcb17",
   "fixture_hash": "sha256:416cf9e2bb697dbdf6ed05376be6667b201b2c2fddf07ef01712c72d3df133a9",
   "gates": {

@@ -1,0 +1,262 @@
+{
+  "a2": {
+    "problems": [],
+    "steps": {
+      "edits_invalidate": {
+        "expected": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "fixture": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "model": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_promote's manifest/procedures/models changed since it was approved (2026-10-10T13:34:04+00:00 by 'm25-matrix') - r"
+        },
+        "seed": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_promote's manifest/procedures/models changed since it was approved (2026-10-10T13:34:04+00:00 by 'm25-matrix') - r"
+        }
+      },
+      "promote": {
+        "accepted": true,
+        "evidence_id": "ev-b2588e271e52e474",
+        "is_approved": true,
+        "maturity": "reviewed",
+        "verification": "verified"
+      },
+      "promote_before_validation": {
+        "accepted": false,
+        "approval_unchanged": true,
+        "reasons": [
+          "no sealed evidence for 'hg_a2_promote' in this host's journal - run `dpagent pipeline validate hg_a2_promote --fixture ... --expected ...` here first (a report file alone is not evidence)"
+        ]
+      },
+      "real_run": {
+        "cleanup_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+        "cleanup_ok": true,
+        "comparison": {
+          "detail": "gold.mart_artist_summary: 1 row(s) matched exactly; silver.dim_artist_active: 4 row(s) matched exactly; silver.dim_artist: 6 row(s) matched exactly",
+          "ok": true
+        },
+        "databases_dropped": true,
+        "deployed": true,
+        "error": "",
+        "gates_passed": true,
+        "run_id": 29,
+        "run_status": "ok",
+        "s3_remaining": 0
+      },
+      "restored_is_valid_again": true,
+      "validate": {
+        "cleanup": "pass",
+        "evidence_id": "ev-b2588e271e52e474",
+        "overall": "pass"
+      }
+    }
+  },
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "a5eec784-6413-4fcf-8326-70d985868ae9",
+        "loaded_rows": 6,
+        "manifest_sha256": "bae5168b0715d707cb618e76feb9a22ccfca982abdcf0a2ea481d336db480352",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "71898abb-54d1-4668-99b5-71ad2b8179bd",
+        "loaded_rows": 6,
+        "manifest_sha256": "2526d7cb07eb9c83e07649e804984d450013af94202ff377e312317d2a48440f",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "d07534ff-675d-414c-ba17-cd8d8125fe8a",
+        "loaded_rows": 6,
+        "manifest_sha256": "5fcd5ea069e3901234f8dc10b5d9ec3fa46ceb6981e950efbd03ec95f35bd951",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 6
+      }
+    ],
+    "namespace": "dpagent-validate/f89da5d2",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 6,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "d07534ff-675d-414c-ba17-cd8d8125fe8a",
+      "detail": "6 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_a56a3d96d6\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_a56a3d96d6\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_F89DA5D2_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_F89DA5D2_BRONZE_BUCKET, DPAGENT_VALIDATE_F89DA5D2_BRONZE_ENDPOINT, DPAGENT_VALIDATE_F89DA5D2_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_F89DA5D2_SRC_DATABASE, DPAGENT_VALIDATE_F89DA5D2_SRC_HOST, DPAGENT_VALIDATE_F89DA5D2_SRC_PASSWORD, DPAGENT_VALIDATE_F89DA5D2_SRC_PORT, DPAGENT_VALIDATE_F89DA5D2_SRC_USER, DPAGENT_VALIDATE_F89DA5D2_WH_DATABASE, DPAGENT_VALIDATE_F89DA5D2_WH_HOST, DPAGENT_VALIDATE_F89DA5D2_WH_PASSWORD, DPAGENT_VALIDATE_F89DA5D2_WH_PORT, DPAGENT_VALIDATE_F89DA5D2_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "real_run": {
+      "artifacts": true,
+      "databases_dropped": true,
+      "s3_remaining": 0
+    },
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_a2_promote__validate__f89da5d2",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-b2588e271e52e474",
+  "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
+  "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
+  "gates": {
+    "run_1": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 1,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 4,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 1,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 4,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:042b91b271e71c50bfb9b388589ae167d5e878ad203c4b5fd2074cd19dd67142",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    27,
+    28
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "validation_overall": "pass",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

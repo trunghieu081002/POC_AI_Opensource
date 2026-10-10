@@ -5,6 +5,7 @@ tests lock in the hash's stability across a promote and its sensitivity to
 every file `deploy()` actually reads for real."""
 import yaml
 
+from approval_helpers import approve_legacy
 from dpagent.pipelines import approval, loader
 
 
@@ -48,7 +49,7 @@ def test_is_approved_is_false_for_a_fresh_draft(tmp_path):
 def test_promote_makes_is_approved_true(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
     reloaded = loader.load("demo", root)
     approved, reason = approval.is_approved(reloaded)
     assert approved is True
@@ -59,7 +60,7 @@ def test_promote_makes_is_approved_true(tmp_path):
 def test_promote_writes_a_git_trackable_approval_file(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
     stored = approval.read_approval(loader.load("demo", root))
     assert stored.approved_by == "alice"
     assert stored.content_hash.startswith("sha256:")
@@ -83,7 +84,7 @@ def test_reviewed_maturity_alone_without_an_approval_file_is_not_approved(tmp_pa
 def test_editing_the_manifest_after_promote_invalidates_it(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     manifest = pipeline.path("pipeline.yaml")
     manifest.write_text(manifest.read_text().replace("localhost", "some-other-host"))
@@ -97,7 +98,7 @@ def test_editing_the_manifest_after_promote_invalidates_it(tmp_path):
 def test_editing_a_referenced_procedure_after_promote_invalidates_it(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     proc = pipeline.path("procedures/build.sql")
     proc.write_text(proc.read_text() + "-- v2\n")
@@ -110,7 +111,7 @@ def test_editing_a_referenced_procedure_after_promote_invalidates_it(tmp_path):
 def test_editing_a_referenced_dbt_model_after_promote_invalidates_it(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     model = pipeline.path("models/stg_a.sql")
     model.write_text(model.read_text() + "-- v2\n")
@@ -127,7 +128,7 @@ def test_editing_an_unrelated_file_under_the_pipeline_root_does_not_invalidate_i
     otherwise-untouched approval look stale."""
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     (pipeline.root / "NOTES.md").write_text("unrelated scratch notes\n")
 
@@ -142,7 +143,7 @@ def test_flipping_maturity_back_to_draft_by_hand_does_not_look_like_a_content_ch
     refusal), not a confusing "content changed" message."""
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    approval.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     manifest = pipeline.path("pipeline.yaml")
     manifest.write_text(manifest.read_text().replace("maturity: reviewed", "maturity: draft"))
@@ -156,9 +157,9 @@ def test_flipping_maturity_back_to_draft_by_hand_does_not_look_like_a_content_ch
 def test_promote_is_idempotent_when_content_has_not_changed(tmp_path):
     root = tmp_path / "pipelines"
     pipeline = _pipeline(root)
-    first = approval.promote(pipeline, "alice")
+    first = approve_legacy(pipeline, "alice")
     reloaded = loader.load("demo", root)
-    second = approval.promote(reloaded, "bob")
+    second = approve_legacy(reloaded, "bob")
     assert first.content_hash == second.content_hash
 
 

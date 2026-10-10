@@ -6,6 +6,7 @@ import pytest
 import yaml
 
 from dpagent.llm import client as llm
+from approval_helpers import approve_legacy
 from dpagent.pipelines import loader, synth
 
 
@@ -99,7 +100,7 @@ def test_synth_overwrite_refuses_outright_against_a_reviewed_pipeline(root, monk
     monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
     synth.synth(_request(), pipelines_dir=root)
     pipeline = loader.load("monthly_sales", root)
-    synth.approval_mod.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
 
     with pytest.raises(ValueError, match="approval history"):
         synth.synth(_request(), pipelines_dir=root, overwrite=True)
@@ -118,7 +119,7 @@ def test_synth_overwrite_refuses_even_when_the_reviewed_manifest_no_longer_loads
     monkeypatch.setattr(llm, "chat_json", FakeReply({"files": dict(VALID_FILES)}))
     synth.synth(_request(), pipelines_dir=root)
     pipeline = loader.load("monthly_sales", root)
-    synth.approval_mod.promote(pipeline, "alice")
+    approve_legacy(pipeline, "alice")
     # Corrupt the manifest after promoting - loader.load() will now fail,
     # but .approved.yaml is still sitting right there.
     (root / "monthly_sales" / "pipeline.yaml").write_text("not: [valid, pipeline, at all\n")

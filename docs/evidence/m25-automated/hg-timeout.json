@@ -1,10 +1,10 @@
 {
   "bronze": {
     "batches": [],
-    "namespace": "dpagent-validate/d8ab8e70",
+    "namespace": "dpagent-validate/819c5da9",
     "s3": {
       "error": "",
-      "objects_found_at_teardown": 2,
+      "objects_found_at_teardown": 0,
       "objects_remaining_after_purge": 0
     },
     "source_down_load": null
@@ -12,20 +12,21 @@
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "fail",
-    "pipeline_artifacts_detail": "DAG removed; DAG delete FAILED: airflow.exceptions.AirflowException: TaskInstances still running; published files removed; secrets released: DPAGENT_VALIDATE_D8AB8E70_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_D8AB8E70_BRONZE_BUCKET, DPAGENT_VALIDATE_D8AB8E70_BRONZE_ENDPOINT, DPAGENT_VALIDATE_D8AB8E70_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_D8AB8E70_SRC_DATABASE, DPAGENT_VALIDATE_D8AB8E70_SRC_HOST, DPAGENT_VALIDATE_D8AB8E70_SRC_PASSWORD, DPAGENT_VALIDATE_D8AB8E70_SRC_PORT, DPAGENT_VALIDATE_D8AB8E70_SRC_USER, DPAGENT_VALIDATE_D8AB8E70_WH_DATABASE, DPAGENT_VALIDATE_D8AB8E70_WH_HOST, DPAGENT_VALIDATE_D8AB8E70_WH_PASSWORD, DPAGENT_VALIDATE_D8AB8E70_WH_PORT, DPAGENT_VALIDATE_D8AB8E70_WH_USER | DAG still registered in Airflow: airflow.exceptions.AirflowException: TaskInstances still running; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_819C5DA9_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_819C5DA9_BRONZE_BUCKET, DPAGENT_VALIDATE_819C5DA9_BRONZE_ENDPOINT, DPAGENT_VALIDATE_819C5DA9_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_819C5DA9_SRC_DATABASE, DPAGENT_VALIDATE_819C5DA9_SRC_HOST, DPAGENT_VALIDATE_819C5DA9_SRC_PASSWORD, DPAGENT_VALIDATE_819C5DA9_SRC_PORT, DPAGENT_VALIDATE_819C5DA9_SRC_USER, DPAGENT_VALIDATE_819C5DA9_WH_DATABASE, DPAGENT_VALIDATE_819C5DA9_WH_HOST, DPAGENT_VALIDATE_819C5DA9_WH_PASSWORD, DPAGENT_VALIDATE_819C5DA9_WH_PORT, DPAGENT_VALIDATE_819C5DA9_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__d8ab8e70",
+  "clone_name": "hg_dbt_branch__validate__819c5da9",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
     "run_2": "not_run"
   },
   "deploy_error": "",
+  "evidence_id": "ev-ca8587222be79588",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -38,6 +39,27 @@
   },
   "overall": "fail",
   "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 timed out (worker not confirmed stopped)",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "cleanup pipeline_artifacts is 'fail', not 'pass'",
+      "cleanup overall is 'fail', not 'pass'",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 0",
+      "run_1: run 22 finished 'cancelled' in the journal",
+      "run_1: gated stage 'landing' has no gate verdict in the journal",
+      "run_1: gated stage 'silver' has no gate verdict in the journal",
+      "run_1: gated stage 'gold' has no gate verdict in the journal"
+    ]
+  },
   "recovered_after_scenario": {
     "databases": [],
     "failed": [],

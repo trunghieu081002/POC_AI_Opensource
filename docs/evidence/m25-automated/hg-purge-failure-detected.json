@@ -2,68 +2,69 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "d7e8b3cd-e2ef-4d36-b220-f920735d8a4e",
+        "batch_id": "65e14ce3-6ee9-429d-8fa9-971b20c891a1",
         "loaded_rows": 6,
-        "manifest_sha256": "449b92edf5b49c0e71666fc8ceff740647ead1d2c59a50ac2908345773ac0eb1",
+        "manifest_sha256": "e7eee49edf8b436b5322e9d5b9f810e3fa32466ce3ff8284bd6c888f8faa984b",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "51105aad-93cd-445e-8ffb-48c96f4e1353",
+        "batch_id": "ed618fc0-a783-4f68-b047-b8ea983e8e7d",
         "loaded_rows": 6,
-        "manifest_sha256": "410bb41d7252b354b32436b9b71106da06ad2f34ba0d91317d98dd3f0f81b114",
+        "manifest_sha256": "e1f8b369fd39648f3b9d2e7d8707d77d556d3476a46b74cf0755a77e1baa3037",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "935abcc7-2df0-4a33-a78d-6814506f2b80",
+        "batch_id": "f7e2cb41-2570-41aa-8a84-0879142f0f23",
         "loaded_rows": 6,
-        "manifest_sha256": "b593c200acf0c5bdf59e3072c7cff01b445233c898fc6813ec9ce9cea0b219e1",
+        "manifest_sha256": "e9a45d97bafdba463d70cf56bcb89b13a4e1d80b7a4d33888669bed3829c7e1a",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/9d4f85a7",
+    "namespace": "dpagent-validate/c6ef9be2",
     "s3": {
-      "error": "6 object(s) still under dpagent-validate/9d4f85a7/ after the purge",
+      "error": "6 object(s) still under dpagent-validate/c6ef9be2/ after the purge",
       "objects_found_at_teardown": 0,
       "objects_remaining_after_purge": 6
     },
     "source_down_load": {
-      "batch_id": "935abcc7-2df0-4a33-a78d-6814506f2b80",
+      "batch_id": "f7e2cb41-2570-41aa-8a84-0879142f0f23",
       "detail": "6 row(s) matched exactly",
       "error": "",
       "landing_matches_fixture": true,
       "loaded": true,
       "ok": true,
       "source_dropped": true,
-      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_64ad8f9d78\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_64ad8f9d78\"",
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_e7e6a79d92\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_e7e6a79d92\"",
       "source_unreachable": true
     }
   },
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_9D4F85A7_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_9D4F85A7_BRONZE_BUCKET, DPAGENT_VALIDATE_9D4F85A7_BRONZE_ENDPOINT, DPAGENT_VALIDATE_9D4F85A7_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_9D4F85A7_SRC_DATABASE, DPAGENT_VALIDATE_9D4F85A7_SRC_HOST, DPAGENT_VALIDATE_9D4F85A7_SRC_PASSWORD, DPAGENT_VALIDATE_9D4F85A7_SRC_PORT, DPAGENT_VALIDATE_9D4F85A7_SRC_USER, DPAGENT_VALIDATE_9D4F85A7_WH_DATABASE, DPAGENT_VALIDATE_9D4F85A7_WH_HOST, DPAGENT_VALIDATE_9D4F85A7_WH_PASSWORD, DPAGENT_VALIDATE_9D4F85A7_WH_PORT, DPAGENT_VALIDATE_9D4F85A7_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
-    "s3_objects": "fail: 6 object(s) still under dpagent-validate/9d4f85a7/ after the purge",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_C6EF9BE2_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_C6EF9BE2_BRONZE_BUCKET, DPAGENT_VALIDATE_C6EF9BE2_BRONZE_ENDPOINT, DPAGENT_VALIDATE_C6EF9BE2_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_C6EF9BE2_SRC_DATABASE, DPAGENT_VALIDATE_C6EF9BE2_SRC_HOST, DPAGENT_VALIDATE_C6EF9BE2_SRC_PASSWORD, DPAGENT_VALIDATE_C6EF9BE2_SRC_PORT, DPAGENT_VALIDATE_C6EF9BE2_SRC_USER, DPAGENT_VALIDATE_C6EF9BE2_WH_DATABASE, DPAGENT_VALIDATE_C6EF9BE2_WH_HOST, DPAGENT_VALIDATE_C6EF9BE2_WH_PASSWORD, DPAGENT_VALIDATE_C6EF9BE2_WH_PORT, DPAGENT_VALIDATE_C6EF9BE2_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "fail: 6 object(s) still under dpagent-validate/c6ef9be2/ after the purge",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__9d4f85a7",
+  "clone_name": "hg_dbt_branch__validate__c6ef9be2",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
     "run_2": "pass"
   },
   "deploy_error": "",
+  "evidence_id": "ev-ca29a1331ee350c9",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -160,6 +161,17 @@
   },
   "overall": "fail",
   "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "validation overall is 'fail'",
+      "cleanup overall is 'fail', not 'pass'",
+      "cleanup s3_objects is 'fail: 6 object(s) still under dpagent-validate/c6ef9be2/ after the purge', not 'pass'",
+      "S3: 6 object(s) remain after purge (must be exactly 0)",
+      "S3 cleanup error: 6 object(s) still under dpagent-validate/c6ef9be2/ after the purge"
+    ]
+  },
   "recovered_after_scenario": {
     "databases": [],
     "failed": [],

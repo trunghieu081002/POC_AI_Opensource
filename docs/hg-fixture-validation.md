@@ -10,8 +10,8 @@ the product's own validation: `dpagent pipeline validate hg_dbt_branch --fixture
 acceptance matrix as everything else (`tests/m25_acceptance/run_matrix.py`,
 `scripts/m25-acceptance-ci.sh`), on a host built from scratch by packs.
 
-Not in this milestone, on purpose: the `promote()` gate, incremental models,
-more connectors.
+Not in this milestone, on purpose: incremental models, more connectors. (The
+`promote()` gate that reads this evidence came next: [promote-evidence.md](promote-evidence.md).)
 
 ## What the validation does for such a pipeline
 
@@ -82,8 +82,8 @@ cleanup:
 | `bronze.namespace`, `bronze.s3` | the namespace, objects found at teardown, objects remaining after purge |
 | `cleanup.*` | per-resource: pipeline artifacts, source/warehouse database + role (catalog-confirmed), `s3_objects` |
 
-This is the product-side evidence a later `promote()` gate can read; that gate
-is not built here.
+This is the product-side evidence `promote()` now requires — sealed into the
+journal and re-checked there, see [promote-evidence.md](promote-evidence.md).
 
 ## The acceptance run
 
@@ -155,7 +155,8 @@ object under `dpagent-validate/` — and exits non-zero on any leak
   inside the same Postgres server); it does not stop a separate source server —
   `scripts/hg-bronze-poc-verify.sh` does that, with a source in its own
   container, and remains the by-hand repro.
-- No `promote()` gate. The evidence exists; nothing requires it yet.
+- (When this milestone was written there was no `promote()` gate; A2 added it —
+  [promote-evidence.md](promote-evidence.md).)
 - Evidence under `docs/evidence/m25-automated/` is from one clean-host run (see
   its README: 21/21 scenarios, all seven pack suites, `leaks=0`); it is a record
   of that run, not a standing guarantee. Two earlier attempts at that run failed

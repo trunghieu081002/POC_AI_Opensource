@@ -2,16 +2,16 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "3899e024-e487-44ea-9a52-fa307bc7b4f9",
+        "batch_id": "f6e61c7e-ce78-42d7-b84e-1cee0e4c21f3",
         "loaded_rows": 6,
-        "manifest_sha256": "31a0252c4cde1d3d013ce89dad4c498c83f4cf8d446a63d0cea523c098ae17b2",
+        "manifest_sha256": "1fa8931523e7a11c67613df6722a484978a86de5e798a552c3b8a765ec68bbcf",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/6d8eab2d",
+    "namespace": "dpagent-validate/02bca84c",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 2,
@@ -22,21 +22,22 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_6D8EAB2D_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_6D8EAB2D_BRONZE_BUCKET, DPAGENT_VALIDATE_6D8EAB2D_BRONZE_ENDPOINT, DPAGENT_VALIDATE_6D8EAB2D_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_6D8EAB2D_SRC_DATABASE, DPAGENT_VALIDATE_6D8EAB2D_SRC_HOST, DPAGENT_VALIDATE_6D8EAB2D_SRC_PASSWORD, DPAGENT_VALIDATE_6D8EAB2D_SRC_PORT, DPAGENT_VALIDATE_6D8EAB2D_SRC_USER, DPAGENT_VALIDATE_6D8EAB2D_WH_DATABASE, DPAGENT_VALIDATE_6D8EAB2D_WH_HOST, DPAGENT_VALIDATE_6D8EAB2D_WH_PASSWORD, DPAGENT_VALIDATE_6D8EAB2D_WH_PORT, DPAGENT_VALIDATE_6D8EAB2D_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_02BCA84C_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_02BCA84C_BRONZE_BUCKET, DPAGENT_VALIDATE_02BCA84C_BRONZE_ENDPOINT, DPAGENT_VALIDATE_02BCA84C_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_02BCA84C_SRC_DATABASE, DPAGENT_VALIDATE_02BCA84C_SRC_HOST, DPAGENT_VALIDATE_02BCA84C_SRC_PASSWORD, DPAGENT_VALIDATE_02BCA84C_SRC_PORT, DPAGENT_VALIDATE_02BCA84C_SRC_USER, DPAGENT_VALIDATE_02BCA84C_WH_DATABASE, DPAGENT_VALIDATE_02BCA84C_WH_HOST, DPAGENT_VALIDATE_02BCA84C_WH_PASSWORD, DPAGENT_VALIDATE_02BCA84C_WH_PORT, DPAGENT_VALIDATE_02BCA84C_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__6d8eab2d",
+  "clone_name": "hg_dbt_branch__validate__02bca84c",
   "comparison": {
     "idempotent": false,
     "run_1": "fail",
     "run_2": "not_run"
   },
   "deploy_error": "",
-  "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
+  "evidence_id": "ev-fa183e744501aa89",
+  "expected_hash": "sha256:eab6dcdc21f7f4eb4a0f9ca2a51927641d7e97800683d0f6bf3c798330870ad7",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
     "run_1": {
@@ -90,6 +91,20 @@
   },
   "overall": "fail",
   "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'fail', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1"
+    ]
+  },
   "recovered_after_scenario": {
     "databases": [],
     "failed": [],

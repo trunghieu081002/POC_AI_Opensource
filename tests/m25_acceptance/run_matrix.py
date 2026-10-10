@@ -49,7 +49,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from dpagent.pipelines import approval, bronze, dbtproject  # noqa: E402
+from dpagent.engine import state  # noqa: E402
+from dpagent.pipelines import approval, bronze, dbtproject, evidence, validate  # noqa: E402
 from dpagent.pipelines import deploy as deploy_mod  # noqa: E402
 from dpagent.pipelines import fixture, loader  # noqa: E402
 from dpagent.pipelines import pg_throwaway  # noqa: E402
@@ -447,7 +448,7 @@ def _seaweed_credentials() -> dict:
     return creds
 
 
-def _hg_pipeline(tmp_path: Path, *, mutate=None) -> tuple[loader.Pipeline, Path, Path]:
+def _hg_pipeline(tmp_path: Path, *, mutate=None, name: str = "") -> tuple[loader.Pipeline, Path, Path]:
     """The real pipelines/hg_dbt_branch (copied, so a scenario may mutate its
     copy), with the original's bronze refs pointed at this host's seaweedfs.
     Its source/warehouse refs are never resolved by a fixture run (the clone
@@ -464,21 +465,49 @@ def _hg_pipeline(tmp_path: Path, *, mutate=None) -> tuple[loader.Pipeline, Path,
     }
     os.environ.update(env)
     import shutil
-    work = tmp_path / HG
+    name = name or HG
+    work = tmp_path / name
     shutil.copytree(HG_DIR, work, ignore=shutil.ignore_patterns(
         ".synth-validation.yaml", ".approved.yaml", "build"))
+    if name != HG:
+        # A distinct pipeline NAME for scenarios that deploy for real: the
+        # published directory and DAG are keyed by name, and the host's own
+        # copy of hg_dbt_branch must never be overwritten or undeployed.
+        manifest = work / "pipeline.yaml"
+        manifest.write_text(manifest.read_text().replace(f"name: {HG}\n", f"name: {name}\n", 1))
     if mutate:
         mutate(work)
-    return loader.load(HG, tmp_path), work / "fixture.yaml", work / "expected.yaml"
+    return loader.load(name, tmp_path), work / "fixture.yaml", work / "expected.yaml"
 
 
-def _run_hg(tmp_path: Path, *, mutate=None, expected_override=None, **run_kwargs) -> dict:
+def _promote_outcome(pipeline, fx_path, ex_path, evidence_id=None) -> dict:
+    """Try the shared promote() gate exactly as the CLI does and report what
+    happened to the approval - so each scenario also proves what its evidence
+    may (or may not) be used for."""
+    approval_file = approval.approval_path(pipeline)
+    before = approval_file.read_bytes() if approval_file.exists() else None
+    try:
+        got = approval.promote(pipeline, "m25-matrix", fixture_path=fx_path,
+                               expected_path=ex_path, evidence_id=evidence_id)
+    except evidence.EvidenceRefused as exc:
+        after = approval_file.read_bytes() if approval_file.exists() else None
+        return {"accepted": False, "reasons": exc.reasons, "approval_unchanged": after == before}
+    reloaded = loader.load(pipeline.name, pipeline.root.parent)
+    return {"accepted": True, "evidence_id": (got.evidence or {}).get("id"),
+            "verification": approval.verification(reloaded)[0],
+            "maturity": reloaded.maturity,
+            "is_approved": approval.is_approved(reloaded)[0]}
+
+
+def _run_hg(tmp_path: Path, *, mutate=None, **run_kwargs) -> dict:
+    """The controlled validation path (step 3, then evidence.run_and_seal - the
+    function `dpagent pipeline validate --fixture` calls), then an attempt to
+    promote on the strength of what it just sealed."""
     pipeline, fx_path, ex_path = _hg_pipeline(tmp_path, mutate=mutate)
-    expected = expected_override or fixture.load_expected(ex_path)
-    report = fixture.run_fixture(pipeline, fixture.load_fixture(fx_path), expected, **run_kwargs)
-    result = fixture.fixture_report_dict(
-        report, pipeline_hash=approval.content_hash(pipeline),
-        fixture_hash=fixture.hash_file(fx_path), expected_hash=fixture.hash_file(ex_path))
+    step3 = validate.validate_pipeline(pipeline, generator="dpagent pipeline validate")
+    report, result, evidence_id = evidence.run_and_seal(
+        pipeline, step3, fx_path, ex_path, **run_kwargs)
+    result["promote"] = _promote_outcome(pipeline, fx_path, ex_path, evidence_id)
     result["_report"] = report      # stripped before anything is written (see main)
     return result
 
@@ -488,9 +517,14 @@ def run_hg_correct_twice(tmp_path: Path) -> dict:
 
 
 def run_hg_wrong_expected(tmp_path: Path) -> dict:
-    expected = fixture.load_expected(HG_DIR / "expected.yaml")
-    expected.rows[0]["artists"] = 99          # hand-edited to be wrong
-    return _run_hg(tmp_path, expected_override=expected)
+    import yaml
+
+    def wrong(work):                          # hand-edited to be wrong
+        f = work / "expected.yaml"
+        doc = yaml.safe_load(f.read_text())
+        doc["rows"][0]["artists"] = 99
+        f.write_text(yaml.safe_dump(doc, sort_keys=False))
+    return _run_hg(tmp_path, mutate=wrong)
 
 
 def run_hg_selector_typo(tmp_path: Path) -> dict:
@@ -564,6 +598,187 @@ def run_hg_purge_failure_detected(tmp_path: Path) -> dict:
                     _s3py("delete", "hg-bronze", key.strip(), check=False)
 
 
+A2 = "hg_a2_promote"
+
+
+def _edit(path: Path, suffix: str):
+    """Append `suffix`; returns the undo."""
+    original = path.read_bytes()
+    path.write_bytes(original + suffix.encode())
+    return lambda: path.write_bytes(original)
+
+
+def run_a2_promote_deploy_run(tmp_path: Path) -> dict:
+    """A2 end to end on the real host: validate (the controlled path, sealing
+    evidence) -> promote (the shared gate) -> REAL deploy of the promoted,
+    non-draft pipeline and a real Airflow run -> edit the content and show the
+    approval is lost and promote refuses. Uses a distinct pipeline name so the
+    host's own copy of hg_dbt_branch is never touched, and its own S3 prefix."""
+    steps: dict[str, dict] = {}
+    prefix = f"a2-promote/{uuid.uuid4().hex[:8]}"
+
+    def retarget(work):
+        # Its own S3 prefix, and its own ${VAR} names: undeploy keeps a secret
+        # another published pipeline still references (the host's checkout copy
+        # of hg_dbt_branch uses HG_POC_*), which is right - so a pipeline that
+        # is to be torn down completely must not share them.
+        f = work / "pipeline.yaml"
+        text = f.read_text().replace("prefix: bronze", f"prefix: {prefix}", 1)
+        f.write_text(text.replace("HG_POC_", "HG_A2_"))
+        for key in [k for k in os.environ if k.startswith("HG_POC_")]:
+            os.environ[key.replace("HG_POC_", "HG_A2_")] = os.environ[key]
+
+    pipeline, fx_path, ex_path = _hg_pipeline(tmp_path, mutate=retarget, name=A2)
+    step3 = validate.validate_pipeline(pipeline, generator="dpagent pipeline validate")
+
+    # 0. nothing validated yet for this content -> refused, nothing written
+    steps["promote_before_validation"] = _promote_outcome(pipeline, fx_path, ex_path)
+
+    # 1. validate - the same function the CLI calls
+    report, result, evidence_id = evidence.run_and_seal(pipeline, step3, fx_path, ex_path)
+    result.pop("promote", None)
+    steps["validate"] = {"overall": result["overall"], "cleanup": result["cleanup"]["overall"],
+                         "evidence_id": evidence_id}
+
+    # 2. promote on that evidence
+    steps["promote"] = _promote_outcome(pipeline, fx_path, ex_path, evidence_id)
+    promoted = loader.load(A2, tmp_path)
+
+    # 3. deploy for real (NOT --allow-draft) and run through the real DAG
+    real: dict = {"deployed": False, "run_status": None, "comparison": None,
+                  "gates_passed": None, "cleanup_ok": None, "s3_remaining": None,
+                  "databases_dropped": None, "error": ""}
+    steps["real_run"] = real
+    if steps["promote"].get("accepted"):
+        expected = fixture.load_expected(ex_path)
+        src = wh = None
+        try:
+            with pg_throwaway.throwaway_database(prefix="dpagent_fixture_a2src") as src, \
+                 pg_throwaway.throwaway_database(prefix="dpagent_fixture_a2wh") as wh:
+                fixture.seed_source(fixture.load_fixture(fx_path), src)
+                overrides = {**fixture.env_overrides_for_source(promoted, src),
+                             **fixture.env_overrides_for_warehouse(promoted, wh)}
+                with fixture._temporarily(overrides):
+                    try:
+                        deploy_mod.deploy(promoted)             # allow_draft=False
+                        real["deployed"] = True
+                        deploy_mod.unpause_dag(A2)
+                        run_id = state.start_run("data", A2)
+                        deploy_mod.trigger_dag(A2, run_id)
+                        deadline = time.monotonic() + 900
+                        status = "running"
+                        while time.monotonic() < deadline:
+                            row = state.get_run(run_id)
+                            if row is not None and row["status"] != "running":
+                                status = row["status"]
+                                break
+                            time.sleep(3)
+                        else:
+                            status = "timeout"
+                        real["run_status"] = status
+                        real["run_id"] = run_id
+                        if status == "ok":
+                            cmp_ = fixture.compare_all(expected, wh, promoted.warehouse.schema)
+                            real["comparison"] = {"ok": cmp_.ok, "detail": cmp_.detail}
+                            gates = fixture.gate_summary_for_run(run_id)
+                            real["gates_passed"] = bool(gates) and all(
+                                g["status"] == "passed" for v in gates.values() for g in v)
+                    except Exception as exc:                    # noqa: BLE001
+                        real["error"] = f"{type(exc).__name__}: {exc}"
+                    finally:
+                        try:
+                            undone = deploy_mod.undeploy(promoted)
+                            ok, detail = fixture._verify_cleanup_complete(promoted, undone, deploy_mod)
+                            real["cleanup_ok"], real["cleanup_detail"] = ok, detail
+                        except Exception as exc:                # noqa: BLE001
+                            real["cleanup_ok"], real["cleanup_detail"] = False, str(exc)
+                        try:
+                            bronze.purge_namespace(promoted, prefix)
+                            real["s3_remaining"] = bronze.count_namespace(promoted, prefix)
+                        except Exception as exc:                # noqa: BLE001
+                            real["s3_remaining"] = f"error: {exc}"
+        except pg_throwaway.ThrowawayUnavailable as exc:
+            real["error"] = str(exc)
+        real["databases_dropped"] = bool(src and wh and src.database_dropped and src.role_dropped
+                                         and wh.database_dropped and wh.role_dropped)
+
+    # 4. change what was approved -> approval is lost, deploy and promote refuse
+    approval_file = approval.approval_path(promoted)
+    approval_bytes = approval_file.read_bytes() if approval_file.exists() else None
+    edits = {
+        "seed": promoted.root / "dwh_dbt" / "seeds" / "manual_excluded_partner_ids.csv",
+        "model": promoted.root / "dwh_dbt" / "models" / "silver" / "dim_artist_active.sql",
+        "fixture": fx_path,
+        "expected": ex_path,
+    }
+    invalidated: dict[str, dict] = {}
+    for label, path in edits.items():
+        undo = _edit(path, "\n" if label == "seed" else "\n# edited after approval\n"
+                     if label in ("fixture", "expected") else "\n-- edited after approval\n")
+        try:
+            current = loader.load(A2, tmp_path)
+            now_ok, reason = approval.is_approved(current)
+            try:
+                deploy_mod.deploy(current, apply_db=False, install_dag_to_airflow=False)
+                deploy_refused = False
+            except deploy_mod.DeployError:
+                deploy_refused = True
+            again = _promote_outcome(current, fx_path, ex_path, evidence_id)
+            invalidated[label] = {
+                "approval_still_valid": now_ok, "deploy_refused": deploy_refused,
+                "promote_accepted": again["accepted"],
+                "approval_unchanged": (approval_file.read_bytes() if approval_file.exists()
+                                       else None) == approval_bytes,
+                "reason": reason[:120]}
+        finally:
+            undo()
+    steps["edits_invalidate"] = invalidated
+    restored = loader.load(A2, tmp_path)
+    steps["restored_is_valid_again"] = approval.is_approved(restored)[0]
+
+    problems = []
+    if steps["promote_before_validation"].get("accepted") is not False:
+        problems.append("promote accepted with no evidence")
+    if steps["validate"]["overall"] != "pass" or steps["validate"]["cleanup"] != "pass":
+        problems.append(f"validation {steps['validate']}")
+    p = steps["promote"]
+    if not (p.get("accepted") and p.get("verification") == "verified" and p.get("maturity") == "reviewed"):
+        problems.append(f"promote {p}")
+    if not (real["deployed"] and real["run_status"] == "ok" and (real["comparison"] or {}).get("ok")
+            and real["gates_passed"] and real["cleanup_ok"] and real["s3_remaining"] == 0
+            and real["databases_dropped"]):
+        problems.append(f"real run {real}")
+    for label, got in invalidated.items():
+        # seed / model are hashed into the approval: it must be lost and deploy
+        # must refuse. fixture / expected are not deployed content: the approval
+        # stands, but they are no longer the files that were validated, so
+        # promote must refuse. In every case promote leaves the approval alone.
+        hashed = label in ("seed", "model")
+        if hashed and (got["approval_still_valid"] or not got["deploy_refused"]):
+            problems.append(f"edit {label}: approval survived or deploy was not refused: {got}")
+        if not hashed and not got["approval_still_valid"]:
+            problems.append(f"edit {label}: approval was lost for an unhashed file: {got}")
+        if got["promote_accepted"] or not got["approval_unchanged"]:
+            problems.append(f"edit {label}: promote accepted or touched the approval: {got}")
+    if len(invalidated) != len(edits):
+        problems.append("not every edit was exercised")
+    if steps["restored_is_valid_again"] is not True:
+        problems.append("restoring the content did not restore the approval")
+
+    for key in [k for k in os.environ if k.startswith("HG_A2_")]:
+        del os.environ[key]
+    result["a2"] = {"steps": steps, "problems": problems}
+    result["validation_overall"] = result["overall"]
+    result["overall"] = "pass" if not problems else "fail"
+    clean = (steps["validate"]["cleanup"] == "pass" and real["cleanup_ok"] is True
+             and real["s3_remaining"] == 0 and real["databases_dropped"] is True)
+    result["cleanup"] = {**result["cleanup"], "overall": "pass" if clean else "fail",
+                         "real_run": {"artifacts": real["cleanup_ok"], "s3_remaining": real["s3_remaining"],
+                                      "databases_dropped": real["databases_dropped"]}}
+    result["_report"] = report
+    return result
+
+
 SCENARIOS = {
     "ref-connection": lambda tmp: run_connection_shape("ref", tmp),
     "literal-connection": lambda tmp: run_connection_shape("literal", tmp),
@@ -595,6 +810,7 @@ BRONZE_SCENARIOS_FN = {
     "hg-timeout": run_hg_timeout,
     "hg-stray-object-purged": run_hg_stray_object_purged,
     "hg-purge-failure-detected": run_hg_purge_failure_detected,
+    "a2-promote-deploy-run": run_a2_promote_deploy_run,
 }
 SCENARIOS.update(BRONZE_SCENARIOS_FN)
 BRONZE_SCENARIOS = list(BRONZE_SCENARIOS_FN)
@@ -711,14 +927,46 @@ def _hg_purge_fail(result: dict) -> tuple[bool, str]:
     return True, "a purge that lied was caught by the independent re-list"
 
 
+def _refused(base):
+    """A failed/odd validation must be able to neither promote nor touch the approval."""
+    def check(result: dict) -> tuple[bool, str]:
+        ok, detail = base(result)
+        pr = result.get("promote") or {}
+        if not ok:
+            return ok, detail
+        if pr.get("accepted") is not False or pr.get("approval_unchanged") is not True:
+            return False, f"promote should have been refused with the approval untouched, got {pr}"
+        return True, detail + "; promote refused: " + "; ".join(pr.get("reasons", []))[:140]
+    return check
+
+
+def _hg_correct_and_promotable(result: dict) -> tuple[bool, str]:
+    ok, detail = _hg_correct(result)
+    pr = result.get("promote") or {}
+    if ok and not (pr.get("accepted") and pr.get("verification") == "verified"
+                   and pr.get("maturity") == "reviewed" and pr.get("is_approved")):
+        return False, f"valid evidence was not accepted by promote: {pr}"
+    return ok, detail
+
+
+def _a2(result: dict) -> tuple[bool, str]:
+    a2 = result.get("a2") or {}
+    if a2.get("problems"):
+        return False, "; ".join(a2["problems"])[:600]
+    if result.get("overall") != "pass" or result.get("cleanup", {}).get("overall") != "pass":
+        return False, f"overall={result.get('overall')!r} cleanup={result.get('cleanup', {}).get('overall')!r}"
+    return True, "validate -> promote -> real deploy/run -> edits invalidate, all as required"
+
+
 EXPECTATIONS.update({
-    "hg-correct-twice": _hg_correct,
-    "hg-wrong-expected": _expect("fail", "pass", comparison__run_1="fail", cleanup__s3_objects="pass"),
-    "hg-selector-typo": _expect("fail", "pass", run_status__run_1="failed", cleanup__s3_objects="pass"),
+    "hg-correct-twice": _hg_correct_and_promotable,
+    "a2-promote-deploy-run": _a2,
+    "hg-wrong-expected": _refused(_expect("fail", "pass", comparison__run_1="fail", cleanup__s3_objects="pass")),
+    "hg-selector-typo": _refused(_expect("fail", "pass", run_status__run_1="failed", cleanup__s3_objects="pass")),
     "hg-symlink-refused": _expect("refused"),
-    "hg-timeout": _expect("fail", "fail", run_status__run_1="timeout"),
+    "hg-timeout": _refused(_expect("fail", "fail", run_status__run_1="timeout")),
     "hg-stray-object-purged": _hg_stray,
-    "hg-purge-failure-detected": _hg_purge_fail,
+    "hg-purge-failure-detected": _refused(_hg_purge_fail),
 })
 
 assert set(EXPECTATIONS) == set(SCENARIOS), (
