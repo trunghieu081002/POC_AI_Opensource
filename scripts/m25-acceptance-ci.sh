@@ -140,7 +140,7 @@ ok "container ${CONTAINER} up, systemd running"
 # ------------------------------------------------------- bootstrap + install
 
 say "bootstrapping dpagent and installing postgres+dlt+dbt+airflow (this takes several minutes)"
-docker exec "${CONTAINER}" bash -lc '
+docker exec -e "DPAGENT_WITH_LLM=${A3:+1}" "${CONTAINER}" bash -lc '
   set -euo pipefail
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
