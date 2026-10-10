@@ -9,9 +9,14 @@ human or a schema check validates before anything runs:
 """
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import os
 import re
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini/gemini-2.0-flash"
@@ -23,6 +28,50 @@ _FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 class LLMError(RuntimeError):
     pass
+
+
+@dataclass
+class CallRecord:
+    """One raw model call, for the A3 verification trace (docs/llm-verification.md).
+    Nothing from the environment is stored - only what was sent and received."""
+    index: int
+    at: str
+    model: str
+    system: str
+    user: str
+    system_sha256: str
+    user_sha256: str
+    response: str = ""
+    response_sha256: str = ""
+    usage: dict = field(default_factory=dict)
+    duration_s: float = 0.0
+    error: str = ""
+
+
+class _Recorder:
+    def __init__(self, max_calls: int | None):
+        self.max_calls = max_calls
+        self.records: list[CallRecord] = []
+
+
+_recorders: list[_Recorder] = []
+
+
+@contextlib.contextmanager
+def record_calls(max_calls: int | None = None):
+    """Record every `chat()` call made inside the block (including the JSON
+    re-asks `chat_json` makes) and refuse the (max_calls+1)th BEFORE it reaches
+    the provider - a verification run must have a hard ceiling on spend."""
+    recorder = _Recorder(max_calls)
+    _recorders.append(recorder)
+    try:
+        yield recorder.records
+    finally:
+        _recorders.remove(recorder)
+
+
+def _sha(text: str) -> str:
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def get_model() -> str:
@@ -68,7 +117,20 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
             "a local ollama/ model. Note: install and verify do not need this."
         )
 
+    record = None
+    for recorder in _recorders:
+        if recorder.max_calls is not None and len(recorder.records) >= recorder.max_calls:
+            raise LLMError(f"call budget exhausted ({recorder.max_calls} call(s)) - "
+                           f"refusing to call {get_model()}")
+        record = CallRecord(
+            index=len(recorder.records) + 1,
+            at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            model=get_model(), system=system, user=user,
+            system_sha256=_sha(system), user_sha256=_sha(user))
+        recorder.records.append(record)
+
     litellm.drop_params = True
+    started = time.monotonic()
     try:
         response = litellm.completion(
             model=get_model(),
@@ -78,9 +140,20 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
             max_tokens=max_tokens,
         )
     except Exception as exc:                       # litellm wraps many providers
+        if record is not None:
+            record.error = f"{type(exc).__name__}: {exc}"[:500]
+            record.duration_s = round(time.monotonic() - started, 2)
         raise LLMError(f"{get_model()} call failed: {exc}") from exc
 
-    return response.choices[0].message.content or ""
+    text = response.choices[0].message.content or ""
+    if record is not None:
+        record.response, record.response_sha256 = text, _sha(text)
+        record.duration_s = round(time.monotonic() - started, 2)
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            record.usage = {k: getattr(usage, k, None)
+                            for k in ("prompt_tokens", "completion_tokens", "total_tokens")}
+    return text
 
 
 def chat_json(system: str, user: str, *, retries: int = 2, **kwargs) -> dict | list:

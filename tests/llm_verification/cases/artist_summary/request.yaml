@@ -1,0 +1,12 @@
+# What the harness hands to `synth` (the BRD and schema are the two files beside this one).
+# Nothing here, and nothing the model is shown, contains the expected result.
+name: a3_artist_summary
+kind: build
+warehouse_schema: a3_artist_summary
+secrets:
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+hint: "Source connection fields use the secret refs above. Use the standard warehouse refs."

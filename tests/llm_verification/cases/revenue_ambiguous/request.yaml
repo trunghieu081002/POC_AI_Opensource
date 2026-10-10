@@ -1,0 +1,13 @@
+# The BRD above deliberately omits: which date defines the month, whether cancelled /
+# draft orders count, tax inclusive or not, and how currencies combine. A correct draft
+# must ask, not choose. There is no fixture/expected: nothing may be built from this BRD yet.
+name: a3_revenue_ambiguous
+kind: ambiguous
+warehouse_schema: a3_revenue_ambiguous
+secrets:
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+hint: ""

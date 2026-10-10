@@ -1,0 +1,19 @@
+# Hand-written input (never shown to the model): ten rows in the throwaway source's public.res_partner,
+# covering every edge the BRD names - excluded ids, NULL / blank / padded names, a duplicated id,
+# and case-sensitivity.
+tables:
+  - name: res_partner
+    columns:
+      id: bigint
+      name: text
+    rows:
+      - {id: 1, name: "Alice"}
+      - {id: 2, name: "Bob"}          # excluded id
+      - {id: 3, name: "Chị Thảo"}
+      - {id: 4, name: "D"}            # excluded id
+      - {id: 5, name: null}           # invalid: NULL name
+      - {id: 6, name: "Alice "}       # padded: same name as id 1 after trimming
+      - {id: 7, name: "   "}          # invalid: blank name
+      - {id: 8, name: "Eve"}
+      - {id: 8, name: "Eve"}          # duplicated id: counted once
+      - {id: 9, name: "alice"}        # different case: a different name
