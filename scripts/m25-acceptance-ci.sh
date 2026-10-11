@@ -233,9 +233,9 @@ section() { printf "== %s\n" "$1"; }
 found()   { if [ -n "$1" ]; then printf "%s\n" "$1"; leaks=$((leaks+1)); else echo "(none)"; fi; }
 section "databases named dpagent_fixture_*";  found "$(sudo -n -u postgres psql -At -c "select datname from pg_database where datname like '"'"'dpagent_fixture_%'"'"'")"
 section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql -At -c "select rolname from pg_roles where rolname like '"'"'dpagent_fixture_%'"'"'")"
-section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
+section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_|a3_artist_summary" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
-section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
+section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_|a3_artist_summary" || true)"
 section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_|A3_SRC_|A3_WH_|WAREHOUSE_DB_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY

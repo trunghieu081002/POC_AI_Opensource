@@ -345,6 +345,16 @@ def _journal_reasons(fx: dict, pipeline: Pipeline) -> list[str]:
         live = fixture_mod.gate_summary_for_run(int(run_id))
         if live != recorded.get(slot):
             r.append(f"{slot}: gate verdicts in the report differ from the journal for run {run_id}")
+        if pipeline.dbt_project is not None:
+            # an owned dbt project's own tests ran on every dbt stage of this run, and passed
+            tests = fixture_mod.dbt_tests_for_run(int(run_id))
+            for t in tests:
+                if t["kind"] != "dbt.test.passed":
+                    r.append(f"{slot}: dbt test failed in stage {t['stage']!r}: {t['message']}")
+            for st in pipeline.stages:
+                if st.engine == "dbt" and not any(t["stage"] == st.name and t["kind"] == "dbt.test.passed"
+                                                  for t in tests):
+                    r.append(f"{slot}: no passing dbt test record for stage {st.name!r} in the journal")
         for stage in gated:
             verdicts = live.get(stage)
             if not verdicts:

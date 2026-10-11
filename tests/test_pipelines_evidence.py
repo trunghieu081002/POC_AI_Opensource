@@ -69,8 +69,16 @@ def _paths(pipeline):
     return pipeline.root / "fixture.yaml", pipeline.root / "expected.yaml"
 
 
-def _journal_run(pipeline, clone, *, status="ok", gate_status="passed", gated=True):
+def _journal_run(pipeline, clone, *, status="ok", gate_status="passed", gated=True,
+                 dbt_test="passed"):
     rid = state.start_run("data", clone)
+    if pipeline.dbt_project is not None and dbt_test:
+        for stage in pipeline.stages:
+            if stage.engine == "dbt":
+                state.event(f"dbt.test.{dbt_test}", f"{clone}/{stage.name}: dbt test ran 2",
+                            run_id=rid, level="info" if dbt_test == "passed" else "error",
+                            data={"stage": stage.name, "ran": 2, "passed": 2 if dbt_test == "passed" else 1,
+                                  "failed": 0 if dbt_test == "passed" else 1, "errored": 0})
     if gated:
         for stage in pipeline.stages:
             srow = state.start_stage(rid, clone, stage.name)
@@ -450,7 +458,7 @@ def hg(tmp_path, monkeypatch):
 
 
 def _hg_validated(hg, *, source_down=True, s3_remaining=0, batches=3, batch_status="loaded",
-                  report_tweak=None):
+                  report_tweak=None, dbt_test="passed"):
     def tweak(report):
         report.bronze_staging = True
         report.dbt_project = True
@@ -468,7 +476,7 @@ def _hg_validated(hg, *, source_down=True, s3_remaining=0, batches=3, batch_stat
 
     fx = hg.root / "fixture.yaml"
     ex = hg.root / "expected.yaml"
-    report = _good_report(hg, clone="hg_dbt_branch__validate_abc")
+    report = _good_report(hg, clone="hg_dbt_branch__validate_abc", dbt_test=dbt_test)
     tweak(report)
     section = fixture.fixture_report_dict(
         report, pipeline_hash=approval.content_hash(hg),
@@ -675,3 +683,16 @@ def test_three_loaded_rows_of_one_batch_are_not_three_batches(hg):
     with pytest.raises(evidence.EvidenceRefused, match="at least 3 bronze batches"):
         approval.promote(_two_table(hg), "alice", fixture_path=hg.root / "fixture.yaml",
                          expected_path=hg.root / "expected.yaml")
+
+
+
+def test_a_failed_dbt_test_in_the_journal_refuses_promotion(hg):
+    """The run can only be ok if dbt test passed - but the journal is checked anyway, so
+    evidence whose runs recorded a failed (or no) dbt test can never promote."""
+    _hg_validated(hg, dbt_test="failed")
+    _hg_refused(hg, "dbt test failed in stage 'silver'")
+
+
+def test_no_dbt_test_record_for_an_owned_projects_stage_refuses_promotion(hg):
+    _hg_validated(hg, dbt_test=None)
+    _hg_refused(hg, "no passing dbt test record for stage 'gold'")

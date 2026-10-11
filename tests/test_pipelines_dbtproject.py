@@ -9,6 +9,7 @@ toy. The dbt-binary-dependent parts use a tiny fake `dbt` script; the real
 scripts/hg-dbt-branch-verify.sh.
 """
 import contextlib
+import json
 import os
 import shutil
 import stat
@@ -383,7 +384,7 @@ def test_when_every_selector_selects_something_dbt_run_does_run(fake_runtime):
                lambda: _fake_dbt(tmp_path, {"dim_artist": "dim_artist",
                                             "dim_artist_active": "dim_artist_active"}))
     runtime.run_transform(pipeline_name="hg_dbt_branch", stage="silver")
-    assert calls == ["deps", "seed", "run"], calls
+    assert calls == ["deps", "seed", "run", "test"], calls
 
 
 def test_a_lock_that_deps_rewrites_fails_the_run(fake_runtime, root):
@@ -476,4 +477,91 @@ def test_runtime_runs_dbt_seed_for_seeds_in_a_custom_seed_path(fake_runtime, roo
                 str(proj / "data" / "seeds" / "manual_excluded_partner_ids.csv"))
     shutil.rmtree(proj / "seeds")
     runtime.run_transform(pipeline_name="hg_dbt_branch", stage="silver")
-    assert calls == ["deps", "seed", "run"], calls     # a literal seeds/ lookup would skip seed
+    assert calls == ["deps", "seed", "run", "test"], calls     # a literal seeds/ lookup would skip seed
+
+
+# ------------------------------------------------------------------ dbt test is part of the stage
+
+def _tests_write(results, rc=0):
+    """A fake `_run` whose `dbt test` writes `results` to run_results.json under --target-path."""
+    calls = []
+
+    def fake(cmd, *, pipeline, kind, what, **kw):
+        calls.append(cmd[1])
+        if cmd[1] == "test":
+            target = Path(cmd[cmd.index("--target-path") + 1])
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "run_results.json").write_text(json.dumps({"results": results}))
+            return subprocess.CompletedProcess(cmd, rc, stdout="", stderr="")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    fake.calls = calls
+    return fake
+
+
+def _silver(fake_runtime, fake):
+    calls, mp, tmp_path = fake_runtime
+    mp.setattr(runtime, "_dbt_bin", lambda: _fake_dbt(tmp_path, {"dim_artist": "dim_artist",
+                                                                  "dim_artist_active": "x"}))
+    mp.setattr(runtime, "_run", fake)
+    p = loader.load("hg_dbt_branch")
+    return runtime._run_own_dbt_project(p, p.stages[1], run_id=None)
+
+
+def _events(kind_prefix):
+    from dpagent.engine import state
+    return [dict(r) for r in state.conn().execute(
+        "select kind, level, message, data_json from events where kind like ?", (kind_prefix + "%",))]
+
+
+def test_dbt_test_runs_on_the_stages_selection_after_dbt_run(fake_runtime):
+    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "pass"},
+                         {"unique_id": "test.p.not_null_dim_artist_sk", "status": "pass"},
+                         {"unique_id": "model.p.dim_artist", "status": "success"}])
+    proc = _silver(fake_runtime, fake)
+    assert proc.returncode == 0
+    assert fake.calls[-2:] == ["run", "test"]
+    ev = _events("dbt.test")
+    assert ev and ev[0]["kind"] == "dbt.test.passed" and "ran 2 - 2 passed" in ev[0]["message"]
+
+
+def test_a_failing_dbt_test_fails_the_stage(fake_runtime):
+    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "fail", "failures": 2},
+                         {"unique_id": "test.p.not_null_dim_artist_sk", "status": "pass"}], rc=1)
+    proc = _silver(fake_runtime, fake)
+    assert proc.returncode != 0
+    assert "[dbt test]" in proc.stderr and "unique_dim_artist_sk fail (2 failing row(s))" in proc.stderr
+    ev = _events("dbt.test")
+    assert ev[0]["kind"] == "dbt.test.failed" and ev[0]["level"] == "error"
+
+
+def test_a_test_reported_as_failed_fails_the_stage_even_if_dbt_exited_0(fake_runtime):
+    fake = _tests_write([{"unique_id": "test.p.x", "status": "error"}], rc=0)
+    assert _silver(fake_runtime, fake).returncode != 0
+
+
+def test_dbt_test_exiting_non_zero_without_results_fails_the_stage(fake_runtime):
+    calls, mp, tmp_path = fake_runtime
+
+    def fake(cmd, *, pipeline, kind, what, **kw):
+        return subprocess.CompletedProcess(cmd, 2 if cmd[1] == "test" else 0, stdout="",
+                                           stderr="Compilation Error in test" if cmd[1] == "test" else "")
+    proc = _silver(fake_runtime, fake)
+    assert proc.returncode != 0 and "Compilation Error in test" in proc.stderr
+
+
+def test_no_declared_tests_is_recorded_not_hidden(fake_runtime):
+    fake = _tests_write([])
+    assert _silver(fake_runtime, fake).returncode == 0
+    ev = _events("dbt.test")
+    assert "no dbt tests are declared" in ev[0]["message"]
+
+
+def test_a_failed_dbt_run_never_runs_dbt_test(fake_runtime):
+    calls, mp, tmp_path = fake_runtime
+    seen = []
+
+    def fake(cmd, *, pipeline, kind, what, **kw):
+        seen.append(cmd[1])
+        return subprocess.CompletedProcess(cmd, 1 if cmd[1] == "run" else 0, stdout="", stderr="boom")
+    assert _silver(fake_runtime, fake).returncode != 0
+    assert "test" not in seen

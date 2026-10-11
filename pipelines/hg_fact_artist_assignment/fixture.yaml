@@ -1,0 +1,28 @@
+# Hand-written input (the same rows as pipelines/hg_bronze_pair/fixture.yaml): seven assignments over
+# five partners - padded name, blank name, NULL name, an assignment whose partner does not exist, one
+# with no partner at all, and a partner assigned twice. Exactly what HG's LEFT JOIN + nullif(trim()) has
+# to get right.
+tables:
+  - name: res_partner
+    columns:
+      id: bigint
+      name: text
+    rows:
+      - {id: 1, name: "Nguyễn Lâm Tùng"}
+      - {id: 2, name: " Nghiêm Đức Tài "}     # padded: HG trims it
+      - {id: 3, name: "   "}                    # blank: HG's nullif(trim(..),'') -> NULL
+      - {id: 4, name: null}                     # NULL name
+      - {id: 5, name: "Alice"}
+  - name: x_music_plan_detail_price
+    columns:
+      id: bigint
+      detail_id: bigint
+      partner_id: bigint
+    rows:
+      - {id: 10, detail_id: 298, partner_id: 1}
+      - {id: 11, detail_id: 117, partner_id: 2}
+      - {id: 12, detail_id: 117, partner_id: 3}
+      - {id: 13, detail_id: 55,  partner_id: 4}
+      - {id: 14, detail_id: 56,  partner_id: 99}     # no such partner (LEFT JOIN keeps the row)
+      - {id: 15, detail_id: 57,  partner_id: null}   # no partner at all
+      - {id: 16, detail_id: 298, partner_id: 5}
