@@ -105,3 +105,33 @@ recorded as a **failed gate** with its reason (`gate.failed`/`stage.failed` even
 **Not a pass and not yet a verdict on the model**: the next run is the first against a harness where the model can be told what broke. Honest
 reading of three runs so far: it understands the BRD (3 × 3 questions asked on the ambiguous one; correct SQL on the build) and has not yet
 produced a deployable manifest within 3 attempts.
+
+
+## `real/20261011T095624Z-ee3e8c` — fourth run, `gemini/gemini-3.8-flash`, commit `f84021e` — **R1 validated and went through the whole chain**
+
+Operator-run (`--a3 real --max-calls 12 --ambiguous-runs 3`), host built from packs, `leaks=0`, 4/4 criteria met, `complete: true`, no inconclusive runs.
+
+**R1 — `llm-after-1-revision(s)`** (explicitly *not* a first-draft success):
+
+| Step | Evidence |
+|---|---|
+| Calls | 4 records: 2 × 503 retried (2.5 s, 1.5 s; flagged `transient`, not counted against the ceiling), then call 3 (343 s, 13 291 tokens of which 11 894 reasoning) and call 4 (93 s). 0 format repairs. |
+| Attempt 1 (`llm`) | drafted; **failed validation**: `schema_contract` on `a3_artist_summary_landing.res_partner` — the model schema-qualified the table name, so the contract found no columns (`{'id': ('bigint', None), 'name': ('text', None)}`). This message came from the journal (`gate.failed`) and was what the model was told — never the expected result. |
+| Attempt 2 (`llm-revision`) | fixed it; **validated**: runs 1 and 2 `ok`, both comparisons `pass`, idempotent, cleanup `pass`; sealed evidence `ev-df5c4171186f68a1`. |
+| Promote (A2 gate) | accepted, `verification: verified`, `maturity: reviewed`. |
+| Real deploy + run | deployed without `--allow-draft`; journal run 6 `ok`; output equals the hand-calculated expected (1 row matched exactly); gates all `passed` in the journal; undeploy verified; both throwaway databases dropped. |
+| Published bytes | the 5 files Airflow/dbt read (`pipeline.yaml`, 2 models under `/opt/dpagent/pipelines/…`, the same 2 under `/opt/dbt/project/models/…`) are hash-identical to the drafted files (promote's `maturity:` label excepted). |
+| Edit checks | model / manifest edit → approval lost and deploy refuses; fixture / expected edit → promote refuses; approval bytes unchanged in all four; restoring restores the approval. |
+
+**R2 — ambiguous BRD: `asked-blocker` ×3** (≈11 s each). Counting all real runs so far on that BRD: 1 + 3 + 3 = 7 asks out of 7 completed attempts — still reported
+per run; a different model, prompt or day can differ.
+
+### What this does and does not show
+
+* It shows **one model (`gemini/gemini-3.8-flash`), on one problem (`artist_summary`), on one day, drafted a pipeline from a BRD and a
+  schema that survived the full chain** — in the second draft, after being shown the validator's own error.
+* It does **not** show the model gets the first draft right (it did not, in this run or the three before it), nor that it will on another
+  problem, another day, or another model.
+* The product and the prompt were changed between runs 1-3 and this one *in response to what those runs exposed* (the dbt `schema` convention, gate
+  keys and shapes, truncation handling, IPv4-first, journal feedback). The prompt hash in `trace.json` differs from the earlier runs: this success
+  is for the final prompt, which was tuned while looking at this same case. A fresh problem is the honest next test of generalisation.

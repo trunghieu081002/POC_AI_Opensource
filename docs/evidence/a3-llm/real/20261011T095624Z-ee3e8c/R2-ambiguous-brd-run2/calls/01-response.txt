@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Mốc thời gian theo tháng tính theo ngày tạo đơn (date_order) hay ngày xác nhận đơn (confirmation_date)?",
+      "why_it_matters": "Quyết định đơn hàng được ghi nhận vào tháng nào. Ngoài ra, đơn chưa xác nhận có confirmation_date mang giá trị NULL, ảnh hưởng trực tiếp đến việc phân nhóm theo tháng."
+    },
+    {
+      "question": "Những trạng thái đơn hàng (state) nào được tính vào doanh thu (ví dụ chỉ tính 'sale', 'done' hay tính cả 'draft', 'sent', 'cancel')?",
+      "why_it_matters": "Nếu không lọc bỏ các đơn nháp (draft/sent) hoặc đơn bị hủy (cancel), doanh thu sẽ bị tính khống sai lệch hoàn toàn so với thực tế bán hàng."
+    },
+    {
+      "question": "Doanh thu tính theo số tiền trước thuế (amount_untaxed) hay tổng tiền đã gồm thuế (amount_total)?",
+      "why_it_matters": "amount_untaxed và amount_total cho ra hai con số doanh thu khác nhau."
+    },
+    {
+      "question": "Xử lý đa tiền tệ (currency_id) như thế nào khi bảng có nhiều loại tiền tệ khác nhau?",
+      "why_it_matters": "Cộng gộp trực tiếp các loại tiền tệ khác nhau sẽ cho ra con số vô nghĩa; nếu cần quy đổi về một đồng tiền chuẩn thì cần có quy tắc hoặc bảng tỷ giá, nhưng schema nguồn hiện tại chưa cung cấp."
+    }
+  ]
+}
