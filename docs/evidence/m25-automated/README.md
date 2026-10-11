@@ -1,4 +1,4 @@
-# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 22 scenarios)
+# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 26 scenarios)
 
 Real, redacted output from `tests/m25_acceptance/run_matrix.py`, written here
 by `scripts/m25-acceptance-ci.sh` so it survives after whatever disposable
@@ -14,7 +14,25 @@ directory is Step 3's own proof: that the *automation* -
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
 
-## Latest run: A2 — promote requires sealed evidence (2026-10-10)
+## Latest run: bronze with two tables (2026-10-11)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
+**26/26 scenarios matched**, host audit **`leaks=0`**. [`run-info.txt`](run-info.txt): commit `0d9572a`, tree
+`b33e01a`, working tree clean. The 22 earlier scenarios (M2.5 matrix, `hg-*`, A2) are the no-regression check of
+the single-table bronze path; the 4 `pair-*` scenarios are new ([`docs/hg-bronze-multi-table.md`](../../hg-bronze-multi-table.md)):
+
+| File | Result |
+|---|---|
+| [`pair-correct-twice.json`](pair-correct-twice.json) | pass: both runs ok, idempotent; 3 batches × 2 tables, every row `loaded` (5 + 7 rows); source dropped, LOAD without it loaded **both** tables and each equals the fixture; S3 15 objects at teardown, 0 after; promote accepted |
+| [`pair-missing-table.json`](pair-missing-table.json) | a third, non-existent table: all three registry rows `failed`, run 1 failed, nothing promotable, cleanup pass |
+| [`pair-tampered-object.json`](pair-tampered-object.json) | one byte flipped (same size, 1176 B) in one table's object after EXTRACT: LOAD refused by sha256; both landing tables still equal the fixture afterwards |
+| [`pair-tampered-batch-manifest.json`](pair-tampered-batch-manifest.json) | the batch manifest rewritten to drop a table: LOAD refused (hash vs registry); both landing tables intact |
+
+The run before this one matched 25/26: `pair-tampered-object` replaced the object with bytes of a *different size*,
+so the size check refused the LOAD before the hash check was reached — the system was right, the scenario did not test
+what it claimed; it now flips one byte at the same size.
+
+## Previous run: A2 — promote requires sealed evidence (2026-10-10)
 
 `bash scripts/m25-acceptance-ci.sh --profile bronze`, host built from packs as below
 (all seven pack suites passed again: airflow 4/4, base 4/4, dbt 4/4, dlt 3/3,
