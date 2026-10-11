@@ -848,10 +848,16 @@ def run_pair_tampered_object(tmp_path: Path) -> dict:
     def tamper(clone, batch_id):
         key = next(k for k in _batch_keys(clone, batch_id)
                    if "/x_music_plan_detail_price/" in k and k.endswith(".parquet"))
-        junk = tmp_path / "junk.bin"
-        junk.write_bytes(b"not the object that was extracted")
-        _s3py("put", BUCKET, key, str(junk))
-        return {"overwrote": key}
+        # Same size, one byte flipped: only the sha256 check can catch it (a different-size
+        # object is caught one check earlier, by size - the first version of this scenario
+        # did that and so never reached the hash).
+        obj = tmp_path / "obj.bin"
+        _s3py("get", BUCKET, key, str(obj))
+        data = bytearray(obj.read_bytes())
+        data[len(data) // 2] ^= 0xFF
+        obj.write_bytes(bytes(data))
+        _s3py("put", BUCKET, key, str(obj))
+        return {"overwrote": key, "bytes": len(data), "flipped_offset": len(data) // 2}
     return _tamper_during_source_down_load(tmp_path, tamper)
 
 
