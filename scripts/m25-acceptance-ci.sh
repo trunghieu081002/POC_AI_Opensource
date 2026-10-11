@@ -65,7 +65,13 @@ if [ -n "$A3" ]; then
   if [ "$A3" = real ] || [ "$A3" = both ]; then
     # fail before building anything if the opt-in is missing
     [ "${DPAGENT_LLM_VERIFY:-}" = 1 ] || { echo "real model calls need DPAGENT_LLM_VERIFY=1 (and a provider key in the environment)" >&2; exit 2; }
-    [ -n "${DPAGENT_MODEL:-}" ] || { echo "set DPAGENT_MODEL to the model under test (e.g. gemini/gemini-2.0-flash)" >&2; exit 2; }
+    [ -n "${DPAGENT_MODEL:-}" ] || { echo "set DPAGENT_MODEL to the model under test (e.g. gemini/gemini-3.8-flash)" >&2; exit 2; }
+    # one tiny call BEFORE the (long) host build: is the key valid, the model served, quota left?
+    if [ "${A3_NO_PROBE:-0}" != 1 ]; then
+      echo ":: probing ${DPAGENT_MODEL} (1 call)" >&2
+      ( cd "$(dirname "${BASH_SOURCE[0]}")/.." && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src python -m dpagent.pipelines.llm_verify probe ) \
+        || { echo "XX the model probe failed - fix the key / model name / quota first (A3_NO_PROBE=1 skips this)" >&2; exit 2; }
+    fi
   fi
 fi
 
@@ -251,16 +257,30 @@ mkdir -p "${RESULTS_DIR}"
   echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "${RESULTS_DIR}/run-info.txt"
 if [ -n "$A3" ]; then
+  # Evidence is per run (a run id directory made by the driver) and is never replaced or
+  # deleted: a failed run stays next to the one that passed.
+  NEWRUNS=()
   for mode in $MODES; do
-    rm -rf "${RESULTS_DIR:?}/${mode}"
-    docker cp "${CONTAINER}:/root/a3-evidence/${mode}" "${RESULTS_DIR}/${mode}" || true
+    STAGE="$(mktemp -d)"
+    docker cp "${CONTAINER}:/root/a3-evidence/${mode}/." "${STAGE}/" || true
+    mkdir -p "${RESULTS_DIR}/${mode}"
+    for run in "${STAGE}"/*/; do
+      [ -d "$run" ] || continue
+      id="$(basename "$run")"
+      [ ! -e "${RESULTS_DIR}/${mode}/${id}" ] || die "evidence for run ${mode}/${id} already exists - refusing to overwrite"
+      mv "$run" "${RESULTS_DIR}/${mode}/${id}"
+      NEWRUNS+=("${RESULTS_DIR}/${mode}/${id}")
+      cp "${RESULTS_DIR}/run-info.txt" "${RESULTS_DIR}/${mode}/${id}/run-info.txt"
+      cp "${LEAK_AUDIT}" "${RESULTS_DIR}/${mode}/${id}/leak-audit.txt"
+    done
+    rm -rf "$STAGE"
   done
   # belt and braces on top of the driver's own check: no credential value may be in the evidence
   for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
     v="${!k:-}"
-    if [ -n "$v" ] && grep -rqF -- "$v" "${RESULTS_DIR}"; then
-      for mode in $MODES; do rm -rf "${RESULTS_DIR:?}/${mode}"; done
-      die "the value of ${k} appears in the A3 evidence - evidence removed, nothing was kept"
+    if [ -n "$v" ] && grep -rqF -- "$v" "${NEWRUNS[@]}"; then
+      rm -rf "${NEWRUNS[@]}"
+      die "the value of ${k} appears in the A3 evidence - this run's evidence was removed, nothing was kept"
     fi
   done
 else

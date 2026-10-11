@@ -130,6 +130,7 @@ class Attempt:
     evidence_id: str = ""
     validation: dict = field(default_factory=dict)
     fed_back: str = ""              # what the model was told on the NEXT ask (never expected)
+    format_repairs: int = 0         # extra calls inside THIS attempt because the reply was not valid JSON
 
 
 @dataclass
@@ -156,19 +157,30 @@ class Trace:
 
 
 def classify(kind: str, attempts: list[Attempt]) -> str:
+    """The label says how many *pipeline* re-asks it took and, separately, how many extra
+    calls were only format repairs (the reply was not valid JSON and chat_json re-asked):
+    `llm-first-draft` means the first pipeline the model proposed validated - a JSON repair
+    does not make it a revision, but it is not hidden either."""
     if kind == "ambiguous":
         if attempts and attempts[0].outcome == "blocked":
-            return "asked-blocker"
+            return "asked-blocker" + _repair_suffix(attempts[:1])
         if attempts and attempts[0].outcome in ("llm-error", "invalid-reply"):
             return "not-validated"
-        return "guessed"
+        return "guessed" + _repair_suffix(attempts[:1])
     for a in attempts:
         if a.outcome == "validated":
+            upto = attempts[:attempts.index(a) + 1]
             if a.source == "human-edit":
                 return "human-assisted"
-            revisions = sum(1 for x in attempts[:attempts.index(a) + 1] if x.source == "llm-revision")
-            return "llm-first-draft" if revisions == 0 else f"llm-after-{revisions}-revision(s)"
+            revisions = sum(1 for x in upto if x.source == "llm-revision")
+            base = "llm-first-draft" if revisions == 0 else f"llm-after-{revisions}-revision(s)"
+            return base + _repair_suffix(upto)
     return "not-validated"
+
+
+def _repair_suffix(attempts: list[Attempt]) -> str:
+    n = sum(a.format_repairs for a in attempts)
+    return f"+{n}-format-repair(s)" if n else ""
 
 
 def _call_summary(rec: llm.CallRecord) -> dict:
@@ -282,10 +294,12 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                                          revision=revision)
             except (llm.LLMError, ValueError, KeyError, TypeError, AttributeError) as exc:
                 attempt.call_indexes = list(range(before + 1, len(records) + 1))
+                attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
                 attempt.outcome = "llm-error" if isinstance(exc, llm.LLMError) else "invalid-reply"
                 attempt.detail = f"{type(exc).__name__}: {exc}"[:600]
                 break
             attempt.call_indexes = list(range(before + 1, len(records) + 1))
+            attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
             if result.blocked:
                 attempt.outcome = "blocked"
                 attempt.blockers = [{"question": b.question, "why_it_matters": b.why_it_matters}
@@ -335,7 +349,8 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
 # ------------------------------------------------------------------ after validation: promote -> deploy -> run
 
 def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expected_path: Path,
-                       evidence_id: str, *, wait_timeout: float = 900.0) -> dict:
+                       evidence_id: str, *, drafted_files: dict[str, str] | None = None,
+                       wait_timeout: float = 900.0) -> dict:
     """Promote THE VALIDATED DRAFT (A2 gate), deploy it for real (not
     --allow-draft) against throwaway source/warehouse databases, run the real
     DAG, compare with the expected result, read the gates from the journal,
@@ -392,6 +407,11 @@ def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expect
                         out["gates"] = gates
                         out["gates_passed"] = bool(gates) and all(
                             g["status"] == "passed" for v in gates.values() for g in v)
+                    if drafted_files is not None:
+                        out["published_bytes"] = check_published_bytes(
+                            promoted.name, drafted_files,
+                            published_dir=deploy_mod.SHARED_PIPELINES_DIR,
+                            dbt_models_dir=deploy_mod._dbt_project_dir() / "models")
                 except Exception as exc:                              # noqa: BLE001
                     out["error"] = f"{type(exc).__name__}: {exc}"
                 finally:
@@ -407,5 +427,112 @@ def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expect
                                     and wh.database_dropped and wh.role_dropped)
     out["ok"] = bool(out["deployed"] and out["run_status"] == "ok"
                      and (out["comparison"] or {}).get("ok") and out["gates_passed"]
-                     and out["undeploy_verified"] and out["databases_dropped"])
+                     and out["undeploy_verified"] and out["databases_dropped"]
+                     and (drafted_files is None or (out.get("published_bytes") or {}).get("ok")))
     return out
+
+
+# ------------------------------------------------------------------ what was actually published
+
+def _strip_label(rel: str, text: str) -> str:
+    if rel == "pipeline.yaml":       # `maturity: reviewed` is promote's label, not content
+        text = "\n".join(l for l in text.split("\n") if not approval_mod._MATURITY_LINE.match(l))
+    return text
+
+
+def check_published_bytes(name: str, drafted_files: dict[str, str], *, published_dir: Path,
+                          dbt_models_dir: Path) -> dict:
+    """Compare the drafted files with the copies Airflow and dbt really read: the
+    published pipeline directory (`SHARED_PIPELINES_DIR/<name>`) and, for dbt models, the
+    shared dbt project's `models/<name>/`. NOT the workspace the draft was written to - that
+    only proves the draft did not change in place. Must run before undeploy removes them."""
+    checked: dict[str, dict] = {}
+    for rel, text in sorted(drafted_files.items()):
+        targets = {f"published/{rel}": Path(published_dir) / name / rel}
+        if rel.startswith("models/") and rel.endswith(".sql"):
+            targets[f"dbt-project/{rel}"] = Path(dbt_models_dir) / name / Path(rel).name
+        for label, path in targets.items():
+            want = _sha(_strip_label(rel, text))
+            if not path.is_file():
+                checked[label] = {"path": str(path), "missing": True, "equal": False}
+                continue
+            got = _sha(_strip_label(rel, path.read_text(encoding="utf-8")))
+            checked[label] = {"path": str(path), "drafted": want, "published": got,
+                              "missing": False, "equal": want == got}
+    return {"checked": checked, "ok": bool(checked) and all(c["equal"] for c in checked.values())}
+
+
+# ------------------------------------------------------------------ criteria (shared by the drivers)
+
+def leak_problems(recovered: dict) -> list[str]:
+    """Recovery cleans a leak up; it must never make the run look clean."""
+    out = []
+    if recovered.get("databases") or recovered.get("roles"):
+        out.append(f"leaked throwaway resources (recovered afterwards): "
+                   f"databases={sorted(recovered.get('databases') or [])} "
+                   f"roles={sorted(recovered.get('roles') or [])}")
+    if recovered.get("failed"):
+        out.append(f"could not recover leaked resources: {recovered['failed']}")
+    return out
+
+
+def build_problems(result: dict) -> list[str]:
+    p = []
+    if not str(result.get("classification", "")).startswith(("llm-", "human-")):
+        p.append(f"not validated ({result.get('classification')}, last outcome {result.get('last_outcome')})")
+    else:
+        dr = result.get("deploy_run") or {}
+        if not dr.get("ok"):
+            p.append("promote/deploy/run did not complete")
+        if (dr.get("published_bytes") or {}).get("ok") is not True:
+            p.append("the published files are not the drafted files")
+        if not (result.get("edit_checks") or {}).get("ok"):
+            p.append("edit checks failed")
+    p += leak_problems(result.get("leaked_and_recovered") or {})
+    return p
+
+
+def ambiguous_problems(result: dict) -> list[str]:
+    p = [] if str(result.get("classification", "")).startswith("asked-blocker") else [
+        f"model did not ask ({result.get('classification')})"]
+    return p + leak_problems(result.get("leaked_and_recovered") or {})
+
+
+def completeness(requested: dict[str, int], ran: dict[str, int]) -> list[str]:
+    """Every requested run must have happened. Running out of budget is `incomplete`, never
+    a pass that quietly counts only the runs that fit."""
+    return [f"{kind}: {ran.get(kind, 0)} of {n} requested run(s) were run"
+            for kind, n in requested.items() if ran.get(kind, 0) < n]
+
+
+# ------------------------------------------------------------------ connectivity probe
+
+def probe() -> dict:
+    """ONE tiny call to the configured model, before any host is built: does the key work,
+    is the model name served, is there quota. Opt-in like everything else; the call and its
+    token usage are returned (never the key)."""
+    ensure_opted_in(1)
+    with llm.record_calls(max_calls=1) as records:
+        try:
+            text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
+                            max_tokens=16)
+        except llm.LLMError as exc:
+            rec = records[0] if records else None
+            return {"ok": False, "model": llm.get_model(), "error": str(exc)[:400],
+                    "calls": len(records), "usage": rec.usage if rec else {}}
+    rec = records[0]
+    return {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
+            "usage": rec.usage, "duration_s": rec.duration_s, "calls": 1}
+
+
+if __name__ == "__main__":      # python -m dpagent.pipelines.llm_verify probe
+    import sys
+    if sys.argv[1:] != ["probe"]:
+        raise SystemExit("usage: python -m dpagent.pipelines.llm_verify probe")
+    try:
+        result = probe()
+    except LLMVerifyRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+    print(json.dumps(result, indent=2))
+    raise SystemExit(0 if result["ok"] else 1)

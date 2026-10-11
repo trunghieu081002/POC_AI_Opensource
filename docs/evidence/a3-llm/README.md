@@ -6,7 +6,12 @@ not evidence about any model — its replies are the hand-written files in
 provider credential when this was produced. A3 is **not complete** until `real/` is here
 (see [`docs/llm-verification.md`](../../llm-verification.md), "Done means").
 
-## `scripted/` — run `scripts/m25-acceptance-ci.sh --a3 scripted` (host built from packs)
+Layout: `<mode>/<run-id>/` — one directory per run, never overwritten (see
+[`docs/llm-verification.md`](../../llm-verification.md)). `scripted/20261011T013416Z-first-clean-run/`
+was produced **before** the acceptance hardening (published-bytes check, leak criterion in real mode,
+incomplete-run detection, format-repair labels); its `result.json` files do not carry those fields.
+
+## `scripted/20261011T013416Z-first-clean-run` — `scripts/m25-acceptance-ci.sh --a3 scripted` (host built from packs)
 
 `run-info.txt`: the commit and tree the host was built from, working tree clean. All seven pack
 suites passed on that host; 8/8 scenarios met their criteria; final host audit `leaks=0`

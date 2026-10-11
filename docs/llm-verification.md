@@ -68,7 +68,7 @@ On a host built from packs (needs docker, root-equivalent like the M2.5 matrix):
 bash scripts/m25-acceptance-ci.sh --a3 scripted
 
 # 2. the real model — explicitly opted in and capped
-export DPAGENT_LLM_VERIFY=1 DPAGENT_MODEL=gemini/gemini-2.0-flash GEMINI_API_KEY=...   # any LiteLLM provider
+export DPAGENT_LLM_VERIFY=1 DPAGENT_MODEL=gemini/gemini-3.8-flash GEMINI_API_KEY=...   # any LiteLLM provider
 bash scripts/m25-acceptance-ci.sh --a3 real --max-calls 8 --ambiguous-runs 3
 # or both on one freshly built host:  --a3 both
 ```
@@ -89,6 +89,33 @@ working tree). `scripted` mode is **not evidence about a model**: its replies ar
 | S6 non-JSON replies | same |
 | S7 ambiguous BRD, model builds anyway | recorded `guessed` = failed test |
 | S8 ambiguous BRD, model asks | `asked-blocker` |
+
+### Criteria that a run must meet (hardened after review)
+
+* **Complete**: every requested run must have happened. If the call budget runs out before the
+  requested ambiguous-BRD runs, the summary carries an `INCOMPLETE` entry and the exit code is 1 —
+  never a pass over only the runs that fit (`llm_verify.completeness`).
+* **No leak**: recovery still cleans up leaked throwaway databases/roles, but a run that leaked
+  fails its criteria, in `real` as in `scripted` mode (`llm_verify.leak_problems`).
+* **Published bytes**: the drafted files are compared with what Airflow and dbt actually read —
+  `/opt/dpagent/pipelines/<name>/…` and the shared dbt project's `models/<name>/…` — read
+  **before** undeploy removes them (`check_published_bytes`; only promote's `maturity:` label line
+  is ignored). Comparing the workspace proves nothing about what ran.
+* **Labels**: a classification names pipeline re-asks and JSON-format repairs separately:
+  `llm-first-draft+1-format-repair(s)` is a first draft whose reply needed one extra call to become
+  valid JSON; `llm-after-1-revision(s)` is a pipeline the validators rejected once.
+* **Evidence is kept per run**: `docs/evidence/a3-llm/<mode>/<run-id>/` (run id = UTC time + suffix,
+  made by the driver, with that run's `run-info.txt` and `leak-audit.txt`). Nothing is overwritten or
+  deleted; failed runs stay beside the ones that passed. A model that fails the problem is a valid
+  evaluation ("model X did not pass this test"), not "A3 complete".
+
+### Choosing the model
+
+`DPAGENT_MODEL` must be set explicitly for a run (the script refuses otherwise). The repo's built-in
+default (`gemini/gemini-2.0-flash`) is stale — Google lists it as shut down — so do not rely on it.
+The model proposed for the first baseline is `gemini/gemini-3.8-flash`; whether your project has access
+and quota is checked by a one-call probe the script runs before the host is built
+(`python -m dpagent.pipelines.llm_verify probe`; `A3_NO_PROBE=1` skips it), not assumed.
 
 ## Done means (A3)
 
