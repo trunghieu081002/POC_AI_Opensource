@@ -1,4 +1,4 @@
-# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 26 scenarios)
+# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 29 scenarios)
 
 Real, redacted output from `tests/m25_acceptance/run_matrix.py`, written here
 by `scripts/m25-acceptance-ci.sh` so it survives after whatever disposable
@@ -14,7 +14,20 @@ directory is Step 3's own proof: that the *automation* -
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
 
-## Latest run: bronze with two tables (2026-10-11)
+## Latest run: HG `fact_artist_assignment` + dbt test enforced (2026-10-12)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
+**29/29 scenarios matched**, host audit **`leaks=0`**; [`run-info.txt`](run-info.txt): commit `a44c6dc`, working
+tree clean. The 26 earlier scenarios are the no-regression check (single-table bronze, two-table bronze, A2, M2.5);
+the 3 `fact-*` scenarios are new ([`docs/hg-fact-artist-assignment.md`](../../hg-fact-artist-assignment.md)):
+
+| File | Result |
+|---|---|
+| [`fact-correct-twice.json`](fact-correct-twice.json) | pass: `silver.fact_artist_assignment` = the 7 hand-calculated rows after both runs, idempotent; HG's 2 dbt tests passed in each run (`dbt_tests` in the report, from the journal); 3 batches × 2 tables loaded; source dropped → LOAD still loaded both; S3 15 objects → 0; promote accepted |
+| [`fact-dbt-test-fails.json`](fact-dbt-test-fails.json) | a `not_null` test on `artist_name` added: dbt ran 3 tests, 2 passed, **1 failed (4 failing rows)** → stage failed, run 1 failed, nothing promotable, cleanup complete |
+| [`fact-promote-deploy-run.json`](fact-promote-deploy-run.json) | validate → promote → real deploy (not draft) → run: 7 rows matched, gates passed, dbt tests 2/2 passed; all **8** approved files published byte-identical; editing the model, the tests yml or the sources yml loses the approval and deploy refuses; editing fixture/expected makes promote refuse; restoring restores the approval; undeploy, S3 and both throwaway databases verified clean |
+
+## Previous run: bronze with two tables (2026-10-11)
 
 `bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
 **26/26 scenarios matched**, host audit **`leaks=0`**. [`run-info.txt`](run-info.txt): commit `0d9572a`, tree

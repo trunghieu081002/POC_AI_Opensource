@@ -2,69 +2,111 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "038b27b1-2155-4dad-aaf6-161b7d082172",
+        "batch_id": "b0c4edf9-108c-40a9-978f-94fcf105d41e",
         "loaded_rows": 6,
-        "manifest_sha256": "b71d5d0b9852242f6df47d18bd613eddf39daf5604afe61182ee13b1e8c53992",
+        "manifest_sha256": "13b130ef733bb174a05bbc8c6d8b721a176a5907c6061fe331b890ccbf098341",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "4d26bc00-4c14-4da9-b772-4564ee294133",
+        "batch_id": "53801799-6e87-4a3a-9e69-c2a007988c86",
         "loaded_rows": 6,
-        "manifest_sha256": "8dac2a0f97b2be5a790069851ca6b4691fba6903c071eb6bd0ae8546075c582b",
+        "manifest_sha256": "949b693ed790757e5b5590f150285e19ceaeec16ebac11a71fed564a854560f2",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "c8911c3e-0f2f-43d7-b198-e190be001fe9",
+        "batch_id": "f1a8e744-0eae-49cc-b432-ded3dc9c6f55",
         "loaded_rows": 6,
-        "manifest_sha256": "04a4f96d0053a9a84e6db8453e572771136bd7485081fed3423ad804422d0d9f",
+        "manifest_sha256": "aa81daabbe4c3b0ad1757b1a8892e24d16eec96b4df7b90c91429d6eecf74e41",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/5346ef26",
+    "namespace": "dpagent-validate/822b1211",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 7,
       "objects_remaining_after_purge": 0
     },
     "source_down_load": {
-      "batch_id": "c8911c3e-0f2f-43d7-b198-e190be001fe9",
+      "batch_id": "f1a8e744-0eae-49cc-b432-ded3dc9c6f55",
       "detail": "res_partner: 6 row(s) matched exactly",
       "error": "",
       "landing_matches_fixture": true,
       "loaded": true,
       "ok": true,
       "source_dropped": true,
-      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_c550ff29ac\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_c550ff29ac\"",
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_6674456061\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_6674456061\"",
       "source_unreachable": true
     }
   },
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_5346EF26_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_5346EF26_BRONZE_BUCKET, DPAGENT_VALIDATE_5346EF26_BRONZE_ENDPOINT, DPAGENT_VALIDATE_5346EF26_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_5346EF26_SRC_DATABASE, DPAGENT_VALIDATE_5346EF26_SRC_HOST, DPAGENT_VALIDATE_5346EF26_SRC_PASSWORD, DPAGENT_VALIDATE_5346EF26_SRC_PORT, DPAGENT_VALIDATE_5346EF26_SRC_USER, DPAGENT_VALIDATE_5346EF26_WH_DATABASE, DPAGENT_VALIDATE_5346EF26_WH_HOST, DPAGENT_VALIDATE_5346EF26_WH_PASSWORD, DPAGENT_VALIDATE_5346EF26_WH_PORT, DPAGENT_VALIDATE_5346EF26_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_822B1211_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_822B1211_BRONZE_BUCKET, DPAGENT_VALIDATE_822B1211_BRONZE_ENDPOINT, DPAGENT_VALIDATE_822B1211_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_822B1211_SRC_DATABASE, DPAGENT_VALIDATE_822B1211_SRC_HOST, DPAGENT_VALIDATE_822B1211_SRC_PASSWORD, DPAGENT_VALIDATE_822B1211_SRC_PORT, DPAGENT_VALIDATE_822B1211_SRC_USER, DPAGENT_VALIDATE_822B1211_WH_DATABASE, DPAGENT_VALIDATE_822B1211_WH_HOST, DPAGENT_VALIDATE_822B1211_WH_PASSWORD, DPAGENT_VALIDATE_822B1211_WH_PORT, DPAGENT_VALIDATE_822B1211_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__5346ef26",
+  "clone_name": "hg_dbt_branch__validate__822b1211",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
     "run_2": "pass"
   },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_dbt_branch__validate__822b1211/silver: dbt test ran 4 - 4 passed, 0 failed, 0 errored, 0 warned",
+        "passed": 4,
+        "ran": 4,
+        "stage": "silver"
+      },
+      {
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_dbt_branch__validate__822b1211/gold: no dbt tests are declared for ['mart_artist_summary']",
+        "passed": 0,
+        "ran": 0,
+        "stage": "gold"
+      }
+    ],
+    "run_2": [
+      {
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_dbt_branch__validate__822b1211/silver: dbt test ran 4 - 4 passed, 0 failed, 0 errored, 0 warned",
+        "passed": 4,
+        "ran": 4,
+        "stage": "silver"
+      },
+      {
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_dbt_branch__validate__822b1211/gold: no dbt tests are declared for ['mart_artist_summary']",
+        "passed": 0,
+        "ran": 0,
+        "stage": "gold"
+      }
+    ]
+  },
   "deploy_error": "",
-  "evidence_id": "ev-302f1f468d46870a",
+  "evidence_id": "ev-1d11d2c4ddeec163",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -163,7 +205,7 @@
   "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
   "promote": {
     "accepted": true,
-    "evidence_id": "ev-302f1f468d46870a",
+    "evidence_id": "ev-1d11d2c4ddeec163",
     "is_approved": true,
     "maturity": "reviewed",
     "verification": "verified"
