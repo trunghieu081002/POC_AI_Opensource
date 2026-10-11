@@ -26,12 +26,16 @@ class Provider:
 
     def __call__(self, *, model, messages, **kwargs):
         self.calls.append({"model": model, "system": messages[0]["content"],
-                           "user": messages[1]["content"]})
+                           "user": messages[1]["content"], "kwargs": kwargs})
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
+        finish = "stop"
+        if isinstance(reply, tuple):               # ("length", partial text): hit the output limit
+            finish, reply = reply
         text = reply if isinstance(reply, str) else json.dumps(reply)
         usage = types.SimpleNamespace(prompt_tokens=11, completion_tokens=7, total_tokens=18)
         return types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=text))],
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=text),
+                                           finish_reason=finish)],
             usage=usage)

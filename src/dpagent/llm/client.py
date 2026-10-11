@@ -30,6 +30,17 @@ class LLMError(RuntimeError):
     pass
 
 
+class ReplyTruncated(LLMError):
+    """The model stopped because it hit the output-token limit (`finish_reason == "length"`).
+    For a reasoning model the limit is shared with its hidden thinking, so a long think leaves
+    a cut-off or empty answer. Re-asking the same prompt repeats it, so this is raised at once
+    instead of being treated as malformed JSON; it says the limit was too small for this
+    model, not that the model's answer was wrong."""
+    def __init__(self, message: str, text: str = ""):
+        super().__init__(message)
+        self.text = text
+
+
 class ProviderUnavailable(LLMError):
     """The provider answered "busy / rate limited / timed out" (503, 429, RESOURCE_EXHAUSTED,
     timeout) - a statement about the service at that moment, not about the model's ability.
@@ -108,6 +119,14 @@ def get_timeout() -> float:
         return 300.0
 
 
+def env_max_tokens(default: int) -> int:
+    """Output-token limit for a call: `DPAGENT_LLM_MAX_TOKENS` if set, else `default`."""
+    try:
+        return int(os.environ["DPAGENT_LLM_MAX_TOKENS"])
+    except (KeyError, ValueError):
+        return default
+
+
 def get_model() -> str:
     return os.environ.get("DPAGENT_MODEL", DEFAULT_MODEL)
 
@@ -139,6 +158,7 @@ def _extract_json(text: str) -> str:
 
 def chat(system: str, user: str, *, temperature: float = 0.1,
          max_tokens: int = 8000) -> str:
+    max_tokens_ = env_max_tokens(max_tokens)
     try:
         import litellm
     except ImportError as exc:
@@ -151,6 +171,10 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
             "a local ollama/ model. Note: install and verify do not need this."
         )
 
+    extra = {}
+    effort = os.environ.get("DPAGENT_LLM_REASONING_EFFORT")
+    if effort:                      # low | medium | high - how long a reasoning model may think
+        extra["reasoning_effort"] = effort
     recorder = _recorders[-1] if _recorders else None
     tries = 1 + (recorder.transient_retries if recorder else 0)
     for n in range(1, tries + 1):
@@ -174,8 +198,9 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 messages=[{"role": "system", "content": system},
                           {"role": "user", "content": user}],
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_tokens=max_tokens_,
                 timeout=get_timeout(),
+                **extra,
             )
         except Exception as exc:                       # litellm wraps many providers
             transient = bool(TRANSIENT.search(f"{type(exc).__name__} {exc}"))
@@ -202,6 +227,11 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
                 if reasoning is not None:
                     record.usage["reasoning_tokens"] = reasoning
+        if str(getattr(response.choices[0], "finish_reason", "") or "") == "length":
+            raise ReplyTruncated(
+                f"{get_model()} stopped at the output limit ({max_tokens_} tokens; "
+                f"usage {record.usage if record is not None else '?'}) - raise "
+                f"DPAGENT_LLM_MAX_TOKENS or lower DPAGENT_LLM_REASONING_EFFORT", text)
         return text
     raise LLMError("unreachable")      # pragma: no cover
 

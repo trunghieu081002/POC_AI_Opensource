@@ -1,0 +1,177 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1,
+        2
+      ],
+      "detail": "run_1: failed\n[run 3] DAG run 3 reached terminal state: failed",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-ed0b0c2d4cfaadb5",
+      "fed_back": "run_1: failed\n[run 3] DAG run 3 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:85870706d614217c58136ef5be1930c219c88019a1e96d71b9911affd937021c",
+        "pipeline.yaml": "sha256:abb360c2dda2ab9efad60431d8c798259d0f1f956afa6c6ae36a22cf1dd727e6"
+      },
+      "format_repairs": 1,
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__ba4dde0e",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_ids": [
+          3
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        3,
+        4,
+        5
+      ],
+      "detail": "LLMError: model did not return valid JSON after 3 tries: Expecting ',' delimiter: line 5 column 4 (char 1599)",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 2,
+      "index": 2,
+      "outcome": "llm-error",
+      "source": "llm-revision",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 12,
+    "max_revisions": 2,
+    "transient_retries": 8,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T06:18:19+00:00",
+      "duration_s": 100.57,
+      "error": "",
+      "finish_reason": "length",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:bf27630b23851fee35d7d51466de617a824be0ad4b5cd4a0c4764f9f63a37d7e",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 15996,
+        "prompt_tokens": 2687,
+        "reasoning_tokens": 15357,
+        "total_tokens": 18683
+      },
+      "user_sha256": "sha256:518e0161a879aad589a23f03e05a366b5894764a41305573f89ed59fb043b1b7"
+    },
+    {
+      "at": "2026-10-11T06:20:00+00:00",
+      "duration_s": 74.75,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 2,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:275ed4cd3c85d94b6e5df0557454acc3f1a1377a1a1a64bf0453b5783e945d3f",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 10067,
+        "prompt_tokens": 2722,
+        "reasoning_tokens": 8842,
+        "total_tokens": 12789
+      },
+      "user_sha256": "sha256:86eaede1d8b1980d6f2c303f33bd0f191332f13bd4043816b2a0df56d43f1b17"
+    },
+    {
+      "at": "2026-10-11T06:21:56+00:00",
+      "duration_s": 209.83,
+      "error": "",
+      "finish_reason": "length",
+      "index": 3,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:2ca04fe5a6f7000fde303c3a623daa16782a8d6bbaa96276819eb8c610d9fb40",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 31356,
+        "prompt_tokens": 3302,
+        "reasoning_tokens": 30718,
+        "total_tokens": 34658
+      },
+      "user_sha256": "sha256:ab474313919be7932957d39f3f7e33ce9ead3f0927d9b1b4764f807d3a2cc817"
+    },
+    {
+      "at": "2026-10-11T06:25:26+00:00",
+      "duration_s": 207.81,
+      "error": "",
+      "finish_reason": "length",
+      "index": 4,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:1e6b28396de00a9f361afc141b76299030ae475fda77058d3b89c7a68630804e",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 15996,
+        "prompt_tokens": 3337,
+        "reasoning_tokens": 15361,
+        "total_tokens": 19333
+      },
+      "user_sha256": "sha256:3544a4e82395e6ddd4fc1d0c0593e6253e4a32aee75f7082d6194c6c71c8ceb8"
+    },
+    {
+      "at": "2026-10-11T06:28:54+00:00",
+      "duration_s": 293.02,
+      "error": "",
+      "finish_reason": "length",
+      "index": 5,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:fab1f4eeab6273df3bc17ac100a2f6e44712cef34eeab3c2ede02611004e28cf",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 31355,
+        "prompt_tokens": 3341,
+        "reasoning_tokens": 30717,
+        "total_tokens": 34696
+      },
+      "user_sha256": "sha256:eb2aeed01fe79cbf51f5ba5b45ba83b8c380c1cd644fd4770f86b4a46dfe2186"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/tmp/a3_i79syv4s/pipelines/a3_artist_summary",
+  "started_at": "2026-10-11T06:18:19+00:00",
+  "trace_version": 1
+}

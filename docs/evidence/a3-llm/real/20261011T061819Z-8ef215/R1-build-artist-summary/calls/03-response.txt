@@ -1,0 +1,56 @@
+run 3 to succeed if the test runner tests normal pipeline operation?
+The test runner in `test_fixtures` tests the pipeline on valid runs!
+So in DAG run 3, the source table is NOT empty!
+
+Then why did a task fail in DAG run 3?
+Let's look at the tasks again:
+What tasks exist?
+Task 1: `landing.extract`
+Task 2: `landing.gates`
+Task 3: `curated.dbt_run`
+Task 4: `curated.gates`
+
+WAIT!
+Look at Task 2: `landing.gates`:
+```yaml
+stages:
+- name: landing
+  gates:
+  - type: schema_contract
+    tables:
+    - res_partner
+  - type: row_count_bounds
+    table: res_partner
+    min_rows: 1
+```
+Wait! What if `freshness` gate was not there? Freshness is not required.
+Wait, what if `schema_contract` gate in landing failed?
+Wait, why would `schema_contract` fail?
+What does `schema_contract` gate do in dpagent?
+Let's search:
+In dpagent:
+`type: schema_contract`
+What does `schema_contract` do?
+Does `schema_contract` verify that columns match the verified source schema?
+Wait! In `pipeline.yaml`:
+Did previous draft have `res_partner`?
+Wait! What if `tables` in `schema_contract` should NOT be there or what if `schema_contract` was NOT in the BRD?
+Look at the BRD:
+"## Kiểm tra chất lượng
+- Cả bốn cột của `artist_summary` phải khác NULL.
+- Bảng nguồn đã nạp phải có ít nhất 1 dòng.
+(Luôn có ít nhất một đối tác được tính; nếu không thì pipeline được phép báo lỗi.)"
+Notice: The BRD ONLY specifies:
+1. "Bảng nguồn đã nạp phải có ít nhất 1 dòng." -> `row_count_bounds: table: res_partner, min_rows: 1`
+2. "Cả bốn cột của `artist_summary` phải khác NULL." -> `not_null: table: artist_summary, columns: [artists, distinct_names, min_id, max_id]`
+Did the BRD ask for `schema_contract`?
+Wait! But what does the system prompt say?
+```yaml
+stages:
+  - name: landing
+    gates: [...]           # structural only - schema_contract/row_count_bounds/freshness
+```
+Wait! System prompt says:
+"Landing's gates are structural only (no quarantine) - the same rule every reference pipeline in this project follows."
+Does landing REQUIRE `schema_contract`?
+Wait! What if `schema_contract` is only for when there is a schema contract

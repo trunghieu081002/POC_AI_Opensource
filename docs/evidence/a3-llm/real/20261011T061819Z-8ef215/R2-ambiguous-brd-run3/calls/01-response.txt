@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Doanh thu được ghi nhận theo ngày tạo đơn (`date_order`) hay ngày xác nhận đơn (`confirmation_date`)?",
+      "why_it_matters": "Xác định tháng ghi nhận doanh thu của từng đơn hàng. Đơn hàng tạo cuối tháng trước nhưng xác nhận ở tháng sau sẽ rơi vào hai kỳ báo cáo khác nhau tùy thuộc vào cột ngày được chọn."
+    },
+    {
+      "question": "Những trạng thái đơn hàng (`state`) nào được tính vào doanh thu (ví dụ: chỉ `sale` và `done`, hay loại trừ `cancel` và `draft`)?",
+      "why_it_matters": "Nếu tính cả đơn nháp (`draft`), báo giá đã gửi (`sent`) hoặc đơn đã hủy (`cancel`), doanh thu sẽ bị tính khống và phản ánh sai lệch kết quả kinh doanh thực tế."
+    },
+    {
+      "question": "Doanh thu tính theo giá trị trước thuế (`amount_untaxed`) hay tổng tiền bao gồm thuế (`amount_total`)?",
+      "why_it_matters": "Ảnh hưởng trực tiếp đến quy mô doanh thu báo cáo; việc bao gồm hay không bao gồm thuế GTGT/thuế bán hàng tạo ra chênh lệch số tiền đáng kể."
+    },
+    {
+      "question": "Hệ thống có nhiều loại tiền tệ (`currency_id`), quy tắc quy đổi tiền tệ về đồng tiền báo cáo chuẩn là gì và lấy tỷ giá từ nguồn nào?",
+      "why_it_matters": "Không thể cộng gộp trực tiếp các đơn hàng khác đồng tiền (ví dụ VND, USD); nếu cộng trực tiếp, con số tổng doanh thu sẽ hoàn toàn vô nghĩa."
+    }
+  ]
+}

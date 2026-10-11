@@ -57,3 +57,24 @@ Changes made because of this run: a provider-busy answer (503/429/timeout) is re
 20 s, 40 s, … apart) without consuming the `--max-calls` ceiling, every try is a flagged record in the trace,
 and a run that stays unavailable is reported `inconclusive-provider-unavailable` — a failed criterion (exit 1)
 that is explicitly *not* a verdict on the model.
+
+
+## `real/20261011T061819Z-8ef215` — second run, `gemini/gemini-3.8-flash`, commit `e081bb9`
+
+Run by the operator (`--a3 real --max-calls 12 --ambiguous-runs 3`; retries 8 × 20 s; 1052 s probe). `leaks=0`.
+**R1 (build) did not validate; R2 (ambiguous BRD) asked in 3 of 3.** A3 is still not complete.
+
+| Run | Result |
+|---|---|
+| R2 runs 1-3, ambiguous revenue BRD | **`asked-blocker` ×3** (10-15 s each, 1.0-1.4k reasoning tokens). Three separate answers, not a promise it always asks. |
+| R1 attempt 1 | call 1 hit `finish_reason=length` (15 357 of 15 996 completion tokens were hidden reasoning → cut-off JSON); the harness re-asked, call 2 returned a draft. **The draft's logic is right** (exclusion list, `trim`, blank/NULL filter, one row per id) but it **failed validation: run 1 `failed`** in the real Airflow run. Cause not recorded — only "DAG run 3 reached terminal state: failed" reached the journal summary, and the journal went with the host. Probable causes visible in the draft: (a) the model has no `{{ config(materialized='table', schema=…) }}` on the model — nothing in the prompt told it that dpagent's gates read the table from `warehouse.schema` (the prompt promised "the reference pipelines you were given" that are never in the message); (b) it wrote `row_count_bounds` with `min_rows`/`max_rows`, which the runtime ignores silently (so those two gates checked nothing). (a) is a guess; (b) is certain. |
+| R1 attempt 2 (re-ask) | calls 3-5 all `finish_reason=length` (up to 30 718 reasoning tokens of a 16 000 limit that the provider counts separately from visible output) → 3 truncated replies, each re-asked as "invalid JSON" → `llm-error`. The 16 000 limit is too small for this model's thinking; re-asking a truncated reply repeats it. Classified at the time `not-validated`; that overstated it. |
+
+What this run proves about the **harness/product** rather than the model — all fixed in the next commit:
+* a **truncated reply** is now `ReplyTruncated` at once (no re-ask), outcome `reply-truncated`, classification `inconclusive-output-limit`
+  (a statement about the run's token limit, not the model's logic); the limit is `DPAGENT_LLM_MAX_TOKENS` (script default 48 000), thinking effort
+  `DPAGENT_LLM_REASONING_EFFORT`;
+* the **loader refuses a gate key the runtime would ignore** (`min_rows`, anything but `min`/`max`/`max_delta_pct` on `row_count_bounds`, and
+  nothing extra on the other gates) — a real silent-no-op found by the model; the capability catalog now lists the optional keys;
+* the **synth prompt states the dbt `config(schema=…)` convention** (changing the prompt hash: runs before and after are not the same test);
+* the **journal events of the validation runs are saved in the trace** and the failing ones are what the model is told on a re-ask (it was told only "terminal state: failed").

@@ -403,7 +403,8 @@ def test_every_provider_call_has_a_time_limit_and_records_why_it_stopped(monkeyp
     monkeypatch.setattr(litellm, "completion", completion)
     monkeypatch.setenv("DPAGENT_LLM_TIMEOUT", "42")
     with llm.record_calls() as records:
-        llm.chat("s", "u")
+        with pytest.raises(llm.ReplyTruncated):
+            llm.chat("s", "u")
     assert seen["timeout"] == 42.0 and records[0].finish_reason == "length"
     assert records[0].usage["reasoning_tokens"] == 13
 
@@ -415,7 +416,7 @@ def test_an_empty_probe_reply_is_not_ok_and_says_why(monkeypatch):
         choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""), finish_reason="length")],
         usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14)))
     result = llm_verify.probe()
-    assert result["ok"] is False and "no text" in result["error"] and "length" in result["error"]
+    assert result["ok"] is False and "output limit" in result["error"]
 
 
 BUSY = RuntimeError("litellm.ServiceUnavailableError: 503 UNAVAILABLE: high demand")
@@ -452,3 +453,63 @@ def test_a_bad_key_is_not_retried(provider, case, tmp_path, monkeypatch):
     trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, transient_retries=5,
                                    runner=scripted_runner())
     assert trace.attempts[0].outcome == "llm-error" and waits == [] and len(p.calls) == 1
+
+
+# ------------------------------------------------------------------ findings of the first real run
+
+def test_a_reply_cut_off_at_the_output_limit_is_not_re_asked_and_is_not_a_model_failure(provider, case, tmp_path):
+    p = provider([("length", '{"files": {"pipeline.yaml": "name: x'), _bundle("good")])
+    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=5,
+                                         runner=scripted_runner(_section()))
+    assert len(p.calls) == 1                                   # the same prompt would be cut off again
+    assert trace.attempts[0].outcome == "reply-truncated"
+    assert trace.classification == "inconclusive-output-limit"
+    assert trace.calls[0]["finish_reason"] == "length"
+    assert llm_verify.build_problems({"classification": trace.classification})[0].startswith("INCONCLUSIVE")
+
+
+def test_output_limit_and_reasoning_effort_come_from_the_environment(provider, monkeypatch):
+    p = provider(["hello"])
+    monkeypatch.setenv("DPAGENT_LLM_MAX_TOKENS", "48000")
+    monkeypatch.setenv("DPAGENT_LLM_REASONING_EFFORT", "low")
+    llm.chat("s", "u", max_tokens=8000)
+    assert p.calls[0]["kwargs"]["max_tokens"] == 48000
+    assert p.calls[0]["kwargs"]["reasoning_effort"] == "low"
+    monkeypatch.delenv("DPAGENT_LLM_MAX_TOKENS")
+    monkeypatch.delenv("DPAGENT_LLM_REASONING_EFFORT")
+    provider(["hello"])
+    assert llm.env_max_tokens(16000) == 16000
+
+
+def test_a_gate_with_a_key_the_runtime_ignores_is_refused(tmp_path):
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": "row_count_bounds", "table": "t", "min": 1, "max": 5}, "x")
+    with pytest.raises(PipelineError, match=r"unknown parameter.*min_rows"):
+        _validate_gate({"type": "row_count_bounds", "table": "t", "min_rows": 1}, "x")
+    with pytest.raises(PipelineError, match="unknown parameter"):
+        _validate_gate({"type": "not_null", "table": "t", "columns": ["a"], "severity": "warn"}, "x")
+
+
+def test_the_model_is_told_which_optional_keys_a_gate_takes_and_the_dbt_schema_convention():
+    catalog = synth.capability_catalog()
+    assert "row_count_bounds" in catalog and "'min', 'max', 'max_delta_pct'" in catalog
+    prompt = llm.load_prompt("synth_pipeline")
+    assert "materialized='table', schema=" in prompt and "min_rows" in prompt
+
+
+def test_failure_events_of_the_validation_runs_reach_the_next_ask(provider, case, tmp_path, monkeypatch):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    run_id = state.start_run("data", "c")
+    state.event("transform.failed", "dbt run failed for 'curated': relation does not exist",
+                run_id=run_id, level="error")
+    state.event("pipeline.started", "started", run_id=run_id)
+    section = _section("fail", "fail")
+    section["run_ids"] = [run_id]
+    section["run_status"] = {"run_1": "failed", "run_2": "not_run"}
+    p = provider([_bundle("wrong_result"), _bundle("good")])
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=4, runner=scripted_runner(section, _section()))
+    assert "relation does not exist" in p.calls[1]["user"]
+    assert "started" not in p.calls[1]["user"].split("Validator output:")[1]
+    assert any(e["kind"] == "transform.failed" for e in trace.attempts[0].validation["run_events"])

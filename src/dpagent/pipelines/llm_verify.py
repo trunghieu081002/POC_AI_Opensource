@@ -161,6 +161,10 @@ def classify(kind: str, attempts: list[Attempt]) -> str:
     calls were only format repairs (the reply was not valid JSON and chat_json re-asked):
     `llm-first-draft` means the first pipeline the model proposed validated - a JSON repair
     does not make it a revision, but it is not hidden either."""
+    if attempts and attempts[-1].outcome == "reply-truncated":
+        # the output-token limit (shared with a reasoning model's hidden thinking) was too small:
+        # a statement about the run's configuration, not about whether the model can do the task
+        return "inconclusive-output-limit"
     if attempts and attempts[-1].outcome == "provider-unavailable":
         # the service was busy even after the permitted retries: the run says nothing about the
         # model (it is neither a pass nor a failure of the model)
@@ -260,14 +264,24 @@ def _failure_text(section: dict, report, run_events: list[str]) -> str:
     return "\n".join(dict.fromkeys(lines)) or "validation failed (no further detail)"
 
 
-def _run_error_events(section: dict) -> list[str]:
+def _run_events(section: dict) -> list[dict]:
+    """Every journal event of the validation runs (kind, level, message) - kept in the trace
+    (the journal itself is gone when the disposable host is) and the failures among them are what
+    the model is told on a re-ask."""
     from ..engine import state
     out = []
     for run_id in section.get("run_ids") or []:
         for ev in state.events_for(int(run_id)):
-            if ev["level"] in ("error", "warn"):
-                out.append(f"[run {run_id}] {ev['message']}"[:1500])
-    return out[:6]
+            out.append({"run": int(run_id), "kind": ev["kind"], "level": ev["level"],
+                        "message": str(ev["message"])[:1500]})
+    return out
+
+
+def _run_error_events(section: dict, events: list[dict] | None = None) -> list[str]:
+    events = _run_events(section) if events is None else events
+    bad = [f"[run {e['run']}] {e['kind']}: {e['message']}" for e in events
+           if e["level"] in ("error", "warn") or "failed" in e["kind"]]
+    return bad[:8]
 
 
 # ------------------------------------------------------------------ the orchestration
@@ -302,6 +316,7 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 attempt.call_indexes = list(range(before + 1, len(records) + 1))
                 attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
                 attempt.outcome = ("provider-unavailable" if isinstance(exc, llm.ProviderUnavailable)
+                                   else "reply-truncated" if isinstance(exc, llm.ReplyTruncated)
                                    else "llm-error" if isinstance(exc, llm.LLMError)
                                    else "invalid-reply")
                 attempt.detail = f"{type(exc).__name__}: {exc}"[:600]
@@ -346,7 +361,9 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 attempt.outcome = "validated"
                 break
             attempt.outcome = "validation-fail"
-            attempt.fed_back = _failure_text(section, report, _run_error_events(section))
+            events = _run_events(section)
+            attempt.validation["run_events"] = events
+            attempt.fed_back = _failure_text(section, report, _run_error_events(section, events))
             attempt.detail = attempt.fed_back[:1500]
             revision = synth_mod.Revision(result.drafted_files, attempt.fed_back)
         trace.calls = [_call_summary(r) for r in records]
@@ -489,6 +506,10 @@ def build_problems(result: dict) -> list[str]:
     if result.get("classification") == "inconclusive-provider-unavailable":
         p.append("INCONCLUSIVE: the provider was unavailable (busy / rate-limited / timed out) "
                  "after the permitted retries - nothing was learned about the model")
+    elif result.get("classification") == "inconclusive-output-limit":
+        p.append("INCONCLUSIVE: a reply hit the output-token limit (raise DPAGENT_LLM_MAX_TOKENS / "
+                 "lower DPAGENT_LLM_REASONING_EFFORT) - the run's limit was too small, which is not "
+                 "a verdict on the model's logic")
     elif not str(result.get("classification", "")).startswith(("llm-", "human-")):
         p.append(f"not validated ({result.get('classification')}, last outcome {result.get('last_outcome')})")
     else:
@@ -505,9 +526,8 @@ def build_problems(result: dict) -> list[str]:
 
 def ambiguous_problems(result: dict) -> list[str]:
     c = str(result.get("classification", ""))
-    if c == "inconclusive-provider-unavailable":
-        p = ["INCONCLUSIVE: the provider was unavailable after the permitted retries - "
-             "nothing was learned about the model"]
+    if c.startswith("inconclusive-"):
+        p = [f"INCONCLUSIVE ({c}): nothing was learned about the model's judgement"]
     else:
         p = [] if c.startswith("asked-blocker") else [f"model did not ask ({c})"]
     return p + leak_problems(result.get("leaked_and_recovered") or {})

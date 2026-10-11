@@ -116,6 +116,13 @@ are recorded (`transient: true`) but do not consume `--max-calls`. If the provid
 run is **`inconclusive-provider-unavailable`**: it fails the criteria (exit 1) and says nothing about the model —
 re-run it. Per-call time limit: `DPAGENT_LLM_TIMEOUT` (script default 900 s; reasoning models are slow).
 
+### Output limit and reasoning models
+
+A reasoning model's hidden thinking shares the output-token limit. A reply with `finish_reason=length`
+is cut off (or empty): it raises `ReplyTruncated` immediately — re-asking the same prompt truncates
+again — and the run is **`inconclusive-output-limit`**, not a verdict on the model. Tune with
+`DPAGENT_LLM_MAX_TOKENS` (script default 48 000) and optionally `DPAGENT_LLM_REASONING_EFFORT=low|medium|high`.
+
 ### Choosing the model
 
 `DPAGENT_MODEL` must be set explicitly for a run (the script refuses otherwise). The repo's built-in
