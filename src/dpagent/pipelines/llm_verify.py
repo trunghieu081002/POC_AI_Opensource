@@ -507,22 +507,37 @@ def completeness(requested: dict[str, int], ran: dict[str, int]) -> list[str]:
 
 # ------------------------------------------------------------------ connectivity probe
 
-def probe() -> dict:
-    """ONE tiny call to the configured model, before any host is built: does the key work,
-    is the model name served, is there quota. Opt-in like everything else; the call and its
-    token usage are returned (never the key)."""
-    ensure_opted_in(1)
-    with llm.record_calls(max_calls=1) as records:
-        try:
-            text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
-                            max_tokens=16)
-        except llm.LLMError as exc:
-            rec = records[0] if records else None
-            return {"ok": False, "model": llm.get_model(), "error": str(exc)[:400],
-                    "calls": len(records), "usage": rec.usage if rec else {}}
-    rec = records[0]
-    return {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
-            "usage": rec.usage, "duration_s": rec.duration_s, "calls": 1}
+_TRANSIENT = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|"
+                        r"rate.?limit|timed? ?out)\b", re.IGNORECASE)
+
+
+def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:
+    """A tiny call to the configured model before any host is built: does the key work, is the
+    model name served, is there quota. A *transient* provider answer (503 "high demand", 429,
+    timeout) is retried a few times with a pause - it says the model is busy, not that the
+    key or name is wrong - and every attempt is reported. Anything else (bad key, unknown
+    model) fails at once. Opt-in like everything else; the key is never returned."""
+    import time
+    sleep = sleep or time.sleep
+    ensure_opted_in(attempts)
+    tries: list[dict] = []
+    for n in range(1, attempts + 1):
+        with llm.record_calls(max_calls=1) as records:
+            try:
+                text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
+                                max_tokens=16)
+            except llm.LLMError as exc:
+                err = str(exc)[:400]
+                tries.append({"attempt": n, "error": err, "transient": bool(_TRANSIENT.search(err))})
+                if not tries[-1]["transient"] or n == attempts:
+                    return {"ok": False, "model": llm.get_model(), "error": err,
+                            "transient": tries[-1]["transient"], "attempts": tries}
+                sleep(wait_s)
+                continue
+        rec = records[0]
+        return {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
+                "usage": rec.usage, "duration_s": rec.duration_s, "attempts": tries + [{"attempt": n}]}
+    return {"ok": False, "model": llm.get_model(), "attempts": tries}
 
 
 if __name__ == "__main__":      # python -m dpagent.pipelines.llm_verify probe

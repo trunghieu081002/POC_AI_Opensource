@@ -370,7 +370,20 @@ def test_probe_is_one_call_and_opt_in(provider, monkeypatch):
     monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
     p = provider(["OK"])
     result = llm_verify.probe()
-    assert result["ok"] and result["calls"] == 1 and len(p.calls) == 1
-    provider([RuntimeError("quota exceeded")])
-    failed = llm_verify.probe()
-    assert failed["ok"] is False and "quota" in failed["error"]
+    assert result["ok"] and len(p.calls) == 1
+    provider([RuntimeError("401 API key not valid")])
+    failed = llm_verify.probe(sleep=lambda s: None)
+    assert failed["ok"] is False and failed["transient"] is False and len(failed["attempts"]) == 1
+
+
+def test_probe_retries_a_busy_model_but_not_a_wrong_key(provider, monkeypatch):
+    monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
+    busy = RuntimeError('503 UNAVAILABLE: This model is currently experiencing high demand')
+    p = provider([busy, busy, "OK"])
+    waits = []
+    result = llm_verify.probe(wait_s=7, sleep=waits.append)
+    assert result["ok"] and len(p.calls) == 3 and waits == [7, 7]
+    assert [a.get("transient") for a in result["attempts"]] == [True, True, None]
+    provider([busy, busy, busy])
+    gave_up = llm_verify.probe(sleep=lambda s: None)
+    assert gave_up["ok"] is False and gave_up["transient"] is True and len(gave_up["attempts"]) == 3
