@@ -48,6 +48,15 @@ class SynthRequest:
 
 
 @dataclass
+class Revision:
+    """A model-visible correction request: the previous draft and what the
+    validators said about it. The model is told nothing else (never the
+    expected result - A3 keeps that for the validator)."""
+    previous_files: dict[str, str]
+    problems: str
+
+
+@dataclass
 class SynthResult:
     name: str
     root: Path
@@ -60,6 +69,9 @@ class SynthResult:
     # .synth-validation.yaml; None only when load_error is set (nothing to
     # compile-check yet).
     validation: "validate_mod.ValidationReport | None" = None
+    # Exactly what the model returned (after name/maturity forcing), for the
+    # A3 trace - the draft is judged as written, not as later cleaned up.
+    drafted_files: dict[str, str] = field(default_factory=dict)
 
     @property
     def blocked(self) -> bool:
@@ -109,7 +121,18 @@ def _safe_relative(root: Path, rel: str) -> Path:
     return candidate
 
 
-def _user_message(request: SynthRequest) -> str:
+def _revision_message(revision: Revision) -> str:
+    drafted = "\n\n".join(f"--- {rel} ---\n{text}" for rel, text in sorted(revision.previous_files.items()))
+    return (
+        "\n\nYour previous draft was run through dpagent's validators and did NOT pass.\n"
+        f"Previous draft:\n{drafted}\n\nValidator output:\n{revision.problems}\n\n"
+        "Return a corrected complete bundle under every rule above. If the failure shows "
+        "the BRD does not actually say what is needed, return `blockers` instead of "
+        "guessing."
+    )
+
+
+def _user_message(request: SynthRequest, revision: Revision | None = None) -> str:
     secrets = "\n".join(f"  {k}: {v}" for k, v in request.secret_refs.items()) or "  (none declared)"
     return (
         f"Pipeline name: {request.name}\n"
@@ -123,11 +146,12 @@ def _user_message(request: SynthRequest) -> str:
         f"Capability catalog (the only connectors/engines/gates you may use):\n"
         f"{capability_catalog()}\n\n"
         f"Emit the pipeline JSON."
+        + (_revision_message(revision) if revision is not None else "")
     )
 
 
 def synth(request: SynthRequest, pipelines_dir: Path | None = None,
-          overwrite: bool = False) -> SynthResult:
+          overwrite: bool = False, revision: Revision | None = None) -> SynthResult:
     """Drafts `pipelines/<name>/` from a BRD, or returns blockers instead of
     guessing.
 
@@ -170,7 +194,7 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
             "against tables/columns nobody has confirmed exist")
 
     system = llm.load_prompt("synth_pipeline")
-    data = llm.chat_json(system, _user_message(request), max_tokens=16000)
+    data = llm.chat_json(system, _user_message(request, revision), max_tokens=16000)
     if not isinstance(data, dict):
         raise llm.LLMError("synth reply was not a JSON object")
 
@@ -252,5 +276,5 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
     return SynthResult(
         name=request.name, root=root, files=sorted(written),
         mapping=str(data.get("mapping", "")), notes=str(data.get("notes", "")),
-        load_error=load_error, validation=validation,
+        load_error=load_error, validation=validation, drafted_files=dict(files),
     )

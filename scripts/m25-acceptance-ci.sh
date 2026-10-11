@@ -33,11 +33,17 @@ set -euo pipefail
 KEEP=0
 SCENARIOS=""
 PROFILE=core
+A3=""               # scripted | real: run the A3 LLM-verification driver instead of the matrix
+A3_MAX_CALLS=8
+A3_AMBIGUOUS_RUNS=3
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --scenarios) SCENARIOS="$2"; shift 2 ;;
     --profile) PROFILE="$2"; shift 2 ;;
+    --a3) A3="$2"; shift 2 ;;                  # scripted | real (docs/llm-verification.md)
+    --max-calls) A3_MAX_CALLS="$2"; shift 2 ;;
+    --ambiguous-runs) A3_AMBIGUOUS_RUNS="$2"; shift 2 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
   esac
@@ -52,6 +58,16 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IMAGE="dpagent-m25-disposable"
 CONTAINER="dpagent-m25-acceptance-$$"
 RESULTS_DIR="${REPO_ROOT}/docs/evidence/m25-automated"
+case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
+if [ -n "$A3" ]; then
+  RESULTS_DIR="${REPO_ROOT}/docs/evidence/a3-llm"
+  PROFILE=core      # A3 needs no object store
+  if [ "$A3" = real ] || [ "$A3" = both ]; then
+    # fail before building anything if the opt-in is missing
+    [ "${DPAGENT_LLM_VERIFY:-}" = 1 ] || { echo "real model calls need DPAGENT_LLM_VERIFY=1 (and a provider key in the environment)" >&2; exit 2; }
+    [ -n "${DPAGENT_MODEL:-}" ] || { echo "set DPAGENT_MODEL to the model under test (e.g. gemini/gemini-2.0-flash)" >&2; exit 2; }
+  fi
+fi
 
 # ---------------------------------------------------------- preconditions
 
@@ -124,7 +140,7 @@ ok "container ${CONTAINER} up, systemd running"
 # ------------------------------------------------------- bootstrap + install
 
 say "bootstrapping dpagent and installing postgres+dlt+dbt+airflow (this takes several minutes)"
-docker exec "${CONTAINER}" bash -lc '
+docker exec -e "DPAGENT_WITH_LLM=${A3:+1}" "${CONTAINER}" bash -lc '
   set -euo pipefail
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
@@ -164,12 +180,37 @@ docker exec "${CONTAINER}" mkdir -p /opt/dpagent/tests/m25_acceptance
 docker cp "${REPO_ROOT}/tests/m25_acceptance/registry.py" "${CONTAINER}:/opt/dpagent/tests/m25_acceptance/registry.py"
 docker cp "${REPO_ROOT}/tests/m25_acceptance/run_matrix.py" "${CONTAINER}:/opt/dpagent/tests/m25_acceptance/run_matrix.py"
 
+if [ -n "$A3" ]; then
+  say "running the A3 LLM-verification driver (mode: ${A3})"
+  docker exec "${CONTAINER}" mkdir -p /opt/dpagent/tests/llm_verification /opt/dpagent/tests/m25_acceptance
+  docker cp "${REPO_ROOT}/tests/llm_verification/." "${CONTAINER}:/opt/dpagent/tests/llm_verification/"
+  docker cp "${REPO_ROOT}/tests/m25_acceptance/registry.py" "${CONTAINER}:/opt/dpagent/tests/m25_acceptance/registry.py"
+  docker cp "${REPO_ROOT}/tests/m25_acceptance/run_matrix.py" "${CONTAINER}:/opt/dpagent/tests/m25_acceptance/run_matrix.py"
+  # Provider credentials are forwarded BY NAME (docker takes the value from this
+  # shell); they are never written to a file, a log line or the evidence.
+  PASS=(-e DPAGENT_LLM_VERIFY -e DPAGENT_MODEL)
+  if [ "$A3" = real ] || [ "$A3" = both ]; then
+    for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
+      [ -z "${!k:-}" ] || PASS+=(-e "$k")
+    done
+  fi
+  DRIVER_RC=0
+  MODES="$A3"; [ "$A3" != both ] || MODES="scripted real"
+  set +e
+  for mode in $MODES; do
+    docker exec "${PASS[@]}" "${CONTAINER}" bash -c "cd /opt/dpagent && .venv/bin/python tests/llm_verification/run_a3.py --mode ${mode} --max-calls ${A3_MAX_CALLS} --ambiguous-runs ${A3_AMBIGUOUS_RUNS}"
+    rc=$?
+    [ "$rc" -eq 0 ] || DRIVER_RC=$rc
+  done
+  set -e
+else
 say "running the acceptance matrix driver"
 set +e
 docker exec -e "M25_ACCEPTANCE_COMMIT=${COMMIT}" "${CONTAINER}" \
   bash -c "cd /opt/dpagent && .venv/bin/python tests/m25_acceptance/run_matrix.py --profile ${PROFILE} ${SCENARIOS}"
 DRIVER_RC=$?
 set -e
+fi
 
 # ----------------------------------------------------------- final leak audit
 
@@ -185,10 +226,10 @@ section() { printf "== %s\n" "$1"; }
 found()   { if [ -n "$1" ]; then printf "%s\n" "$1"; leaks=$((leaks+1)); else echo "(none)"; fi; }
 section "databases named dpagent_fixture_*";  found "$(sudo -n -u postgres psql -At -c "select datname from pg_database where datname like '"'"'dpagent_fixture_%'"'"'")"
 section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql -At -c "select rolname from pg_roles where rolname like '"'"'dpagent_fixture_%'"'"'")"
-section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote" || true)"
+section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
-section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote" || true)"
-section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
+section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_promote|a3_artist_summary" || true)"
+section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_|A3_SRC_|A3_WH_|WAREHOUSE_DB_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY
   section "S3 objects under dpagent-validate/"; found "$(python3 /opt/seaweedfs/bin/s3.py list hg-bronze dpagent-validate/ || true)"
@@ -209,6 +250,20 @@ mkdir -p "${RESULTS_DIR}"
   echo "profile=${PROFILE}"
   echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "${RESULTS_DIR}/run-info.txt"
+if [ -n "$A3" ]; then
+  for mode in $MODES; do
+    rm -rf "${RESULTS_DIR:?}/${mode}"
+    docker cp "${CONTAINER}:/root/a3-evidence/${mode}" "${RESULTS_DIR}/${mode}" || true
+  done
+  # belt and braces on top of the driver's own check: no credential value may be in the evidence
+  for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
+    v="${!k:-}"
+    if [ -n "$v" ] && grep -rqF -- "$v" "${RESULTS_DIR}"; then
+      for mode in $MODES; do rm -rf "${RESULTS_DIR:?}/${mode}"; done
+      die "the value of ${k} appears in the A3 evidence - evidence removed, nothing was kept"
+    fi
+  done
+else
 docker exec "${CONTAINER}" bash -c 'ls /root/m25-evidence/*.json 2>/dev/null' | while read -r remote_path; do
   name="$(basename "$remote_path")"
   docker cp "${CONTAINER}:${remote_path}" "/tmp/m25-raw-$$-${name}"
@@ -229,6 +284,7 @@ if docker exec "${CONTAINER}" test -f /root/m25-evidence/registry.jsonl; then
   docker cp "${CONTAINER}:/root/m25-evidence/registry.jsonl" "/tmp/m25-registry-$$.jsonl"
   cat "/tmp/m25-registry-$$.jsonl" >> "${RESULTS_DIR}/registry.jsonl"
   rm -f "/tmp/m25-registry-$$.jsonl"
+fi
 fi
 cp "${LEAK_AUDIT}" "${RESULTS_DIR}/leak-audit.txt"
 ok "evidence written under ${RESULTS_DIR}"
