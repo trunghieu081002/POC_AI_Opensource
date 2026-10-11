@@ -167,9 +167,9 @@ def test_structural_failure_is_fed_back_and_budget_ends_the_run(provider, case, 
 def test_api_timeout_is_a_clear_error_and_nothing_is_approved(provider, case, tmp_path):
     provider([TimeoutError("read timed out")])
     trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, runner=scripted_runner())
-    assert trace.attempts[0].outcome == "llm-error"
+    assert trace.attempts[0].outcome == "provider-unavailable"
     assert "read timed out" in trace.attempts[0].detail
-    assert trace.classification == "not-validated"
+    assert trace.classification == "inconclusive-provider-unavailable"
     assert not (tmp_path / "w" / case.name / ".approved.yaml").exists()
 
 
@@ -416,3 +416,39 @@ def test_an_empty_probe_reply_is_not_ok_and_says_why(monkeypatch):
         usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14)))
     result = llm_verify.probe()
     assert result["ok"] is False and "no text" in result["error"] and "length" in result["error"]
+
+
+BUSY = RuntimeError("litellm.ServiceUnavailableError: 503 UNAVAILABLE: high demand")
+
+
+def test_busy_provider_is_retried_and_the_retries_do_not_eat_the_call_ceiling(provider, case, tmp_path, monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm, "_sleep", waits.append)
+    p = provider([BUSY, BUSY, _bundle("good")])
+    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=1, transient_retries=3,
+                                         wait_s=5, runner=scripted_runner(_section()))
+    assert trace.classification == "llm-first-draft"          # max_calls=1 and still got an answer
+    assert len(p.calls) == 3 and waits == [5, 10]
+    assert [c["transient"] for c in trace.calls] == [True, True, False]
+    assert trace.attempts[0].format_repairs == 0                # busy answers are not format repairs
+
+
+def test_a_provider_that_stays_busy_is_inconclusive_not_a_model_failure(provider, case, tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "_sleep", lambda s: None)
+    provider([BUSY] * 3)
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=4, transient_retries=2,
+                                   runner=scripted_runner())
+    assert trace.attempts[0].outcome == "provider-unavailable"
+    assert trace.classification == "inconclusive-provider-unavailable"
+    result = {"classification": trace.classification, "leaked_and_recovered": {}}
+    assert llm_verify.build_problems(result)[0].startswith("INCONCLUSIVE")
+    assert llm_verify.ambiguous_problems(result)[0].startswith("INCONCLUSIVE")
+
+
+def test_a_bad_key_is_not_retried(provider, case, tmp_path, monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm, "_sleep", waits.append)
+    p = provider([RuntimeError("401 API key not valid")])
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, transient_retries=5,
+                                   runner=scripted_runner())
+    assert trace.attempts[0].outcome == "llm-error" and waits == [] and len(p.calls) == 1

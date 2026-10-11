@@ -1,0 +1,58 @@
+{
+  "complete": true,
+  "mode": "real",
+  "not_met": [
+    "R1-build-artist-summary",
+    "R2-ambiguous-brd-run2",
+    "R2-ambiguous-brd-run3"
+  ],
+  "run_id": "20261011T045338Z-6b8c21",
+  "runs": [
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": [
+        "not validated (not-validated, last outcome llm-error)"
+      ],
+      "expectation_problems": null,
+      "label": "R1-build-artist-summary",
+      "last_outcome": "llm-error",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 0
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run1",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 3704
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": [
+        "model did not ask (not-validated)"
+      ],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run2",
+      "last_outcome": "llm-error",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 0
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": [
+        "model did not ask (not-validated)"
+      ],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run3",
+      "last_outcome": "llm-error",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 0
+    }
+  ]
+}

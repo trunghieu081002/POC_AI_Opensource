@@ -109,6 +109,13 @@ working tree). `scripted` mode is **not evidence about a model**: its replies ar
   deleted; failed runs stay beside the ones that passed. A model that fails the problem is a valid
   evaluation ("model X did not pass this test"), not "A3 complete".
 
+### A busy provider is not a failing model
+
+A 503 / 429 / timeout is retried (`A3_TRANSIENT_RETRIES`, default 5, waiting 20 s, 40 s, …); the tries
+are recorded (`transient: true`) but do not consume `--max-calls`. If the provider is still unavailable the
+run is **`inconclusive-provider-unavailable`**: it fails the criteria (exit 1) and says nothing about the model —
+re-run it. Per-call time limit: `DPAGENT_LLM_TIMEOUT` (script default 900 s; reasoning models are slow).
+
 ### Choosing the model
 
 `DPAGENT_MODEL` must be set explicitly for a run (the script refuses otherwise). The repo's built-in

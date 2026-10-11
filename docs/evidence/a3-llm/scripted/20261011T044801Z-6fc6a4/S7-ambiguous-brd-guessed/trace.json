@@ -1,0 +1,62 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "the BRD is missing information that changes the numbers; the model built a pipeline instead of asking",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {
+        "models/artist_summary.sql": "sha256:4eefc08f5433a97f9b670e22a6284565b74210a79bb95a1bdbd18dbc527a59b3",
+        "pipeline.yaml": "sha256:281011a9e5105e31b94703007be6b0b0761deca4dd7a32bbc942572e5cfb7665"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "built-anyway",
+      "source": "llm",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T04:53:28+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:f81c02098982a18d68e38217fee924a348297db6b1dee07962c3b368f5c2fa2e",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:aff2341be4b5b737d809cbb5891cf69b4c6c3876c0df865ea2fbc974bb8ebcef"
+    }
+  ],
+  "case": "a3_revenue_ambiguous",
+  "classification": "guessed",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:7cc83d542c80a2b2ae866612c7a5e3ad296daf9ca304d81248a41616d107cf40",
+    "request_yaml": "sha256:70e013c82c3566bb683e8304e79bf8a3bfda014f988deb57e1f8f290bfc27452",
+    "source_schema": "sha256:4987833152ad481c865071ddee8eb1ca71cb88bf1e2f2c167c74a14eac76bac2",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "ambiguous",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "",
+  "started_at": "2026-10-11T04:53:28+00:00",
+  "trace_version": 1
+}

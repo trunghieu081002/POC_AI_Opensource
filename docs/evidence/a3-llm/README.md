@@ -1,6 +1,6 @@
 # A3 evidence
 
-**State: harness verified with a scripted stand-in; NO real-model run yet.** `scripted/` is
+**State: harness verified with a scripted stand-in; the first real-model run was INCONCLUSIVE (see below). A3 is not complete.** `scripted/` is
 not evidence about any model — its replies are the hand-written files in
 `tests/llm_verification/scripted_drafts/`. `real/` does not exist because the machine had no
 provider credential when this was produced. A3 is **not complete** until `real/` is here
@@ -38,3 +38,22 @@ and two driver runs failed on real defects fixed before this one (the `litellm` 
 host — now installed through bootstrap's `DPAGENT_WITH_LLM`; and the real deploy used dpagent's shared
 `WAREHOUSE_DB_*` refs, which `undeploy` rightly kept because other pipelines use them — the case now
 carries its own `A3_WH_*` refs).
+
+
+## `real/20261011T045338Z-6b8c21` — first run against `gemini/gemini-3.8-flash` (host `20261011T044801Z-6fc6a4` scripted run: 8/8, leaks=0, same host build)
+
+Run by the operator; commit `1784b20`. Outcome: **inconclusive for the build task, one data point for the ambiguous BRD.**
+
+| Run | Result |
+|---|---|
+| R1 build `artist_summary` | the single call was answered `503 UNAVAILABLE - high demand` (2 s). Nothing was learned about the model; the harness at that commit did not retry, so no pipeline was ever drafted. Classified at the time as `not-validated / llm-error`, which **overstated** it — it is a provider outage, now its own outcome (`inconclusive-provider-unavailable`). |
+| R2 run 1, ambiguous revenue BRD | **asked** (`asked-blocker`): 4 blockers — which date defines the month (`date_order` vs `confirmation_date`), which `state`s count (cancel/draft), tax-inclusive or not, multi-currency handling. 1 call, 202 s, 936 reasoning tokens. This is one run; it is not a promise the model always asks. |
+| R2 runs 2 and 3 | both `503 UNAVAILABLE` (2-3 s) — inconclusive for the same reason. |
+
+Also seen: the model needs minutes per answer (the 1-call probe took ~1050 s earlier, the ambiguous call 202 s), so
+the per-call limit defaults to 900 s in the A3 script. `leaks=0`.
+
+Changes made because of this run: a provider-busy answer (503/429/timeout) is retried (default 5 times,
+20 s, 40 s, … apart) without consuming the `--max-calls` ceiling, every try is a flagged record in the trace,
+and a run that stays unavailable is reported `inconclusive-provider-unavailable` — a failed criterion (exit 1)
+that is explicitly *not* a verdict on the model.

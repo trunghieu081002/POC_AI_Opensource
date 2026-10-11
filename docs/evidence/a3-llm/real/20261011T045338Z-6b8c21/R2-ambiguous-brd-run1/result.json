@@ -1,0 +1,24 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "blocked",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "revenue_ambiguous",
+  "classification": "asked-blocker",
+  "label": "R2-ambiguous-brd-run1",
+  "last_outcome": "blocked",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "gemini/gemini-3.8-flash",
+  "tokens": 3704
+}

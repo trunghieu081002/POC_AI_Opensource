@@ -161,6 +161,10 @@ def classify(kind: str, attempts: list[Attempt]) -> str:
     calls were only format repairs (the reply was not valid JSON and chat_json re-asked):
     `llm-first-draft` means the first pipeline the model proposed validated - a JSON repair
     does not make it a revision, but it is not hidden either."""
+    if attempts and attempts[-1].outcome == "provider-unavailable":
+        # the service was busy even after the permitted retries: the run says nothing about the
+        # model (it is neither a pass nor a failure of the model)
+        return "inconclusive-provider-unavailable"
     if kind == "ambiguous":
         if attempts and attempts[0].outcome == "blocked":
             return "asked-blocker" + _repair_suffix(attempts[:1])
@@ -188,7 +192,7 @@ def _call_summary(rec: llm.CallRecord) -> dict:
             "system_sha256": rec.system_sha256, "user_sha256": rec.user_sha256,
             "response_sha256": rec.response_sha256, "usage": rec.usage,
             "finish_reason": rec.finish_reason,
-            "duration_s": rec.duration_s, "error": rec.error}
+            "duration_s": rec.duration_s, "error": rec.error, "transient": rec.transient}
 
 
 def _secret_values() -> list[str]:
@@ -272,7 +276,7 @@ Runner = Callable[..., tuple]     # (pipeline, step3_report, fixture_path, expec
 
 
 def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 2,
-             runner: Runner | None = None) -> tuple[Trace, list[llm.CallRecord]]:
+             runner: Runner | None = None, transient_retries: int = 0, wait_s: float = 20.0) -> tuple[Trace, list[llm.CallRecord]]:
     """Draft with the real model, then push the draft - unchanged - through the
     existing chain. A build case re-asks (at most `max_revisions` times) when
     validation fails; an ambiguous case gets exactly one ask."""
@@ -280,12 +284,13 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
     trace = Trace(case=case.name, kind=case.kind,
                   started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   model=llm.get_model(), dpagent=__version__,
-                  budget={"max_calls": max_calls, "max_revisions": max_revisions},
+                  budget={"max_calls": max_calls, "max_revisions": max_revisions,
+                          "transient_retries": transient_retries, "wait_s": wait_s},
                   inputs=case.input_hashes())
     workdir = Path(workdir)
     workdir.mkdir(parents=True, exist_ok=True)
     revision = None
-    with llm.record_calls(max_calls) as records:
+    with llm.record_calls(max_calls, transient_retries=transient_retries, wait_s=wait_s) as records:
         for n in range(1, (max_revisions if case.kind == "build" else 0) + 2):
             attempt = Attempt(index=n, source="llm" if n == 1 else "llm-revision")
             trace.attempts.append(attempt)
@@ -295,12 +300,14 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                                          revision=revision)
             except (llm.LLMError, ValueError, KeyError, TypeError, AttributeError) as exc:
                 attempt.call_indexes = list(range(before + 1, len(records) + 1))
-                attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
-                attempt.outcome = "llm-error" if isinstance(exc, llm.LLMError) else "invalid-reply"
+                attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
+                attempt.outcome = ("provider-unavailable" if isinstance(exc, llm.ProviderUnavailable)
+                                   else "llm-error" if isinstance(exc, llm.LLMError)
+                                   else "invalid-reply")
                 attempt.detail = f"{type(exc).__name__}: {exc}"[:600]
                 break
             attempt.call_indexes = list(range(before + 1, len(records) + 1))
-            attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
+            attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
             if result.blocked:
                 attempt.outcome = "blocked"
                 attempt.blockers = [{"question": b.question, "why_it_matters": b.why_it_matters}
@@ -479,7 +486,10 @@ def leak_problems(recovered: dict) -> list[str]:
 
 def build_problems(result: dict) -> list[str]:
     p = []
-    if not str(result.get("classification", "")).startswith(("llm-", "human-")):
+    if result.get("classification") == "inconclusive-provider-unavailable":
+        p.append("INCONCLUSIVE: the provider was unavailable (busy / rate-limited / timed out) "
+                 "after the permitted retries - nothing was learned about the model")
+    elif not str(result.get("classification", "")).startswith(("llm-", "human-")):
         p.append(f"not validated ({result.get('classification')}, last outcome {result.get('last_outcome')})")
     else:
         dr = result.get("deploy_run") or {}
@@ -494,8 +504,12 @@ def build_problems(result: dict) -> list[str]:
 
 
 def ambiguous_problems(result: dict) -> list[str]:
-    p = [] if str(result.get("classification", "")).startswith("asked-blocker") else [
-        f"model did not ask ({result.get('classification')})"]
+    c = str(result.get("classification", ""))
+    if c == "inconclusive-provider-unavailable":
+        p = ["INCONCLUSIVE: the provider was unavailable after the permitted retries - "
+             "nothing was learned about the model"]
+    else:
+        p = [] if c.startswith("asked-blocker") else [f"model did not ask ({c})"]
     return p + leak_problems(result.get("leaked_and_recovered") or {})
 
 
@@ -508,8 +522,7 @@ def completeness(requested: dict[str, int], ran: dict[str, int]) -> list[str]:
 
 # ------------------------------------------------------------------ connectivity probe
 
-_TRANSIENT = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|"
-                        r"rate.?limit|timed? ?out)\b", re.IGNORECASE)
+_TRANSIENT = llm.TRANSIENT
 
 
 def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:

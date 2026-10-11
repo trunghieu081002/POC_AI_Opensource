@@ -1,0 +1,61 @@
+{
+  "attempts": [
+    {
+      "blockers": [
+        {
+          "question": "Which date defines the month?",
+          "why_it_matters": "x"
+        }
+      ],
+      "call_indexes": [
+        1
+      ],
+      "detail": "",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "blocked",
+      "source": "llm",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T04:53:33+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:5bb46273bba6d0369fa10555c17d3cabac4de9219aecd6c23ec4af2962c61390",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:aff2341be4b5b737d809cbb5891cf69b4c6c3876c0df865ea2fbc974bb8ebcef"
+    }
+  ],
+  "case": "a3_revenue_ambiguous",
+  "classification": "asked-blocker",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:7cc83d542c80a2b2ae866612c7a5e3ad296daf9ca304d81248a41616d107cf40",
+    "request_yaml": "sha256:70e013c82c3566bb683e8304e79bf8a3bfda014f988deb57e1f8f290bfc27452",
+    "source_schema": "sha256:4987833152ad481c865071ddee8eb1ca71cb88bf1e2f2c167c74a14eac76bac2",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "ambiguous",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "",
+  "started_at": "2026-10-11T04:53:33+00:00",
+  "trace_version": 1
+}

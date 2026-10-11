@@ -194,7 +194,7 @@ if [ -n "$A3" ]; then
   docker cp "${REPO_ROOT}/tests/m25_acceptance/run_matrix.py" "${CONTAINER}:/opt/dpagent/tests/m25_acceptance/run_matrix.py"
   # Provider credentials are forwarded BY NAME (docker takes the value from this
   # shell); they are never written to a file, a log line or the evidence.
-  PASS=(-e DPAGENT_LLM_VERIFY -e DPAGENT_MODEL)
+  PASS=(-e DPAGENT_LLM_VERIFY -e DPAGENT_MODEL -e "DPAGENT_LLM_TIMEOUT=${DPAGENT_LLM_TIMEOUT:-900}" -e "A3_TRANSIENT_RETRIES=${A3_TRANSIENT_RETRIES:-5}")
   if [ "$A3" = real ] || [ "$A3" = both ]; then
     for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
       [ -z "${!k:-}" ] || PASS+=(-e "$k")

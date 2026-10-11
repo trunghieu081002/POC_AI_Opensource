@@ -30,6 +30,16 @@ class LLMError(RuntimeError):
     pass
 
 
+class ProviderUnavailable(LLMError):
+    """The provider answered "busy / rate limited / timed out" (503, 429, RESOURCE_EXHAUSTED,
+    timeout) - a statement about the service at that moment, not about the model's ability.
+    Callers that evaluate a model must report it as inconclusive, never as the model failing."""
+
+
+TRANSIENT = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|"
+                       r"rate.?limit|timed? ?out|Timeout)\b", re.IGNORECASE)
+
+
 @dataclass
 class CallRecord:
     """One raw model call, for the A3 verification trace (docs/llm-verification.md).
@@ -47,23 +57,37 @@ class CallRecord:
     duration_s: float = 0.0
     error: str = ""
     finish_reason: str = ""
+    transient: bool = False     # a provider-busy answer; not counted against the call ceiling
 
 
 class _Recorder:
-    def __init__(self, max_calls: int | None):
+    def __init__(self, max_calls: int | None, transient_retries: int, wait_s: float):
         self.max_calls = max_calls
+        self.transient_retries = transient_retries
+        self.wait_s = wait_s
         self.records: list[CallRecord] = []
+
+    def used(self) -> int:
+        """Calls that count against the ceiling: everything except a provider-busy answer
+        (which returned no tokens and cost nothing)."""
+        return sum(1 for r in self.records if not r.transient)
 
 
 _recorders: list[_Recorder] = []
 
 
 @contextlib.contextmanager
-def record_calls(max_calls: int | None = None):
+def record_calls(max_calls: int | None = None, *, transient_retries: int = 0,
+                 wait_s: float = 20.0):
     """Record every `chat()` call made inside the block (including the JSON
     re-asks `chat_json` makes) and refuse the (max_calls+1)th BEFORE it reaches
-    the provider - a verification run must have a hard ceiling on spend."""
-    recorder = _Recorder(max_calls)
+    the provider - a verification run must have a hard ceiling on spend.
+
+    `transient_retries`: how many times ONE chat() call is repeated when the provider says it
+    is busy (waiting `wait_s`, `2*wait_s`, ... between tries). Each try is its own record,
+    flagged `transient`, and is not counted against `max_calls`; if the last try is still busy
+    chat() raises ProviderUnavailable."""
+    recorder = _Recorder(max_calls, transient_retries, wait_s)
     _recorders.append(recorder)
     try:
         yield recorder.records
@@ -127,49 +151,63 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
             "a local ollama/ model. Note: install and verify do not need this."
         )
 
-    record = None
-    for recorder in _recorders:
-        if recorder.max_calls is not None and len(recorder.records) >= recorder.max_calls:
-            raise LLMError(f"call budget exhausted ({recorder.max_calls} call(s)) - "
-                           f"refusing to call {get_model()}")
-        record = CallRecord(
-            index=len(recorder.records) + 1,
-            at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            model=get_model(), system=system, user=user,
-            system_sha256=_sha(system), user_sha256=_sha(user))
-        recorder.records.append(record)
+    recorder = _recorders[-1] if _recorders else None
+    tries = 1 + (recorder.transient_retries if recorder else 0)
+    for n in range(1, tries + 1):
+        record = None
+        if recorder is not None:
+            if recorder.max_calls is not None and recorder.used() >= recorder.max_calls:
+                raise LLMError(f"call budget exhausted ({recorder.max_calls} call(s)) - "
+                               f"refusing to call {get_model()}")
+            record = CallRecord(
+                index=len(recorder.records) + 1,
+                at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                model=get_model(), system=system, user=user,
+                system_sha256=_sha(system), user_sha256=_sha(user))
+            recorder.records.append(record)
 
-    litellm.drop_params = True
-    started = time.monotonic()
-    try:
-        response = litellm.completion(
-            model=get_model(),
-            messages=[{"role": "system", "content": system},
-                      {"role": "user", "content": user}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=get_timeout(),
-        )
-    except Exception as exc:                       # litellm wraps many providers
+        litellm.drop_params = True
+        started = time.monotonic()
+        try:
+            response = litellm.completion(
+                model=get_model(),
+                messages=[{"role": "system", "content": system},
+                          {"role": "user", "content": user}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=get_timeout(),
+            )
+        except Exception as exc:                       # litellm wraps many providers
+            transient = bool(TRANSIENT.search(f"{type(exc).__name__} {exc}"))
+            if record is not None:
+                record.error = f"{type(exc).__name__}: {exc}"[:500]
+                record.transient = transient
+                record.duration_s = round(time.monotonic() - started, 2)
+            if transient and n < tries:
+                _sleep(recorder.wait_s * n)
+                continue
+            cls = ProviderUnavailable if transient else LLMError
+            raise cls(f"{get_model()} call failed: {exc}") from exc
+
+        text = response.choices[0].message.content or ""
         if record is not None:
-            record.error = f"{type(exc).__name__}: {exc}"[:500]
+            record.finish_reason = str(getattr(response.choices[0], "finish_reason", "") or "")
+            record.response, record.response_sha256 = text, _sha(text)
             record.duration_s = round(time.monotonic() - started, 2)
-        raise LLMError(f"{get_model()} call failed: {exc}") from exc
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                record.usage = {k: getattr(usage, k, None)
+                                for k in ("prompt_tokens", "completion_tokens", "total_tokens")}
+                details = getattr(usage, "completion_tokens_details", None)
+                reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
+                if reasoning is not None:
+                    record.usage["reasoning_tokens"] = reasoning
+        return text
+    raise LLMError("unreachable")      # pragma: no cover
 
-    text = response.choices[0].message.content or ""
-    if record is not None:
-        record.finish_reason = str(getattr(response.choices[0], "finish_reason", "") or "")
-        record.response, record.response_sha256 = text, _sha(text)
-        record.duration_s = round(time.monotonic() - started, 2)
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            record.usage = {k: getattr(usage, k, None)
-                            for k in ("prompt_tokens", "completion_tokens", "total_tokens")}
-            details = getattr(usage, "completion_tokens_details", None)
-            reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
-            if reasoning is not None:
-                record.usage["reasoning_tokens"] = reasoning
-    return text
+
+def _sleep(seconds: float) -> None:
+    time.sleep(seconds)
 
 
 def chat_json(system: str, user: str, *, retries: int = 2, **kwargs) -> dict | list:

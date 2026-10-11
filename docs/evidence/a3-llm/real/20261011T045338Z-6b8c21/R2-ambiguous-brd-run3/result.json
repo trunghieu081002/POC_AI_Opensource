@@ -1,0 +1,24 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "llm-error",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "revenue_ambiguous",
+  "classification": "not-validated",
+  "label": "R2-ambiguous-brd-run3",
+  "last_outcome": "llm-error",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "gemini/gemini-3.8-flash",
+  "tokens": 0
+}
