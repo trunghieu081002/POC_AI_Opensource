@@ -300,3 +300,77 @@ def test_the_request_hands_the_model_its_own_warehouse_refs(case):
     wh = case.request.warehouse
     assert wh["host"] == "${A3_WH_HOST:-localhost}" and wh["schema"] == "a3_artist_summary"
     assert "WAREHOUSE_DB" not in json.dumps(wh)
+
+
+# ------------------------------------------------------------------ acceptance criteria (review of A3)
+
+def test_running_out_of_budget_before_all_requested_runs_is_incomplete_not_a_pass():
+    assert llm_verify.completeness({"build": 1, "ambiguous": 3}, {"build": 1, "ambiguous": 0}) == [
+        "ambiguous: 0 of 3 requested run(s) were run"]
+    assert llm_verify.completeness({"build": 1, "ambiguous": 3}, {"build": 1, "ambiguous": 3}) == []
+
+
+def _passing_build():
+    return {"classification": "llm-first-draft", "last_outcome": "validated",
+            "deploy_run": {"ok": True, "published_bytes": {"ok": True}},
+            "edit_checks": {"ok": True},
+            "leaked_and_recovered": {"databases": [], "roles": [], "failed": []}}
+
+
+def test_a_recovered_leak_still_fails_the_criteria():
+    assert llm_verify.build_problems(_passing_build()) == []
+    leaky = _passing_build()
+    leaky["leaked_and_recovered"] = {"databases": ["dpagent_fixture_x"], "roles": [], "failed": []}
+    assert "leaked throwaway resources" in llm_verify.build_problems(leaky)[0]
+    ambiguous = {"classification": "asked-blocker", "leaked_and_recovered": leaky["leaked_and_recovered"]}
+    assert llm_verify.ambiguous_problems(ambiguous)
+    assert llm_verify.leak_problems({"failed": ["x"]})
+
+
+def test_published_files_must_equal_the_draft_not_just_the_workspace(tmp_path):
+    drafted = {"pipeline.yaml": "name: p\n", "models/m.sql": "select 1\n"}
+    pub, dbt = tmp_path / "pub", tmp_path / "dbt"
+    (pub / "p" / "models").mkdir(parents=True)
+    (dbt / "p").mkdir(parents=True)
+    (pub / "p" / "pipeline.yaml").write_text("name: p\nmaturity: reviewed\n")   # promote's label
+    (pub / "p" / "models" / "m.sql").write_text("select 1\n")
+    (dbt / "p" / "m.sql").write_text("select 1\n")
+    ok = llm_verify.check_published_bytes("p", drafted, published_dir=pub, dbt_models_dir=dbt)
+    assert ok["ok"] is True and len(ok["checked"]) == 3
+
+    (dbt / "p" / "m.sql").write_text("select 2\n")              # what dbt runs differs ...
+    bad = llm_verify.check_published_bytes("p", drafted, published_dir=pub, dbt_models_dir=dbt)
+    assert bad["ok"] is False and bad["checked"]["dbt-project/models/m.sql"]["equal"] is False
+    # ... even though the draft itself, in the workspace, is untouched
+    (dbt / "p" / "m.sql").unlink()
+    gone = llm_verify.check_published_bytes("p", drafted, published_dir=pub, dbt_models_dir=dbt)
+    assert gone["ok"] is False and gone["checked"]["dbt-project/models/m.sql"]["missing"] is True
+    assert llm_verify.check_published_bytes("p", {}, published_dir=pub, dbt_models_dir=dbt)["ok"] is False
+
+
+def test_a_json_repair_is_counted_separately_from_a_pipeline_revision(provider, case, tmp_path):
+    provider(["Sure! here is the pipeline", _bundle("good")])      # prose first, then valid JSON
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=4,
+                                   runner=scripted_runner(_section()))
+    assert trace.attempts[0].format_repairs == 1 and len(trace.attempts[0].call_indexes) == 2
+    assert trace.classification == "llm-first-draft+1-format-repair(s)"
+
+
+def test_a_pipeline_revision_is_not_hidden_by_the_label(provider, case, tmp_path):
+    provider([_bundle("wrong_result"), "oops not json", _bundle("good")])
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=6, max_revisions=2,
+                                   runner=scripted_runner(_section("fail", "fail"), _section()))
+    assert trace.classification == "llm-after-1-revision(s)+1-format-repair(s)"
+
+
+def test_probe_is_one_call_and_opt_in(provider, monkeypatch):
+    monkeypatch.delenv(llm_verify.OPT_IN_ENV, raising=False)
+    with pytest.raises(llm_verify.LLMVerifyRefused):
+        llm_verify.probe()
+    monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
+    p = provider(["OK"])
+    result = llm_verify.probe()
+    assert result["ok"] and result["calls"] == 1 and len(p.calls) == 1
+    provider([RuntimeError("quota exceeded")])
+    failed = llm_verify.probe()
+    assert failed["ok"] is False and "quota" in failed["error"]

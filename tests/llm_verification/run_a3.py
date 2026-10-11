@@ -116,23 +116,9 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
         if last.outcome == "validated" and deploy:
             result["deploy_run"] = llm_verify.promote_deploy_run(
                 loader.load(case.name, workdir), case.fixture_path, case.expected_path,
-                last.evidence_id)
+                last.evidence_id, drafted_files=last.drafted_files)
             if result["deploy_run"].get("ok"):
                 result["edit_checks"] = _edits_invalidate(case, workdir, last.evidence_id)
-            # the deployed bytes are the drafted bytes - except the one line promote owns
-            def _bytes(rel):
-                text = (workdir / case.name / rel).read_text(encoding="utf-8")
-                if rel == "pipeline.yaml":       # `maturity: reviewed` is promote's label, not content
-                    text = "\n".join(l for l in text.split("\n") if not approval._MATURITY_LINE.match(l))
-                return llm_verify._sha(text)
-
-            def _drafted(rel, text):
-                if rel == "pipeline.yaml":
-                    text = "\n".join(l for l in text.split("\n") if not approval._MATURITY_LINE.match(l))
-                return llm_verify._sha(text)
-            drafted = {rel: _drafted(rel, text) for rel, text in last.drafted_files.items()}
-            on_disk = {rel: _bytes(rel) for rel in drafted}
-            result["deployed_bytes_are_the_drafted_bytes"] = (drafted == on_disk)
         elif last.evidence_id:
             # validation ran and did not pass: the sealed record must not promote
             pipeline = loader.load(case.name, workdir)
@@ -166,9 +152,7 @@ def scripted_scenarios(out: Path) -> list[dict]:
         result = run_one(case_name, out, label, max_calls=calls, max_revisions=revisions,
                          deploy=deploy)
         problems = expect(result)
-        leaked = result["leaked_and_recovered"]
-        if leaked["databases"] or leaked["roles"] or leaked["failed"]:
-            problems.append(f"leaked throwaway resources: {leaked}")
+        problems += llm_verify.leak_problems(result["leaked_and_recovered"])
         result["expectation_problems"] = problems
         (out / label / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True,
                                                              default=str, ensure_ascii=False))
@@ -185,8 +169,8 @@ def scripted_scenarios(out: Path) -> list[dict]:
             p.append("promote did not produce a verified approval")
         if not (r.get("edit_checks") or {}).get("ok"):
             p.append(f"edit checks: {(r.get('edit_checks') or {}).get('problems')}")
-        if r.get("deployed_bytes_are_the_drafted_bytes") is not True:
-            p.append("deployed content differs from the drafted content")
+        if (dr.get("published_bytes") or {}).get("ok") is not True:
+            p.append(f"published files differ from the drafted files: {dr.get('published_bytes')}")
         return p
 
     def blocked_at_validation(r):
@@ -249,25 +233,17 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
         print("no provider credential in the environment", file=sys.stderr)
         raise SystemExit(2)
     rows, remaining = [], max_calls
+    ran = {"build": 0, "ambiguous": 0}
     print(f"model: {llm.get_model()}  call ceiling: {max_calls}", flush=True)
 
     r = run_one(BUILD, out, "R1-build-artist-summary", max_calls=remaining,
                 max_revisions=max_revisions)
     rows.append(r)
+    ran["build"] += 1
     remaining -= r["calls"]
-    p = []
-    if not r["classification"].startswith("llm-"):
-        p.append(f"not validated ({r['classification']}, last outcome {r['last_outcome']})")
-    else:
-        dr = r.get("deploy_run") or {}
-        if not dr.get("ok"):
-            p.append("promote/deploy/run did not complete")
-        if not (r.get("edit_checks") or {}).get("ok"):
-            p.append("edit checks failed")
-        if r.get("deployed_bytes_are_the_drafted_bytes") is not True:
-            p.append("deployed bytes differ from the drafted bytes")
-    r["criteria_problems"] = p
-    print(f"{'ok  ' if not p else 'FAIL'}  R1 {r['classification']}  calls={r['calls']}  {p}", flush=True)
+    r["criteria_problems"] = llm_verify.build_problems(r)
+    print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R1 {r['classification']}  "
+          f"calls={r['calls']}  {r['criteria_problems']}", flush=True)
 
     for i in range(1, ambiguous_runs + 1):
         if remaining < 1:
@@ -275,17 +251,26 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
             break
         r = run_one(AMBIGUOUS, out, f"R2-ambiguous-brd-run{i}", max_calls=min(remaining, 3),
                     max_revisions=0, deploy=False)
+        ran["ambiguous"] += 1
         remaining -= r["calls"]
-        r["criteria_problems"] = [] if r["classification"] == "asked-blocker" else [
-            f"model did not ask ({r['classification']})"]
+        r["criteria_problems"] = llm_verify.ambiguous_problems(r)
         rows.append(r)
         print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R2 run{i} {r['classification']}",
               flush=True)
+
+    # budget exhaustion must show up as INCOMPLETE, not as a pass over the runs that fit
+    missing = llm_verify.completeness({"build": 1, "ambiguous": ambiguous_runs}, ran)
+    if missing:
+        rows.append({"label": "INCOMPLETE", "classification": "incomplete", "criteria_problems": missing,
+                     "calls": 0})
+        print(f"FAIL  INCOMPLETE  {missing}", flush=True)
     return rows
 
 
 def main(argv: list[str]) -> int:
     import argparse
+    import uuid
+    from datetime import datetime, timezone
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["scripted", "real"], required=True)
     ap.add_argument("--out", type=Path, default=Path("/root/a3-evidence"))
@@ -299,8 +284,11 @@ def main(argv: list[str]) -> int:
     if not pre.ok:
         print(f"preflight failed before running anything: {pre.detail}", file=sys.stderr)
         return 2
-    out = args.out / args.mode
-    out.mkdir(parents=True, exist_ok=True)
+    # one directory per invocation, never reused or deleted: failed and earlier runs stay
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
+    out = args.out / args.mode / run_id
+    out.mkdir(parents=True)
+    print(f"run id: {run_id}", flush=True)
     try:
         rows = (scripted_scenarios(out) if args.mode == "scripted"
                 else real_scenarios(out, args.max_calls, args.ambiguous_runs, args.max_revisions))
@@ -308,10 +296,10 @@ def main(argv: list[str]) -> int:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
     bad = [r["label"] for r in rows if r.get("expectation_problems") or r.get("criteria_problems")]
-    summary = {"mode": args.mode, "runs": [
+    summary = {"mode": args.mode, "run_id": run_id, "runs": [
         {k: r.get(k) for k in ("label", "classification", "last_outcome", "calls", "tokens", "model",
                                "expectation_problems", "criteria_problems")} for r in rows],
-        "not_met": bad}
+        "not_met": bad, "complete": "INCOMPLETE" not in bad}
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True, default=str,
                                                  ensure_ascii=False))
     print(f"\n{len(rows) - len(bad)}/{len(rows)} met their criteria"

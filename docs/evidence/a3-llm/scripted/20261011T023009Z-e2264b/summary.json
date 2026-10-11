@@ -1,0 +1,88 @@
+{
+  "complete": true,
+  "mode": "scripted",
+  "not_met": [],
+  "run_id": "20261011T023009Z-e2264b",
+  "runs": [
+    {
+      "calls": 1,
+      "classification": "llm-first-draft",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S1-good-draft-first-try",
+      "last_outcome": "validated",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 2,
+      "classification": "llm-after-1-revision(s)",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S2-wrong-then-corrected",
+      "last_outcome": "validated",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 36
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S3-unknown-column",
+      "last_outcome": "validation-fail",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S4-wrong-result",
+      "last_outcome": "validation-fail",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S5-api-timeout",
+      "last_outcome": "llm-error",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 0
+    },
+    {
+      "calls": 3,
+      "classification": "not-validated",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S6-invalid-response",
+      "last_outcome": "llm-error",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 54
+    },
+    {
+      "calls": 1,
+      "classification": "guessed",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S7-ambiguous-brd-guessed",
+      "last_outcome": "built-anyway",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "S8-ambiguous-brd-asked",
+      "last_outcome": "blocked",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    }
+  ]
+}

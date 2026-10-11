@@ -1,0 +1,81 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "run_1: failed\n[run 10] dbt run failed for 'curated': \u001b[0m02:34:28  Running with dbt=1.8.10\n\u001b[0m02:34:28  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions\n\u001b[0m02:34:29  Registered adapter: postgres=1.8.2\n\u001b[0m02:34:29  Unable to do partial parsing because profile has changed\n\u001b[0m02:34:30  Found 1 model, 434 macros\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  Concurrency: 4 threads (target='run')\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  1 of 1 START sql table model a3_artist_summary.artist_summary .................. [RUN]\n\u001b[0m02:34:30  1 of 1 ERROR creating sql table model a3_artist_summary.artist_summary ......... [\u001b[31mERROR\u001b[0m in 0.14s]\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  Finished running 1 table model in 0 hours 0 minutes and 0.31 seconds (0.31s).\n\u001b[0m02:34:31  \n\u001b[0m02:34:31  \u001b[31mCompleted with 1 error and 0 warnings:\u001b[0m\n\u001b[0m02:34:31  \n\u001b[0m02:34:31    Database Error in model artist_summary__validate_a94d9b6b (models/a3_artist_summary__validate__a94d9b6b/artist_summary__validate_a94d9b6b.sql)\n  column \"partner_name\" does not exist\n  LINE 15:     select distinct id, btrim(partner_name) as name\n                                         ^\n  compiled code at target/run/default/models/a3_artist_summary__validate__a94d9b6b/artist_summary__validate_a94d9b6b.sql\n\u001b[0m02:34:31  \n\u001b[0m02:34:31  Done. PASS=0 WARN=0 ERROR=1 SKIP=0 TOTAL=1\n[run 10] DAG run 10 reached termi",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-c95f5c70e77c22fd",
+      "fed_back": "run_1: failed\n[run 10] dbt run failed for 'curated': \u001b[0m02:34:28  Running with dbt=1.8.10\n\u001b[0m02:34:28  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions\n\u001b[0m02:34:29  Registered adapter: postgres=1.8.2\n\u001b[0m02:34:29  Unable to do partial parsing because profile has changed\n\u001b[0m02:34:30  Found 1 model, 434 macros\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  Concurrency: 4 threads (target='run')\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  1 of 1 START sql table model a3_artist_summary.artist_summary .................. [RUN]\n\u001b[0m02:34:30  1 of 1 ERROR creating sql table model a3_artist_summary.artist_summary ......... [\u001b[31mERROR\u001b[0m in 0.14s]\n\u001b[0m02:34:30  \n\u001b[0m02:34:30  Finished running 1 table model in 0 hours 0 minutes and 0.31 seconds (0.31s).\n\u001b[0m02:34:31  \n\u001b[0m02:34:31  \u001b[31mCompleted with 1 error and 0 warnings:\u001b[0m\n\u001b[0m02:34:31  \n\u001b[0m02:34:31    Database Error in model artist_summary__validate_a94d9b6b (models/a3_artist_summary__validate__a94d9b6b/artist_summary__validate_a94d9b6b.sql)\n  column \"partner_name\" does not exist\n  LINE 15:     select distinct id, btrim(partner_name) as name\n                                         ^\n  compiled code at target/run/default/models/a3_artist_summary__validate__a94d9b6b/artist_summary__validate_a94d9b6b.sql\n\u001b[0m02:34:31  \n\u001b[0m02:34:31  Done. PASS=0 WARN=0 ERROR=1 SKIP=0 TOTAL=1\n[run 10] DAG run 10 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:e3190878aaac014962483a18b64499d41c6b2dd9d431c68866e63cbe7a5a9cda",
+        "pipeline.yaml": "sha256:f142152bf31e1bd289b562490cf9da3b46ff2348139ec11c594973cb677e3ba2"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__a94d9b6b",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_ids": [
+          10
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T02:34:01+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:2a738aacdf54e9d2e3250a41e98dcfc5d623bc3bcd356695f35eaf7685fc1e76",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:518e0161a879aad589a23f03e05a366b5894764a41305573f89ed59fb043b1b7"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "/tmp/a3_66zargxl/pipelines/a3_artist_summary",
+  "started_at": "2026-10-11T02:34:01+00:00",
+  "trace_version": 1
+}

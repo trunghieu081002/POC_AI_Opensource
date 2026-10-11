@@ -1,0 +1,25 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "built-anyway",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "revenue_ambiguous",
+  "classification": "guessed",
+  "expectation_problems": [],
+  "label": "S7-ambiguous-brd-guessed",
+  "last_outcome": "built-anyway",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 18
+}
