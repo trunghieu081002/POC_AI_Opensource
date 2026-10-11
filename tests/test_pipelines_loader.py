@@ -600,11 +600,26 @@ def test_bronze_staging_refuses_incremental(root):
         loader.load("demo", root)
 
 
-def test_bronze_staging_refuses_more_than_one_table(root):
+def test_bronze_staging_accepts_several_tables_read_as_one_batch(root):
     data = _minimal(bronze_staging=True, bronze=_BRONZE)
     data["source"]["tables"] = ["res_partner", "sale_order"]
     _write(root, "demo", data)
-    with pytest.raises(loader.PipelineError, match="exactly one source table"):
+    assert loader.load("demo", root).source.tables == ["res_partner", "sale_order"]
+
+
+def test_bronze_staging_refuses_duplicate_landing_names(root):
+    data = _minimal(bronze_staging=True, bronze=_BRONZE)
+    data["source"]["tables"] = ["public.res_partner", "other.res_partner"]
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="distinct table names"):
+        loader.load("demo", root)
+
+
+def test_bronze_staging_has_a_ceiling_on_tables(root):
+    data = _minimal(bronze_staging=True, bronze=_BRONZE)
+    data["source"]["tables"] = [f"t{i}" for i in range(loader.MAX_BRONZE_TABLES + 1)]
+    _write(root, "demo", data)
+    with pytest.raises(loader.PipelineError, match="1 to 20"):
         loader.load("demo", root)
 
 

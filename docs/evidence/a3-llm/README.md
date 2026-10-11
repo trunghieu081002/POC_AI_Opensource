@@ -1,10 +1,10 @@
 # A3 evidence
 
-**State: A3's criteria are met for `gemini/gemini-3.8-flash` on the `artist_summary` case — see the fourth real run below, and its caveats. (Runs 1-3 are kept: inconclusive, inconclusive, failed.)** `scripted/` is
-not evidence about any model — its replies are the hand-written files in
-`tests/llm_verification/scripted_drafts/`. `real/` does not exist because the machine had no
-provider credential when this was produced. A3 is **not complete** until `real/` is here
-(see [`docs/llm-verification.md`](../../llm-verification.md), "Done means").
+**State: A3's criteria are met for `gemini/gemini-3.8-flash` on the `artist_summary` case — see the fourth real run below, and its caveats.**
+The three earlier real runs are kept: run 1 inconclusive (provider 503), run 2 not validated (truncated replies / a validation failure), run 3 not
+validated (a `schema_contract` written as a list). `scripted/` is not evidence about any model — its replies are the hand-written files in
+`tests/llm_verification/scripted_drafts/`; it proves the chain and the blocks. "Done means" is in
+[`docs/llm-verification.md`](../../llm-verification.md).
 
 Layout: `<mode>/<run-id>/` — one directory per run, never overwritten (see
 [`docs/llm-verification.md`](../../llm-verification.md)). `scripted/20261011T013416Z-first-clean-run/`
@@ -123,8 +123,8 @@ Operator-run (`--a3 real --max-calls 12 --ambiguous-runs 3`), host built from pa
 | Published bytes | the 5 files Airflow/dbt read (`pipeline.yaml`, 2 models under `/opt/dpagent/pipelines/…`, the same 2 under `/opt/dbt/project/models/…`) are hash-identical to the drafted files (promote's `maturity:` label excepted). |
 | Edit checks | model / manifest edit → approval lost and deploy refuses; fixture / expected edit → promote refuses; approval bytes unchanged in all four; restoring restores the approval. |
 
-**R2 — ambiguous BRD: `asked-blocker` ×3** (≈11 s each). Counting all real runs so far on that BRD: 1 + 3 + 3 = 7 asks out of 7 completed attempts — still reported
-per run; a different model, prompt or day can differ.
+**R2 — ambiguous BRD: `asked-blocker` ×3** (≈11 s each). Counting all four real runs on that BRD: 10 `asked-blocker` out of the 10 attempts that got an answer (a further 2 attempts in run 1 were provider 503s and
+say nothing) — still reported per run; a different model, prompt or day can differ.
 
 ### What this does and does not show
 
@@ -155,7 +155,7 @@ anyway) is recorded `guessed`; S8 `asked-blocker`. One earlier attempt to build 
 | Evidence accepted by A2 | promote accepted, `verified` (`ev-df5c4171186f68a1`) |
 | Promoted, deployed, run for real | deploy without `--allow-draft`, journal run 6 `ok` |
 | Output after deploy correct | 1 row matched exactly; gates passed in the journal |
-| Under-specified BRD tested | `asked-blocker` ×3 in this run (7/7 across all real runs) — per run, not generalised |
+| Under-specified BRD tested | `asked-blocker` ×3 in this run (10 of 10 answered attempts across the four real runs; 2 more were provider 503s) — per run, not generalised |
 | Wrong output blocked | scripted S3/S4 (and S2's first reply) on the same code |
 | Cleanup verified | undeploy verified, S3-style leak audit `leaks=0` on both hosts |
 | Anyone can repeat it | `docs/llm-verification.md` |

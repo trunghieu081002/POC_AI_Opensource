@@ -1122,17 +1122,22 @@ def _source_down_proof(clone: Pipeline, fixture_obj: "Fixture", src_db: Throwawa
         proof.error = f"LOAD with the source gone failed: {exc}"
         return proof
 
-    table = clone.source.tables[0]
-    fx_table = next((t for t in fixture_obj.tables if t.name == table), None)
-    if fx_table is None:
-        proof.error = f"the fixture has no table {table!r} to compare the landing against"
-        return proof
     landing = _landing_dataset(clone)
-    result = compare_curated(ExpectedResult(table=table, rows=fx_table.rows,
-                                            row_count=len(fx_table.rows), schema=landing),
-                             wh_db, landing)
-    proof.landing_matches_fixture = result.ok
-    proof.detail = result.detail
+    details = []
+    proof.landing_matches_fixture = True
+    for relation in clone.source.tables:
+        table = relation.rpartition(".")[2]
+        fx_table = next((t for t in fixture_obj.tables if t.name == table), None)
+        if fx_table is None:
+            proof.error = f"the fixture has no table {table!r} to compare the landing against"
+            proof.landing_matches_fixture = False
+            return proof
+        result = compare_curated(ExpectedResult(table=table, rows=fx_table.rows,
+                                                row_count=len(fx_table.rows), schema=landing),
+                                 wh_db, landing)
+        proof.landing_matches_fixture = proof.landing_matches_fixture and result.ok
+        details.append(f"{table}: {result.detail}")
+    proof.detail = "; ".join(details)
     return proof
 
 

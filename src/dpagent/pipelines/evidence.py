@@ -308,9 +308,17 @@ def _policy_reasons(payload: dict, pipeline: Pipeline, fixture_hash: str,
         if s3.get("error"):
             r.append(f"S3 cleanup error: {s3['error']}")
         batches = b.get("batches") or []
-        if len(batches) < 3:
+        # one registry row per (batch, table): count batches, not rows
+        distinct = {x.get("batch_id") for x in batches}
+        if len(distinct) < 3:
             r.append(f"expected at least 3 bronze batches (2 runs + the source-down LOAD), "
-                     f"got {len(batches)}")
+                     f"got {len(distinct)}")
+        expected_tables = len(pipeline.source.tables)
+        for batch_id in sorted(distinct, key=str):
+            got = [x for x in batches if x.get("batch_id") == batch_id]
+            if len(got) != expected_tables:
+                r.append(f"bronze batch {batch_id} has {len(got)} table(s) in the registry, "
+                         f"the pipeline reads {expected_tables}")
         for batch in batches:
             if batch.get("status") != "loaded":
                 r.append(f"bronze batch {batch.get('batch_id')} is {batch.get('status')!r}, "

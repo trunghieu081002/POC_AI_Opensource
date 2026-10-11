@@ -448,7 +448,8 @@ def _seaweed_credentials() -> dict:
     return creds
 
 
-def _hg_pipeline(tmp_path: Path, *, mutate=None, name: str = "") -> tuple[loader.Pipeline, Path, Path]:
+def _hg_pipeline(tmp_path: Path, *, mutate=None, name: str = "",
+                 source: Path | None = None) -> tuple[loader.Pipeline, Path, Path]:
     """The real pipelines/hg_dbt_branch (copied, so a scenario may mutate its
     copy), with the original's bronze refs pointed at this host's seaweedfs.
     Its source/warehouse refs are never resolved by a fixture run (the clone
@@ -465,16 +466,18 @@ def _hg_pipeline(tmp_path: Path, *, mutate=None, name: str = "") -> tuple[loader
     }
     os.environ.update(env)
     import shutil
-    name = name or HG
+    source = source or HG_DIR
+    base = source.name
+    name = name or base
     work = tmp_path / name
-    shutil.copytree(HG_DIR, work, ignore=shutil.ignore_patterns(
+    shutil.copytree(source, work, ignore=shutil.ignore_patterns(
         ".synth-validation.yaml", ".approved.yaml", "build"))
-    if name != HG:
+    if name != base:
         # A distinct pipeline NAME for scenarios that deploy for real: the
         # published directory and DAG are keyed by name, and the host's own
         # copy of hg_dbt_branch must never be overwritten or undeployed.
         manifest = work / "pipeline.yaml"
-        manifest.write_text(manifest.read_text().replace(f"name: {HG}\n", f"name: {name}\n", 1))
+        manifest.write_text(manifest.read_text().replace(f"name: {base}\n", f"name: {name}\n", 1))
     if mutate:
         mutate(work)
     return loader.load(name, tmp_path), work / "fixture.yaml", work / "expected.yaml"
@@ -499,11 +502,11 @@ def _promote_outcome(pipeline, fx_path, ex_path, evidence_id=None) -> dict:
             "is_approved": approval.is_approved(reloaded)[0]}
 
 
-def _run_hg(tmp_path: Path, *, mutate=None, **run_kwargs) -> dict:
+def _run_hg(tmp_path: Path, *, mutate=None, source: Path | None = None, **run_kwargs) -> dict:
     """The controlled validation path (step 3, then evidence.run_and_seal - the
     function `dpagent pipeline validate --fixture` calls), then an attempt to
     promote on the strength of what it just sealed."""
-    pipeline, fx_path, ex_path = _hg_pipeline(tmp_path, mutate=mutate)
+    pipeline, fx_path, ex_path = _hg_pipeline(tmp_path, mutate=mutate, source=source)
     step3 = validate.validate_pipeline(pipeline, generator="dpagent pipeline validate")
     report, result, evidence_id = evidence.run_and_seal(
         pipeline, step3, fx_path, ex_path, **run_kwargs)
@@ -779,6 +782,93 @@ def run_a2_promote_deploy_run(tmp_path: Path) -> dict:
     return result
 
 
+PAIR_DIR = REPO_ROOT / "pipelines" / "hg_bronze_pair"
+BUCKET = "hg-bronze"
+
+
+def _pair(tmp_path: Path, **kw) -> dict:
+    return _run_hg(tmp_path, source=PAIR_DIR, **kw)
+
+
+def run_pair_correct_twice(tmp_path: Path) -> dict:
+    return _pair(tmp_path)
+
+
+def run_pair_missing_table(tmp_path: Path) -> dict:
+    """One of the pipeline's tables does not exist in the source: the whole batch must fail at
+    EXTRACT, so no landing is built from the table that did exist."""
+    def add_missing(work):
+        f = work / "pipeline.yaml"
+        f.write_text(f.read_text().replace("tables: [res_partner, x_music_plan_detail_price]",
+                                           "tables: [res_partner, x_music_plan_detail_price, no_such_table]"))
+    return _pair(tmp_path, mutate=add_missing)
+
+
+def _tamper_during_source_down_load(tmp_path: Path, tamper) -> dict:
+    """Replace the source-down proof's LOAD by one that first lets `tamper(clone, batch_id)` damage
+    the batch in object storage; then, after the refused LOAD, compare BOTH landing tables with the
+    fixture again: a refused LOAD must leave the previous (complete) landing untouched."""
+    original_proof = fixture._source_down_proof
+    seen: dict = {}
+
+    def proof(clone, fixture_obj, src_db, wh_db):
+        real_load = bronze.run_load
+
+        def damaged_load(*, pipeline, batch_id, **k):
+            seen["damage"] = tamper(clone, batch_id)
+            return real_load(pipeline=pipeline, batch_id=batch_id, **k)
+
+        with _patched(bronze, "run_load", damaged_load):
+            result = original_proof(clone, fixture_obj, src_db, wh_db)
+        landing = fixture._landing_dataset(clone)
+        checks = {}
+        for relation in clone.source.tables:
+            table = relation.rpartition(".")[2]
+            fx_t = next(t for t in fixture_obj.tables if t.name == table)
+            cmp_ = fixture.compare_curated(
+                fixture.ExpectedResult(table=table, rows=fx_t.rows, row_count=len(fx_t.rows),
+                                       schema=landing), wh_db, landing)
+            checks[table] = cmp_.ok
+        seen["landing_intact_after_refused_load"] = checks
+        return result
+
+    with _patched(fixture, "_source_down_proof", proof):
+        out = _pair(tmp_path)
+    out["tamper"] = seen
+    return out
+
+
+def _batch_keys(clone, batch_id: str) -> list[str]:
+    base = f"{clone.bronze.prefix}/{clone.name}/"
+    keys = [k.strip() for k in _s3py("list", BUCKET, base, check=False).stdout.split("\n") if k.strip()]
+    return [k for k in keys if batch_id in k]
+
+
+def run_pair_tampered_object(tmp_path: Path) -> dict:
+    def tamper(clone, batch_id):
+        key = next(k for k in _batch_keys(clone, batch_id)
+                   if "/x_music_plan_detail_price/" in k and k.endswith(".parquet"))
+        junk = tmp_path / "junk.bin"
+        junk.write_bytes(b"not the object that was extracted")
+        _s3py("put", BUCKET, key, str(junk))
+        return {"overwrote": key}
+    return _tamper_during_source_down_load(tmp_path, tamper)
+
+
+def run_pair_tampered_batch_manifest(tmp_path: Path) -> dict:
+    def tamper(clone, batch_id):
+        key = next(k for k in _batch_keys(clone, batch_id) if k.endswith("_batch.json"))
+        got = tmp_path / "batch.json"
+        _s3py("get", BUCKET, key, str(got))
+        import json as _json
+        doc = _json.loads(got.read_text())
+        doc["tables"] = doc["tables"][:1]            # a batch that "forgets" a table
+        got.write_text(_json.dumps(doc, indent=2, sort_keys=True))
+        _s3py("put", BUCKET, key, str(got))
+        return {"overwrote": key}
+    return _tamper_during_source_down_load(tmp_path, tamper)
+
+
 SCENARIOS = {
     "ref-connection": lambda tmp: run_connection_shape("ref", tmp),
     "literal-connection": lambda tmp: run_connection_shape("literal", tmp),
@@ -811,6 +901,10 @@ BRONZE_SCENARIOS_FN = {
     "hg-stray-object-purged": run_hg_stray_object_purged,
     "hg-purge-failure-detected": run_hg_purge_failure_detected,
     "a2-promote-deploy-run": run_a2_promote_deploy_run,
+    "pair-correct-twice": run_pair_correct_twice,
+    "pair-missing-table": run_pair_missing_table,
+    "pair-tampered-object": run_pair_tampered_object,
+    "pair-tampered-batch-manifest": run_pair_tampered_batch_manifest,
 }
 SCENARIOS.update(BRONZE_SCENARIOS_FN)
 BRONZE_SCENARIOS = list(BRONZE_SCENARIOS_FN)
@@ -967,6 +1061,84 @@ EXPECTATIONS.update({
     "hg-timeout": _refused(_expect("fail", "fail", run_status__run_1="timeout")),
     "hg-stray-object-purged": _hg_stray,
     "hg-purge-failure-detected": _refused(_hg_purge_fail),
+})
+
+def _pair_correct(result: dict) -> tuple[bool, str]:
+    """Two tables, one batch: every claim checked, per table and for the set."""
+    problems = []
+    need = lambda cond, msg: None if cond else problems.append(msg)     # noqa: E731
+    need(result.get("overall") == "pass", f"overall={result.get('overall')!r}")
+    need(result.get("run_status") == {"run_1": "ok", "run_2": "ok"}, f"run_status={result.get('run_status')}")
+    need(result.get("comparison", {}).get("idempotent") is True, "not idempotent")
+    c = result.get("cleanup", {})
+    need(c.get("overall") == "pass" and c.get("s3_objects") == "pass", f"cleanup={c}")
+    b = result.get("bronze") or {}
+    batches = b.get("batches", [])
+    by_batch: dict = {}
+    for x in batches:
+        by_batch.setdefault(x["batch_id"], []).append(x)
+    need(len(by_batch) == 3, f"expected 3 batches, got {len(by_batch)}")
+    for bid, rows in by_batch.items():
+        need(sorted(r["table_name"] for r in rows) == ["res_partner", "x_music_plan_detail_price"],
+             f"batch {bid} holds {[r['table_name'] for r in rows]}")
+        need(all(r["status"] == "loaded" for r in rows), f"batch {bid} statuses {[r['status'] for r in rows]}")
+        need({r["table_name"]: r["loaded_rows"] for r in rows} == {"res_partner": 5, "x_music_plan_detail_price": 7},
+             f"batch {bid} loaded_rows {[(r['table_name'], r['loaded_rows']) for r in rows]}")
+        need(len({r["manifest_sha256"] for r in rows}) == 2, f"batch {bid}: table manifests not distinct")
+    # 3 batches x (2 tables x (1 parquet + 1 manifest) + 1 batch manifest)
+    need(b.get("s3", {}).get("objects_found_at_teardown") == 15, f"s3 {b.get('s3')}")
+    need(b.get("s3", {}).get("objects_remaining_after_purge") == 0, f"s3 {b.get('s3')}")
+    sd = b.get("source_down_load") or {}
+    need(sd.get("ok") is True and sd.get("source_dropped") and sd.get("source_unreachable"),
+         f"source_down_load={sd}")
+    pr = result.get("promote") or {}
+    need(pr.get("accepted") and pr.get("verification") == "verified", f"promote={pr}")
+    return (not problems), ("; ".join(problems) if problems else "matched expectation")
+
+
+def _pair_missing(result: dict) -> tuple[bool, str]:
+    b = (result.get("bronze") or {})
+    batches = b.get("batches", [])
+    problems = []
+    if result.get("overall") != "fail" or (result.get("run_status") or {}).get("run_1") != "failed":
+        problems.append(f"expected a failed run 1, got {result.get('overall')!r}/{result.get('run_status')}")
+    if not batches or any(x["status"] != "failed" for x in batches):
+        problems.append(f"every table of the batch must be 'failed', got {[(x['table_name'], x['status']) for x in batches]}")
+    if len({x["table_name"] for x in batches}) != 3:
+        problems.append("the registry should hold a row for each of the 3 tables")
+    if (result.get("cleanup") or {}).get("overall") != "pass":
+        problems.append(f"cleanup={result.get('cleanup')}")
+    pr = result.get("promote") or {}
+    if pr.get("accepted") is not False or pr.get("approval_unchanged") is not True:
+        problems.append(f"promote={pr}")
+    return (not problems), ("; ".join(problems) if problems else
+                            "one missing table failed the whole batch; nothing promotable")
+
+
+def _pair_tampered(needle: str):
+    def check(result: dict) -> tuple[bool, str]:
+        sd = (result.get("bronze") or {}).get("source_down_load") or {}
+        t = result.get("tamper") or {}
+        problems = []
+        if result.get("overall") != "fail":
+            problems.append(f"overall={result.get('overall')!r}")
+        if sd.get("loaded") is not False or needle not in (sd.get("error") or ""):
+            problems.append(f"LOAD must be refused naming {needle!r}; source_down_load={sd}")
+        if t.get("landing_intact_after_refused_load") != {"res_partner": True, "x_music_plan_detail_price": True}:
+            problems.append(f"landing after the refused LOAD: {t.get('landing_intact_after_refused_load')}")
+        pr = result.get("promote") or {}
+        if pr.get("accepted") is not False:
+            problems.append("a validation whose LOAD was refused must not promote")
+        return (not problems), ("; ".join(problems) if problems else
+                                f"LOAD refused ({needle}); previous landing intact in both tables")
+    return check
+
+
+EXPECTATIONS.update({
+    "pair-correct-twice": _pair_correct,
+    "pair-missing-table": _pair_missing,
+    "pair-tampered-object": _pair_tampered("sha256"),
+    "pair-tampered-batch-manifest": _pair_tampered("batch"),
 })
 
 assert set(EXPECTATIONS) == set(SCENARIOS), (

@@ -80,7 +80,8 @@ def _parse(stdout: str, kind: str) -> dict:
 
 def run_extract(*, pipeline_name: str | None = None, run_id: int | None = None,
                 pipeline: loader.Pipeline | None = None) -> str:
-    """EXTRACT one full snapshot of the pipeline's single source table into
+    """EXTRACT one full snapshot of the pipeline's source table(s) - all in one
+    consistent snapshot, one batch - into
     bronze object storage; returns the new batch id (the DAG pushes it to
     XCom, so a retried LOAD task always loads this same batch). `pipeline`
     lets a caller that already holds one (fixture validation, whose clone is
@@ -94,10 +95,12 @@ def run_extract(*, pipeline_name: str | None = None, run_id: int | None = None,
         "SRC_HOST": str(src.get("host", "")), "SRC_PORT": str(src.get("port", "5432")),
         "SRC_DATABASE": str(src.get("database", "")), "SRC_USER": str(src.get("user", "")),
         "SRC_PASSWORD": str(src.get("password", "")),
-        "SOURCE_TABLE": pipeline.source.tables[0],
+        "SOURCE_TABLES": ",".join(pipeline.source.tables),
         "BRONZE_CHUNK_ROWS": str(pipeline.bronze.chunk_rows),
     })
-    state.event("bronze.extract.start", f"{pipeline_name}: {pipeline.source.tables[0]} -> bronze",
+    state.event("bronze.extract.start",
+                f"{pipeline_name}: {', '.join(pipeline.source.tables)} -> bronze "
+                f"({'one snapshot' if len(pipeline.source.tables) > 1 else 'snapshot'})",
                 run_id=run_id)
     proc = runtime._run([runtime._dlt_python(), str(WORKER), "extract"], pipeline=pipeline,
                         kind="extract", what=f"the bronze extract for {pipeline_name!r}", env=env)

@@ -181,7 +181,7 @@ def test_load_is_never_given_a_single_source_value(tmp_path, monkeypatch):
                          '"objects": 3, "table": "res_partner", "batch_id": "B"}\n')
     bronze.run_load(pipeline_name="demo", batch_id="2b0c2f6e-0000-4000-8000-000000000000")
     env = calls[0]["env"]
-    assert not [k for k in env if k.startswith("SRC_") or k == "SOURCE_TABLE"]
+    assert not [k for k in env if k.startswith("SRC_") or k.startswith("SOURCE_TABLE")]
     blob = json.dumps(env)
     assert "src-secret-pw" not in blob and "src-host" not in blob
     assert env["WH_HOST"] == "wh-host" and env["BRONZE_ENDPOINT"] == "http://s3"
@@ -206,7 +206,7 @@ def test_extract_is_the_only_call_that_gets_the_source(tmp_path, monkeypatch):
                          '"objects": 3, "total_rows": 5, "manifest_key": "m"}\n')
     assert bronze.run_extract(pipeline_name="demo") == "B"
     env = calls[0]["env"]
-    assert env["SRC_HOST"] == "src-host" and env["SOURCE_TABLE"] == "res_partner"
+    assert env["SRC_HOST"] == "src-host" and env["SOURCE_TABLES"] == "res_partner"
 
 
 def test_load_without_a_batch_id_fails_instead_of_guessing(tmp_path, monkeypatch):
@@ -254,3 +254,104 @@ def test_a_normal_pipelines_dag_is_unchanged_by_the_bronze_feature(tmp_path, mon
     plain = dataclasses.replace(p, bronze_staging=False, bronze=None)
     dag = deploy.render_dag(plain)
     assert "bronze" not in dag and "runtime.run_extract" in dag
+
+
+# ------------------------------------------------------------------ several tables, one batch
+
+def _table_sha(name):
+    return w.sha256_hex(f"manifest-of-{name}".encode())
+
+
+def _batch(**over):
+    kwargs = dict(pipeline="p", batch_id="B", extracted_at="2026-10-12T00:00:00+00:00",
+                  tables=[{"table": "x_plan", "relation": "public.x_plan", "manifest_key": "k1",
+                           "manifest_sha256": _table_sha("x_plan"), "total_rows": 3, "objects": 1},
+                          {"table": "res_partner", "relation": "public.res_partner",
+                           "manifest_key": "k2", "manifest_sha256": _table_sha("res_partner"),
+                           "total_rows": 6, "objects": 1}])
+    kwargs.update(over)
+    return w.build_batch_manifest(**kwargs)
+
+
+def _registry():
+    return {"x_plan": _table_sha("x_plan"), "res_partner": _table_sha("res_partner")}
+
+
+def _check(raw=None, **over):
+    raw = raw or _batch()
+    kwargs = dict(expected_sha256=w.sha256_hex(raw), pipeline="p", batch_id="B",
+                  registry=_registry())
+    kwargs.update(over)
+    return w.check_batch_manifest(raw, **kwargs)
+
+
+def test_batch_manifest_is_canonical_and_orders_tables_by_name():
+    assert _batch() == _batch()
+    doc = json.loads(_batch())
+    assert [t["table"] for t in doc["tables"]] == ["res_partner", "x_plan"]
+    assert w.batch_manifest_key("bronze/", "p", "B") == "bronze/p/_batches/B/_batch.json"
+
+
+def test_a_complete_batch_is_accepted():
+    assert len(_check()["tables"]) == 2
+
+
+def test_a_batch_manifest_changed_after_publication_is_refused():
+    raw = _batch()
+    with pytest.raises(w.BronzeError, match="does not match the registry"):
+        _check(raw, expected_sha256=w.sha256_hex(raw + b" "))
+
+
+def test_a_table_the_registry_has_but_the_batch_manifest_lacks_is_an_incomplete_batch():
+    short = _batch(tables=[json.loads(_batch())["tables"][0]])
+    with pytest.raises(w.BronzeError, match=r"incomplete or inconsistent.*missing from manifest: \['x_plan'\]"):
+        _check(short)
+
+
+def test_a_table_the_batch_manifest_names_but_the_registry_lacks_is_refused():
+    registry = {"res_partner": _table_sha("res_partner")}
+    with pytest.raises(w.BronzeError, match=r"not in registry: \['x_plan'\]"):
+        _check(registry=registry)
+
+
+def test_a_table_manifest_swapped_after_the_batch_was_sealed_is_refused():
+    registry = _registry()
+    registry["x_plan"] = _table_sha("something-else")
+    with pytest.raises(w.BronzeError, match="differs from the one the batch manifest recorded"):
+        _check(registry=registry)
+
+
+@pytest.mark.parametrize("field,value", [("pipeline", "other"), ("batch_id", "C")])
+def test_a_batch_manifest_for_something_else_is_refused(field, value):
+    with pytest.raises(w.BronzeError, match=field):
+        _check(**{field: value})
+
+
+def test_the_same_table_twice_in_a_batch_manifest_is_refused():
+    t = json.loads(_batch())["tables"][0]
+    with pytest.raises(w.BronzeError, match="same table twice"):
+        _check(_batch(tables=[t, t]))
+
+
+def test_a_table_manifest_is_not_a_batch_manifest():
+    raw = _manifest()
+    with pytest.raises(w.BronzeError, match="not a batch manifest"):
+        w.check_batch_manifest(raw, expected_sha256=w.sha256_hex(raw), pipeline="p",
+                               batch_id="B", registry={})
+
+
+def test_extract_passes_every_table_and_the_source_only_there(tmp_path, monkeypatch):
+    _pipeline(tmp_path, monkeypatch)
+    p = tmp_path / "pipelines" / "demo" / "pipeline.yaml"
+    p.write_text(p.read_text().replace("tables: [res_partner]", "tables: [res_partner, x_plan]"))
+    calls = _capture_run(monkeypatch,
+                         'DPAGENT_BRONZE_EXTRACT {"batch_id": "B", "objects": 2, "total_rows": 9, '
+                         '"tables": {"res_partner": {"rows": 6, "objects": 1}, '
+                         '"x_plan": {"rows": 3, "objects": 1}}}\n')
+    assert bronze.run_extract(pipeline_name="demo") == "B"
+    assert calls[0]["env"]["SOURCE_TABLES"] == "res_partner,x_plan"
+    load_calls = _capture_run(monkeypatch,
+                              'DPAGENT_BRONZE_LOAD {"outcome": "loaded", "rows": 9, "objects": 2, '
+                              '"batch_id": "B", "tables": {}}\n')
+    bronze.run_load(pipeline_name="demo", batch_id="2b0c2f6e-0000-4000-8000-000000000000")
+    assert not [k for k in load_calls[0]["env"] if k.startswith("SRC_") or k.startswith("SOURCE_")]
