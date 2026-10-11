@@ -95,14 +95,15 @@ def _edits_invalidate(case: llm_verify.Case, workdir: Path, evidence_id: str) ->
 
 
 def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_revisions: int,
-            deploy: bool = True) -> dict:
+            deploy: bool = True, transient_retries: int = 0) -> dict:
     before = run_matrix._throwaway_names()
     with tempfile.TemporaryDirectory(prefix="a3_") as tmp_s:
         tmp = Path(tmp_s)
         case = _private_case(case_name, tmp)
         workdir = tmp / "pipelines"
         trace, records = llm_verify.run_case(case, workdir, max_calls=max_calls,
-                                             max_revisions=max_revisions)
+                                             max_revisions=max_revisions,
+                                             transient_retries=transient_retries)
         run_dir = out_dir / label
         llm_verify.write_trace(trace, records, run_dir)
         result: dict = {"label": label, "case": case_name, "model": trace.model,
@@ -204,11 +205,11 @@ def scripted_scenarios(out: Path) -> list[dict]:
 
     def no_approval(r):
         p = []
-        if r["last_outcome"] not in ("llm-error", "invalid-reply"):
+        if r["last_outcome"] not in ("llm-error", "invalid-reply", "provider-unavailable"):
             p.append(f"expected a clear model-call error, got {r['last_outcome']}")
         if r["approval_file_exists"] or r["attempts"][-1]["evidence_id"] or "deploy_run" in r:
             p.append("an approval, evidence or deploy exists after a failed model call")
-        if r["classification"] != "not-validated":
+        if r["classification"] not in ("not-validated", "inconclusive-provider-unavailable"):
             p.append(f"classification {r['classification']}")
         return p
     scenario("S5-api-timeout", [TimeoutError("simulated provider timeout")], BUILD, no_approval)
@@ -236,8 +237,9 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
     ran = {"build": 0, "ambiguous": 0}
     print(f"model: {llm.get_model()}  call ceiling: {max_calls}", flush=True)
 
+    retries = int(os.environ.get("A3_TRANSIENT_RETRIES", "5"))
     r = run_one(BUILD, out, "R1-build-artist-summary", max_calls=remaining,
-                max_revisions=max_revisions)
+                max_revisions=max_revisions, transient_retries=retries)
     rows.append(r)
     ran["build"] += 1
     remaining -= r["calls"]
@@ -250,7 +252,7 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
             print(f"call budget used up before ambiguous run {i}", flush=True)
             break
         r = run_one(AMBIGUOUS, out, f"R2-ambiguous-brd-run{i}", max_calls=min(remaining, 3),
-                    max_revisions=0, deploy=False)
+                    max_revisions=0, deploy=False, transient_retries=retries)
         ran["ambiguous"] += 1
         remaining -= r["calls"]
         r["criteria_problems"] = llm_verify.ambiguous_problems(r)
@@ -299,7 +301,9 @@ def main(argv: list[str]) -> int:
     summary = {"mode": args.mode, "run_id": run_id, "runs": [
         {k: r.get(k) for k in ("label", "classification", "last_outcome", "calls", "tokens", "model",
                                "expectation_problems", "criteria_problems")} for r in rows],
-        "not_met": bad, "complete": "INCOMPLETE" not in bad}
+        "not_met": bad,
+        "inconclusive": [r["label"] for r in rows
+                         if r.get("classification") == "inconclusive-provider-unavailable"], "complete": "INCOMPLETE" not in bad}
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True, default=str,
                                                  ensure_ascii=False))
     print(f"\n{len(rows) - len(bad)}/{len(rows)} met their criteria"

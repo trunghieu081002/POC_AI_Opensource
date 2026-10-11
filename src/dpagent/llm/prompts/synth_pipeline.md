@@ -137,6 +137,16 @@ Rules, all non-negotiable:
   all. A drafted model using either is refused outright at validation time,
   before it ever reaches a fixture run.
 
+- **Every dbt-engine model starts with** `{{ config(materialized='table', schema='<this
+  pipeline's warehouse.schema>') }}` - exactly that, with the same schema string as the manifest's
+  `warehouse.schema`. dpagent's gates and the next stage read the table from `warehouse.schema`; a
+  model without this `schema` config is built in dbt's default schema and every gate on it fails
+  ("table not found"). This `config(...)` call is the only Jinja a model may use.
+- A gate takes **only** the fields the catalog lists for its type (required, plus the listed
+  optional ones - e.g. `row_count_bounds` takes `table` and optionally `min`, `max`,
+  `max_delta_pct`; it does not take `min_rows`). Any other key is rejected when the manifest is
+  loaded, because the runtime would silently ignore it and the gate would check nothing.
+
 # What "verified source schema" means
 
 You are given real table/column names and types, and a one-line business

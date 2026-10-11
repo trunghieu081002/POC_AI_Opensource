@@ -1,0 +1,77 @@
+{
+  "attempts": [
+    {
+      "blockers": [
+        {
+          "question": "Mốc thời gian để tổng hợp doanh thu theo tháng là ngày tạo đơn (`date_order`) hay ngày xác nhận đơn (`confirmation_date`)?",
+          "why_it_matters": "Quyết định dùng cột nào để gom nhóm theo tháng (`date_trunc`), hai cột này có thời điểm khác nhau và `confirmation_date` có thể mang giá trị NULL đối với các đơn chưa xác nhận."
+        },
+        {
+          "question": "Những trạng thái đơn hàng (`state`) nào được tính vào doanh thu?",
+          "why_it_matters": "Bảng `sale_order` có các trạng thái `draft`, `sent`, `sale`, `done`, `cancel`. Nếu tính cả đơn nháp hoặc đơn huỷ sẽ làm sai lệch hoàn toàn số liệu doanh thu thực tế."
+        },
+        {
+          "question": "Doanh thu được tính theo số tiền trước thuế (`amount_untaxed`) hay tổng tiền đã bao gồm thuế (`amount_total`)?",
+          "why_it_matters": "Hai chỉ số này cho ra các con số doanh thu chênh lệch đáng kể tương ứng với phần tiền thuế."
+        },
+        {
+          "question": "Quy tắc xử lý đa tiền tệ (`currency_id`) như thế nào khi tổng hợp?",
+          "why_it_matters": "Hệ thống có nhiều loại tiền tệ khác nhau. Việc cộng dồn trực tiếp các loại tiền tệ khác nhau mà không quy đổi về một đồng tiền chung hoặc lọc theo đơn vị tiền tệ sẽ tạo ra kết quả vô nghĩa, trong khi schema hiện tại chưa cung cấp bảng tỷ giá."
+        }
+      ],
+      "call_indexes": [
+        1
+      ],
+      "detail": "",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "blocked",
+      "source": "llm",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 3,
+    "max_revisions": 0,
+    "transient_retries": 8,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T09:11:58+00:00",
+      "duration_s": 10.43,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:6771947d91752163244115ac308e830737a9fecd1a6a70c3b22b3949757d0425",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 1228,
+        "prompt_tokens": 2660,
+        "reasoning_tokens": 852,
+        "total_tokens": 3888
+      },
+      "user_sha256": "sha256:de5866abf30a101f29b7d98d1ebc58cf6affc31e6956295fece576cdd0082fba"
+    }
+  ],
+  "case": "a3_revenue_ambiguous",
+  "classification": "asked-blocker",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:7cc83d542c80a2b2ae866612c7a5e3ad296daf9ca304d81248a41616d107cf40",
+    "request_yaml": "sha256:70e013c82c3566bb683e8304e79bf8a3bfda014f988deb57e1f8f290bfc27452",
+    "source_schema": "sha256:4987833152ad481c865071ddee8eb1ca71cb88bf1e2f2c167c74a14eac76bac2",
+    "synth_system_prompt": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1"
+  },
+  "kind": "ambiguous",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "",
+  "started_at": "2026-10-11T09:11:58+00:00",
+  "trace_version": 1
+}

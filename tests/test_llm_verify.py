@@ -167,9 +167,9 @@ def test_structural_failure_is_fed_back_and_budget_ends_the_run(provider, case, 
 def test_api_timeout_is_a_clear_error_and_nothing_is_approved(provider, case, tmp_path):
     provider([TimeoutError("read timed out")])
     trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, runner=scripted_runner())
-    assert trace.attempts[0].outcome == "llm-error"
+    assert trace.attempts[0].outcome == "provider-unavailable"
     assert "read timed out" in trace.attempts[0].detail
-    assert trace.classification == "not-validated"
+    assert trace.classification == "inconclusive-provider-unavailable"
     assert not (tmp_path / "w" / case.name / ".approved.yaml").exists()
 
 
@@ -370,7 +370,236 @@ def test_probe_is_one_call_and_opt_in(provider, monkeypatch):
     monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
     p = provider(["OK"])
     result = llm_verify.probe()
-    assert result["ok"] and result["calls"] == 1 and len(p.calls) == 1
-    provider([RuntimeError("quota exceeded")])
-    failed = llm_verify.probe()
-    assert failed["ok"] is False and "quota" in failed["error"]
+    assert result["ok"] and len(p.calls) == 1
+    provider([RuntimeError("401 API key not valid")])
+    failed = llm_verify.probe(sleep=lambda s: None)
+    assert failed["ok"] is False and failed["transient"] is False and len(failed["attempts"]) == 1
+
+
+def test_probe_retries_a_busy_model_but_not_a_wrong_key(provider, monkeypatch):
+    monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
+    busy = RuntimeError('503 UNAVAILABLE: This model is currently experiencing high demand')
+    p = provider([busy, busy, "OK"])
+    waits = []
+    result = llm_verify.probe(wait_s=7, sleep=waits.append)
+    assert result["ok"] and len(p.calls) == 3 and waits == [7, 7]
+    assert [a.get("transient") for a in result["attempts"]] == [True, True, None]
+    provider([busy, busy, busy])
+    gave_up = llm_verify.probe(sleep=lambda s: None)
+    assert gave_up["ok"] is False and gave_up["transient"] is True and len(gave_up["attempts"]) == 3
+
+
+def test_every_provider_call_has_a_time_limit_and_records_why_it_stopped(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    seen = {}
+
+    def completion(**kwargs):
+        seen.update(kwargs)
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""),
+                                           finish_reason="length")],
+            usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14,
+                                        completion_tokens_details=types.SimpleNamespace(reasoning_tokens=13)))
+    monkeypatch.setattr(litellm, "completion", completion)
+    monkeypatch.setenv("DPAGENT_LLM_TIMEOUT", "42")
+    with llm.record_calls() as records:
+        with pytest.raises(llm.ReplyTruncated):
+            llm.chat("s", "u")
+    assert seen["timeout"] == 42.0 and records[0].finish_reason == "length"
+    assert records[0].usage["reasoning_tokens"] == 13
+
+
+def test_an_empty_probe_reply_is_not_ok_and_says_why(monkeypatch):
+    monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    monkeypatch.setattr(litellm, "completion", lambda **kw: types.SimpleNamespace(
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""), finish_reason="length")],
+        usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14)))
+    result = llm_verify.probe()
+    assert result["ok"] is False and "output limit" in result["error"]
+
+
+BUSY = RuntimeError("litellm.ServiceUnavailableError: 503 UNAVAILABLE: high demand")
+
+
+def test_busy_provider_is_retried_and_the_retries_do_not_eat_the_call_ceiling(provider, case, tmp_path, monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm, "_sleep", waits.append)
+    p = provider([BUSY, BUSY, _bundle("good")])
+    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=1, transient_retries=3,
+                                         wait_s=5, runner=scripted_runner(_section()))
+    assert trace.classification == "llm-first-draft"          # max_calls=1 and still got an answer
+    assert len(p.calls) == 3 and waits == [5, 10]
+    assert [c["transient"] for c in trace.calls] == [True, True, False]
+    assert trace.attempts[0].format_repairs == 0                # busy answers are not format repairs
+
+
+def test_a_provider_that_stays_busy_is_inconclusive_not_a_model_failure(provider, case, tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "_sleep", lambda s: None)
+    provider([BUSY] * 3)
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=4, transient_retries=2,
+                                   runner=scripted_runner())
+    assert trace.attempts[0].outcome == "provider-unavailable"
+    assert trace.classification == "inconclusive-provider-unavailable"
+    result = {"classification": trace.classification, "leaked_and_recovered": {}}
+    assert llm_verify.build_problems(result)[0].startswith("INCONCLUSIVE")
+    assert llm_verify.ambiguous_problems(result)[0].startswith("INCONCLUSIVE")
+
+
+def test_a_bad_key_is_not_retried(provider, case, tmp_path, monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm, "_sleep", waits.append)
+    p = provider([RuntimeError("401 API key not valid")])
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, transient_retries=5,
+                                   runner=scripted_runner())
+    assert trace.attempts[0].outcome == "llm-error" and waits == [] and len(p.calls) == 1
+
+
+# ------------------------------------------------------------------ findings of the first real run
+
+def test_a_reply_cut_off_at_the_output_limit_is_not_re_asked_and_is_not_a_model_failure(provider, case, tmp_path):
+    p = provider([("length", '{"files": {"pipeline.yaml": "name: x'), _bundle("good")])
+    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=5,
+                                         runner=scripted_runner(_section()))
+    assert len(p.calls) == 1                                   # the same prompt would be cut off again
+    assert trace.attempts[0].outcome == "reply-truncated"
+    assert trace.classification == "inconclusive-output-limit"
+    assert trace.calls[0]["finish_reason"] == "length"
+    assert llm_verify.build_problems({"classification": trace.classification})[0].startswith("INCONCLUSIVE")
+
+
+def test_output_limit_and_reasoning_effort_come_from_the_environment(provider, monkeypatch):
+    p = provider(["hello"])
+    monkeypatch.setenv("DPAGENT_LLM_MAX_TOKENS", "48000")
+    monkeypatch.setenv("DPAGENT_LLM_REASONING_EFFORT", "low")
+    llm.chat("s", "u", max_tokens=8000)
+    assert p.calls[0]["kwargs"]["max_tokens"] == 48000
+    assert p.calls[0]["kwargs"]["reasoning_effort"] == "low"
+    monkeypatch.delenv("DPAGENT_LLM_MAX_TOKENS")
+    monkeypatch.delenv("DPAGENT_LLM_REASONING_EFFORT")
+    provider(["hello"])
+    assert llm.env_max_tokens(16000) == 16000
+
+
+def test_a_gate_with_a_key_the_runtime_ignores_is_refused(tmp_path):
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": "row_count_bounds", "table": "t", "min": 1, "max": 5}, "x")
+    with pytest.raises(PipelineError, match=r"unknown parameter.*min_rows"):
+        _validate_gate({"type": "row_count_bounds", "table": "t", "min_rows": 1}, "x")
+    with pytest.raises(PipelineError, match="unknown parameter"):
+        _validate_gate({"type": "not_null", "table": "t", "columns": ["a"], "severity": "warn"}, "x")
+
+
+def test_the_model_is_told_which_optional_keys_a_gate_takes_and_the_dbt_schema_convention():
+    catalog = synth.capability_catalog()
+    assert "row_count_bounds" in catalog and "'min', 'max', 'max_delta_pct'" in catalog
+    prompt = llm.load_prompt("synth_pipeline")
+    assert "materialized='table', schema=" in prompt and "min_rows" in prompt
+
+
+def test_failure_events_of_the_validation_runs_reach_the_next_ask(provider, case, tmp_path, monkeypatch):
+    from dpagent.engine import state
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    run_id = state.start_run("data", "c")
+    state.event("transform.failed", "dbt run failed for 'curated': relation does not exist",
+                run_id=run_id, level="error")
+    state.event("pipeline.started", "started", run_id=run_id)
+    section = _section("fail", "fail")
+    section["run_ids"] = [run_id]
+    section["run_status"] = {"run_1": "failed", "run_2": "not_run"}
+    p = provider([_bundle("wrong_result"), _bundle("good")])
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=4, runner=scripted_runner(section, _section()))
+    assert "relation does not exist" in p.calls[1]["user"]
+    assert "started" not in p.calls[1]["user"].split("Validator output:")[1]
+    assert any(e["kind"] == "transform.failed" for e in trace.attempts[0].validation["run_events"])
+
+
+def test_a_call_that_never_returns_is_abandoned_at_the_wall_clock_limit(monkeypatch):
+    import threading
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    monkeypatch.setenv("DPAGENT_LLM_TIMEOUT", "0.3")
+    release = threading.Event()
+    monkeypatch.setattr(litellm, "completion", lambda **kw: release.wait(30))   # ignores timeout=
+    import time
+    started = time.monotonic()
+    with llm.record_calls() as records:
+        with pytest.raises(llm.ProviderUnavailable, match="wall-clock"):
+            llm.chat("s", "u")
+    release.set()
+    assert time.monotonic() - started < 5 and records[0].transient is True
+
+
+def test_ipv4_addresses_are_tried_before_ipv6(monkeypatch):
+    import socket
+    mixed = [(socket.AF_INET6, 1, 6, "", ("2001:db8::1", 443, 0, 0)),
+             (socket.AF_INET6, 1, 6, "", ("2001:db8::2", 443, 0, 0)),
+             (socket.AF_INET, 1, 6, "", ("192.0.2.7", 443))]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: list(mixed))
+    monkeypatch.setattr(llm, "_ipv4_first_installed", False)
+    llm.prefer_ipv4()
+    families = [r[0] for r in socket.getaddrinfo("x", 443)]
+    assert families == [socket.AF_INET, socket.AF_INET6, socket.AF_INET6]   # reordered, none dropped
+    llm.prefer_ipv4()                                                          # idempotent: no double wrap
+    assert [r[0] for r in socket.getaddrinfo("x", 443)] == families
+
+
+def test_ipv6_first_can_be_requested(monkeypatch):
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(socket.AF_INET6, 1, 6, "", ("::1", 1, 0, 0)),
+                                                                 (socket.AF_INET, 1, 6, "", ("127.0.0.1", 1))])
+    monkeypatch.setattr(llm, "_ipv4_first_installed", False)
+    monkeypatch.setenv("DPAGENT_LLM_IPV6_FIRST", "1")
+    llm.prefer_ipv4()
+    assert socket.getaddrinfo("x", 1)[0][0] == socket.AF_INET6
+
+
+# ------------------------------------------------------------------ findings of the third real run
+
+def test_a_schema_contract_written_as_a_list_of_tables_is_refused_at_load():
+    """The model wrote `tables: [res_partner]`; the runtime indexed it as a mapping and the
+    gate task died with nothing in the journal."""
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": "schema_contract", "tables": {"res_partner": {"id": "bigint"}}}, "x")
+    for bad in (["res_partner"], {"res_partner": ["id"]}, {"res_partner": {}}, {}, "res_partner"):
+        with pytest.raises(PipelineError, match="schema_contract"):
+            _validate_gate({"type": "schema_contract", "tables": bad}, "x")
+
+
+@pytest.mark.parametrize("gate_type", ["not_null", "unique"])
+def test_columns_must_be_a_non_empty_list(gate_type):
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": gate_type, "table": "t", "columns": ["a"]}, "x")
+    for bad in ("a", [], None):
+        with pytest.raises(PipelineError, match="columns"):
+            _validate_gate({"type": gate_type, "table": "t", "columns": bad}, "x")
+
+
+def test_the_catalog_shows_the_shape_of_schema_contract_tables():
+    assert "tables: {table_name: {column_name: postgres_type}}" in synth.capability_catalog()
+
+
+def test_a_gate_that_crashes_is_a_failed_gate_with_the_reason_in_the_journal(tmp_path, monkeypatch):
+    from dpagent.engine import state
+    from dpagent.pipelines import runtime
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    root = tmp_path / "pipelines"
+    (root / "g").mkdir(parents=True)
+    (root / "g" / "pipeline.yaml").write_text(
+        "name: g\nsummary: t\nsource: {connector: csv, files: {path: /tmp/x.csv}}\n"
+        "warehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    pipeline = loader.load("g", root)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+
+    def boom(*a, **k):
+        raise TypeError("list indices must be integers or slices, not str")
+    monkeypatch.setattr(runtime, "_evaluate_gate", boom)
+    run_id = state.start_run("data", "g")
+    with pytest.raises(runtime.GateFailed, match="the gate itself raised TypeError"):
+        runtime.run_gate(pipeline_name="g", stage="landing", run_id=run_id)
+    kinds = {e["kind"]: e["message"] for e in state.events_for(run_id)}
+    assert "gate.failed" in kinds and "list indices" in kinds["gate.failed"]
+    assert "stage.failed" in kinds
+    assert state.latest_stage("g", "landing")["status"] == "failed"

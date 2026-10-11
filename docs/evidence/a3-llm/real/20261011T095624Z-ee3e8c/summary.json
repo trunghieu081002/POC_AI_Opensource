@@ -1,0 +1,49 @@
+{
+  "complete": true,
+  "inconclusive": [],
+  "mode": "real",
+  "not_met": [],
+  "run_id": "20261011T095624Z-ee3e8c",
+  "runs": [
+    {
+      "calls": 4,
+      "classification": "llm-after-1-revision(s)",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R1-build-artist-summary",
+      "last_outcome": "validated",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 30379
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run1",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 4094
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run2",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 4285
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run3",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 4449
+    }
+  ]
+}

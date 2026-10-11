@@ -1,0 +1,25 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "provider-unavailable",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "inconclusive-provider-unavailable",
+  "expectation_problems": [],
+  "label": "S5-api-timeout",
+  "last_outcome": "provider-unavailable",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 0
+}

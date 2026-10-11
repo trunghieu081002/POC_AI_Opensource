@@ -1,0 +1,102 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "ev-126ff44784e021df",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "not-validated",
+  "expectation_problems": [],
+  "label": "S3-unknown-column",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_artist_summary__validate__978dece0",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "not_run",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_artist_summary__validate__978dece0 via odoo_postgres",
+        "run": 10
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_artist_summary__validate__978dece0 extract complete: res_partner +10",
+        "run": 10
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__978dece0/landing row_count_bounds: ok",
+        "run": 10
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__978dece0/landing gates passed",
+        "run": 10
+      },
+      {
+        "kind": "transform.start",
+        "level": "info",
+        "message": "a3_artist_summary__validate__978dece0/curated via dbt",
+        "run": 10
+      },
+      {
+        "kind": "transform.failed",
+        "level": "error",
+        "message": "dbt run failed for 'curated': \u001b[0m11:00:07  Running with dbt=1.8.10\n\u001b[0m11:00:07  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions\n\u001b[0m11:00:07  Registered adapter: postgres=1.8.2\n\u001b[0m11:00:07  Unable to do partial parsing because profile has changed\n\u001b[0m11:00:09  Found 1 model, 434 macros\n\u001b[0m11:00:09  \n\u001b[0m11:00:09  Concurrency: 4 threads (target='run')\n\u001b[0m11:00:09  \n\u001b[0m11:00:09  1 of 1 START sql table model a3_artist_summary.artist_summary .................. [RUN]\n\u001b[0m11:00:09  1 of 1 ERROR creating sql table model a3_artist_summary.artist_summary ......... [\u001b[31mERROR\u001b[0m in 0.10s]\n\u001b[0m11:00:09  \n\u001b[0m11:00:09  Finished running 1 table model in 0 hours 0 minutes and 0.29 seconds (0.29s).\n\u001b[0m11:00:09  \n\u001b[0m11:00:09  \u001b[31mCompleted with 1 error and 0 warnings:\u001b[0m\n\u001b[0m11:00:09  \n\u001b[0m11:00:09    Database Error in model artist_summary__validate_978dece0 (models/a3_artist_summary__validate__978dece0/artist_summary__validate_978dece0.sql)\n  column \"partner_name\" does not exist\n  LINE 15:     select distinct id, btrim(partner_name) as name\n                                         ^\n  compiled code at target/run/default/models/a3_artist_summary__validate__978dece0/artist_summary__validate_978dece0.sql\n\u001b[0m11:00:09  \n\u001b[0m11:00:09  Done. PASS=0 WARN=0 ERROR=1 SKIP=0 TOTAL=1",
+        "run": 10
+      },
+      {
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 10 reached terminal state: failed",
+        "run": 10
+      }
+    ],
+    "run_ids": [
+      10
+    ],
+    "run_status": {
+      "run_1": "failed",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "run_1: run 10 finished 'failed' in the journal",
+      "run_1: gated stage 'curated' has no gate verdict in the journal"
+    ]
+  },
+  "tokens": 18
+}

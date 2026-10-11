@@ -1,0 +1,215 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1,
+        2,
+        3
+      ],
+      "detail": "run_1: failed\ngate schema_contract in stage landing: failed - a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] gate.failed: a3_artist_summary__validate__cc0f244f/landing schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] stage.failed: a3_artist_summary__validate__cc0f244f/landing halted: schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] pipeline.failed: DAG run 3 reached terminal state: failed",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "models/stg_artists.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-ffacbcb5fb65b385",
+      "fed_back": "run_1: failed\ngate schema_contract in stage landing: failed - a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] gate.failed: a3_artist_summary__validate__cc0f244f/landing schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] stage.failed: a3_artist_summary__validate__cc0f244f/landing halted: schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}\n[run 3] pipeline.failed: DAG run 3 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:fc593ecd3f1f800508d08dee1586a7b7d378261062a5db0a8007f8800ecb7207",
+        "models/stg_artists.sql": "sha256:54916ccb1ec82194368f1cd63605d83cace460c602ca659c38326df71edfa6fc",
+        "pipeline.yaml": "sha256:92f7554e4bec7400ee513bc44cff324535dc71588f08acf7290d330502caf4f4"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__cc0f244f",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_events": [
+          {
+            "kind": "extract.start",
+            "level": "info",
+            "message": "a3_artist_summary__validate__cc0f244f via odoo_postgres",
+            "run": 3
+          },
+          {
+            "kind": "extract.done",
+            "level": "info",
+            "message": "a3_artist_summary__validate__cc0f244f extract complete: res_partner +10",
+            "run": 3
+          },
+          {
+            "kind": "gate.failed",
+            "level": "error",
+            "message": "a3_artist_summary__validate__cc0f244f/landing schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}",
+            "run": 3
+          },
+          {
+            "kind": "gate.passed",
+            "level": "info",
+            "message": "a3_artist_summary__validate__cc0f244f/landing row_count_bounds: ok",
+            "run": 3
+          },
+          {
+            "kind": "stage.failed",
+            "level": "error",
+            "message": "a3_artist_summary__validate__cc0f244f/landing halted: schema_contract: a3_artist_summary_landing.res_partner: {'id': ('bigint', None), 'name': ('text', None)}",
+            "run": 3
+          },
+          {
+            "kind": "pipeline.failed",
+            "level": "error",
+            "message": "DAG run 3 reached terminal state: failed",
+            "run": 3
+          }
+        ],
+        "run_ids": [
+          3
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        4
+      ],
+      "detail": "",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "models/stg_artists.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-df5c4171186f68a1",
+      "fed_back": "",
+      "files": {
+        "models/artist_summary.sql": "sha256:fc593ecd3f1f800508d08dee1586a7b7d378261062a5db0a8007f8800ecb7207",
+        "models/stg_artists.sql": "sha256:e61e908692d406dab92f0d4b447f2ff04a3c9786c54669d5cb7f20d081d29569",
+        "pipeline.yaml": "sha256:a136ac095b4de78ad645a23d7ef0727bd2a27839c80fa77ee8e872b9322121c2"
+      },
+      "format_repairs": 0,
+      "index": 2,
+      "outcome": "validated",
+      "source": "llm-revision",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__b974c81d",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          4,
+          5
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 12,
+    "max_revisions": 2,
+    "transient_retries": 8,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T09:56:25+00:00",
+      "duration_s": 2.55,
+      "error": "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "finish_reason": "",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": true,
+      "usage": {},
+      "user_sha256": "sha256:bc2b889608e373f8c68bd16e52db5394294383924a05169fbc81b9178a9cd82e"
+    },
+    {
+      "at": "2026-10-11T09:56:47+00:00",
+      "duration_s": 1.53,
+      "error": "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "finish_reason": "",
+      "index": 2,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": true,
+      "usage": {},
+      "user_sha256": "sha256:bc2b889608e373f8c68bd16e52db5394294383924a05169fbc81b9178a9cd82e"
+    },
+    {
+      "at": "2026-10-11T09:57:29+00:00",
+      "duration_s": 343.14,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 3,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:2a2e3d37920c0529d8a40af02779e73f0e204a7824571a146f1bd56d4a07f3f9",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 13291,
+        "prompt_tokens": 3066,
+        "reasoning_tokens": 11894,
+        "total_tokens": 16357
+      },
+      "user_sha256": "sha256:bc2b889608e373f8c68bd16e52db5394294383924a05169fbc81b9178a9cd82e"
+    },
+    {
+      "at": "2026-10-11T10:03:52+00:00",
+      "duration_s": 92.65,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 4,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:de5154ff96edcfe13393958c12a469ece484c664b3c693fc0178d38e4b5f9c50",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 9959,
+        "prompt_tokens": 4063,
+        "reasoning_tokens": 8757,
+        "total_tokens": 14022
+      },
+      "user_sha256": "sha256:3d77f3741e4662cd75651e575eea13f08ebf7529785a9f9c416ee78ce3705610"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "llm-after-1-revision(s)",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/tmp/a3_nsuunqj8/pipelines/a3_artist_summary",
+  "started_at": "2026-10-11T09:56:25+00:00",
+  "trace_version": 1
+}

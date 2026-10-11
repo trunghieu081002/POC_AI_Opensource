@@ -1,0 +1,45 @@
+name: a3_artist_summary
+summary: Báo cáo tổng hợp đối tác nghệ sĩ từ Odoo res_partner
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${A3_SRC_HOST}
+    port: ${A3_SRC_PORT}
+    database: ${A3_SRC_NAME}
+    user: ${A3_SRC_USER}
+    password: ${A3_SRC_PASSWORD}
+  tables:
+  - res_partner
+warehouse:
+  host: ${A3_WH_HOST:-localhost}
+  port: ${A3_WH_PORT:-5432}
+  database: ${A3_WH_NAME:-warehouse}
+  user: ${A3_WH_USER}
+  password: ${A3_WH_PASSWORD}
+  schema: a3_artist_summary
+stages:
+- name: landing
+  gates:
+  - type: schema_contract
+    tables:
+    - res_partner
+  - type: row_count_bounds
+    table: res_partner
+    min_rows: 1
+- name: curated
+  engine: dbt
+  depends_on: landing
+  models:
+  - artist_summary
+  gates:
+  - type: not_null
+    table: artist_summary
+    columns:
+    - artists
+    - distinct_names
+    - min_id
+    - max_id
+  - type: row_count_bounds
+    table: artist_summary
+    min_rows: 1
+    max_rows: 1

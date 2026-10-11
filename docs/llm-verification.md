@@ -109,6 +109,20 @@ working tree). `scripted` mode is **not evidence about a model**: its replies ar
   deleted; failed runs stay beside the ones that passed. A model that fails the problem is a valid
   evaluation ("model X did not pass this test"), not "A3 complete".
 
+### A busy provider is not a failing model
+
+A 503 / 429 / timeout is retried (`A3_TRANSIENT_RETRIES`, default 5, waiting 20 s, 40 s, …); the tries
+are recorded (`transient: true`) but do not consume `--max-calls`. If the provider is still unavailable the
+run is **`inconclusive-provider-unavailable`**: it fails the criteria (exit 1) and says nothing about the model —
+re-run it. Per-call time limit: `DPAGENT_LLM_TIMEOUT` (script default 900 s; reasoning models are slow).
+
+### Output limit and reasoning models
+
+A reasoning model's hidden thinking shares the output-token limit. A reply with `finish_reason=length`
+is cut off (or empty): it raises `ReplyTruncated` immediately — re-asking the same prompt truncates
+again — and the run is **`inconclusive-output-limit`**, not a verdict on the model. Tune with
+`DPAGENT_LLM_MAX_TOKENS` (script default 48 000) and optionally `DPAGENT_LLM_REASONING_EFFORT=low|medium|high`.
+
 ### Choosing the model
 
 `DPAGENT_MODEL` must be set explicitly for a run (the script refuses otherwise). The repo's built-in
@@ -124,3 +138,12 @@ classification stated; fixture matches expected and is idempotent; A2 accepts th
 promoted, deployed and run for real with the right output and gates from the journal; cleanup verified;
 the ambiguous BRD got a question (reported per run, not generalised); and the scripted blocks above held.
 See the evidence README for what actually happened.
+
+
+## Status (2026-10-11)
+
+Met for `gemini/gemini-3.8-flash` on the `artist_summary` case — `docs/evidence/a3-llm/real/20261011T095624Z-ee3e8c`
+(classification `llm-after-1-revision(s)`; the first draft failed validation on a schema-qualified contract table, the
+second passed and went through promote → real deploy → run → edit checks) — with the caveats in the evidence README:
+one model, one problem, a prompt tuned while looking at this case, first draft not right. Not shown: other models, other
+problems, multi-table or owned-dbt-project drafts (synth still writes only `pipeline.yaml` + `models/`/`procedures/` SQL).

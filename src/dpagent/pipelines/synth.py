@@ -96,7 +96,11 @@ def capability_catalog() -> str:
         "Gate types (required fields):",
     ]
     for gate_type, fields_ in sorted(loader_mod.GATE_REQUIRED_FIELDS.items()):
-        lines.append(f"  - {gate_type}: {fields_}")
+        optional = loader_mod.GATE_OPTIONAL_FIELDS.get(gate_type)
+        shape = loader_mod.GATE_FIELD_SHAPES.get(gate_type)
+        lines.append(f"  - {gate_type}: {fields_}" + (f" - shape: {shape}" if shape else "")
+                     + (f" (optional: {optional}; no other keys are accepted)" if optional
+                        else " (no other keys are accepted)"))
     return "\n".join(lines)
 
 
@@ -194,7 +198,7 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
             "against tables/columns nobody has confirmed exist")
 
     system = llm.load_prompt("synth_pipeline")
-    data = llm.chat_json(system, _user_message(request, revision), max_tokens=16000)
+    data = llm.chat_json(system, _user_message(request, revision), max_tokens=llm.env_max_tokens(16000))
     if not isinstance(data, dict):
         raise llm.LLMError("synth reply was not a JSON object")
 

@@ -1,0 +1,262 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "run_1: failed\n[run 3] extract.failed: a3_artist_summary__validate__efc22d74 extract failed: Traceback (most recent call last):\n  File \"<stdin>\", line 13, in <module>\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 233, in __call__\n    source = self._deco_f(*args, **kwargs)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 332, in _wrap\n    return _eval_rv(rv, schema_copy)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 292, in _eval_rv\n    _rv = list(_rv)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/sources/sql_database/__init__.py\", line 146, in sql_database\n    metadata.reflect(\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py\", line 5878, in reflect\n    raise exc.InvalidRequestError(\nsqlalchemy.exc.InvalidRequestError: Could not reflect: requested table(s) not available in Engine(postgresql://dpagent_fixture_src_df5d9719a5:***@localhost:5432/dpagent_fixture_src_df5d9719a5) schema 'public': (public.res_partner)\n[run 3] pipeline.failed: DAG run 3 reached terminal state: failed",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-f55f1f9a75526e2c",
+      "fed_back": "run_1: failed\n[run 3] extract.failed: a3_artist_summary__validate__efc22d74 extract failed: Traceback (most recent call last):\n  File \"<stdin>\", line 13, in <module>\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 233, in __call__\n    source = self._deco_f(*args, **kwargs)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 332, in _wrap\n    return _eval_rv(rv, schema_copy)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 292, in _eval_rv\n    _rv = list(_rv)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/sources/sql_database/__init__.py\", line 146, in sql_database\n    metadata.reflect(\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py\", line 5878, in reflect\n    raise exc.InvalidRequestError(\nsqlalchemy.exc.InvalidRequestError: Could not reflect: requested table(s) not available in Engine(postgresql://dpagent_fixture_src_df5d9719a5:***@localhost:5432/dpagent_fixture_src_df5d9719a5) schema 'public': (public.res_partner)\n[run 3] pipeline.failed: DAG run 3 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:32bd89e91bfa99459d2f3de9fb7766244ccecc40a5d3b299d7cbd774b3103c7b",
+        "pipeline.yaml": "sha256:f9fc757bec85def49bd25afaac97034761d0bd55273e4dbffabdbbd3c8ad0787"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__efc22d74",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_events": [
+          {
+            "kind": "extract.start",
+            "level": "info",
+            "message": "a3_artist_summary__validate__efc22d74 via odoo_postgres",
+            "run": 3
+          },
+          {
+            "kind": "extract.failed",
+            "level": "error",
+            "message": "a3_artist_summary__validate__efc22d74 extract failed: Traceback (most recent call last):\n  File \"<stdin>\", line 13, in <module>\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 233, in __call__\n    source = self._deco_f(*args, **kwargs)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 332, in _wrap\n    return _eval_rv(rv, schema_copy)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/extract/decorators.py\", line 292, in _eval_rv\n    _rv = list(_rv)\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/dlt/sources/sql_database/__init__.py\", line 146, in sql_database\n    metadata.reflect(\n  File \"/opt/dlt/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py\", line 5878, in reflect\n    raise exc.InvalidRequestError(\nsqlalchemy.exc.InvalidRequestError: Could not reflect: requested table(s) not available in Engine(postgresql://dpagent_fixture_src_df5d9719a5:***@localhost:5432/dpagent_fixture_src_df5d9719a5) schema 'public': (public.res_partner)",
+            "run": 3
+          },
+          {
+            "kind": "pipeline.failed",
+            "level": "error",
+            "message": "DAG run 3 reached terminal state: failed",
+            "run": 3
+          }
+        ],
+        "run_ids": [
+          3
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        2
+      ],
+      "detail": "run_1: failed\n[run 4] pipeline.failed: DAG run 4 reached terminal state: failed",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-dfc6b3f5e8878453",
+      "fed_back": "run_1: failed\n[run 4] pipeline.failed: DAG run 4 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:32bd89e91bfa99459d2f3de9fb7766244ccecc40a5d3b299d7cbd774b3103c7b",
+        "pipeline.yaml": "sha256:46850000f0456b91f237224551913c0f977cfb9e797fbfa8c7778eb96a78f977"
+      },
+      "format_repairs": 0,
+      "index": 2,
+      "outcome": "validation-fail",
+      "source": "llm-revision",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__b185dd69",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_events": [
+          {
+            "kind": "extract.start",
+            "level": "info",
+            "message": "a3_artist_summary__validate__b185dd69 via odoo_postgres",
+            "run": 4
+          },
+          {
+            "kind": "extract.done",
+            "level": "info",
+            "message": "a3_artist_summary__validate__b185dd69 extract complete: res_partner +10",
+            "run": 4
+          },
+          {
+            "kind": "pipeline.failed",
+            "level": "error",
+            "message": "DAG run 4 reached terminal state: failed",
+            "run": 4
+          }
+        ],
+        "run_ids": [
+          4
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        3
+      ],
+      "detail": "run_1: failed\n[run 5] pipeline.failed: DAG run 5 reached terminal state: failed",
+      "drafted_files": [
+        "models/artist_summary.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-86f32dfd11cc9109",
+      "fed_back": "run_1: failed\n[run 5] pipeline.failed: DAG run 5 reached terminal state: failed",
+      "files": {
+        "models/artist_summary.sql": "sha256:aa06f383421764193d4fd0ac1f0ffdf12ed1393b08cdc4e1eff1e2c145d77266",
+        "pipeline.yaml": "sha256:8db6fc2134ca3ccc5ffe09cee4566b11dc81b20df95fc0c20e9fcc343add7b70"
+      },
+      "format_repairs": 0,
+      "index": 3,
+      "outcome": "validation-fail",
+      "source": "llm-revision",
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_artist_summary__validate__a867dcc1",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_events": [
+          {
+            "kind": "extract.start",
+            "level": "info",
+            "message": "a3_artist_summary__validate__a867dcc1 via odoo_postgres",
+            "run": 5
+          },
+          {
+            "kind": "extract.done",
+            "level": "info",
+            "message": "a3_artist_summary__validate__a867dcc1 extract complete: res_partner +10",
+            "run": 5
+          },
+          {
+            "kind": "pipeline.failed",
+            "level": "error",
+            "message": "DAG run 5 reached terminal state: failed",
+            "run": 5
+          }
+        ],
+        "run_ids": [
+          5
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 12,
+    "max_revisions": 2,
+    "transient_retries": 8,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T09:05:41+00:00",
+      "duration_s": 128.97,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:17707042f1abe505999cca46a7b64d95327c5158bf546a66d807130f317eff14",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 21060,
+        "prompt_tokens": 2969,
+        "reasoning_tokens": 19798,
+        "total_tokens": 24029
+      },
+      "user_sha256": "sha256:7d85758852c7c4473495c56afead06b73b80176f0d09dca2a8e310e17c291794"
+    },
+    {
+      "at": "2026-10-11T09:08:27+00:00",
+      "duration_s": 40.29,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 2,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:b6de7f466eef90853ce26a31ed625f8047b9524688e6f21331fa534b91d4b6ba",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 5738,
+        "prompt_tokens": 4017,
+        "reasoning_tokens": 4649,
+        "total_tokens": 9755
+      },
+      "user_sha256": "sha256:a31034e411d226679bc61722f1ed2ba3f13b0ff7ac8620d2bb9039fb30a50821"
+    },
+    {
+      "at": "2026-10-11T09:09:36+00:00",
+      "duration_s": 97.53,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 3,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:cd038536d2d43ff8c204a37007859ea26b13ee45b60f26b89029515f56472d8b",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 14871,
+        "prompt_tokens": 3619,
+        "reasoning_tokens": 13988,
+        "total_tokens": 18490
+      },
+      "user_sha256": "sha256:e94d00497f1c9bcead065f4ab4f9af7e60723d731d3a37e9720a303ec3d69f0b"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/tmp/a3_or470qpg/pipelines/a3_artist_summary",
+  "started_at": "2026-10-11T09:05:41+00:00",
+  "trace_version": 1
+}

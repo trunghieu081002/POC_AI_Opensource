@@ -1,0 +1,50 @@
+Pipeline name: a3_revenue_ambiguous
+Operator hint: (none)
+
+BRD / report spec:
+# Báo cáo doanh thu
+
+Tổng hợp doanh thu theo tháng từ bảng đơn hàng `sale_order`, để ban lãnh đạo theo dõi.
+Kết quả là một bảng `monthly_revenue` gồm tháng và doanh thu.
+
+
+Verified source schema (real table/column names and types - do not invent any not listed here):
+Source: PostgreSQL, connector `odoo_postgres`, table `public.sale_order`.
+
+| column           | type      | meaning |
+|------------------|-----------|---------|
+| id               | bigint    | order id |
+| date_order       | timestamp | when the quotation/order was created |
+| confirmation_date| timestamp | when the order was confirmed by sales (NULL while still a quotation) |
+| state            | text      | one of: draft, sent, sale, done, cancel |
+| amount_untaxed   | numeric   | total before tax |
+| amount_tax       | numeric   | tax amount |
+| amount_total     | numeric   | total including tax |
+| currency_id      | bigint    | order currency (several currencies are in use) |
+
+Landing: dpagent copies the table as received into the schema `a3_revenue_ambiguous_landing`
+(table `a3_revenue_ambiguous_landing.sale_order`). The pipeline's own warehouse schema is `a3_revenue_ambiguous`.
+
+
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${A3_WH_HOST:-localhost}', 'port': '${A3_WH_PORT:-5432}', 'database': '${A3_WH_NAME:-warehouse}', 'user': '${A3_WH_USER}', 'password': '${A3_WH_PASSWORD}', 'schema': 'a3_revenue_ambiguous'}
+
+Secret refs available: 
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+
+Capability catalog (the only connectors/engines/gates you may use):
+Connectors: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server
+Transform engines: dbt, procedure
+Gate types (required fields):
+  - business_rule: ['name', 'sql', 'expect', 'table', 'id_column']
+  - freshness: ['tables', 'column', 'max_age']
+  - not_null: ['table', 'columns']
+  - referential_integrity: ['table', 'column', 'references']
+  - row_count_bounds: ['table']
+  - schema_contract: ['tables']
+  - unique: ['table', 'columns']
+
+Emit the pipeline JSON.

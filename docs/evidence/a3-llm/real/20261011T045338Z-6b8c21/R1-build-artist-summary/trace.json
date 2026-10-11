@@ -1,0 +1,54 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "LLMError: gemini/gemini-3.8-flash call failed: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "llm-error",
+      "source": "llm",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 12,
+    "max_revisions": 2
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T04:53:38+00:00",
+      "duration_s": 2.03,
+      "error": "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "finish_reason": "",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {},
+      "user_sha256": "sha256:518e0161a879aad589a23f03e05a366b5894764a41305573f89ed59fb043b1b7"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "",
+  "started_at": "2026-10-11T04:53:38+00:00",
+  "trace_version": 1
+}

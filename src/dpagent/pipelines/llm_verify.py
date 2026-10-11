@@ -161,6 +161,14 @@ def classify(kind: str, attempts: list[Attempt]) -> str:
     calls were only format repairs (the reply was not valid JSON and chat_json re-asked):
     `llm-first-draft` means the first pipeline the model proposed validated - a JSON repair
     does not make it a revision, but it is not hidden either."""
+    if attempts and attempts[-1].outcome == "reply-truncated":
+        # the output-token limit (shared with a reasoning model's hidden thinking) was too small:
+        # a statement about the run's configuration, not about whether the model can do the task
+        return "inconclusive-output-limit"
+    if attempts and attempts[-1].outcome == "provider-unavailable":
+        # the service was busy even after the permitted retries: the run says nothing about the
+        # model (it is neither a pass nor a failure of the model)
+        return "inconclusive-provider-unavailable"
     if kind == "ambiguous":
         if attempts and attempts[0].outcome == "blocked":
             return "asked-blocker" + _repair_suffix(attempts[:1])
@@ -187,7 +195,8 @@ def _call_summary(rec: llm.CallRecord) -> dict:
     return {"index": rec.index, "at": rec.at, "model": rec.model,
             "system_sha256": rec.system_sha256, "user_sha256": rec.user_sha256,
             "response_sha256": rec.response_sha256, "usage": rec.usage,
-            "duration_s": rec.duration_s, "error": rec.error}
+            "finish_reason": rec.finish_reason,
+            "duration_s": rec.duration_s, "error": rec.error, "transient": rec.transient}
 
 
 def _secret_values() -> list[str]:
@@ -255,14 +264,24 @@ def _failure_text(section: dict, report, run_events: list[str]) -> str:
     return "\n".join(dict.fromkeys(lines)) or "validation failed (no further detail)"
 
 
-def _run_error_events(section: dict) -> list[str]:
+def _run_events(section: dict) -> list[dict]:
+    """Every journal event of the validation runs (kind, level, message) - kept in the trace
+    (the journal itself is gone when the disposable host is) and the failures among them are what
+    the model is told on a re-ask."""
     from ..engine import state
     out = []
     for run_id in section.get("run_ids") or []:
         for ev in state.events_for(int(run_id)):
-            if ev["level"] in ("error", "warn"):
-                out.append(f"[run {run_id}] {ev['message']}"[:1500])
-    return out[:6]
+            out.append({"run": int(run_id), "kind": ev["kind"], "level": ev["level"],
+                        "message": str(ev["message"])[:1500]})
+    return out
+
+
+def _run_error_events(section: dict, events: list[dict] | None = None) -> list[str]:
+    events = _run_events(section) if events is None else events
+    bad = [f"[run {e['run']}] {e['kind']}: {e['message']}" for e in events
+           if e["level"] in ("error", "warn") or "failed" in e["kind"]]
+    return bad[:8]
 
 
 # ------------------------------------------------------------------ the orchestration
@@ -271,7 +290,7 @@ Runner = Callable[..., tuple]     # (pipeline, step3_report, fixture_path, expec
 
 
 def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 2,
-             runner: Runner | None = None) -> tuple[Trace, list[llm.CallRecord]]:
+             runner: Runner | None = None, transient_retries: int = 0, wait_s: float = 20.0) -> tuple[Trace, list[llm.CallRecord]]:
     """Draft with the real model, then push the draft - unchanged - through the
     existing chain. A build case re-asks (at most `max_revisions` times) when
     validation fails; an ambiguous case gets exactly one ask."""
@@ -279,12 +298,13 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
     trace = Trace(case=case.name, kind=case.kind,
                   started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   model=llm.get_model(), dpagent=__version__,
-                  budget={"max_calls": max_calls, "max_revisions": max_revisions},
+                  budget={"max_calls": max_calls, "max_revisions": max_revisions,
+                          "transient_retries": transient_retries, "wait_s": wait_s},
                   inputs=case.input_hashes())
     workdir = Path(workdir)
     workdir.mkdir(parents=True, exist_ok=True)
     revision = None
-    with llm.record_calls(max_calls) as records:
+    with llm.record_calls(max_calls, transient_retries=transient_retries, wait_s=wait_s) as records:
         for n in range(1, (max_revisions if case.kind == "build" else 0) + 2):
             attempt = Attempt(index=n, source="llm" if n == 1 else "llm-revision")
             trace.attempts.append(attempt)
@@ -294,12 +314,15 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                                          revision=revision)
             except (llm.LLMError, ValueError, KeyError, TypeError, AttributeError) as exc:
                 attempt.call_indexes = list(range(before + 1, len(records) + 1))
-                attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
-                attempt.outcome = "llm-error" if isinstance(exc, llm.LLMError) else "invalid-reply"
+                attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
+                attempt.outcome = ("provider-unavailable" if isinstance(exc, llm.ProviderUnavailable)
+                                   else "reply-truncated" if isinstance(exc, llm.ReplyTruncated)
+                                   else "llm-error" if isinstance(exc, llm.LLMError)
+                                   else "invalid-reply")
                 attempt.detail = f"{type(exc).__name__}: {exc}"[:600]
                 break
             attempt.call_indexes = list(range(before + 1, len(records) + 1))
-            attempt.format_repairs = max(0, len(attempt.call_indexes) - 1)
+            attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
             if result.blocked:
                 attempt.outcome = "blocked"
                 attempt.blockers = [{"question": b.question, "why_it_matters": b.why_it_matters}
@@ -338,7 +361,9 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 attempt.outcome = "validated"
                 break
             attempt.outcome = "validation-fail"
-            attempt.fed_back = _failure_text(section, report, _run_error_events(section))
+            events = _run_events(section)
+            attempt.validation["run_events"] = events
+            attempt.fed_back = _failure_text(section, report, _run_error_events(section, events))
             attempt.detail = attempt.fed_back[:1500]
             revision = synth_mod.Revision(result.drafted_files, attempt.fed_back)
         trace.calls = [_call_summary(r) for r in records]
@@ -478,7 +503,14 @@ def leak_problems(recovered: dict) -> list[str]:
 
 def build_problems(result: dict) -> list[str]:
     p = []
-    if not str(result.get("classification", "")).startswith(("llm-", "human-")):
+    if result.get("classification") == "inconclusive-provider-unavailable":
+        p.append("INCONCLUSIVE: the provider was unavailable (busy / rate-limited / timed out) "
+                 "after the permitted retries - nothing was learned about the model")
+    elif result.get("classification") == "inconclusive-output-limit":
+        p.append("INCONCLUSIVE: a reply hit the output-token limit (raise DPAGENT_LLM_MAX_TOKENS / "
+                 "lower DPAGENT_LLM_REASONING_EFFORT) - the run's limit was too small, which is not "
+                 "a verdict on the model's logic")
+    elif not str(result.get("classification", "")).startswith(("llm-", "human-")):
         p.append(f"not validated ({result.get('classification')}, last outcome {result.get('last_outcome')})")
     else:
         dr = result.get("deploy_run") or {}
@@ -493,8 +525,11 @@ def build_problems(result: dict) -> list[str]:
 
 
 def ambiguous_problems(result: dict) -> list[str]:
-    p = [] if str(result.get("classification", "")).startswith("asked-blocker") else [
-        f"model did not ask ({result.get('classification')})"]
+    c = str(result.get("classification", ""))
+    if c.startswith("inconclusive-"):
+        p = [f"INCONCLUSIVE ({c}): nothing was learned about the model's judgement"]
+    else:
+        p = [] if c.startswith("asked-blocker") else [f"model did not ask ({c})"]
     return p + leak_problems(result.get("leaked_and_recovered") or {})
 
 
@@ -507,22 +542,44 @@ def completeness(requested: dict[str, int], ran: dict[str, int]) -> list[str]:
 
 # ------------------------------------------------------------------ connectivity probe
 
-def probe() -> dict:
-    """ONE tiny call to the configured model, before any host is built: does the key work,
-    is the model name served, is there quota. Opt-in like everything else; the call and its
-    token usage are returned (never the key)."""
-    ensure_opted_in(1)
-    with llm.record_calls(max_calls=1) as records:
-        try:
-            text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
-                            max_tokens=16)
-        except llm.LLMError as exc:
-            rec = records[0] if records else None
-            return {"ok": False, "model": llm.get_model(), "error": str(exc)[:400],
-                    "calls": len(records), "usage": rec.usage if rec else {}}
-    rec = records[0]
-    return {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
-            "usage": rec.usage, "duration_s": rec.duration_s, "calls": 1}
+_TRANSIENT = llm.TRANSIENT
+
+
+def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:
+    """A tiny call to the configured model before any host is built: does the key work, is the
+    model name served, is there quota. A *transient* provider answer (503 "high demand", 429,
+    timeout) is retried a few times with a pause - it says the model is busy, not that the
+    key or name is wrong - and every attempt is reported. Anything else (bad key, unknown
+    model) fails at once. Opt-in like everything else; the key is never returned."""
+    import time
+    sleep = sleep or time.sleep
+    ensure_opted_in(attempts)
+    tries: list[dict] = []
+    for n in range(1, attempts + 1):
+        with llm.record_calls(max_calls=1) as records:
+            try:
+                # generous: a "thinking" model spends part of max_tokens on reasoning
+                # before the first visible character - 16 yielded an empty reply
+                text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
+                                max_tokens=1024)
+            except llm.LLMError as exc:
+                err = str(exc)[:400]
+                tries.append({"attempt": n, "error": err, "transient": bool(_TRANSIENT.search(err))})
+                if not tries[-1]["transient"] or n == attempts:
+                    return {"ok": False, "model": llm.get_model(), "error": err,
+                            "transient": tries[-1]["transient"], "attempts": tries}
+                sleep(wait_s)
+                continue
+        rec = records[0]
+        out = {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
+               "usage": rec.usage, "finish_reason": rec.finish_reason,
+               "duration_s": rec.duration_s, "attempts": tries + [{"attempt": n}]}
+        if not out["ok"]:
+            out["error"] = (f"the model answered but with no text (finish_reason="
+                            f"{rec.finish_reason!r}, usage={rec.usage}) - for a reasoning model this "
+                            f"means the token limit was used up before any visible output")
+        return out
+    return {"ok": False, "model": llm.get_model(), "attempts": tries}
 
 
 if __name__ == "__main__":      # python -m dpagent.pipelines.llm_verify probe
