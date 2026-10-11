@@ -78,3 +78,30 @@ What this run proves about the **harness/product** rather than the model — all
   nothing extra on the other gates) — a real silent-no-op found by the model; the capability catalog now lists the optional keys;
 * the **synth prompt states the dbt `config(schema=…)` convention** (changing the prompt hash: runs before and after are not the same test);
 * the **journal events of the validation runs are saved in the trace** and the failing ones are what the model is told on a re-ask (it was told only "terminal state: failed").
+
+
+## `real/20261011T090541Z-21b661` — third run, `gemini/gemini-3.8-flash`, commit `936a5a2`
+
+Probe 3.5 s (IPv4-first fix); R2 `asked-blocker` ×3 again (≈11 s each). **R1 did not validate — and this time the trace says why.**
+Three calls (129 s, 40 s, 98 s; no truncation, no 503), three drafts, all `validation-fail`:
+
+| Attempt | What the model wrote | What happened |
+|---|---|---|
+| 1 | `tables: [public.res_partner]` and gates on `a3_artist_summary_landing.res_partner` | extract failed: *Could not reflect: requested table(s) not available … (public.res_partner)* — the journal message reached the model |
+| 2 (re-ask) | fixed the extract table (`res_partner`) but kept schema-qualified gate tables and `schema_contract: {tables: [..]}` | extract OK (`res_partner +10`), then the run died with **no gate event at all** |
+| 3 (re-ask) | fixed the gate tables; kept `schema_contract` with `tables: [res_partner]` | same: extract OK, then dead with no event; the model was told only "terminal state: failed" |
+
+The SQL was right from attempt 1 (exclusion list, trim, blank/NULL, one row per id, `config(schema=…)`, correct `min`/`max`
+keys — the prompt fix of the previous round worked). The remaining failure is a **product weakness the model exposed**: the
+`schema_contract` gate takes `tables: {table: {column: type}}`, the catalog only said `['tables']`, the loader accepted a list, and at run
+time the gate indexed it as a mapping, raised `TypeError` and the task died **without a journal event** — so nothing could be fed back
+to the model and a human looking at `audit` would see only "failed". (Cause confirmed from `runtime._evaluate_gate`; the crash itself was not
+captured on that host — inferred from "extract done, no gate event, run failed" and the draft's list-shaped `tables`.)
+
+Fixed afterwards (not part of this run): the loader refuses a `schema_contract` whose `tables` is not table → {column: type} (and
+`columns` that is not a non-empty list for `not_null`/`unique`); the capability catalog shows each gate's field shape; a gate that raises is
+recorded as a **failed gate** with its reason (`gate.failed`/`stage.failed` events), so it reaches `audit` and the next ask.
+
+**Not a pass and not yet a verdict on the model**: the next run is the first against a harness where the model can be told what broke. Honest
+reading of three runs so far: it understands the BRD (3 × 3 questions asked on the ambiguous one; correct SQL on the build) and has not yet
+produced a deployable manifest within 3 attempts.

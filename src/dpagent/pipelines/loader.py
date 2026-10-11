@@ -41,6 +41,17 @@ GATE_REQUIRED_FIELDS = {
     "business_rule": ["name", "sql", "expect", "table", "id_column"],
 }
 
+# What each required field looks like - shown to the model in the capability catalog, because
+# "schema_contract: ['tables']" does not say that `tables` is a mapping of table -> {column: type}
+# (a real model wrote a list and the gate crashed at run time).
+GATE_FIELD_SHAPES = {
+    "schema_contract": "tables: {table_name: {column_name: postgres_type}}",
+    "freshness": "tables: [..], column: <timestamp column>, max_age: '24h'|'30m'|'7d'",
+    "row_count_bounds": "table: <table>; optional min/max: integers",
+    "not_null": "table: <table>, columns: [<column>, ..]",
+    "unique": "table: <table>, columns: [<column>, ..]",
+}
+
 # Optional parameters a gate type understands (runtime.py reads exactly these). A gate
 # carrying any other key is refused: an unknown key is silently ignored by the runtime, so a
 # gate written with `min_rows: 1` instead of `min: 1` would pass vacuously - found when a real
@@ -275,6 +286,22 @@ def _validate_gate(raw: dict, where: str) -> Gate:
         raise PipelineError(
             f"{where}: gate {gate_type!r} has unknown parameter(s) {unknown} - the runtime "
             f"would ignore them silently; this gate understands {allowed}")
+    if gate_type == "schema_contract":
+        tables = raw.get("tables")
+        if (not isinstance(tables, dict) or not tables
+                or not all(isinstance(cols, dict) and cols and all(
+                    isinstance(c, str) and isinstance(t, str) for c, t in cols.items())
+                    for cols in tables.values())):
+            raise PipelineError(
+                f"{where}: schema_contract's `tables` must map each table to its columns and "
+                f"types, e.g. {{res_partner: {{id: bigint, name: text}}}} - a list of table names "
+                f"describes no contract (got {tables!r})")
+    if gate_type in ("not_null", "unique") and not (
+            isinstance(raw.get("columns"), list) and raw["columns"]
+            and all(isinstance(c, str) for c in raw["columns"])):
+        raise PipelineError(
+            f"{where}: gate {gate_type!r}'s `columns` must be a non-empty list of column names "
+            f"(got {raw.get('columns')!r})")
     if gate_type == "freshness" and not _DURATION.match(str(raw.get("max_age", ""))):
         raise PipelineError(
             f"{where}: freshness gate's max_age {raw.get('max_age')!r} "

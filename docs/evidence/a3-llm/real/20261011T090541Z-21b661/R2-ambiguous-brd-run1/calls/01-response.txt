@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Doanh thu tính theo mốc thời gian nào: ngày tạo đơn hàng (`date_order`) hay ngày xác nhận đơn (`confirmation_date`)?",
+      "why_it_matters": "Quyết định cột dùng để gom nhóm theo tháng. Chọn sai cột sẽ làm lệch doanh thu giữa các tháng và các đơn chưa xác nhận (`confirmation_date` mang giá trị NULL) sẽ không rõ xử lý thế nào."
+    },
+    {
+      "question": "Những trạng thái đơn hàng (`state`) nào được ghi nhận vào doanh thu (ví dụ: chỉ `sale`, `done` hay loại trừ `cancel`, `draft`)?",
+      "why_it_matters": "Cột `state` có 5 trạng thái (`draft`, `sent`, `sale`, `done`, `cancel`). Nếu không xác định rõ bộ lọc trạng thái, doanh thu sẽ bị tính sai lệch lớn (ví dụ tính cả đơn nháp hoặc đơn bị hủy)."
+    },
+    {
+      "question": "Doanh thu được tính theo số tiền trước thuế (`amount_untaxed`) hay tổng tiền đã gồm thuế (`amount_total`)?",
+      "why_it_matters": "Hai cột này thể hiện hai định nghĩa doanh thu khác nhau và cho ra con số chênh lệch trực tiếp theo tiền thuế."
+    },
+    {
+      "question": "Xử lý đa tiền tệ (`currency_id`) như thế nào để tổng hợp doanh thu về một loại tiền tệ chuẩn?",
+      "why_it_matters": "Hệ thống ghi nhận nhiều loại tiền tệ khác nhau. Không thể cộng dồn trực tiếp các giá trị khác tiền tệ, và nguồn dữ liệu hiện tại chưa cung cấp bảng tỷ giá hay đồng tiền cơ sở của báo cáo."
+    }
+  ]
+}

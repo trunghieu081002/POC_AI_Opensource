@@ -552,3 +552,54 @@ def test_ipv6_first_can_be_requested(monkeypatch):
     monkeypatch.setenv("DPAGENT_LLM_IPV6_FIRST", "1")
     llm.prefer_ipv4()
     assert socket.getaddrinfo("x", 1)[0][0] == socket.AF_INET6
+
+
+# ------------------------------------------------------------------ findings of the third real run
+
+def test_a_schema_contract_written_as_a_list_of_tables_is_refused_at_load():
+    """The model wrote `tables: [res_partner]`; the runtime indexed it as a mapping and the
+    gate task died with nothing in the journal."""
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": "schema_contract", "tables": {"res_partner": {"id": "bigint"}}}, "x")
+    for bad in (["res_partner"], {"res_partner": ["id"]}, {"res_partner": {}}, {}, "res_partner"):
+        with pytest.raises(PipelineError, match="schema_contract"):
+            _validate_gate({"type": "schema_contract", "tables": bad}, "x")
+
+
+@pytest.mark.parametrize("gate_type", ["not_null", "unique"])
+def test_columns_must_be_a_non_empty_list(gate_type):
+    from dpagent.pipelines.loader import PipelineError, _validate_gate
+    _validate_gate({"type": gate_type, "table": "t", "columns": ["a"]}, "x")
+    for bad in ("a", [], None):
+        with pytest.raises(PipelineError, match="columns"):
+            _validate_gate({"type": gate_type, "table": "t", "columns": bad}, "x")
+
+
+def test_the_catalog_shows_the_shape_of_schema_contract_tables():
+    assert "tables: {table_name: {column_name: postgres_type}}" in synth.capability_catalog()
+
+
+def test_a_gate_that_crashes_is_a_failed_gate_with_the_reason_in_the_journal(tmp_path, monkeypatch):
+    from dpagent.engine import state
+    from dpagent.pipelines import runtime
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    root = tmp_path / "pipelines"
+    (root / "g").mkdir(parents=True)
+    (root / "g" / "pipeline.yaml").write_text(
+        "name: g\nsummary: t\nsource: {connector: csv, files: {path: /tmp/x.csv}}\n"
+        "warehouse: {host: h, database: d}\n"
+        "stages: [{name: landing, gates: [{type: row_count_bounds, table: x, min: 1}]}]\n")
+    pipeline = loader.load("g", root)
+    monkeypatch.setattr(runtime.loader, "load", lambda name: pipeline)
+
+    def boom(*a, **k):
+        raise TypeError("list indices must be integers or slices, not str")
+    monkeypatch.setattr(runtime, "_evaluate_gate", boom)
+    run_id = state.start_run("data", "g")
+    with pytest.raises(runtime.GateFailed, match="the gate itself raised TypeError"):
+        runtime.run_gate(pipeline_name="g", stage="landing", run_id=run_id)
+    kinds = {e["kind"]: e["message"] for e in state.events_for(run_id)}
+    assert "gate.failed" in kinds and "list indices" in kinds["gate.failed"]
+    assert "stage.failed" in kinds
+    assert state.latest_stage("g", "landing")["status"] == "failed"

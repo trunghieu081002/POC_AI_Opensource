@@ -1,0 +1,90 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "ev-f55f1f9a75526e2c",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    },
+    {
+      "evidence_id": "ev-dfc6b3f5e8878453",
+      "n": 2,
+      "outcome": "validation-fail",
+      "source": "llm-revision"
+    },
+    {
+      "evidence_id": "ev-86f32dfd11cc9109",
+      "n": 3,
+      "outcome": "validation-fail",
+      "source": "llm-revision"
+    }
+  ],
+  "calls": 3,
+  "case": "artist_summary",
+  "classification": "not-validated",
+  "label": "R1-build-artist-summary",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_artist_summary__validate__a867dcc1",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "not_run",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_artist_summary__validate__a867dcc1 via odoo_postgres",
+        "run": 5
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_artist_summary__validate__a867dcc1 extract complete: res_partner +10",
+        "run": 5
+      },
+      {
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 5 reached terminal state: failed",
+        "run": 5
+      }
+    ],
+    "run_ids": [
+      5
+    ],
+    "run_status": {
+      "run_1": "failed",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "gemini/gemini-3.8-flash",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "run_1: run 5 finished 'failed' in the journal",
+      "run_1: gated stage 'landing' has no gate verdict in the journal",
+      "run_1: gated stage 'curated' has no gate verdict in the journal"
+    ]
+  },
+  "tokens": 52274
+}

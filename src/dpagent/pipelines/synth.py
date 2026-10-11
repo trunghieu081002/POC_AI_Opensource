@@ -97,7 +97,8 @@ def capability_catalog() -> str:
     ]
     for gate_type, fields_ in sorted(loader_mod.GATE_REQUIRED_FIELDS.items()):
         optional = loader_mod.GATE_OPTIONAL_FIELDS.get(gate_type)
-        lines.append(f"  - {gate_type}: {fields_}"
+        shape = loader_mod.GATE_FIELD_SHAPES.get(gate_type)
+        lines.append(f"  - {gate_type}: {fields_}" + (f" - shape: {shape}" if shape else "")
                      + (f" (optional: {optional}; no other keys are accepted)" if optional
                         else " (no other keys are accepted)"))
     return "\n".join(lines)

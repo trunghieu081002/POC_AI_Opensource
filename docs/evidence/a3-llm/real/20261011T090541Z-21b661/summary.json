@@ -1,0 +1,53 @@
+{
+  "complete": true,
+  "inconclusive": [],
+  "mode": "real",
+  "not_met": [
+    "R1-build-artist-summary"
+  ],
+  "run_id": "20261011T090541Z-21b661",
+  "runs": [
+    {
+      "calls": 3,
+      "classification": "not-validated",
+      "criteria_problems": [
+        "not validated (not-validated, last outcome validation-fail)"
+      ],
+      "expectation_problems": null,
+      "label": "R1-build-artist-summary",
+      "last_outcome": "validation-fail",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 52274
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run1",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 4280
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run2",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 3888
+    },
+    {
+      "calls": 1,
+      "classification": "asked-blocker",
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R2-ambiguous-brd-run3",
+      "last_outcome": "blocked",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 4080
+    }
+  ]
+}

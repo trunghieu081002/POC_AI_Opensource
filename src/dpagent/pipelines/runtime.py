@@ -383,7 +383,14 @@ def run_gate(*, pipeline_name: str, stage: str, run_id: int | None = None) -> No
     row_count = None
 
     for gate in target.gates:
-        passed, detail, checked, rejected = _evaluate_gate(pipeline, gate, target, run_id)
+        try:
+            passed, detail, checked, rejected = _evaluate_gate(pipeline, gate, target, run_id)
+        except Exception as exc:                       # noqa: BLE001 - recorded, then the stage fails
+            # A gate that CRASHES (a malformed parameter, a table that is not there) used to kill
+            # the task with nothing in the journal: the run just said "failed". It is a failed
+            # gate, with the reason on the record - for the operator and for `audit`.
+            passed, checked, rejected = False, None, None
+            detail = f"the gate itself raised {type(exc).__name__}: {exc}"[:1500]
         if gate.type == "row_count_bounds":
             row_count = checked
         state.record_gate(stage_row_id, gate.type, "passed" if passed else "failed",
