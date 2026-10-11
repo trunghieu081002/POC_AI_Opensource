@@ -1,6 +1,6 @@
 # A3 evidence
 
-**State: harness verified with a scripted stand-in; the first real-model run was INCONCLUSIVE (see below). A3 is not complete.** `scripted/` is
+**State: A3's criteria are met for `gemini/gemini-3.8-flash` on the `artist_summary` case — see the fourth real run below, and its caveats. (Runs 1-3 are kept: inconclusive, inconclusive, failed.)** `scripted/` is
 not evidence about any model — its replies are the hand-written files in
 `tests/llm_verification/scripted_drafts/`. `real/` does not exist because the machine had no
 provider credential when this was produced. A3 is **not complete** until `real/` is here
@@ -135,3 +135,27 @@ per run; a different model, prompt or day can differ.
 * The product and the prompt were changed between runs 1-3 and this one *in response to what those runs exposed* (the dbt `schema` convention, gate
   keys and shapes, truncation handling, IPv4-first, journal feedback). The prompt hash in `trace.json` differs from the earlier runs: this success
   is for the final prompt, which was tuned while looking at this same case. A fresh problem is the honest next test of generalisation.
+
+
+## `scripted/20261011T105436Z-0ac0c2` — the blocking cases on the SAME code as the fourth real run
+
+Re-run on commit `2f9cbfa` (the earlier scripted evidence predates the loader/runtime/client changes made after the real runs): **8/8, `leaks=0`**.
+S1/S2 full chain with published-bytes check; S3 (unknown column) and S4 (wrong result) fail validation and cannot be promoted or deployed; S5 (API
+timeout) is now `inconclusive-provider-unavailable` with no approval/evidence/deploy; S6 (non-JSON replies) no approval; S7 (ambiguous BRD, "model" builds
+anyway) is recorded `guessed`; S8 `asked-blocker`. One earlier attempt to build the host failed before reaching the driver (the usual shared-machine
+`postgres` suite flake) and was repeated; only this run's evidence exists for it.
+
+## A3 criteria, one by one
+
+| Criterion | Where |
+|---|---|
+| A pipeline drafted by a real model from BRD + schema | real/…ee3e8c R1 (`gemini/gemini-3.8-flash`) |
+| Fix state stated | `llm-after-1-revision(s)` — validator output shown to the model; no human edit |
+| Fixture matches expected, re-run stable | both runs `pass`, idempotent |
+| Evidence accepted by A2 | promote accepted, `verified` (`ev-df5c4171186f68a1`) |
+| Promoted, deployed, run for real | deploy without `--allow-draft`, journal run 6 `ok` |
+| Output after deploy correct | 1 row matched exactly; gates passed in the journal |
+| Under-specified BRD tested | `asked-blocker` ×3 in this run (7/7 across all real runs) — per run, not generalised |
+| Wrong output blocked | scripted S3/S4 (and S2's first reply) on the same code |
+| Cleanup verified | undeploy verified, S3-style leak audit `leaks=0` on both hosts |
+| Anyone can repeat it | `docs/llm-verification.md` |
