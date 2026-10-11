@@ -1,19 +1,12 @@
 {
   "mode": "scripted",
-  "not_met": [
-    "S1-good-draft-first-try",
-    "S2-wrong-then-corrected"
-  ],
+  "not_met": [],
   "runs": [
     {
       "calls": 1,
       "classification": "llm-first-draft",
       "criteria_problems": null,
-      "expectation_problems": [
-        "deploy/run did not complete: {'promote': {'accepted': True, 'evidence_id': 'ev-0557a4cc558fba2a', 'verification': 'verified', 'maturity': 'reviewed', 'approval_hash': 'sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576'}, 'deployed': True, 'run_status': 'ok', 'comparison': {'ok': True, 'detail': '1 row(s) m",
-        "edit checks: None",
-        "deployed content differs from the drafted content"
-      ],
+      "expectation_problems": [],
       "label": "S1-good-draft-first-try",
       "last_outcome": "validated",
       "model": "scripted/stand-in-for-a-model",
@@ -23,11 +16,7 @@
       "calls": 2,
       "classification": "llm-after-1-revision(s)",
       "criteria_problems": null,
-      "expectation_problems": [
-        "deploy/run did not complete: {'promote': {'accepted': True, 'evidence_id': 'ev-176d6e1f4b964b6d', 'verification': 'verified', 'maturity': 'reviewed', 'approval_hash': 'sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576'}, 'deployed': True, 'run_status': 'ok', 'comparison': {'ok': True, 'detail': '1 row(s) m",
-        "edit checks: None",
-        "deployed content differs from the drafted content"
-      ],
+      "expectation_problems": [],
       "label": "S2-wrong-then-corrected",
       "last_outcome": "validated",
       "model": "scripted/stand-in-for-a-model",

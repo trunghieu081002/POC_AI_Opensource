@@ -26,7 +26,7 @@ Landing: dpagent copies the table as received into the schema `a3_revenue_ambigu
 (table `a3_revenue_ambiguous_landing.sale_order`). The pipeline's own warehouse schema is `a3_revenue_ambiguous`.
 
 
-Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${WAREHOUSE_DB_HOST:-localhost}', 'port': '${WAREHOUSE_DB_PORT:-5432}', 'database': '${WAREHOUSE_DB_NAME:-warehouse}', 'user': '${WAREHOUSE_DB_USER}', 'password': '${WAREHOUSE_DB_PASSWORD}', 'schema': 'a3_revenue_ambiguous'}
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${A3_WH_HOST:-localhost}', 'port': '${A3_WH_PORT:-5432}', 'database': '${A3_WH_NAME:-warehouse}', 'user': '${A3_WH_USER}', 'password': '${A3_WH_PASSWORD}', 'schema': 'a3_revenue_ambiguous'}
 
 Secret refs available: 
   A3_SRC_HOST: source Postgres host

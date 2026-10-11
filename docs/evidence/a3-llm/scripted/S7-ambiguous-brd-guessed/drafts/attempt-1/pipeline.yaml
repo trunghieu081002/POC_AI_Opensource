@@ -12,11 +12,11 @@ source:
   tables:
   - res_partner
 warehouse:
-  host: ${WAREHOUSE_DB_HOST:-localhost}
-  port: ${WAREHOUSE_DB_PORT:-5432}
-  database: ${WAREHOUSE_DB_NAME:-warehouse}
-  user: ${WAREHOUSE_DB_USER}
-  password: ${WAREHOUSE_DB_PASSWORD}
+  host: ${A3_WH_HOST:-localhost}
+  port: ${A3_WH_PORT:-5432}
+  database: ${A3_WH_NAME:-warehouse}
+  user: ${A3_WH_USER}
+  password: ${A3_WH_PASSWORD}
   schema: a3_artist_summary
 stages:
 - name: landing

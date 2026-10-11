@@ -27,7 +27,7 @@
   },
   "calls": [
     {
-      "at": "2026-10-10T19:15:16+00:00",
+      "at": "2026-10-11T01:34:13+00:00",
       "duration_s": 0.0,
       "error": "",
       "index": 1,
@@ -39,7 +39,7 @@
         "prompt_tokens": 11,
         "total_tokens": 18
       },
-      "user_sha256": "sha256:30c2ba8213ad3dd8742f5a55e7760ad3e026228be543f534d5b15aa028aacccf"
+      "user_sha256": "sha256:aff2341be4b5b737d809cbb5891cf69b4c6c3876c0df865ea2fbc974bb8ebcef"
     }
   ],
   "case": "a3_revenue_ambiguous",
@@ -47,13 +47,13 @@
   "dpagent": "0.4.0",
   "inputs": {
     "brd": "sha256:7cc83d542c80a2b2ae866612c7a5e3ad296daf9ca304d81248a41616d107cf40",
-    "request_yaml": "sha256:1e594e44853fa87805ac7a36c00721534d3ac7b7ffa6850bbbffc64c489b18aa",
+    "request_yaml": "sha256:70e013c82c3566bb683e8304e79bf8a3bfda014f988deb57e1f8f290bfc27452",
     "source_schema": "sha256:4987833152ad481c865071ddee8eb1ca71cb88bf1e2f2c167c74a14eac76bac2",
     "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
   },
   "kind": "ambiguous",
   "model": "scripted/stand-in-for-a-model",
   "pipeline_dir": "",
-  "started_at": "2026-10-10T19:15:16+00:00",
+  "started_at": "2026-10-11T01:34:13+00:00",
   "trace_version": 1
 }

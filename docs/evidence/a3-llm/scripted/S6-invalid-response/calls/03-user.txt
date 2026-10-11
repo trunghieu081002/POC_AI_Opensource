@@ -49,7 +49,7 @@ schema `a3_artist_summary_landing`, so the extracted table is `a3_artist_summary
 The pipeline's own warehouse schema (for its dbt models / output tables) is `a3_artist_summary`.
 
 
-Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${WAREHOUSE_DB_HOST:-localhost}', 'port': '${WAREHOUSE_DB_PORT:-5432}', 'database': '${WAREHOUSE_DB_NAME:-warehouse}', 'user': '${WAREHOUSE_DB_USER}', 'password': '${WAREHOUSE_DB_PASSWORD}', 'schema': 'a3_artist_summary'}
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${A3_WH_HOST:-localhost}', 'port': '${A3_WH_PORT:-5432}', 'database': '${A3_WH_NAME:-warehouse}', 'user': '${A3_WH_USER}', 'password': '${A3_WH_PASSWORD}', 'schema': 'a3_artist_summary'}
 
 Secret refs available: 
   A3_SRC_HOST: source Postgres host

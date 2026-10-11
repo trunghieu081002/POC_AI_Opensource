@@ -2,7 +2,7 @@
   "approval_file_exists": false,
   "attempts": [
     {
-      "evidence_id": "ev-762d14c40900ff38",
+      "evidence_id": "ev-49987ff54db4f0c2",
       "n": 1,
       "outcome": "validation-fail",
       "source": "llm"
@@ -16,7 +16,7 @@
   "last_outcome": "validation-fail",
   "last_validation": {
     "cleanup": "pass",
-    "clone_name": "a3_artist_summary__validate__cb4e9f12",
+    "clone_name": "a3_artist_summary__validate__74671aeb",
     "comparison": {
       "idempotent": false,
       "run_1": "not_run",

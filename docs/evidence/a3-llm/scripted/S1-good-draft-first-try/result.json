@@ -2,7 +2,7 @@
   "approval_file_exists": true,
   "attempts": [
     {
-      "evidence_id": "ev-0557a4cc558fba2a",
+      "evidence_id": "ev-8153f393fb4e8eb0",
       "n": 1,
       "outcome": "validated",
       "source": "llm"
@@ -40,30 +40,57 @@
       ]
     },
     "gates_passed": true,
-    "ok": false,
+    "ok": true,
     "promote": {
       "accepted": true,
-      "approval_hash": "sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576",
-      "evidence_id": "ev-0557a4cc558fba2a",
+      "approval_hash": "sha256:81cd250164752a45714e6696d85699ec418e0dfd2976c7e6c0329c09afc81d24",
+      "evidence_id": "ev-8153f393fb4e8eb0",
       "maturity": "reviewed",
       "verification": "verified"
     },
     "run_id": 5,
     "run_status": "ok",
-    "undeploy_detail": "clone secret(s) still in /opt/airflow/home/pipelines.env: WAREHOUSE_DB_HOST, WAREHOUSE_DB_NAME, WAREHOUSE_DB_PASSWORD, WAREHOUSE_DB_PORT, WAREHOUSE_DB_USER",
-    "undeploy_verified": false
+    "undeploy_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "undeploy_verified": true
   },
-  "deployed_bytes_are_the_drafted_bytes": false,
-  "expectation_problems": [
-    "deploy/run did not complete: {'promote': {'accepted': True, 'evidence_id': 'ev-0557a4cc558fba2a', 'verification': 'verified', 'maturity': 'reviewed', 'approval_hash': 'sha256:85fa4739e12f737d98afe27b77652dfe69829154d5ff5946593d4d1891264576'}, 'deployed': True, 'run_status': 'ok', 'comparison': {'ok': True, 'detail': '1 row(s) m",
-    "edit checks: None",
-    "deployed content differs from the drafted content"
-  ],
+  "deployed_bytes_are_the_drafted_bytes": true,
+  "edit_checks": {
+    "edits": {
+      "expected": {
+        "approval_still_valid": true,
+        "approval_unchanged": true,
+        "deploy_refused": false,
+        "promote_accepted": false
+      },
+      "fixture": {
+        "approval_still_valid": true,
+        "approval_unchanged": true,
+        "deploy_refused": false,
+        "promote_accepted": false
+      },
+      "manifest": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      },
+      "model": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      }
+    },
+    "ok": true,
+    "problems": [],
+    "restored_is_valid_again": true
+  },
+  "expectation_problems": [],
   "label": "S1-good-draft-first-try",
   "last_outcome": "validated",
   "last_validation": {
     "cleanup": "pass",
-    "clone_name": "a3_artist_summary__validate__a0d8b261",
+    "clone_name": "a3_artist_summary__validate__03cd43c1",
     "comparison": {
       "idempotent": true,
       "run_1": "pass",

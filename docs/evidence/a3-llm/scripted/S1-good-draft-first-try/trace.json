@@ -10,18 +10,18 @@
         "models/artist_summary.sql",
         "pipeline.yaml"
       ],
-      "evidence_id": "ev-0557a4cc558fba2a",
+      "evidence_id": "ev-8153f393fb4e8eb0",
       "fed_back": "",
       "files": {
         "models/artist_summary.sql": "sha256:4eefc08f5433a97f9b670e22a6284565b74210a79bb95a1bdbd18dbc527a59b3",
-        "pipeline.yaml": "sha256:70d276fe2d818fc3f3eb48a4204b68ee94e7152cb6f13a0c6387f0a124c2e6a8"
+        "pipeline.yaml": "sha256:f142152bf31e1bd289b562490cf9da3b46ff2348139ec11c594973cb677e3ba2"
       },
       "index": 1,
       "outcome": "validated",
       "source": "llm",
       "validation": {
         "cleanup": "pass",
-        "clone_name": "a3_artist_summary__validate__a0d8b261",
+        "clone_name": "a3_artist_summary__validate__03cd43c1",
         "comparison": {
           "idempotent": true,
           "run_1": "pass",
@@ -47,19 +47,19 @@
   },
   "calls": [
     {
-      "at": "2026-10-10T19:09:12+00:00",
+      "at": "2026-10-11T01:28:22+00:00",
       "duration_s": 0.0,
       "error": "",
       "index": 1,
       "model": "scripted/stand-in-for-a-model",
-      "response_sha256": "sha256:3c5e659e575e1b5b16e17b5989863a5479122c7aff6ea657183909f447a9298a",
+      "response_sha256": "sha256:f81c02098982a18d68e38217fee924a348297db6b1dee07962c3b368f5c2fa2e",
       "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
       "usage": {
         "completion_tokens": 7,
         "prompt_tokens": 11,
         "total_tokens": 18
       },
-      "user_sha256": "sha256:feaf12262a82782a34acaf0851d82b5767b44174a03481ec2cdab1506f6e070c"
+      "user_sha256": "sha256:518e0161a879aad589a23f03e05a366b5894764a41305573f89ed59fb043b1b7"
     }
   ],
   "case": "a3_artist_summary",
@@ -69,13 +69,13 @@
     "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
     "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
     "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
-    "request_yaml": "sha256:979f55af0efc41de09e8fd4daebb76cb4936495acd82e6c542b2163c461d9c44",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
     "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
     "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
   },
   "kind": "build",
   "model": "scripted/stand-in-for-a-model",
-  "pipeline_dir": "/tmp/a3_84oqurzd/pipelines/a3_artist_summary",
-  "started_at": "2026-10-10T19:09:12+00:00",
+  "pipeline_dir": "/tmp/a3_dzadocua/pipelines/a3_artist_summary",
+  "started_at": "2026-10-11T01:28:22+00:00",
   "trace_version": 1
 }

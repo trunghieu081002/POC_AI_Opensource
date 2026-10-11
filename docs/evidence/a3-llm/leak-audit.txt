@@ -9,10 +9,6 @@
 == Airflow DAGs of clones
 (none)
 == clone secrets in pipelines.env
-WAREHOUSE_DB_HOST=<redacted>
-WAREHOUSE_DB_NAME=<redacted>
-WAREHOUSE_DB_PASSWORD=<redacted>
-WAREHOUSE_DB_PORT=<redacted>
-WAREHOUSE_DB_USER=<redacted>
+(none)
 
-leaks=1
+leaks=0
