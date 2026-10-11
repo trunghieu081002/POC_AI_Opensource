@@ -513,3 +513,18 @@ def test_failure_events_of_the_validation_runs_reach_the_next_ask(provider, case
     assert "relation does not exist" in p.calls[1]["user"]
     assert "started" not in p.calls[1]["user"].split("Validator output:")[1]
     assert any(e["kind"] == "transform.failed" for e in trace.attempts[0].validation["run_events"])
+
+
+def test_a_call_that_never_returns_is_abandoned_at_the_wall_clock_limit(monkeypatch):
+    import threading
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    monkeypatch.setenv("DPAGENT_LLM_TIMEOUT", "0.3")
+    release = threading.Event()
+    monkeypatch.setattr(litellm, "completion", lambda **kw: release.wait(30))   # ignores timeout=
+    import time
+    started = time.monotonic()
+    with llm.record_calls() as records:
+        with pytest.raises(llm.ProviderUnavailable, match="wall-clock"):
+            llm.chat("s", "u")
+    release.set()
+    assert time.monotonic() - started < 5 and records[0].transient is True

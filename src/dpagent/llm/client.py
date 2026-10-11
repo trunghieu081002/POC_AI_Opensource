@@ -48,7 +48,7 @@ class ProviderUnavailable(LLMError):
 
 
 TRANSIENT = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|"
-                       r"rate.?limit|timed? ?out|Timeout)\b", re.IGNORECASE)
+                       r"rate.?limit|timed? ?out|Timeout\w*|wall-clock)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -159,6 +159,9 @@ def _extract_json(text: str) -> str:
 def chat(system: str, user: str, *, temperature: float = 0.1,
          max_tokens: int = 8000) -> str:
     max_tokens_ = env_max_tokens(max_tokens)
+    # litellm fetches its model price list from GitHub on first use; dpagent never needs prices,
+    # and on a host without a clean route to GitHub that fetch is a candidate for long stalls.
+    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     try:
         import litellm
     except ImportError as exc:
@@ -193,7 +196,8 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
         litellm.drop_params = True
         started = time.monotonic()
         try:
-            response = litellm.completion(
+            response = _completion_with_deadline(
+                litellm.completion, get_timeout(),
                 model=get_model(),
                 messages=[{"role": "system", "content": system},
                           {"role": "user", "content": user}],
@@ -234,6 +238,31 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 f"DPAGENT_LLM_MAX_TOKENS or lower DPAGENT_LLM_REASONING_EFFORT", text)
         return text
     raise LLMError("unreachable")      # pragma: no cover
+
+
+def _completion_with_deadline(completion, seconds: float, **kwargs):
+    """Run the provider call with a wall-clock limit that does not depend on the library
+    honouring its own `timeout=` (a one-token probe took 1052 s with timeout=300). On expiry
+    the call is abandoned (its thread is a daemon and cannot keep the process alive) and
+    reported as a timeout - a transient, retryable condition."""
+    import threading
+    box: dict = {}
+
+    def run():
+        try:
+            box["value"] = completion(**kwargs)
+        except BaseException as exc:                    # noqa: BLE001 - re-raised below
+            box["error"] = exc
+
+    worker = threading.Thread(target=run, daemon=True, name="llm-call")
+    worker.start()
+    worker.join(seconds)
+    if worker.is_alive():
+        raise TimeoutError(f"no answer from the provider within {seconds:g}s (wall-clock limit "
+                           f"DPAGENT_LLM_TIMEOUT); the request was abandoned")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
 
 
 def _sleep(seconds: float) -> None:
