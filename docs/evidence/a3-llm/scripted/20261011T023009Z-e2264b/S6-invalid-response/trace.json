@@ -1,0 +1,89 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1,
+        2,
+        3
+      ],
+      "detail": "LLMError: model did not return valid JSON after 3 tries: Expecting value: line 1 column 1 (char 0)",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 2,
+      "index": 1,
+      "outcome": "llm-error",
+      "source": "llm",
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0
+  },
+  "calls": [
+    {
+      "at": "2026-10-11T02:35:31+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:6fc3bd7755c7324d0c5cee488788f86a72fc1b94c4cf8992cb5dc0927bf29319",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:518e0161a879aad589a23f03e05a366b5894764a41305573f89ed59fb043b1b7"
+    },
+    {
+      "at": "2026-10-11T02:35:31+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 2,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:129fa721a0de45615a57d8012758b793e8b08d0177abe3ae255b8ac670fa0427",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:86eaede1d8b1980d6f2c303f33bd0f191332f13bd4043816b2a0df56d43f1b17"
+    },
+    {
+      "at": "2026-10-11T02:35:31+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "index": 3,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:1785cfc3bc6ac7738e8b38cdccd1af12563c2b9070e07af336a1bf8c0f772b6a",
+      "system_sha256": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752",
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:86eaede1d8b1980d6f2c303f33bd0f191332f13bd4043816b2a0df56d43f1b17"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:e06ed43b26acb52732b7c2cd537db2176b5715ddf9e22e607a66be4d41ea6752"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "",
+  "started_at": "2026-10-11T02:35:31+00:00",
+  "trace_version": 1
+}

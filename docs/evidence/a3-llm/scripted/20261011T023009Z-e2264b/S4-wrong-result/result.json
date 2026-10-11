@@ -1,0 +1,55 @@
+{
+  "approval_file_exists": false,
+  "attempts": [
+    {
+      "evidence_id": "ev-cf570e836fd49956",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "not-validated",
+  "expectation_problems": [],
+  "label": "S4-wrong-result",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_artist_summary__validate__f32624de",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "fail",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_ids": [
+      11
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'fail', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1"
+    ]
+  },
+  "tokens": 18
+}

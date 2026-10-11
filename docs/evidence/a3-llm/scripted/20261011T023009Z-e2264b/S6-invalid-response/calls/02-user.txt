@@ -1,0 +1,75 @@
+Pipeline name: a3_artist_summary
+Operator hint: Source connection fields use the secret refs above. Use the standard warehouse refs.
+
+BRD / report spec:
+# Báo cáo: Tổng hợp nghệ sĩ (artist summary)
+
+HG cần một dòng tổng hợp cho danh sách đối tác được coi là nghệ sĩ.
+Nguồn: bảng `res_partner` (cột `id`, `name`).
+
+## Quy tắc "đối tác được tính"
+
+1. Loại các `id` nằm trong danh sách loại trừ thủ công: **2 và 4**.
+2. Loại đối tác có `name` là NULL, rỗng, hoặc chỉ gồm khoảng trắng. Các dòng này
+   không được tính vào bất kỳ chỉ số nào và **không được làm pipeline lỗi**.
+3. Nếu cùng một `id` xuất hiện nhiều lần trong dữ liệu nguồn (trùng khóa), chỉ tính
+   `id` đó **một lần**.
+4. Tên được chuẩn hoá bằng cách cắt khoảng trắng đầu/cuối trước khi so sánh.
+   So sánh **phân biệt hoa/thường** ("Alice" khác "alice").
+
+## Đầu ra
+
+Bảng `artist_summary` nằm trong schema riêng của pipeline, **đúng 1 dòng**, các cột:
+
+| Cột | Ý nghĩa |
+|---|---|
+| `artists` | số đối tác được tính (đếm theo `id` duy nhất) |
+| `distinct_names` | số tên khác nhau (sau khi chuẩn hoá) trong các đối tác được tính |
+| `min_id` | `id` nhỏ nhất trong các đối tác được tính |
+| `max_id` | `id` lớn nhất trong các đối tác được tính |
+
+## Kiểm tra chất lượng
+
+- Cả bốn cột của `artist_summary` phải khác NULL.
+- Bảng nguồn đã nạp phải có ít nhất 1 dòng.
+
+(Luôn có ít nhất một đối tác được tính; nếu không thì pipeline được phép báo lỗi.)
+
+
+Verified source schema (real table/column names and types - do not invent any not listed here):
+Source: PostgreSQL, connector `odoo_postgres`, table `public.res_partner` (the only table needed).
+
+| column | type   | meaning |
+|--------|--------|---------|
+| id     | bigint | partner id. In real Odoo this is the primary key; this feed may nevertheless repeat a row (the same id twice) |
+| name   | text   | partner display name; may be NULL, empty, or whitespace only; may carry leading/trailing spaces |
+
+Landing: dpagent's extract copies the table as received (nothing dropped, nothing cast) into the
+schema `a3_artist_summary_landing`, so the extracted table is `a3_artist_summary_landing.res_partner`.
+The pipeline's own warehouse schema (for its dbt models / output tables) is `a3_artist_summary`.
+
+
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${A3_WH_HOST:-localhost}', 'port': '${A3_WH_PORT:-5432}', 'database': '${A3_WH_NAME:-warehouse}', 'user': '${A3_WH_USER}', 'password': '${A3_WH_PASSWORD}', 'schema': 'a3_artist_summary'}
+
+Secret refs available: 
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+
+Capability catalog (the only connectors/engines/gates you may use):
+Connectors: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server
+Transform engines: dbt, procedure
+Gate types (required fields):
+  - business_rule: ['name', 'sql', 'expect', 'table', 'id_column']
+  - freshness: ['tables', 'column', 'max_age']
+  - not_null: ['table', 'columns']
+  - referential_integrity: ['table', 'column', 'references']
+  - row_count_bounds: ['table']
+  - schema_contract: ['tables']
+  - unique: ['table', 'columns']
+
+Emit the pipeline JSON.
+
+Your previous reply was not valid JSON (Expecting value: line 1 column 1 (char 0)). Reply with JSON only — no prose, no markdown fences.
