@@ -162,6 +162,7 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
     # litellm fetches its model price list from GitHub on first use; dpagent never needs prices,
     # and on a host without a clean route to GitHub that fetch is a candidate for long stalls.
     os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    prefer_ipv4()
     try:
         import litellm
     except ImportError as exc:
@@ -238,6 +239,32 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 f"DPAGENT_LLM_MAX_TOKENS or lower DPAGENT_LLM_REASONING_EFFORT", text)
         return text
     raise LLMError("unreachable")      # pragma: no cover
+
+
+_ipv4_first_installed = False
+
+
+def prefer_ipv4() -> None:
+    """Put IPv4 addresses before IPv6 in every name lookup of this process.
+
+    Found on an operator's host: generativelanguage.googleapis.com resolves to several AAAA
+    records, IPv6 is black-holed there (a connect just times out), and curl hides it with
+    happy-eyeballs while Python's HTTP stack tries the addresses one after another, each
+    waiting out the kernel's ~2-minute connect timeout - a one-token call took 17 minutes
+    (IPv4 curl: 0.14 s). Ordering (not dropping) keeps IPv6-only networks working: it is only
+    tried after IPv4 fails. Opt out with DPAGENT_LLM_IPV6_FIRST=1. Idempotent."""
+    global _ipv4_first_installed
+    if _ipv4_first_installed or os.environ.get("DPAGENT_LLM_IPV6_FIRST") == "1":
+        return
+    import socket
+    original = socket.getaddrinfo
+
+    def getaddrinfo(*args, **kwargs):
+        results = original(*args, **kwargs)
+        return sorted(results, key=lambda r: r[0] != socket.AF_INET)   # stable: v4 first
+
+    socket.getaddrinfo = getaddrinfo
+    _ipv4_first_installed = True
 
 
 def _completion_with_deadline(completion, seconds: float, **kwargs):

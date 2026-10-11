@@ -528,3 +528,27 @@ def test_a_call_that_never_returns_is_abandoned_at_the_wall_clock_limit(monkeypa
             llm.chat("s", "u")
     release.set()
     assert time.monotonic() - started < 5 and records[0].transient is True
+
+
+def test_ipv4_addresses_are_tried_before_ipv6(monkeypatch):
+    import socket
+    mixed = [(socket.AF_INET6, 1, 6, "", ("2001:db8::1", 443, 0, 0)),
+             (socket.AF_INET6, 1, 6, "", ("2001:db8::2", 443, 0, 0)),
+             (socket.AF_INET, 1, 6, "", ("192.0.2.7", 443))]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: list(mixed))
+    monkeypatch.setattr(llm, "_ipv4_first_installed", False)
+    llm.prefer_ipv4()
+    families = [r[0] for r in socket.getaddrinfo("x", 443)]
+    assert families == [socket.AF_INET, socket.AF_INET6, socket.AF_INET6]   # reordered, none dropped
+    llm.prefer_ipv4()                                                          # idempotent: no double wrap
+    assert [r[0] for r in socket.getaddrinfo("x", 443)] == families
+
+
+def test_ipv6_first_can_be_requested(monkeypatch):
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(socket.AF_INET6, 1, 6, "", ("::1", 1, 0, 0)),
+                                                                 (socket.AF_INET, 1, 6, "", ("127.0.0.1", 1))])
+    monkeypatch.setattr(llm, "_ipv4_first_installed", False)
+    monkeypatch.setenv("DPAGENT_LLM_IPV6_FIRST", "1")
+    llm.prefer_ipv4()
+    assert socket.getaddrinfo("x", 1)[0][0] == socket.AF_INET6
