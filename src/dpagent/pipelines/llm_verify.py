@@ -187,6 +187,7 @@ def _call_summary(rec: llm.CallRecord) -> dict:
     return {"index": rec.index, "at": rec.at, "model": rec.model,
             "system_sha256": rec.system_sha256, "user_sha256": rec.user_sha256,
             "response_sha256": rec.response_sha256, "usage": rec.usage,
+            "finish_reason": rec.finish_reason,
             "duration_s": rec.duration_s, "error": rec.error}
 
 
@@ -524,8 +525,10 @@ def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:
     for n in range(1, attempts + 1):
         with llm.record_calls(max_calls=1) as records:
             try:
+                # generous: a "thinking" model spends part of max_tokens on reasoning
+                # before the first visible character - 16 yielded an empty reply
                 text = llm.chat("You are a connectivity probe.", "Reply with the single word OK.",
-                                max_tokens=16)
+                                max_tokens=1024)
             except llm.LLMError as exc:
                 err = str(exc)[:400]
                 tries.append({"attempt": n, "error": err, "transient": bool(_TRANSIENT.search(err))})
@@ -535,8 +538,14 @@ def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:
                 sleep(wait_s)
                 continue
         rec = records[0]
-        return {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
-                "usage": rec.usage, "duration_s": rec.duration_s, "attempts": tries + [{"attempt": n}]}
+        out = {"ok": bool(text.strip()), "model": rec.model, "reply": text.strip()[:40],
+               "usage": rec.usage, "finish_reason": rec.finish_reason,
+               "duration_s": rec.duration_s, "attempts": tries + [{"attempt": n}]}
+        if not out["ok"]:
+            out["error"] = (f"the model answered but with no text (finish_reason="
+                            f"{rec.finish_reason!r}, usage={rec.usage}) - for a reasoning model this "
+                            f"means the token limit was used up before any visible output")
+        return out
     return {"ok": False, "model": llm.get_model(), "attempts": tries}
 
 

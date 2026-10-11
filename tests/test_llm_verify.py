@@ -387,3 +387,32 @@ def test_probe_retries_a_busy_model_but_not_a_wrong_key(provider, monkeypatch):
     provider([busy, busy, busy])
     gave_up = llm_verify.probe(sleep=lambda s: None)
     assert gave_up["ok"] is False and gave_up["transient"] is True and len(gave_up["attempts"]) == 3
+
+
+def test_every_provider_call_has_a_time_limit_and_records_why_it_stopped(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    seen = {}
+
+    def completion(**kwargs):
+        seen.update(kwargs)
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""),
+                                           finish_reason="length")],
+            usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14,
+                                        completion_tokens_details=types.SimpleNamespace(reasoning_tokens=13)))
+    monkeypatch.setattr(litellm, "completion", completion)
+    monkeypatch.setenv("DPAGENT_LLM_TIMEOUT", "42")
+    with llm.record_calls() as records:
+        llm.chat("s", "u")
+    assert seen["timeout"] == 42.0 and records[0].finish_reason == "length"
+    assert records[0].usage["reasoning_tokens"] == 13
+
+
+def test_an_empty_probe_reply_is_not_ok_and_says_why(monkeypatch):
+    monkeypatch.setenv(llm_verify.OPT_IN_ENV, "1")
+    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+    monkeypatch.setattr(litellm, "completion", lambda **kw: types.SimpleNamespace(
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""), finish_reason="length")],
+        usage=types.SimpleNamespace(prompt_tokens=1, completion_tokens=13, total_tokens=14)))
+    result = llm_verify.probe()
+    assert result["ok"] is False and "no text" in result["error"] and "length" in result["error"]

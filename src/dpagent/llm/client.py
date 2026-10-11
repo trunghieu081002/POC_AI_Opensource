@@ -46,6 +46,7 @@ class CallRecord:
     usage: dict = field(default_factory=dict)
     duration_s: float = 0.0
     error: str = ""
+    finish_reason: str = ""
 
 
 class _Recorder:
@@ -72,6 +73,15 @@ def record_calls(max_calls: int | None = None):
 
 def _sha(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def get_timeout() -> float:
+    """Seconds one provider call may take (DPAGENT_LLM_TIMEOUT, default 300). Without a
+    limit a stuck call held a verification probe for 18 minutes."""
+    try:
+        return float(os.environ.get("DPAGENT_LLM_TIMEOUT", "300"))
+    except ValueError:
+        return 300.0
 
 
 def get_model() -> str:
@@ -138,6 +148,7 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                       {"role": "user", "content": user}],
             temperature=temperature,
             max_tokens=max_tokens,
+            timeout=get_timeout(),
         )
     except Exception as exc:                       # litellm wraps many providers
         if record is not None:
@@ -147,12 +158,17 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
 
     text = response.choices[0].message.content or ""
     if record is not None:
+        record.finish_reason = str(getattr(response.choices[0], "finish_reason", "") or "")
         record.response, record.response_sha256 = text, _sha(text)
         record.duration_s = round(time.monotonic() - started, 2)
         usage = getattr(response, "usage", None)
         if usage is not None:
             record.usage = {k: getattr(usage, k, None)
                             for k in ("prompt_tokens", "completion_tokens", "total_tokens")}
+            details = getattr(usage, "completion_tokens_details", None)
+            reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
+            if reasoning is not None:
+                record.usage["reasoning_tokens"] = reasoning
     return text
 
 
