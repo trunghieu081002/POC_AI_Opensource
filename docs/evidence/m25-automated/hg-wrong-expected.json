@@ -2,16 +2,16 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "1901713d-2156-4265-b23f-aa7aa725ccde",
+        "batch_id": "fcf609bf-d791-4582-953e-2afe63d1418a",
         "loaded_rows": 6,
-        "manifest_sha256": "36ed64a5cf0ec4f769a80da97c5398f7fc67538b0951e9c395cd4b68bb9888d0",
+        "manifest_sha256": "9a2412c602d4ba5d228328234aec20e5193d23b1e8c4abd226d1138bf4620b59",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/aa932328",
+    "namespace": "dpagent-validate/b2420e51",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 2,
@@ -22,14 +22,14 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_AA932328_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_AA932328_BRONZE_BUCKET, DPAGENT_VALIDATE_AA932328_BRONZE_ENDPOINT, DPAGENT_VALIDATE_AA932328_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_AA932328_SRC_DATABASE, DPAGENT_VALIDATE_AA932328_SRC_HOST, DPAGENT_VALIDATE_AA932328_SRC_PASSWORD, DPAGENT_VALIDATE_AA932328_SRC_PORT, DPAGENT_VALIDATE_AA932328_SRC_USER, DPAGENT_VALIDATE_AA932328_WH_DATABASE, DPAGENT_VALIDATE_AA932328_WH_HOST, DPAGENT_VALIDATE_AA932328_WH_PASSWORD, DPAGENT_VALIDATE_AA932328_WH_PORT, DPAGENT_VALIDATE_AA932328_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_B2420E51_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_B2420E51_BRONZE_BUCKET, DPAGENT_VALIDATE_B2420E51_BRONZE_ENDPOINT, DPAGENT_VALIDATE_B2420E51_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_B2420E51_SRC_DATABASE, DPAGENT_VALIDATE_B2420E51_SRC_HOST, DPAGENT_VALIDATE_B2420E51_SRC_PASSWORD, DPAGENT_VALIDATE_B2420E51_SRC_PORT, DPAGENT_VALIDATE_B2420E51_SRC_USER, DPAGENT_VALIDATE_B2420E51_WH_DATABASE, DPAGENT_VALIDATE_B2420E51_WH_HOST, DPAGENT_VALIDATE_B2420E51_WH_PASSWORD, DPAGENT_VALIDATE_B2420E51_WH_PORT, DPAGENT_VALIDATE_B2420E51_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__aa932328",
+  "clone_name": "hg_dbt_branch__validate__b2420e51",
   "comparison": {
     "idempotent": false,
     "run_1": "fail",
@@ -63,12 +63,7 @@
             {
               "failures": 0,
               "status": "pass",
-              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
-            },
-            {
-              "failures": 0,
-              "status": "pass",
-              "test": "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
             },
             {
               "failures": 0,
@@ -78,7 +73,12 @@
             {
               "failures": 0,
               "status": "pass",
-              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
+              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
             }
           ],
           "untested_models": [],
@@ -87,7 +87,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__aa932328/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "message": "hg_dbt_branch__validate__b2420e51/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
         "required": 4,
@@ -104,35 +104,59 @@
           "models": [
             "mart_artist_summary"
           ],
-          "passed": 0,
-          "ran": 0,
-          "reason": "no dbt tests are declared on ['mart_artist_summary']",
-          "required": [],
+          "passed": 4,
+          "ran": 4,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_mart_artist_summary_artists.43325cd272",
+            "test.dwh_hgmedia.not_null_mart_artist_summary_distinct_names.270bff7db0",
+            "test.dwh_hgmedia.not_null_mart_artist_summary_max_platform_id.fde9405b63",
+            "test.dwh_hgmedia.not_null_mart_artist_summary_min_platform_id.8aaaeea712"
+          ],
           "skipped": 0,
           "stage": "gold",
-          "status": "not_applicable",
-          "tests": [],
-          "untested_models": [
-            "mart_artist_summary"
+          "status": "passed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_max_platform_id.fde9405b63"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_min_platform_id.8aaaeea712"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_artists.43325cd272"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_distinct_names.270bff7db0"
+            }
           ],
+          "untested_models": [],
           "warned": 0
         },
         "errored": 0,
         "failed": 0,
-        "kind": "dbt.test.not_applicable",
-        "message": "hg_dbt_branch__validate__aa932328/gold: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['mart_artist_summary']",
-        "passed": 0,
-        "ran": 0,
-        "required": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_dbt_branch__validate__b2420e51/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "passed": 4,
+        "ran": 4,
+        "required": 4,
         "skipped": 0,
         "stage": "gold",
-        "status": "not_applicable"
+        "status": "passed"
       }
     ],
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-ec23ee82d481acf8",
+  "evidence_id": "ev-e13dae72f6e0533b",
   "expected_hash": "sha256:eab6dcdc21f7f4eb4a0f9ca2a51927641d7e97800683d0f6bf3c798330870ad7",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -186,7 +210,7 @@
     "dbt_project": true
   },
   "overall": "fail",
-  "pipeline_hash": "sha256:f4faf33c20aa9c1cee753320b9d8d64b4b2041488eb6153fd77705fdd4523c47",
+  "pipeline_hash": "sha256:8e71149eb4b7b58cf3587905975c35fedf831a238d95c4cf6977d9f2c8a66de1",
   "promote": {
     "accepted": false,
     "approval_unchanged": true,
@@ -198,8 +222,7 @@
       "validation overall is 'fail'",
       "expected exactly 2 run ids, the evidence has 1",
       "bronze pipeline but no source-removed proof in the evidence",
-      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
-      "run_1: stage 'gold': dbt test is 'not_applicable': no dbt tests are declared on ['mart_artist_summary']"
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1"
     ]
   },
   "recovered_after_scenario": {
