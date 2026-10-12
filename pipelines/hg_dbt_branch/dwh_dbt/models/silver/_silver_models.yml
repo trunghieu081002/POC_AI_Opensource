@@ -1,8 +1,8 @@
 version: 2
 
-# HG-style column tests (dbt tests are not run by dpagent's `dbt run`; the
-# pipeline's gates are what enforce these at run time) - kept so `dbt parse`
-# exercises the same schema-yml constructs HG's project uses.
+# HG-style column tests. `dbt test` runs after `dbt run` on every stage of an owned project and
+# a failing test fails the stage (docs/hg-fact-artist-assignment.md); the pipeline's gates check
+# the same keys again.
 models:
   - name: dim_artist
     columns:

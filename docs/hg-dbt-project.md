@@ -155,11 +155,13 @@ host), through a real Airflow DAG:
 - **One small branch, not HG's project.** 1 source table, 2 silver models
   (1 verbatim from HG), 1 gold. HG's other ~60 models, the incremental `fact`
   models (`+materialized: incremental`), the other sources (Google Sheet, SQL
-  Server, Elasticsearch), `dbt test` execution and HG's DQ DAG are untouched.
+  Server, Elasticsearch) and HG's DQ DAG are untouched.
   Incremental models in particular are a different problem (state across
   runs) and are not claimed.
-- dbt tests in the project's yml files are parsed but **not run** by dpagent;
-  its gates enforce at run time. Mapping dbt tests to gates is not built.
+- ~~dbt tests are parsed but not run~~ - superseded: `dbt test` now runs after `dbt run` on every
+  stage of an owned project, and every model of the stage needs a test for A2 to promote
+  (docs/hg-fact-artist-assignment.md). This project's own gold model got its tests for that
+  (`models/gold/_gold_models.yml`, not from HG). Mapping dbt tests to gates is not built.
 - Fixture validation now covers these pipelines (docs/hg-fixture-validation.md),
   but nothing yet *requires* that evidence before `promote()` — that is A2,
   not started.

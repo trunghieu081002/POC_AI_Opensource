@@ -1,0 +1,17 @@
+version: 2
+
+# NOT from HG - tests for this project's own gold model. Every model of an owned project's dbt
+# stage needs at least one test, or the stage's tests are `incomplete` / `not_applicable` and A2
+# refuses to promote (docs/hg-fact-artist-assignment.md). The mart is one aggregate row: none of
+# its columns may be NULL.
+models:
+  - name: mart_artist_summary
+    columns:
+      - name: artists
+        tests: [not_null]
+      - name: distinct_names
+        tests: [not_null]
+      - name: min_platform_id
+        tests: [not_null]
+      - name: max_platform_id
+        tests: [not_null]
