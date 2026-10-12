@@ -134,7 +134,11 @@ trap cleanup EXIT
 # -------------------------------------------------------------- launch
 
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
-docker run -d --name "${CONTAINER}" \
+
+# WSL/Docker Desktop may need host cgroup namespaces with this bind mount for systemd PID ownership.
+CGROUPNS_ARGS=()
+[ -z "${M25_CGROUPNS:-}" ] || CGROUPNS_ARGS=(--cgroupns "${M25_CGROUPNS}")
+docker run -d --name "${CONTAINER}" "${CGROUPNS_ARGS[@]}" \
   --privileged \
   --tmpfs /run --tmpfs /run/lock \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
@@ -261,6 +265,7 @@ mkdir -p "${RESULTS_DIR}"
   echo "tree=${TREE}"
   echo "working_tree_clean=$([ -z "$DIRTY" ] && echo yes || echo NO)"
   echo "profile=${PROFILE}"
+  echo "cgroupns=$(docker inspect -f '{{.HostConfig.CgroupnsMode}}' "${CONTAINER}")"
   echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "${RESULTS_DIR}/run-info.txt"
 if [ -n "$A3" ]; then
