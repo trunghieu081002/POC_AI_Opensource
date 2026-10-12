@@ -184,9 +184,12 @@ def test_a_path_outside_the_allowlist_is_refused(provider, case, tmp_path):
     bad = _bundle("good")
     bad["files"][".approved.yaml"] = "content_hash: forged\n"
     provider([bad])
-    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, runner=scripted_runner())
-    assert trace.attempts[0].outcome == "invalid-reply"
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=3, max_revisions=0,
+                                   runner=scripted_runner())
+    # refused before anything is written; told to the model (a revision, if the budget allows)
+    assert trace.attempts[0].outcome == "refused-file"
     assert "approval can only come from a human" in trace.attempts[0].detail
+    assert not (tmp_path / "w" / case.name).exists()
 
 
 # ------------------------------------------------------------------ ambiguous BRD

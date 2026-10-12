@@ -1,0 +1,21 @@
+# Hand-written input for the validator ONLY - the model never sees it. Seven plan details chosen
+# for what the BRD's rules do with them: a padded state, a blank state, a NULL state, NULL plan /
+# manager / A&R ids, a cancelled row (kept), and two columns the output must not carry.
+tables:
+  - name: x_music_plan_detail
+    columns:
+      id: bigint
+      plan_id: bigint
+      produce_manager: bigint
+      ar_id: bigint
+      state: text
+      quality: text
+      original_song_name: text
+    rows:
+      - {id: 4278, plan_id: 2956, produce_manager: 3372, ar_id: 3298, state: "approved",     quality: "excellent", original_song_name: "Bài A"}
+      - {id: 4279, plan_id: 2956, produce_manager: 3372, ar_id: 3393, state: "draft",        quality: "excellent", original_song_name: null}
+      - {id: 4280, plan_id: 2957, produce_manager: 3372, ar_id: 3393, state: "  approved  ", quality: "good",      original_song_name: "  "}
+      - {id: 4307, plan_id: 2958, produce_manager: 33,   ar_id: null, state: "draft",        quality: null,        original_song_name: null}
+      - {id: 4308, plan_id: null, produce_manager: null, ar_id: 3393, state: "   ",          quality: "excellent", original_song_name: null}
+      - {id: 4229, plan_id: 2952, produce_manager: 3372, ar_id: 38,   state: null,           quality: "excellent", original_song_name: null}
+      - {id: 4400, plan_id: 2960, produce_manager: 35,   ar_id: 35,   state: "cancel",       quality: "poor",      original_song_name: "Bài B"}

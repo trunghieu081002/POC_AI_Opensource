@@ -88,7 +88,8 @@ def _journal_run(pipeline, clone, *, status="ok", gate_status="passed", gated=Tr
     if pipeline.dbt_project is not None and dbt_test:
         for stage in pipeline.stages:
             if stage.engine == "dbt":
-                data = _dbt_test_data(stage.name, dbt_test, **(dbt_test_data or {}))
+                override = dbt_test_data(stage.name) if callable(dbt_test_data) else dbt_test_data
+                data = _dbt_test_data(stage.name, dbt_test, **(override or {}))
                 state.event(f"dbt.test.{dbt_test}", f"{clone}/{stage.name}: dbt test ran 2",
                             run_id=rid, level="info" if dbt_test == "passed" else "error",
                             data=data)
@@ -739,4 +740,44 @@ def test_a_passed_label_without_the_results_to_back_it_refuses_promotion(hg, dat
 ])
 def test_a_stage_whose_tests_were_not_applicable_or_unknown_refuses_promotion(hg, status, reason):
     _hg_validated(hg, dbt_test=status, dbt_test_data={"status": status})
+    _hg_refused(hg, reason)
+
+
+# expected.yaml's `required_dbt_tests` (acceptance policy): A2 checks them in the journal, matched on
+# what dbt's manifest says each test is - a test of the wrong severity, column or model is not it.
+def _require(hg, severity="error"):
+    import yaml as _yaml
+    f = hg.root / "expected.yaml"
+    doc = _yaml.safe_load(f.read_text())
+    doc["required_dbt_tests"] = [{"model": "dim_artist", "column": "dim_artist_sk",
+                                  "tests": ["unique"], "severity": severity}]
+    f.write_text(_yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+
+
+def _described(stage, severity="error", column="dim_artist_sk"):
+    return [{"test": f"test.p.unique_{stage}_sk", "status": "pass", "name": "unique",
+             "column": column, "models": ["dim_artist"], "severity": severity},
+            {"test": f"test.p.not_null_{stage}_sk", "status": "pass", "name": "not_null",
+             "column": column, "models": ["dim_artist"], "severity": severity}]
+
+
+def test_required_dbt_tests_in_expected_are_enforced_by_promote(hg):
+    _require(hg)
+    _hg_validated(hg, dbt_test_data=lambda stage: {"tests": _described(stage)})
+    _hg_promote(hg)
+
+
+@pytest.mark.parametrize("tests, reason", [
+    (None, "required a `unique` test on dim_artist.dim_artist_sk: dbt ran none"),
+    ("warn", "required a `unique` test on dim_artist.dim_artist_sk has severity ['warn']; required 'error'"),
+    ("column", "required a `unique` test on dim_artist.dim_artist_sk: dbt ran none"),
+])
+def test_a_required_dbt_test_missing_or_of_the_wrong_kind_refuses_promotion(hg, tests, reason):
+    _require(hg)
+    def data(stage):
+        if tests is None:      # dbt's record without the manifest's description of the test
+            return {}
+        return {"tests": _described(stage, severity="warn") if tests == "warn"
+                else _described(stage, column="other")}
+    _hg_validated(hg, dbt_test_data=data)
     _hg_refused(hg, reason)

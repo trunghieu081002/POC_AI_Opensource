@@ -327,7 +327,7 @@ def _policy_reasons(payload: dict, pipeline: Pipeline, fixture_hash: str,
     return r
 
 
-def _journal_reasons(fx: dict, pipeline: Pipeline) -> list[str]:
+def _journal_reasons(fx: dict, pipeline: Pipeline, required_tests: list[dict] | None = None) -> list[str]:
     """Ask the journal again - the report's claim that the runs happened and
     which gates they passed must agree with the append-only record."""
     r: list[str] = []
@@ -362,6 +362,10 @@ def _journal_reasons(fx: dict, pipeline: Pipeline) -> list[str]:
                         problems = [f"recorded as {t['kind']!r}"]
                     for p in problems:
                         r.append(f"{slot}: stage {st.name!r}: {p}")
+            if required_tests:
+                ran = [x for t in tests for x in ((t.get("data") or {}).get("tests") or [])]
+                for p in dbtproject.required_test_problems(ran, required_tests):
+                    r.append(f"{slot}: {p}")
         for stage in gated:
             verdicts = live.get(stage)
             if not verdicts:
@@ -392,8 +396,15 @@ def check_for_promote(pipeline: Pipeline, *, fixture_path: Path, expected_path: 
     fixture_hash = fixture_mod.hash_file(fixture_path)
     expected_hash = fixture_mod.hash_file(expected_path)
     reasons = _policy_reasons(payload, pipeline, fixture_hash, expected_hash)
+    try:
+        required_tests = fixture_mod.load_expected(expected_path).required_dbt_tests
+    except (ValueError, OSError) as exc:
+        reasons.append(f"expected file {str(expected_path)!r} is not usable: {exc}")
+        required_tests = []
+    if required_tests and pipeline.dbt_project is None:
+        reasons.append("expected.yaml requires dbt tests, but the pipeline owns no dbt project")
     if fx.get("report_version") in SUPPORTED_REPORT_VERSIONS:
-        reasons += _journal_reasons(fx, pipeline)
+        reasons += _journal_reasons(fx, pipeline, required_tests)
     if reasons:
         raise EvidenceRefused(reasons)
 

@@ -1,0 +1,27 @@
+# Calculated by hand from fixture.yaml and brd.md - never read back from any pipeline's output, and
+# the model never sees it (tests/test_llm_verify.py recomputes it from the fixture independently).
+#   one row per source row, none dropped -> 7 rows
+#   fact_khsx_detail_sk = dbt_utils.generate_surrogate_key(['id'])
+#                       = md5(coalesce(cast(id as text), '_dbt_utils_surrogate_key_null_')) = md5('<id>')
+#                         (hashes computed with Python hashlib.md5)
+#   every other column: the value as text, trimmed; NULL / '' / whitespace-only -> NULL
+#     4280 "  approved  " -> approved; 4308 "   " -> NULL, plan/manager NULL; 4229 state NULL -> NULL;
+#     4307 ar_id NULL -> NULL; 4400 cancel is kept
+table: fact_khsx_detail
+schema: silver
+row_count: 7
+# BRD "Kiểm tra chất lượng": these dbt tests must run and pass, with severity error - checked by A2
+# in the journal (test name / column / model / severity as dbt's manifest describes them)
+required_dbt_tests:
+  - {model: fact_khsx_detail, column: fact_khsx_detail_sk, tests: [unique, not_null], severity: error}
+# BRD: exactly these six columns, all text - no other source column carried over
+columns: {fact_khsx_detail_sk: text, production_plan_detail_id: text, production_plan_id: text,
+          production_manager: text, ar_manager: text, status: text}
+rows:
+  - {fact_khsx_detail_sk: 97e48472142cfdd1cd5d5b5ca6831cf4, production_plan_detail_id: "4278", production_plan_id: "2956", production_manager: "3372", ar_manager: "3298", status: approved}
+  - {fact_khsx_detail_sk: 120ca817ebe8caa71e92ac53049b2c6a, production_plan_detail_id: "4279", production_plan_id: "2956", production_manager: "3372", ar_manager: "3393", status: draft}
+  - {fact_khsx_detail_sk: 55603a5f239e435c642244be3e891b85, production_plan_detail_id: "4280", production_plan_id: "2957", production_manager: "3372", ar_manager: "3393", status: approved}
+  - {fact_khsx_detail_sk: 38087d90fe0083a5d17fef54ed2b3220, production_plan_detail_id: "4307", production_plan_id: "2958", production_manager: "33",   ar_manager: null,   status: draft}
+  - {fact_khsx_detail_sk: 8cb94e7a9661ea20b1293c589216d396, production_plan_detail_id: "4308", production_plan_id: null,   production_manager: null,   ar_manager: "3393", status: null}
+  - {fact_khsx_detail_sk: 5dcd0ddd3d918c70d380d32bce4e733a, production_plan_detail_id: "4229", production_plan_id: "2952", production_manager: "3372", ar_manager: "38",   status: null}
+  - {fact_khsx_detail_sk: 3ce3bd7d63a2c9c81983cc8e9bd02ae5, production_plan_detail_id: "4400", production_plan_id: "2960", production_manager: "35",   ar_manager: "35",   status: cancel}

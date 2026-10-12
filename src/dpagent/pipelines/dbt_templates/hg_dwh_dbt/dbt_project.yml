@@ -1,0 +1,19 @@
+name: 'dwh_hgmedia'
+version: '1.0.0'
+config-version: 2
+
+profile: 'dwh_hgmedia'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+# Template (dpagent, derived from phulee9/hgmedia dwh_dbt at e9cbff0): full snapshot only - every
+# silver/gold model is a table; HG's incremental fact config is deliberately not carried over.
+models:
+  dwh_hgmedia:
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold

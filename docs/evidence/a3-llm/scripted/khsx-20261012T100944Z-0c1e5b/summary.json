@@ -1,0 +1,163 @@
+{
+  "complete": true,
+  "inconclusive": [],
+  "mode": "scripted",
+  "not_met": [],
+  "run_id": "20261012T100944Z-0c1e5b",
+  "runs": [
+    {
+      "calls": 1,
+      "classification": "llm-first-draft",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K1-good-project-first-try",
+      "last_outcome": "validated",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K2-missing-tests",
+      "last_outcome": "policy-fail",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K3-test-fails",
+      "last_outcome": "validation-fail",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K4-warn-severity",
+      "last_outcome": "policy-fail",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K5-path-macro",
+      "last_outcome": "refused-file",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K6-path-traversal",
+      "last_outcome": "refused-file",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K7-template-override",
+      "last_outcome": "refused-file",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 1,
+      "classification": "not-validated",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K8-approval-forged",
+      "last_outcome": "refused-file",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 18
+    },
+    {
+      "calls": 2,
+      "classification": "llm-after-1-revision(s)",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 1,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": null,
+      "expectation_problems": [],
+      "label": "K9-missing-tests-then-corrected",
+      "last_outcome": "validated",
+      "model": "scripted/stand-in-for-a-model",
+      "tokens": 36
+    }
+  ],
+  "suite": "khsx"
+}

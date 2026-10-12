@@ -1,0 +1,45 @@
+name: a3_fact_khsx_detail
+summary: x_music_plan_detail -> staging -> silver.fact_khsx_detail (scripted reference
+  draft - written by a person, NOT by a model)
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${A3_SRC_HOST}
+    port: ${A3_SRC_PORT:-5432}
+    database: ${A3_SRC_NAME}
+    user: ${A3_SRC_USER}
+    password: ${A3_SRC_PASSWORD}
+  tables:
+  - x_music_plan_detail
+warehouse:
+  host: ${A3_WH_HOST:-localhost}
+  port: ${A3_WH_PORT:-5432}
+  database: ${A3_WH_NAME:-warehouse}
+  user: ${A3_WH_USER}
+  password: ${A3_WH_PASSWORD}
+  schema: silver
+landing_dataset_name: staging
+dbt_project:
+  path: dwh_dbt
+stages:
+- name: landing
+  gates:
+  - type: row_count_bounds
+    table: x_music_plan_detail
+    min: 1
+- name: silver
+  engine: dbt
+  depends_on: landing
+  schema: silver
+  models:
+  - fact_khsx_detail
+  gates:
+  - type: not_null
+    table: fact_khsx_detail
+    columns:
+    - fact_khsx_detail_sk
+    - production_plan_detail_id
+  - type: unique
+    table: fact_khsx_detail
+    columns:
+    - fact_khsx_detail_sk

@@ -39,6 +39,7 @@ import run_matrix  # noqa: E402  (its leak detection and the promote probe are r
 
 CASES = Path(__file__).resolve().parent / "cases"
 BUILD, AMBIGUOUS = "artist_summary", "revenue_ambiguous"
+KHSX = "fact_khsx_detail"      # an owned dbt project drafted from a template (docs/llm-owned-dbt-project.md)
 NAME = "a3_artist_summary"
 
 
@@ -56,9 +57,17 @@ def _edits_invalidate(case: llm_verify.Case, workdir: Path, evidence_id: str) ->
     pipeline = loader.load(case.name, workdir)
     approval_file = approval.approval_path(pipeline)
     approved_bytes = approval_file.read_bytes()
-    model = next(iter(sorted((pipeline.root / "models").glob("*.sql"))))
-    edits = {"model": model, "fixture": case.fixture_path, "expected": case.expected_path,
+    edits = {"fixture": case.fixture_path, "expected": case.expected_path,
              "manifest": pipeline.root / "pipeline.yaml"}
+    if pipeline.dbt_project is not None:
+        project = pipeline.root / pipeline.dbt_project.path
+        ymls = sorted((project / "models").rglob("*.yml"))
+        edits["model"] = sorted((project / "models").rglob("*.sql"))[0]
+        edits["models-yml"] = ymls[0] if ymls else project / "models" / "_missing.yml"
+        edits["template-dbt_project.yml"] = project / "dbt_project.yml"
+        edits["template-macro"] = sorted((project / "macros").rglob("*.sql"))[0]
+    else:
+        edits["model"] = next(iter(sorted((pipeline.root / "models").glob("*.sql"))))
     results = {}
     for label, path in edits.items():
         undo = run_matrix._edit(path, "\n-- edited after approval\n" if path.suffix == ".sql"
@@ -78,7 +87,7 @@ def _edits_invalidate(case: llm_verify.Case, workdir: Path, evidence_id: str) ->
                               "approval_unchanged": approval_file.read_bytes() == approved_bytes}
         finally:
             undo()
-    hashed = ("model", "manifest")
+    hashed = ("model", "manifest", "models-yml", "template-dbt_project.yml", "template-macro")
     problems = []
     for label, got in results.items():
         if label in hashed and (got["approval_still_valid"] or not got["deploy_refused"]):
@@ -111,13 +120,19 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
                         "attempts": [{"n": a.index, "source": a.source, "outcome": a.outcome,
                                       "evidence_id": a.evidence_id} for a in trace.attempts],
                         "calls": len(records),
+                        "counts": counts(trace),
                         "tokens": sum((c["usage"] or {}).get("total_tokens") or 0 for c in trace.calls)}
         last = trace.attempts[-1]
         approved_file = workdir / case.name / approval.APPROVAL_FILENAME
+        result["files_written"] = sorted(str(f.relative_to(workdir)) for f in workdir.rglob("*")
+                                         if f.is_file()) if workdir.exists() else []
         if last.outcome == "validated" and deploy:
+            published = dict(last.drafted_files)
+            # the template's files are published too; they are compared with the template itself
+            published.update(synth_template_texts(case))
             result["deploy_run"] = llm_verify.promote_deploy_run(
                 loader.load(case.name, workdir), case.fixture_path, case.expected_path,
-                last.evidence_id, drafted_files=last.drafted_files)
+                last.evidence_id, drafted_files=published, required_tests=case.required_tests)
             if result["deploy_run"].get("ok"):
                 result["edit_checks"] = _edits_invalidate(case, workdir, last.evidence_id)
         elif last.evidence_id:
@@ -126,6 +141,7 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
             result["promote_after_failed_validation"] = run_matrix._promote_outcome(
                 pipeline, case.fixture_path, case.expected_path, last.evidence_id)
         result["last_validation"] = last.validation
+        result["attempt_detail"] = last.detail
         result["approval_file_exists"] = approved_file.exists()
         result["last_outcome"] = last.outcome
         recovered = run_matrix._recover_leaked(before)
@@ -133,6 +149,26 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
         (run_dir / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True,
                                                          default=str, ensure_ascii=False))
     return result
+
+
+def synth_template_texts(case: llm_verify.Case) -> dict[str, str]:
+    from dpagent.pipelines import synth
+    if not case.request.dbt_template:
+        return {}
+    return {f"{case.request.dbt_project_path}/{rel}": text
+            for rel, text in synth.template_files(case.request.dbt_template).items()}
+
+
+def counts(trace) -> dict:
+    """Reported separately, never folded into one number: pipeline re-asks (the validators or the
+    file allowlist rejected a draft), JSON-format repairs, human edits, provider errors."""
+    return {
+        "pipeline_revisions": sum(1 for a in trace.attempts if a.source == "llm-revision"),
+        "format_repairs": sum(a.format_repairs for a in trace.attempts),
+        "human_edits": sum(1 for a in trace.attempts if a.source == "human-edit"),
+        "provider_errors": sum(1 for c in trace.calls if c.get("transient") or c.get("error")),
+        "provider_errors_transient": sum(1 for c in trace.calls if c.get("transient")),
+    }
 
 
 # ------------------------------------------------------------------ scripted mode
@@ -226,6 +262,96 @@ def scripted_scenarios(out: Path) -> list[dict]:
     return rows
 
 
+def khsx_scripted_scenarios(out: Path) -> list[dict]:
+    """The owned-dbt-project path (a template + model-written files) on a real host, with hand-
+    written replies (scripted_drafts/khsx_*): the right project, then each way it must be blocked."""
+    os.environ.setdefault("GEMINI_API_KEY", "scripted-not-a-key")
+    os.environ["DPAGENT_MODEL"] = "scripted/stand-in-for-a-model"
+    rows = []
+
+    def scenario(label, replies, expect, *, revisions=0, calls=4, deploy=True):
+        _install(replies)
+        result = run_one(KHSX, out, label, max_calls=calls, max_revisions=revisions, deploy=deploy)
+        problems = expect(result)
+        problems += llm_verify.leak_problems(result["leaked_and_recovered"])
+        result["expectation_problems"] = problems
+        (out / label / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True,
+                                                             default=str, ensure_ascii=False))
+        rows.append(result)
+        print(f"{'ok  ' if not problems else 'FAIL'}  {label:34} {result['classification']:28}"
+              f" {'; '.join(problems)[:300]}", flush=True)
+
+    def chain_ok(r):
+        p = []
+        dr = r.get("deploy_run") or {}
+        if not dr.get("ok"):
+            p.append(f"deploy/run did not complete: {str(dr)[:400]}")
+        if (dr.get("promote") or {}).get("verification") != "verified":
+            p.append("promote did not produce a verified approval")
+        if dr.get("dbt_test_problems") or not dr.get("dbt_tests"):
+            p.append(f"real run's dbt tests: {dr.get('dbt_test_problems') or 'none on record'}")
+        if not (r.get("edit_checks") or {}).get("ok"):
+            p.append(f"edit checks: {(r.get('edit_checks') or {}).get('problems')}")
+        pb = dr.get("published_bytes") or {}
+        if pb.get("ok") is not True:
+            p.append(f"published files differ: {pb}")
+        elif not any(k.startswith("published/dwh_dbt/macros/") for k in pb.get("checked", {})):
+            p.append("the template's files were not among the published files checked")
+        return p
+
+    def not_promotable(outcome, needle):
+        def check(r):
+            p = []
+            if r["last_outcome"] != outcome:
+                p.append(f"expected {outcome}, got {r['last_outcome']}")
+            last = (r.get("attempt_detail") or "")
+            if needle not in last:
+                p.append(f"the reason does not name {needle!r}: {last[:300]}")
+            if r["approval_file_exists"] or "deploy_run" in r:
+                p.append("an approval or a deploy exists")
+            pr = r.get("promote_after_failed_validation")
+            if pr is not None and (pr.get("accepted") is not False or pr.get("approval_unchanged") is not True):
+                p.append(f"promote on the sealed evidence was not refused cleanly: {pr}")
+            if outcome != "refused-file" and pr is None:
+                p.append("the sealed evidence was not offered to promote")
+            return p
+        return check
+
+    def refused_file(needle):
+        def check(r):
+            p = not_promotable("refused-file", needle)(r)
+            if r["files_written"]:
+                p.append(f"files were written for a refused draft: {r['files_written']}")
+            if r["attempts"][-1]["evidence_id"]:
+                p.append("evidence exists for a refused draft")
+            return p
+        return check
+
+    scenario("K1-good-project-first-try", [scripted.bundle("khsx_good")],
+             lambda r: chain_ok(r) + ([] if r["classification"] == "llm-first-draft"
+                                      else [f"classification {r['classification']}"]))
+    scenario("K2-missing-tests", [scripted.bundle("khsx_missing_tests")],
+             not_promotable("policy-fail", "not_applicable"))
+    scenario("K3-test-fails", [scripted.bundle("khsx_test_fails")],
+             not_promotable("validation-fail", "dbt test"))
+    scenario("K4-warn-severity", [scripted.bundle("khsx_warn_severity")],
+             not_promotable("policy-fail", "required 'error'"))
+    scenario("K5-path-macro", [scripted.bundle("khsx_good", extra={"dwh_dbt/macros/mine.sql": "{% macro x() %}1{% endmacro %}"})],
+             refused_file("dwh_dbt/macros/mine.sql"), deploy=False)
+    scenario("K6-path-traversal", [scripted.bundle("khsx_good", extra={"dwh_dbt/models/../../../evil.sql": "select 1"})],
+             refused_file("evil.sql"), deploy=False)
+    scenario("K7-template-override", [scripted.bundle("khsx_good", extra={"dwh_dbt/dbt_project.yml": "name: x\n"})],
+             refused_file("comes from the dbt project template"), deploy=False)
+    scenario("K8-approval-forged", [scripted.bundle("khsx_good", extra={".approved.yaml": "approved_by: model\n"})],
+             refused_file(".approved.yaml"), deploy=False)
+    scenario("K9-missing-tests-then-corrected",
+             [scripted.bundle("khsx_missing_tests"), scripted.bundle("khsx_good")],
+             lambda r: chain_ok(r) + ([] if r["classification"] == "llm-after-1-revision(s)"
+                                      else [f"classification {r['classification']}"]),
+             revisions=2)
+    return rows
+
+
 # ------------------------------------------------------------------ real mode
 
 def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions: int) -> list[dict]:
@@ -269,6 +395,27 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
     return rows
 
 
+def khsx_real_scenarios(out: Path, max_calls: int, max_revisions: int) -> list[dict]:
+    """One real-model run on the owned-dbt-project case: the prompt, template and code are the
+    committed ones (the CI script refuses a dirty tree and records the commit); every call and
+    attempt is kept. One model, one problem, one day."""
+    llm_verify.ensure_opted_in(max_calls)
+    if not llm.available():
+        print("no provider credential in the environment", file=sys.stderr)
+        raise SystemExit(2)
+    print(f"model: {llm.get_model()}  call ceiling: {max_calls}  revisions: {max_revisions}", flush=True)
+    retries = int(os.environ.get("A3_TRANSIENT_RETRIES", "5"))
+    r = run_one(KHSX, out, "R3-build-fact-khsx-detail", max_calls=max_calls,
+                max_revisions=max_revisions, transient_retries=retries)
+    r["criteria_problems"] = llm_verify.build_problems(r)
+    dr = r.get("deploy_run") or {}
+    if dr and (dr.get("dbt_test_problems") or not dr.get("dbt_tests")):
+        r["criteria_problems"].append(f"real run's dbt tests: {dr.get('dbt_test_problems') or 'none on record'}")
+    print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R3 {r['classification']}  "
+          f"calls={r['calls']}  counts={r['counts']}  {r['criteria_problems']}", flush=True)
+    return [r]
+
+
 def main(argv: list[str]) -> int:
     import argparse
     import uuid
@@ -279,6 +426,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--max-calls", type=int, default=0)
     ap.add_argument("--max-revisions", type=int, default=2)
     ap.add_argument("--ambiguous-runs", type=int, default=3)
+    ap.add_argument("--suite", choices=["artist", "khsx"], default="artist",
+                    help="artist: the A3 artist_summary case + ambiguous BRD; khsx: the owned dbt "
+                         "project from a template (fact_khsx_detail)")
     args = ap.parse_args(argv)
 
     pre = fixture_mod.preflight_fixture_host(
@@ -288,19 +438,23 @@ def main(argv: list[str]) -> int:
         return 2
     # one directory per invocation, never reused or deleted: failed and earlier runs stay
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
-    out = args.out / args.mode / run_id
+    out = args.out / args.mode / (run_id if args.suite == "artist" else f"{args.suite}-{run_id}")
     out.mkdir(parents=True)
     print(f"run id: {run_id}", flush=True)
     try:
-        rows = (scripted_scenarios(out) if args.mode == "scripted"
-                else real_scenarios(out, args.max_calls, args.ambiguous_runs, args.max_revisions))
+        if args.suite == "khsx":
+            rows = (khsx_scripted_scenarios(out) if args.mode == "scripted"
+                    else khsx_real_scenarios(out, args.max_calls, args.max_revisions))
+        else:
+            rows = (scripted_scenarios(out) if args.mode == "scripted"
+                    else real_scenarios(out, args.max_calls, args.ambiguous_runs, args.max_revisions))
     except llm_verify.LLMVerifyRefused as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
     bad = [r["label"] for r in rows if r.get("expectation_problems") or r.get("criteria_problems")]
-    summary = {"mode": args.mode, "run_id": run_id, "runs": [
+    summary = {"mode": args.mode, "suite": args.suite, "run_id": run_id, "runs": [
         {k: r.get(k) for k in ("label", "classification", "last_outcome", "calls", "tokens", "model",
-                               "expectation_problems", "criteria_problems")} for r in rows],
+                               "counts", "expectation_problems", "criteria_problems")} for r in rows],
         "not_met": bad,
         "inconclusive": [r["label"] for r in rows
                          if r.get("classification") == "inconclusive-provider-unavailable"], "complete": "INCOMPLETE" not in bad}

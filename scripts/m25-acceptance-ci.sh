@@ -36,6 +36,8 @@ PROFILE=core
 A3=""               # scripted | real: run the A3 LLM-verification driver instead of the matrix
 A3_MAX_CALLS=8
 A3_AMBIGUOUS_RUNS=3
+A3_SUITE=artist      # artist (A3 artist_summary + ambiguous BRD) | khsx (owned dbt project from a template)
+A3_MAX_REVISIONS=2
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
@@ -44,6 +46,8 @@ while [ $# -gt 0 ]; do
     --a3) A3="$2"; shift 2 ;;                  # scripted | real (docs/llm-verification.md)
     --max-calls) A3_MAX_CALLS="$2"; shift 2 ;;
     --ambiguous-runs) A3_AMBIGUOUS_RUNS="$2"; shift 2 ;;
+    --a3-suite) A3_SUITE="$2"; shift 2 ;;          # artist | khsx (docs/llm-owned-dbt-project.md)
+    --max-revisions) A3_MAX_REVISIONS="$2"; shift 2 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
   esac
@@ -59,6 +63,7 @@ IMAGE="dpagent-m25-disposable"
 CONTAINER="dpagent-m25-acceptance-$$"
 RESULTS_DIR="${REPO_ROOT}/docs/evidence/m25-automated"
 case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
+case "$A3_SUITE" in artist|khsx) ;; *) echo "--a3-suite must be artist or khsx" >&2; exit 2 ;; esac
 if [ -n "$A3" ]; then
   RESULTS_DIR="${REPO_ROOT}/docs/evidence/a3-llm"
   PROFILE=core      # A3 needs no object store
@@ -205,7 +210,7 @@ if [ -n "$A3" ]; then
   MODES="$A3"; [ "$A3" != both ] || MODES="scripted real"
   set +e
   for mode in $MODES; do
-    docker exec "${PASS[@]}" "${CONTAINER}" bash -c "cd /opt/dpagent && .venv/bin/python tests/llm_verification/run_a3.py --mode ${mode} --max-calls ${A3_MAX_CALLS} --ambiguous-runs ${A3_AMBIGUOUS_RUNS}"
+    docker exec "${PASS[@]}" "${CONTAINER}" bash -c "cd /opt/dpagent && .venv/bin/python tests/llm_verification/run_a3.py --mode ${mode} --suite ${A3_SUITE} --max-calls ${A3_MAX_CALLS} --max-revisions ${A3_MAX_REVISIONS} --ambiguous-runs ${A3_AMBIGUOUS_RUNS}"
     rc=$?
     [ "$rc" -eq 0 ] || DRIVER_RC=$rc
   done
@@ -233,9 +238,9 @@ section() { printf "== %s\n" "$1"; }
 found()   { if [ -n "$1" ]; then printf "%s\n" "$1"; leaks=$((leaks+1)); else echo "(none)"; fi; }
 section "databases named dpagent_fixture_*";  found "$(sudo -n -u postgres psql -At -c "select datname from pg_database where datname like '"'"'dpagent_fixture_%'"'"'")"
 section "roles named dpagent_fixture_*";      found "$(sudo -n -u postgres psql -At -c "select rolname from pg_roles where rolname like '"'"'dpagent_fixture_%'"'"'")"
-section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_|a3_artist_summary" || true)"
+section "published validation clones";        found "$(ls /opt/dpagent/pipelines | grep -E "__validate__|hg_a2_|a3_" || true)"
 section "shared dbt project clone models";    found "$(ls /opt/dbt/project/models 2>/dev/null | grep __validate__ || true)"
-section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_|a3_artist_summary" || true)"
+section "Airflow DAGs of clones";             found "$(su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -E "__validate__|hg_a2_|a3_" || true)"
 section "clone secrets in pipelines.env";     found "$(grep -E "DPAGENT_VALIDATE|HG_POC_|HG_A2_|A3_SRC_|A3_WH_|WAREHOUSE_DB_" /opt/airflow/home/pipelines.env 2>/dev/null | sed "s/=.*/=<redacted>/" || true)"
 if [ -f /opt/seaweedfs/credentials.env ]; then
   . /opt/seaweedfs/credentials.env; export S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY

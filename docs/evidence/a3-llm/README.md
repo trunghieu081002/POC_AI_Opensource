@@ -6,6 +6,50 @@ validated (a `schema_contract` written as a list). `scripted/` is not evidence a
 `tests/llm_verification/scripted_drafts/`; it proves the chain and the blocks. "Done means" is in
 [`docs/llm-verification.md`](../../llm-verification.md).
 
+## Owned dbt project from a template — `fact_khsx_detail` (docs/llm-owned-dbt-project.md)
+
+**Met for `gemini/gemini-3.8-flash` on `fact_khsx_detail`, first draft, one call** — with the caveats below.
+
+### `real/khsx-20261012T113944Z-91d8b7` — `--a3 real --a3-suite khsx --max-calls 6 --max-revisions 2`
+
+Host built from packs (all six pack suites passed), commit `b934af1` (prompt, template and code frozen at
+`cea84fa`; `b934af1` only adds the scripted evidence), working tree clean; probe ok; `leaks=0`.
+
+| | |
+|---|---|
+| Classification | **`llm-first-draft`** |
+| Pipeline revisions / format repairs / human edits / provider errors | **0 / 0 / 0 / 0** (1 call, 27.6 s, 8 161 tokens of which 3 272 reasoning) |
+| Frozen inputs (trace) | system prompt `synth_dbt_project` sha256 `72429722…`; the 4 template files hashed one by one; BRD, schema, request, fixture, expected hashed |
+| Who wrote what | model: `pipeline.yaml`, `dwh_dbt/models/staging/_sources.yml`, `dwh_dbt/models/silver/fact_khsx_detail.sql`, `dwh_dbt/models/silver/_silver_models.yml` (`drafts/attempt-1/`); template: `dbt_project.yml`, `macros/generate_schema_name.sql`, `packages.yml`, `package-lock.yml` |
+| Validation (twice) | pass, idempotent, 7 rows; dbt test `passed` in both runs: 3 tests (`unique` + `not_null` on the key at severity `error`, plus a `not_null` on `production_plan_detail_id` the model added for the BRD's gate); exactly the six text columns |
+| A2 promote | accepted → `verified` (the required tests found in the journal, as dbt's manifest describes them) |
+| Real deploy (not draft) → Airflow run | ok; output = expected (7 rows); gates passed; dbt tests 3/3 passed, required-test check clean |
+| Published files | 8 / 8 byte-identical (4 model-written + 4 template) |
+| Edits after approval | model, tests yml, manifest, template `dbt_project.yml`, template macro → approval lost, deploy refused; fixture / expected → promote refused; restored → approved again |
+| Undeploy / throwaway databases | verified / dropped |
+
+**Caveats.** One model, one problem, one run, on one day. The problem is small and its BRD is precise (cast to
+text, trim, blank → NULL, the surrogate-key macro named): the model's SQL ended up expression-for-expression close to
+HG's own `fact_khsx_detail.sql`, which it was **not** shown (`tests/test_llm_owned_project.py` checks the prompt
+contains neither HG's SQL nor any fixture/expected value) — the BRD said what to compute. The template, not the model,
+chose the project layout, materialization, schemas and packages. A first-try pass here says nothing about harder
+problems (joins, incremental models, ambiguous rules) or other models.
+
+### Regression on this branch (commit `510301b`)
+
+`scripted/20261012T134026Z-4c19ed` — `--a3 scripted` (the artist_summary suite S1–S8): **8/8**, `leaks=0`.
+`--profile bronze` matrix: **31/31**, `leaks=0` (`docs/evidence/m25-automated/`, commit `42048fd`).
+
+### `scripted/khsx-20261012T100944Z-0c1e5b` — `--a3 scripted --a3-suite khsx` (not evidence about a model)
+
+Commit `cea84fa`, 9/9 met, `leaks=0`. K1 good project: the full chain above, 8 files byte-identical, every hashed
+edit (model, tests yml, `dbt_project.yml`, macro, manifest) loses the approval. K2 missing tests → `not_applicable` →
+`policy-fail`, A2 refuses. K3 a test the fixture violates → dbt test fails the run. K4 required tests at
+`severity: warn` → `policy-fail` (required `error`), A2 refuses. K5–K8 a macro, `../`, `dbt_project.yml`,
+`.approved.yaml` → refused, nothing written, no evidence. K9 missing tests then corrected → `llm-after-1-revision(s)`
+and the full chain. (A first attempt at this run died while building the host — `systemctl restart postgresql` timed
+out under load on the shared machine; no scenario ran; not kept.)
+
 Layout: `<mode>/<run-id>/` — one directory per run, never overwritten (see
 [`docs/llm-verification.md`](../../llm-verification.md)). `scripted/20261011T013416Z-first-clean-run/`
 was produced **before** the acceptance hardening (published-bytes check, leak criterion in real mode,

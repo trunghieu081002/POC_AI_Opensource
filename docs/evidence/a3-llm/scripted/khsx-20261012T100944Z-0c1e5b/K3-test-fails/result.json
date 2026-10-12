@@ -1,0 +1,128 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "run_1: failed\n[run 8] dbt.test.failed: a3_fact_khsx_detail__validate__e9d3e5ff/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] transform.failed: dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] pipeline.failed: DAG run 8 reached terminal state: failed",
+  "attempts": [
+    {
+      "evidence_id": "ev-c5ee49d6efd177af",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_khsx_detail",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_khsx_detail/.synth-validation.yaml",
+    "a3_fact_khsx_detail/dwh_dbt/dbt_project.yml",
+    "a3_fact_khsx_detail/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_khsx_detail/dwh_dbt/models/silver/fact/fact_khsx_detail.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_khsx_detail/dwh_dbt/package-lock.yml",
+    "a3_fact_khsx_detail/dwh_dbt/packages.yml",
+    "a3_fact_khsx_detail/pipeline.yaml"
+  ],
+  "label": "K3-test-fails",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_khsx_detail__validate__e9d3e5ff",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "not_run",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff via odoo_postgres",
+        "run": 8
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff extract complete: x_music_plan_detail +7",
+        "run": 8
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff/landing row_count_bounds: ok",
+        "run": 8
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff/landing gates passed",
+        "run": 8
+      },
+      {
+        "kind": "transform.start",
+        "level": "info",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff/silver via dbt",
+        "run": 8
+      },
+      {
+        "kind": "dbt.test.failed",
+        "level": "error",
+        "message": "a3_fact_khsx_detail__validate__e9d3e5ff/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))",
+        "run": 8
+      },
+      {
+        "kind": "transform.failed",
+        "level": "error",
+        "message": "dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))",
+        "run": 8
+      },
+      {
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 8 reached terminal state: failed",
+        "run": 8
+      }
+    ],
+    "run_ids": [
+      8
+    ],
+    "run_status": {
+      "run_1": "failed",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "run_1: run 8 finished 'failed' in the journal",
+      "run_1: stage 'silver': dbt test is 'failed': a test failed or errored",
+      "run_1: gated stage 'silver' has no gate verdict in the journal"
+    ]
+  },
+  "tokens": 18
+}

@@ -9,9 +9,12 @@ from pathlib import Path
 DRAFTS = Path(__file__).resolve().parent / "scripted_drafts"
 
 
-def bundle(name: str) -> dict:
+def bundle(name: str, extra: dict | None = None) -> dict:
+    """The files under scripted_drafts/<name>/ as a reply; `extra` adds files to it (paths the
+    writer must refuse - nothing of such a reply may be written)."""
     root = DRAFTS / name
     files = {str(p.relative_to(root)): p.read_text() for p in sorted(root.rglob("*")) if p.is_file()}
+    files.update(extra or {})
     return {"files": files, "mapping": f"scripted draft {name} (not model output)",
             "notes": "scripted"}
 

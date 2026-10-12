@@ -2,89 +2,89 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "433ea191-7327-4da3-b765-732fd51b5fbb",
+        "batch_id": "11e68c65-e7cf-4008-b848-f6443a7fc981",
         "loaded_rows": 5,
-        "manifest_sha256": "b407bedddc3cb54168733f1fede7a64f3f274555495e19143e40d84023c49137",
+        "manifest_sha256": "5399642e481d4ca12c1112924ac595965f48e678edd24d10ae58ffc6212d0c7b",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "433ea191-7327-4da3-b765-732fd51b5fbb",
+        "batch_id": "11e68c65-e7cf-4008-b848-f6443a7fc981",
         "loaded_rows": 7,
-        "manifest_sha256": "6e80db87ef5cb8a57992b960bba66a9bf3d9f2fa3fd95ee69730f36eb27d26b4",
+        "manifest_sha256": "ecdae4eb61f29516ec2bf0a7acb1d6322b93457a60047d8cc81bc1ebfb481882",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       },
       {
-        "batch_id": "c8d01a85-21a7-4033-9dd5-6fd02815d91c",
+        "batch_id": "ddc04403-48e8-466c-ac59-96d4388dcdca",
         "loaded_rows": 5,
-        "manifest_sha256": "321a6e4483c2e10fb54867c3ed308040e729bf2275c9fa918b9d8363f5fb7df9",
+        "manifest_sha256": "420a167105d958a029af77cd45e937d0a98888292d2cb1ad99307e60ef01357d",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "c8d01a85-21a7-4033-9dd5-6fd02815d91c",
+        "batch_id": "ddc04403-48e8-466c-ac59-96d4388dcdca",
         "loaded_rows": 7,
-        "manifest_sha256": "764acef74f7c1f75ebecfac1e74ffcb373f82cc99992f5547488d0fe6f3f5de4",
+        "manifest_sha256": "446ee4270369f8e5db58c64368566443cedf3a1bceb1bd94c5ad3f02018fc160",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       },
       {
-        "batch_id": "7999e25a-277d-443d-9ffd-bb1623b13d9a",
+        "batch_id": "c8ce0303-0063-4d1b-b79e-aa04fad0c973",
         "loaded_rows": 5,
-        "manifest_sha256": "fea88287f46f79e337bffeef88d314b0f01c357dd4e71c7e79915e34e0846db1",
+        "manifest_sha256": "f6bb9b16f2ac9bc849da61354c676d0ee6bc62918606cc3eb6510993be368e16",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "7999e25a-277d-443d-9ffd-bb1623b13d9a",
+        "batch_id": "c8ce0303-0063-4d1b-b79e-aa04fad0c973",
         "loaded_rows": 7,
-        "manifest_sha256": "74dee653824867fb4cb215650bc53eda4a0b59baf8e49f422b2073e86fdef16d",
+        "manifest_sha256": "ef750a06e6d755fa80b148a5a334c1e5ce309f0954e67d2ab3c9390c830088ae",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       }
     ],
-    "namespace": "dpagent-validate/04b8256b",
+    "namespace": "dpagent-validate/5a6c5eff",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 15,
       "objects_remaining_after_purge": 0
     },
     "source_down_load": {
-      "batch_id": "7999e25a-277d-443d-9ffd-bb1623b13d9a",
+      "batch_id": "c8ce0303-0063-4d1b-b79e-aa04fad0c973",
       "detail": "x_music_plan_detail_price: 7 row(s) matched exactly; res_partner: 5 row(s) matched exactly",
       "error": "",
       "landing_matches_fixture": true,
       "loaded": true,
       "ok": true,
       "source_dropped": true,
-      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_1c5268db40\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_1c5268db40\"",
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_ce4efe9173\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_ce4efe9173\"",
       "source_unreachable": true
     }
   },
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_04B8256B_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_04B8256B_BRONZE_BUCKET, DPAGENT_VALIDATE_04B8256B_BRONZE_ENDPOINT, DPAGENT_VALIDATE_04B8256B_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_04B8256B_SRC_DATABASE, DPAGENT_VALIDATE_04B8256B_SRC_HOST, DPAGENT_VALIDATE_04B8256B_SRC_PASSWORD, DPAGENT_VALIDATE_04B8256B_SRC_PORT, DPAGENT_VALIDATE_04B8256B_SRC_USER, DPAGENT_VALIDATE_04B8256B_WH_DATABASE, DPAGENT_VALIDATE_04B8256B_WH_HOST, DPAGENT_VALIDATE_04B8256B_WH_PASSWORD, DPAGENT_VALIDATE_04B8256B_WH_PORT, DPAGENT_VALIDATE_04B8256B_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_5A6C5EFF_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_5A6C5EFF_BRONZE_BUCKET, DPAGENT_VALIDATE_5A6C5EFF_BRONZE_ENDPOINT, DPAGENT_VALIDATE_5A6C5EFF_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_5A6C5EFF_SRC_DATABASE, DPAGENT_VALIDATE_5A6C5EFF_SRC_HOST, DPAGENT_VALIDATE_5A6C5EFF_SRC_PASSWORD, DPAGENT_VALIDATE_5A6C5EFF_SRC_PORT, DPAGENT_VALIDATE_5A6C5EFF_SRC_USER, DPAGENT_VALIDATE_5A6C5EFF_WH_DATABASE, DPAGENT_VALIDATE_5A6C5EFF_WH_HOST, DPAGENT_VALIDATE_5A6C5EFF_WH_PASSWORD, DPAGENT_VALIDATE_5A6C5EFF_WH_PORT, DPAGENT_VALIDATE_5A6C5EFF_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_fact_artist_assignment__validate__04b8256b",
+  "clone_name": "hg_fact_artist_assignment__validate__5a6c5eff",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
@@ -113,12 +113,24 @@
           "status": "passed",
           "tests": [
             {
+              "column": "fact_artist_assignment_sk",
               "failures": 0,
+              "models": [
+                "fact_artist_assignment"
+              ],
+              "name": "not_null",
+              "severity": "error",
               "status": "pass",
               "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70"
             },
             {
+              "column": "fact_artist_assignment_sk",
               "failures": 0,
+              "models": [
+                "fact_artist_assignment"
+              ],
+              "name": "unique",
+              "severity": "error",
               "status": "pass",
               "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
             }
@@ -129,7 +141,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_fact_artist_assignment__validate__04b8256b/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "message": "hg_fact_artist_assignment__validate__5a6c5eff/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
         "passed": 2,
         "ran": 2,
         "required": 2,
@@ -160,14 +172,26 @@
           "status": "passed",
           "tests": [
             {
+              "column": "fact_artist_assignment_sk",
               "failures": 0,
-              "status": "pass",
-              "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
-            },
-            {
-              "failures": 0,
+              "models": [
+                "fact_artist_assignment"
+              ],
+              "name": "not_null",
+              "severity": "error",
               "status": "pass",
               "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70"
+            },
+            {
+              "column": "fact_artist_assignment_sk",
+              "failures": 0,
+              "models": [
+                "fact_artist_assignment"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
             }
           ],
           "untested_models": [],
@@ -176,7 +200,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_fact_artist_assignment__validate__04b8256b/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "message": "hg_fact_artist_assignment__validate__5a6c5eff/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
         "passed": 2,
         "ran": 2,
         "required": 2,
@@ -187,7 +211,7 @@
     ]
   },
   "deploy_error": "",
-  "evidence_id": "ev-b79b942f665b422c",
+  "evidence_id": "ev-8f15d3f96df57942",
   "expected_hash": "sha256:1c2dc7327023871b4fd51a88515779454c3d461db1eb40c4950d5a7e1c7b9f6c",
   "fixture_hash": "sha256:19ebb8e7c2e28036aaa1c55b534dbfd0b49365739504bcf393338fc5bea8cfb4",
   "gates": {
@@ -268,7 +292,7 @@
   "pipeline_hash": "sha256:27c7f47c859bdd2e007e084cf63d356628ef21fdcd4b26c2e8004f7eaed20383",
   "promote": {
     "accepted": true,
-    "evidence_id": "ev-b79b942f665b422c",
+    "evidence_id": "ev-8f15d3f96df57942",
     "is_approved": true,
     "maturity": "reviewed",
     "verification": "verified"

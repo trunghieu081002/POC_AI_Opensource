@@ -2,7 +2,7 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "f6c0e882-2f0c-478c-b763-27e51ff84ddd",
+        "batch_id": "884de294-3ac6-4f65-9c28-6e345579b369",
         "loaded_rows": null,
         "manifest_sha256": null,
         "object_count": null,
@@ -11,7 +11,7 @@
         "total_rows": null
       },
       {
-        "batch_id": "f6c0e882-2f0c-478c-b763-27e51ff84ddd",
+        "batch_id": "884de294-3ac6-4f65-9c28-6e345579b369",
         "loaded_rows": null,
         "manifest_sha256": null,
         "object_count": null,
@@ -20,7 +20,7 @@
         "total_rows": null
       },
       {
-        "batch_id": "f6c0e882-2f0c-478c-b763-27e51ff84ddd",
+        "batch_id": "884de294-3ac6-4f65-9c28-6e345579b369",
         "loaded_rows": null,
         "manifest_sha256": null,
         "object_count": null,
@@ -29,7 +29,7 @@
         "total_rows": null
       }
     ],
-    "namespace": "dpagent-validate/c854ea0d",
+    "namespace": "dpagent-validate/e7853e99",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 4,
@@ -40,14 +40,14 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_C854EA0D_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_C854EA0D_BRONZE_BUCKET, DPAGENT_VALIDATE_C854EA0D_BRONZE_ENDPOINT, DPAGENT_VALIDATE_C854EA0D_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_C854EA0D_SRC_DATABASE, DPAGENT_VALIDATE_C854EA0D_SRC_HOST, DPAGENT_VALIDATE_C854EA0D_SRC_PASSWORD, DPAGENT_VALIDATE_C854EA0D_SRC_PORT, DPAGENT_VALIDATE_C854EA0D_SRC_USER, DPAGENT_VALIDATE_C854EA0D_WH_DATABASE, DPAGENT_VALIDATE_C854EA0D_WH_HOST, DPAGENT_VALIDATE_C854EA0D_WH_PASSWORD, DPAGENT_VALIDATE_C854EA0D_WH_PORT, DPAGENT_VALIDATE_C854EA0D_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_E7853E99_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_E7853E99_BRONZE_BUCKET, DPAGENT_VALIDATE_E7853E99_BRONZE_ENDPOINT, DPAGENT_VALIDATE_E7853E99_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_E7853E99_SRC_DATABASE, DPAGENT_VALIDATE_E7853E99_SRC_HOST, DPAGENT_VALIDATE_E7853E99_SRC_PASSWORD, DPAGENT_VALIDATE_E7853E99_SRC_PORT, DPAGENT_VALIDATE_E7853E99_SRC_USER, DPAGENT_VALIDATE_E7853E99_WH_DATABASE, DPAGENT_VALIDATE_E7853E99_WH_HOST, DPAGENT_VALIDATE_E7853E99_WH_PASSWORD, DPAGENT_VALIDATE_E7853E99_WH_PORT, DPAGENT_VALIDATE_E7853E99_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_bronze_pair__validate__c854ea0d",
+  "clone_name": "hg_bronze_pair__validate__e7853e99",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -58,7 +58,7 @@
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-b59471eb085b92c3",
+  "evidence_id": "ev-70a8e8a3d9478762",
   "expected_hash": "sha256:4ea7769c5d6fafddba848c96c9ef316d974e47dcf31e56bce37cb93399887999",
   "fixture_hash": "sha256:59c68189c508e4609779a1ec030cc6faf07b0a7f1237d1eb41a9e6b73ca0b613",
   "gates": {
@@ -84,9 +84,9 @@
       "expected exactly 2 run ids, the evidence has 1",
       "bronze pipeline but no source-removed proof in the evidence",
       "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
-      "bronze batch f6c0e882-2f0c-478c-b763-27e51ff84ddd is 'failed', not 'loaded'",
-      "bronze batch f6c0e882-2f0c-478c-b763-27e51ff84ddd is 'failed', not 'loaded'",
-      "bronze batch f6c0e882-2f0c-478c-b763-27e51ff84ddd is 'failed', not 'loaded'",
+      "bronze batch 884de294-3ac6-4f65-9c28-6e345579b369 is 'failed', not 'loaded'",
+      "bronze batch 884de294-3ac6-4f65-9c28-6e345579b369 is 'failed', not 'loaded'",
+      "bronze batch 884de294-3ac6-4f65-9c28-6e345579b369 is 'failed', not 'loaded'",
       "run_1: run 32 finished 'failed' in the journal",
       "run_1: gated stage 'landing' has no gate verdict in the journal"
     ]

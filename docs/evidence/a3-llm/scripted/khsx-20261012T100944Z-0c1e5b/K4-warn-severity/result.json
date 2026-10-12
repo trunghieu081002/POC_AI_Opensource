@@ -1,0 +1,193 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "dbt tests do not meet the requirement:\nrun_1: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'\nrun_1: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'\nrun_2: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'\nrun_2: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'",
+  "attempts": [
+    {
+      "evidence_id": "ev-1fbf852e3961a744",
+      "n": 1,
+      "outcome": "policy-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_khsx_detail",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_khsx_detail/.synth-validation.yaml",
+    "a3_fact_khsx_detail/dwh_dbt/dbt_project.yml",
+    "a3_fact_khsx_detail/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_khsx_detail/dwh_dbt/models/silver/fact/fact_khsx_detail.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_khsx_detail/dwh_dbt/package-lock.yml",
+    "a3_fact_khsx_detail/dwh_dbt/packages.yml",
+    "a3_fact_khsx_detail/pipeline.yaml"
+  ],
+  "label": "K4-warn-severity",
+  "last_outcome": "policy-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_khsx_detail__validate__4988a905",
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "dbt_tests": {
+      "run_1": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_khsx_detail"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_khsx_detail_fact_khsx_detail_sk.d37b96028a",
+              "test.dwh_hgmedia.unique_fact_khsx_detail_fact_khsx_detail_sk.84e3c88716"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_khsx_detail_sk",
+                "failures": 0,
+                "models": [
+                  "fact_khsx_detail"
+                ],
+                "name": "unique",
+                "severity": "warn",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_khsx_detail_fact_khsx_detail_sk.84e3c88716"
+              },
+              {
+                "column": "fact_khsx_detail_sk",
+                "failures": 0,
+                "models": [
+                  "fact_khsx_detail"
+                ],
+                "name": "not_null",
+                "severity": "warn",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_khsx_detail_fact_khsx_detail_sk.d37b96028a"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_khsx_detail__validate__4988a905/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ],
+      "run_2": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_khsx_detail"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_khsx_detail_fact_khsx_detail_sk.d37b96028a",
+              "test.dwh_hgmedia.unique_fact_khsx_detail_fact_khsx_detail_sk.84e3c88716"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_khsx_detail_sk",
+                "failures": 0,
+                "models": [
+                  "fact_khsx_detail"
+                ],
+                "name": "not_null",
+                "severity": "warn",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_khsx_detail_fact_khsx_detail_sk.d37b96028a"
+              },
+              {
+                "column": "fact_khsx_detail_sk",
+                "failures": 0,
+                "models": [
+                  "fact_khsx_detail"
+                ],
+                "name": "unique",
+                "severity": "warn",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_khsx_detail_fact_khsx_detail_sk.84e3c88716"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_khsx_detail__validate__4988a905/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ]
+    },
+    "deploy_error": "",
+    "overall": "pass",
+    "run_ids": [
+      9,
+      10
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run_1: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'",
+      "run_1: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'",
+      "run_2: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'",
+      "run_2: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk has severity ['warn']; required 'error'"
+    ]
+  },
+  "tokens": 18
+}

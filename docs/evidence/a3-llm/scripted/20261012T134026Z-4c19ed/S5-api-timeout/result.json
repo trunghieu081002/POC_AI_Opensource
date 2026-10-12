@@ -1,0 +1,34 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "ProviderUnavailable: scripted/stand-in-for-a-model call failed: simulated provider timeout",
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "provider-unavailable",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "inconclusive-provider-unavailable",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 1,
+    "provider_errors_transient": 1
+  },
+  "expectation_problems": [],
+  "files_written": [],
+  "label": "S5-api-timeout",
+  "last_outcome": "provider-unavailable",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 0
+}

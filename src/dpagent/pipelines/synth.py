@@ -29,6 +29,17 @@ from . import validate as validate_mod
 from ..llm import client as llm
 
 _SQL_PATH = re.compile(r"^(models|procedures)/[^./][^/]*\.sql$")
+# Owned dbt project drafted from a template: the model writes files under <project>/models/ only -
+# lower-case names, at most 4 sub-directories, `.sql` models and `.yml` property files.
+_NAME = r"[a-z0-9_][a-z0-9_]*"
+_MODEL_FILE = re.compile(rf"^models/(?:{_NAME}/){{0,4}}_?{_NAME}\.(sql|yml)$")
+_PROJECT_DIR = re.compile(r"^[a-z][a-z0-9_]*$")
+TEMPLATES_DIR = Path(__file__).resolve().parent / "dbt_templates"
+
+
+class DraftRefused(ValueError):
+    """A drafted file the writer will not write (path outside the allowlist, a template file,
+    the approval file). Nothing of the draft is written."""
 
 
 @dataclass
@@ -45,6 +56,9 @@ class SynthRequest:
     warehouse: dict              # host/port/database/schema refs - no password literal
     secret_refs: dict[str, str] = field(default_factory=dict)   # ENV_VAR -> what it is
     hint: str = ""
+    # an owned dbt project drafted from dbt_templates/<dbt_template>/, at <dbt_project_path>/
+    dbt_template: str = ""
+    dbt_project_path: str = "dwh_dbt"
 
 
 @dataclass
@@ -72,6 +86,8 @@ class SynthResult:
     # Exactly what the model returned (after name/maturity forcing), for the
     # A3 trace - the draft is judged as written, not as later cleaned up.
     drafted_files: dict[str, str] = field(default_factory=dict)
+    # Copied from the dbt project template, not written by the model (path -> text).
+    template_files: dict[str, str] = field(default_factory=dict)
 
     @property
     def blocked(self) -> bool:
@@ -104,24 +120,62 @@ def capability_catalog() -> str:
     return "\n".join(lines)
 
 
-def _safe_relative(root: Path, rel: str) -> Path:
+def template_files(template: str) -> dict[str, str]:
+    """Every file of dbt_templates/<template>/ (path relative to it -> text). Refuses a symlink or
+    anything that is not a regular file: a template is copied byte for byte into a draft."""
+    if not template or not _PROJECT_DIR.match(template):
+        raise DraftRefused(f"unknown dbt template {template!r}")
+    base = TEMPLATES_DIR / template
+    if not base.is_dir() or base.is_symlink():
+        raise DraftRefused(f"unknown dbt template {template!r}")
+    out = {}
+    for path in sorted(base.rglob("*")):
+        if path.is_symlink():
+            raise DraftRefused(f"template {template!r} contains a symlink: {path.relative_to(base)}")
+        if path.is_file():
+            # bytes decoded as they are: read_text() would turn HG's CRLF packages.yml into LF
+            out[path.relative_to(base).as_posix()] = path.read_bytes().decode("utf-8")
+    if "dbt_project.yml" not in out:
+        raise DraftRefused(f"template {template!r} has no dbt_project.yml")
+    return out
+
+
+def _safe_relative(root: Path, rel: str, *, project: str = "",
+                   reserved: frozenset[str] = frozenset()) -> Path:
     """A drafted file may only be `pipeline.yaml` itself or a `.sql` file
     under `models/`/`procedures/` - never `.approved.yaml` (that would let a
     draft forge its own approval, defeating the whole point of M1's gate),
     never a dotfile, never anything outside the pipeline's own directory.
+
+    With an owned dbt project (`project` = its directory): `pipeline.yaml` or a `.sql`/`.yml`
+    file under `<project>/models/` - never a template file (`reserved`), never the project's
+    configuration, macros, packages or lock, never `..`, an absolute path or a dotfile.
     """
+    if not isinstance(rel, str) or not rel:
+        raise DraftRefused(f"refusing a drafted file with no usable path: {rel!r}")
     if rel == approval_mod.APPROVAL_FILENAME:
-        raise ValueError(
+        raise DraftRefused(
             f"refusing to let a drafted pipeline write {rel!r} - approval can "
             f"only come from a human running `dpagent pipeline promote`")
-    if rel != "pipeline.yaml" and not _SQL_PATH.match(rel):
-        raise ValueError(
+    if project:
+        if rel in reserved:
+            raise DraftRefused(f"refusing to write {rel!r} - it comes from the dbt project "
+                               f"template and is not the draft's to change")
+        inside = rel[len(project) + 1:] if rel.startswith(project + "/") else ""
+        if rel != "pipeline.yaml" and not _MODEL_FILE.match(inside):
+            raise DraftRefused(
+                f"refusing to write {rel!r} - a draft may only contain pipeline.yaml and "
+                f".sql / .yml files under {project}/models/ (lower-case names, no other "
+                f"directories: the template provides the project's configuration, macros and "
+                f"packages)")
+    elif rel != "pipeline.yaml" and not _SQL_PATH.match(rel):
+        raise DraftRefused(
             f"refusing to write {rel!r} - a draft may only contain pipeline.yaml "
             f"and .sql files under models/ or procedures/")
     candidate = (root / rel).resolve()
     root_resolved = root.resolve()
     if candidate != root_resolved and not str(candidate).startswith(str(root_resolved) + os.sep):
-        raise ValueError(f"refusing to write outside the pipeline: {rel!r}")
+        raise DraftRefused(f"refusing to write outside the pipeline: {rel!r}")
     return candidate
 
 
@@ -136,7 +190,18 @@ def _revision_message(revision: Revision) -> str:
     )
 
 
-def _user_message(request: SynthRequest, revision: Revision | None = None) -> str:
+def _template_message(request: SynthRequest, files: dict[str, str]) -> str:
+    shown = "\n\n".join(f"--- {request.dbt_project_path}/{rel} ---\n{text}"
+                         for rel, text in sorted(files.items()))
+    return (
+        f"\n\ndbt project directory: {request.dbt_project_path}\n"
+        f"Template {request.dbt_template!r} - copied into {request.dbt_project_path}/ verbatim; "
+        f"these files are NOT yours to return:\n{shown}\n"
+    )
+
+
+def _user_message(request: SynthRequest, revision: Revision | None = None,
+                  template: dict[str, str] | None = None) -> str:
     secrets = "\n".join(f"  {k}: {v}" for k, v in request.secret_refs.items()) or "  (none declared)"
     return (
         f"Pipeline name: {request.name}\n"
@@ -148,8 +213,9 @@ def _user_message(request: SynthRequest, revision: Revision | None = None) -> st
         f"value): {request.warehouse}\n\n"
         f"Secret refs available: \n{secrets}\n\n"
         f"Capability catalog (the only connectors/engines/gates you may use):\n"
-        f"{capability_catalog()}\n\n"
-        f"Emit the pipeline JSON."
+        f"{capability_catalog()}"
+        + (_template_message(request, template) if template else "")
+        + "\n\nEmit the pipeline JSON."
         + (_revision_message(revision) if revision is not None else "")
     )
 
@@ -197,8 +263,15 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
             "no verified source schema given - synth refuses to draft blind "
             "against tables/columns nobody has confirmed exist")
 
-    system = llm.load_prompt("synth_pipeline")
-    data = llm.chat_json(system, _user_message(request, revision), max_tokens=llm.env_max_tokens(16000))
+    template = None
+    if request.dbt_template:
+        if not _PROJECT_DIR.match(request.dbt_project_path or ""):
+            raise DraftRefused(f"dbt project path {request.dbt_project_path!r} must be a plain "
+                               f"lower-case directory name")
+        template = template_files(request.dbt_template)
+    system = llm.load_prompt(system_prompt_name(request))
+    data = llm.chat_json(system, _user_message(request, revision, template),
+                         max_tokens=llm.env_max_tokens(16000))
     if not isinstance(data, dict):
         raise llm.LLMError("synth reply was not a JSON object")
 
@@ -222,20 +295,34 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
     # model"); omitting the key is what loader.load() already treats as
     # draft, so there is nothing else to force here.
     manifest = yaml.safe_load(files["pipeline.yaml"]) or {}
+    if not isinstance(manifest, dict):
+        raise llm.LLMError("synth reply's pipeline.yaml is not a mapping")
     manifest["name"] = request.name
     manifest.pop("maturity", None)
+    project = request.dbt_project_path if template else ""
+    if template:
+        # the project lives where the template was put, whatever the draft says
+        manifest["dbt_project"] = {"path": project}
     files["pipeline.yaml"] = yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True)
 
+    reserved = frozenset(f"{project}/{rel}" for rel in (template or {}))
     written: list[str] = []
     validated: dict[str, Path] = {}
     for rel, content in files.items():
         if not isinstance(content, str):
-            continue
-        validated[rel] = _safe_relative(root, rel)
+            raise DraftRefused(f"drafted file {rel!r} is not text")
+        validated[rel] = _safe_relative(root, rel, project=project, reserved=reserved)
 
+    # Everything is checked before anything is written: a refused path leaves nothing behind.
     root.mkdir(parents=True)
+    for rel, text in (template or {}).items():
+        path = root / project / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode("utf-8"))           # byte for byte, line endings included
     for rel, path in validated.items():
         path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            raise DraftRefused(f"refusing to write through a symlink: {rel!r}")
         path.write_text(files[rel], encoding="utf-8", newline="\n")
         written.append(rel)
 
@@ -281,4 +368,9 @@ def synth(request: SynthRequest, pipelines_dir: Path | None = None,
         name=request.name, root=root, files=sorted(written),
         mapping=str(data.get("mapping", "")), notes=str(data.get("notes", "")),
         load_error=load_error, validation=validation, drafted_files=dict(files),
+        template_files={f"{project}/{rel}": text for rel, text in (template or {}).items()},
     )
+
+
+def system_prompt_name(request: SynthRequest) -> str:
+    return "synth_dbt_project" if request.dbt_template else "synth_pipeline"
