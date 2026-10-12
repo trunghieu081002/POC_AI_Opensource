@@ -61,11 +61,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IMAGE="dpagent-m25-disposable"
 CONTAINER="dpagent-m25-acceptance-$$"
-RESULTS_DIR="${REPO_ROOT}/docs/evidence/m25-automated"
+# Optional per-run destination keeps failed and successful regression evidence side by side.
+RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/m25-automated}"
 case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
 case "$A3_SUITE" in artist|khsx|label) ;; *) echo "--a3-suite must be artist, khsx or label" >&2; exit 2 ;; esac
 if [ -n "$A3" ]; then
-  RESULTS_DIR="${REPO_ROOT}/docs/evidence/a3-llm"
+  RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/a3-llm}"
   PROFILE=core      # A3 needs no object store
   if [ "$A3" = real ] || [ "$A3" = both ]; then
     # fail before building anything if the opt-in is missing

@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import litellm  # noqa: E402
 import scripted  # noqa: E402
+from dpagent.engine import state  # noqa: E402
 from dpagent.llm import client as llm  # noqa: E402
 from dpagent.pipelines import approval, llm_verify, loader  # noqa: E402
 from dpagent.pipelines import fixture as fixture_mod  # noqa: E402
@@ -148,6 +149,10 @@ def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_re
             pipeline = loader.load(case.name, workdir)
             result["promote_after_failed_validation"] = run_matrix._promote_outcome(
                 pipeline, case.fixture_path, case.expected_path, last.evidence_id)
+        result["validation_stages"] = {str(rid): [
+            {"stage": row["stage"], "status": row["status"]}
+            for row in state.stages_for_run(int(rid))]
+            for rid in last.validation.get("run_ids") or []}
         result["last_validation"] = last.validation
         result["attempt_detail"] = last.detail
         result["approval_file_exists"] = approved_file.exists()
@@ -390,9 +395,44 @@ def label_scripted_scenarios(out: Path) -> list[dict]:
         cert = next(t for t in doc["tables"] if t["name"] == "x_acceptance_cert")
         cert["rows"].append({"id": 7, "purchase_order_id": 5001,
                              "acceptance_link": "https://cert.hg/5001-b", "name": "second cert of 5001"})
+    def blocker_fails_at_landing(r):
+        problems = not_promotable("validation-fail", "unique")(r)
+        runs = r.get("validation_stages") or {}
+        if not runs or not any({"stage": "landing", "status": "failed"} in stages
+                               for stages in runs.values()):
+            problems.append("B1 did not fail the landing stage")
+        if any(row["stage"] == "silver" for stages in runs.values() for row in stages):
+            problems.append("silver ran after the B1 violation")
+        if any(ev["kind"] == "transform.start" and "/silver via " in ev["message"]
+               for ev in (r.get("last_validation") or {}).get("run_events", [])):
+            problems.append("silver transform started after the B1 violation")
+        if (r.get("last_validation") or {}).get("cleanup") != "pass":
+            problems.append("B1 validation cleanup did not pass")
+        return problems
+
     # blocker B1: two certificates for one order - the RIGHT project must fail at its gate, not pick one
     scenario("L7-two-certificates-one-order-fails", [scripted.bundle("lab_good")],
-             not_promotable("validation-fail", "unique"), mutate_fixture=second_cert_for_order_5001)
+             blocker_fails_at_landing, mutate_fixture=second_cert_for_order_5001)
+
+    # Clean data and the right gate are insufficient if quarantine could remove B1 rows and continue.
+    import yaml
+    reply = scripted.bundle("lab_good")
+    manifest = yaml.safe_load(reply["files"]["pipeline.yaml"])
+    manifest["stages"][0]["quarantine"] = {"reject_threshold_pct": 100}
+    reply["files"]["pipeline.yaml"] = yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True)
+
+    def quarantined_gate_refused(r):
+        problems = not_promotable("policy-fail", "on_violation: fail forbids stage quarantine")(r)
+        validation = r.get("last_validation") or {}
+        if validation.get("overall") != "pass" or validation.get("cleanup") != "pass":
+            problems.append("clean-fixture validation did not pass with clean cleanup")
+        promote = r.get("promote_after_failed_validation") or {}
+        if not any("on_violation: fail forbids stage quarantine" in reason
+                   for reason in promote.get("reasons", [])):
+            problems.append("A2 did not refuse the quarantine policy itself")
+        return problems
+
+    scenario("L8-certificate-gate-quarantine-100", [reply], quarantined_gate_refused)
     return rows
 
 
