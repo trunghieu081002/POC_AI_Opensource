@@ -6,6 +6,51 @@ validated (a `schema_contract` written as a list). `scripted/` is not evidence a
 `tests/llm_verification/scripted_drafts/`; it proves the chain and the blocks. "Done means" is in
 [`docs/llm-verification.md`](../../llm-verification.md).
 
+## Second owned-project case — `fact_label_operation` (two tables, LEFT JOIN, filter, one row per raw ISRC)
+
+**Met for `gemini/gemini-3.8-flash`, first draft, one call** — with the caveats below.
+
+### `real/label-20261012T151931Z-e77327` — `--a3 real --a3-suite label --max-calls 6 --max-revisions 2`
+
+Commit `2721c9d` (case + code `59a4b64`; synth, prompt `72429722…` and template unchanged from #38), working tree
+clean; host built from packs, all six suites passed; `leaks=0`. The probe before the host was built met one 503
+("high demand") and succeeded on its retry — outside the run, not counted.
+
+| | |
+|---|---|
+| Classification | **`llm-first-draft`** |
+| Pipeline revisions / format repairs / human edits / provider errors (in the run) | **0 / 0 / 0 / 0** (1 call, 74.3 s, 14 901 tokens) |
+| Model-written | `pipeline.yaml`, `dwh_dbt/models/staging/_sources.yml`, `dwh_dbt/models/silver/fact_label_operation.sql`, `dwh_dbt/models/silver/_silver_models.yml`; template files unchanged |
+| Validation (twice) | pass, idempotent, 7 rows; exactly the 7 columns and types; dbt test `passed` 2/2 required (`unique`, `not_null`, severity `error` per dbt's manifest) in both runs; landing gates `row_count_bounds` and the required `unique` on `x_acceptance_cert.purchase_order_id` passed |
+| A2 promote | accepted → `verified` (required tests in the journal, required gate in the manifest) |
+| Real deploy → run | ok; 7 rows matched; gates passed; dbt tests 2/2 |
+| Published files / edits / cleanup | 8/8 byte-identical; every hashed edit loses the approval; fixture/expected edits make promote refuse; undeploy verified, databases dropped |
+
+What the model did: filter → `row_number() over (partition by isrc order by id)` on the **raw** ISRC → keep row 1
+→ LEFT JOIN the certificates → trim/NULL on output; it declared the B1 gate and, in its notes, asked the reviewer to
+check exactly the three points the BRD makes delicate (the gate, the double→text cast, raw-ISRC grouping). Its SQL is
+structured differently from HG's (`DISTINCT ON` after the join): de-duplicating before the join is equivalent only
+because the B1 gate guarantees at most one certificate per order.
+
+**Caveats.**
+- One model, one problem, one run. The BRD spells the processing order out precisely (it was written to remove
+  ambiguity); this measures implementing a precise spec, not discovering HG's rules.
+- A difference the fixture does not exercise: `distributor` is `cast(cast(distro as bigint) as text)` — a
+  fractional `distro` (12.5) would be rounded, HG would give `'12.5'`. Equivalent under the schema's contract
+  ("whole numbers stored as double"); recorded, not hidden.
+- The silver stage has no dpagent gates (`gates: []`); the BRD did not require any there — the key is covered by the
+  dbt tests.
+- This case has now been seen.
+
+### `scripted/label-20261012T145106Z-dd7cd6` — `--a3 scripted --a3-suite label` (not evidence about a model)
+
+Commit `59a4b64`, 7/7, `leaks=0`. L1 right project: the full chain, 8 files byte-identical. L2 INNER JOIN, L3 no
+`active` filter, L4 largest id kept, L5 grouping on the trimmed ISRC: each ran and its output did not match →
+not promotable. L6 no certificate gate: output matched, `policy-fail` ("required a `unique` gate on
+x_acceptance_cert ['purchase_order_id'] in stage 'landing': not declared"), A2 refused. L7 two certificates for one
+order: the right project failed at its landing gate ("2/7 row(s) in x_acceptance_cert failed unique") instead of
+picking one.
+
 ## Owned dbt project from a template — `fact_khsx_detail` (docs/llm-owned-dbt-project.md)
 
 **Met for `gemini/gemini-3.8-flash` on `fact_khsx_detail`, first draft, one call** — with the caveats below.

@@ -128,3 +128,7 @@ checked against the manifest by the harness and **by A2**; the fixture holds no 
 bash scripts/m25-acceptance-ci.sh --a3 scripted --a3-suite label
 bash scripts/m25-acceptance-ci.sh --a3 real --a3-suite label --max-calls 6 --max-revisions 2
 ```
+
+**Status (2026-10-12):** met for `gemini/gemini-3.8-flash` — `llm-first-draft`, one call, 0/0/0/0; full chain,
+`leaks=0`; scripted 7/7. Caveats (a precise BRD; a fractional-`distro` difference the fixture does not exercise) in
+[`docs/evidence/a3-llm/README.md`](evidence/a3-llm/README.md).

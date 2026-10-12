@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: staging
+    schema: staging
+    tables:
+      - name: x_music_song
+        description: Raw song records landed from Odoo x_music_song.
+      - name: x_acceptance_cert
+        description: Raw acceptance certificate records landed from Odoo x_acceptance_cert.

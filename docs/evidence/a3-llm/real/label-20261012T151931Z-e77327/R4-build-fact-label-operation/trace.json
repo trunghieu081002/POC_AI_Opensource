@@ -1,0 +1,225 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "",
+      "drafted_files": [
+        "dwh_dbt/models/silver/_silver_models.yml",
+        "dwh_dbt/models/silver/fact_label_operation.sql",
+        "dwh_dbt/models/staging/_sources.yml",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-9c65bad27a4c6869",
+      "fed_back": "",
+      "files": {
+        "dwh_dbt/models/silver/_silver_models.yml": "sha256:5cc4244d01267668c1c5d189adf04cf14faa2a5a3ad26f9572e59ba88b9b37b7",
+        "dwh_dbt/models/silver/fact_label_operation.sql": "sha256:feb2f7d626da091f2960eda9fd7d52df58d2a471ae910f1c1901557a3a9a6ae3",
+        "dwh_dbt/models/staging/_sources.yml": "sha256:1e85a7a63910609064bccf3fad33d69e778f7802aec826da04a8e6dee19f2d0b",
+        "pipeline.yaml": "sha256:681bde82a9a3ba0290968b56d96f7a38970a377f4bd629eb6a7aa48b760f94e4"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "validated",
+      "source": "llm",
+      "template_files": {
+        "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+        "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+        "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+        "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+      },
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_fact_label_operation__validate__ee47de78",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "dbt_tests": {
+          "run_1": [
+            {
+              "data": {
+                "errored": 0,
+                "exit_code": 0,
+                "failed": 0,
+                "missing": [],
+                "models": [
+                  "fact_label_operation"
+                ],
+                "passed": 2,
+                "ran": 2,
+                "reason": "",
+                "required": [
+                  "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+                  "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                ],
+                "skipped": 0,
+                "stage": "silver",
+                "status": "passed",
+                "tests": [
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "not_null",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+                  },
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "unique",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                  }
+                ],
+                "untested_models": [],
+                "warned": 0
+              },
+              "errored": 0,
+              "failed": 0,
+              "kind": "dbt.test.passed",
+              "message": "a3_fact_label_operation__validate__ee47de78/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+              "passed": 2,
+              "ran": 2,
+              "required": 2,
+              "skipped": 0,
+              "stage": "silver",
+              "status": "passed"
+            }
+          ],
+          "run_2": [
+            {
+              "data": {
+                "errored": 0,
+                "exit_code": 0,
+                "failed": 0,
+                "missing": [],
+                "models": [
+                  "fact_label_operation"
+                ],
+                "passed": 2,
+                "ran": 2,
+                "reason": "",
+                "required": [
+                  "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+                  "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                ],
+                "skipped": 0,
+                "stage": "silver",
+                "status": "passed",
+                "tests": [
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "not_null",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+                  },
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "unique",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                  }
+                ],
+                "untested_models": [],
+                "warned": 0
+              },
+              "errored": 0,
+              "failed": 0,
+              "kind": "dbt.test.passed",
+              "message": "a3_fact_label_operation__validate__ee47de78/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+              "passed": 2,
+              "ran": 2,
+              "required": 2,
+              "skipped": 0,
+              "stage": "silver",
+              "status": "passed"
+            }
+          ]
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          3,
+          4
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 6,
+    "max_revisions": 2,
+    "transient_retries": 8,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-12T15:19:31+00:00",
+      "duration_s": 74.28,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:b98e843df06f1467ea782975b598f5e4b629a69426a5cbc647ad9afe567f9a1f",
+      "system_sha256": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 10839,
+        "prompt_tokens": 4062,
+        "reasoning_tokens": 9134,
+        "total_tokens": 14901
+      },
+      "user_sha256": "sha256:eafd38408620d66a4a7cb626dd821443bdaef70e90b030601d0262ad4f793b46"
+    }
+  ],
+  "case": "a3_fact_label_operation",
+  "classification": "llm-first-draft",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:ba33b0b8de44d11d0640151609e4cb5ce111f52ae90f2289e50d2a05663cb581",
+    "dbt_template": "hg_dwh_dbt",
+    "dbt_template_files": {
+      "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+      "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+      "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+      "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+    },
+    "expected": "sha256:0d3afb27a2383310de87fc59b4865716eff52ea2f6af91d03e697bc3b767cd34",
+    "fixture": "sha256:e53bf211036fd96bc17956317e7147b3f41004c34bba2cbb81c90ff481ec9b3f",
+    "request_yaml": "sha256:54f485e90ce77c681726c38c8047f4979a154c2e1442920065b738ec45425741",
+    "source_schema": "sha256:7f034ac7f125e5f2bac6d09c302bba37a99e30d781aba8ccc8b7bbe1a437ac55",
+    "synth_system_prompt": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+    "synth_system_prompt_name": "synth_dbt_project"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/tmp/a3_oxgamuz7/pipelines/a3_fact_label_operation",
+  "started_at": "2026-10-12T15:19:31+00:00",
+  "trace_version": 1
+}
