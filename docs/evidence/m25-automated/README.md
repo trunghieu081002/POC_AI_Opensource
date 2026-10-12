@@ -1,4 +1,4 @@
-# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 26 scenarios)
+# M2.5 Step 3 — automated-rerun evidence (profile `bronze`: 31 scenarios)
 
 Real, redacted output from `tests/m25_acceptance/run_matrix.py`, written here
 by `scripts/m25-acceptance-ci.sh` so it survives after whatever disposable
@@ -14,7 +14,40 @@ directory is Step 3's own proof: that the *automation* -
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
 
-## Latest run: bronze with two tables (2026-10-11)
+## Latest run: dbt test verdict from the manifest, LOAD failing mid-transaction (2026-10-12)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
+**31/31 scenarios matched**, host audit **`leaks=0`**; [`run-info.txt`](run-info.txt): commit `151b5d2`, working
+tree clean. The 29 earlier scenarios are the no-regression check; 2 are new:
+
+| File | Result |
+|---|---|
+| [`pair-load-fails-midway.json`](pair-load-fails-midway.json) | marker row in landing `res_partner` (6 rows) + a raising trigger on landing `x_music_plan_detail_price` (7 rows); LOAD failed at the INSERT into the **second** table (`m25 injected failure on the second landing table`), i.e. after `res_partner` had been truncated and refilled in the same transaction → afterwards `res_partner` still 6 rows with the marker, `x_music…` 7, both registry rows `extracted`; trigger dropped, same batch LOADed again → `res_partner` 5 (marker gone), 7, both `loaded`; then the normal two-table proof (3 batches, S3 15 → 0, promote accepted) |
+| [`fact-no-tests.json`](fact-no-tests.json) | the model's tests removed: both runs ok, each recorded `dbt.test.not_applicable` with **0 required tests** (from the real dbt manifest) — this used to be recorded `dbt.test.passed`; promote refused: `dbt test is 'not_applicable': no dbt tests are declared on ['fact_artist_assignment']` |
+
+What the existing scenarios now carry: every `dbt.test.passed` record names its required tests and each one's
+result, re-checked by A2 — `fact-correct-twice`: silver 2/2 required passed in each run; `hg-correct-twice`: silver
+4/4 and gold 4/4 in each run.
+
+**The run before this one (commit `492b8dc`, evidence commit `2ae2933`) was 29/31:** `hg-correct-twice` and
+`a2-promote-deploy-run` failed because `hg_dbt_branch`'s own (not HG's) gold model `mart_artist_summary` declared no
+dbt test — formerly recorded as "passed, 0 tests", now `not_applicable`, so A2 refused. Fixed by declaring tests on
+that model (`models/gold/_gold_models.yml`, `not_null` on its 4 columns), not by relaxing the rule.
+
+## Previous run: HG `fact_artist_assignment` + dbt test enforced (2026-10-11)
+
+`bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
+**29/29 scenarios matched**, host audit **`leaks=0`**; [`run-info.txt`](run-info.txt): commit `a44c6dc`, working
+tree clean. The 26 earlier scenarios are the no-regression check (single-table bronze, two-table bronze, A2, M2.5);
+the 3 `fact-*` scenarios are new ([`docs/hg-fact-artist-assignment.md`](../../hg-fact-artist-assignment.md)):
+
+| File | Result |
+|---|---|
+| [`fact-correct-twice.json`](fact-correct-twice.json) | pass: `silver.fact_artist_assignment` = the 7 hand-calculated rows after both runs, idempotent; HG's 2 dbt tests passed in each run (`dbt_tests` in the report, from the journal); 3 batches × 2 tables loaded; source dropped → LOAD still loaded both; S3 15 objects → 0; promote accepted |
+| [`fact-dbt-test-fails.json`](fact-dbt-test-fails.json) | a `not_null` test on `artist_name` added: dbt ran 3 tests, 2 passed, **1 failed (4 failing rows)** → stage failed, run 1 failed, nothing promotable, cleanup complete |
+| [`fact-promote-deploy-run.json`](fact-promote-deploy-run.json) | validate → promote → real deploy (not draft) → run: 7 rows matched, gates passed, dbt tests 2/2 passed; all **8** approved files published byte-identical; editing the model, the tests yml or the sources yml loses the approval and deploy refuses; editing fixture/expected makes promote refuse; restoring restores the approval; undeploy, S3 and both throwaway databases verified clean |
+
+## Previous run: bronze with two tables (2026-10-11)
 
 `bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
 **26/26 scenarios matched**, host audit **`leaks=0`**. [`run-info.txt`](run-info.txt): commit `0d9572a`, tree

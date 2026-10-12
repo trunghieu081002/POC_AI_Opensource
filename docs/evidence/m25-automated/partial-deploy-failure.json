@@ -9,13 +9,17 @@
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__b16e9fbc",
+  "clone_name": "m25_monthly_sales__validate__8ba58a6f",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
     "run_2": "not_run"
   },
-  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: '/tmp/dpagent_validate_clone_gtpvgh49/m25_monthly_sales__validate__b16e9fbc/build/dags'",
+  "dbt_tests": {
+    "run_1": [],
+    "run_2": []
+  },
+  "deploy_error": "NotADirectoryError: [Errno 20] Not a directory: '/tmp/dpagent_validate_clone_bj6pesjn/m25_monthly_sales__validate__8ba58a6f/build/dags'",
   "expected_hash": "sha256:8cfa1d2e3476f04c8e1a0c0e0a5af8731039bd5e216a3e4ab91e7bcfcf9dcb17",
   "fixture_hash": "sha256:416cf9e2bb697dbdf6ed05376be6667b201b2c2fddf07ef01712c72d3df133a9",
   "gates": {

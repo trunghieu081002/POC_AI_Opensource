@@ -1,0 +1,382 @@
+{
+  "a2": {
+    "problems": [],
+    "steps": {
+      "edits_invalidate": {
+        "expected": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "fixture": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "model": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_fact's manifest/procedures/models changed since it was approved (2026-10-12T04:29:38+00:00 by 'm25-matrix') - re-r"
+        },
+        "sources": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_fact's manifest/procedures/models changed since it was approved (2026-10-12T04:29:38+00:00 by 'm25-matrix') - re-r"
+        },
+        "tests": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_fact's manifest/procedures/models changed since it was approved (2026-10-12T04:29:38+00:00 by 'm25-matrix') - re-r"
+        }
+      },
+      "promote": {
+        "accepted": true,
+        "evidence_id": "ev-c49c5abb4f67b122",
+        "is_approved": true,
+        "maturity": "reviewed",
+        "verification": "verified"
+      },
+      "promote_before_validation": {
+        "accepted": false,
+        "approval_unchanged": true,
+        "reasons": [
+          "no sealed evidence for 'hg_a2_fact' in this host's journal - run `dpagent pipeline validate hg_a2_fact --fixture ... --expected ...` here first (a report file alone is not evidence)"
+        ]
+      },
+      "real_run": {
+        "cleanup_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+        "cleanup_ok": true,
+        "comparison": {
+          "detail": "7 row(s) matched exactly",
+          "ok": true
+        },
+        "databases_dropped": true,
+        "dbt_tests": [
+          {
+            "kind": "dbt.test.passed",
+            "message": "hg_a2_fact/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required"
+          }
+        ],
+        "deployed": true,
+        "error": "",
+        "gates_passed": true,
+        "published_files_checked": 8,
+        "published_files_differ": [],
+        "run_id": 46,
+        "run_status": "ok",
+        "s3_remaining": 0
+      },
+      "restored_is_valid_again": true,
+      "validate": {
+        "cleanup": "pass",
+        "evidence_id": "ev-c49c5abb4f67b122",
+        "overall": "pass"
+      }
+    }
+  },
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "8d81b167-326b-4c51-a1b6-a6a5f87a2e88",
+        "loaded_rows": 5,
+        "manifest_sha256": "f90f4059266e3c40bed460888c6fa634c57ea7dfff75cea14642bfe9045d25e0",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "8d81b167-326b-4c51-a1b6-a6a5f87a2e88",
+        "loaded_rows": 7,
+        "manifest_sha256": "b4dfd93ecc52a129c78aa837d961d1cde04165a4eee3a889aea30b366b8c7c41",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "0dd47922-8db9-4a39-aa37-6dd018baef01",
+        "loaded_rows": 5,
+        "manifest_sha256": "9416d3a0b79468fb0de13cc915aa7548a7e0b092cec0c4bc52bd80a0360a9fa9",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "0dd47922-8db9-4a39-aa37-6dd018baef01",
+        "loaded_rows": 7,
+        "manifest_sha256": "81b350404b6fda2fcf98a9c4d3d38bf5614d301589ebdcc72ff59ea90c7f7aef",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "f4751a30-c9b7-4712-bce2-927a2de09666",
+        "loaded_rows": 5,
+        "manifest_sha256": "25a723584781b236883e56ff34ed5ca0f748685cbf26922e2b07cf6d9d4881e3",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "f4751a30-c9b7-4712-bce2-927a2de09666",
+        "loaded_rows": 7,
+        "manifest_sha256": "339483ddd182ff03fa01ee81bf73e31c9173d30b59cc3028faa7c62e2468ec1f",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      }
+    ],
+    "namespace": "dpagent-validate/1678218b",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 15,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "f4751a30-c9b7-4712-bce2-927a2de09666",
+      "detail": "x_music_plan_detail_price: 7 row(s) matched exactly; res_partner: 5 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_e7d7c82ffe\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_e7d7c82ffe\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_1678218B_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_1678218B_BRONZE_BUCKET, DPAGENT_VALIDATE_1678218B_BRONZE_ENDPOINT, DPAGENT_VALIDATE_1678218B_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_1678218B_SRC_DATABASE, DPAGENT_VALIDATE_1678218B_SRC_HOST, DPAGENT_VALIDATE_1678218B_SRC_PASSWORD, DPAGENT_VALIDATE_1678218B_SRC_PORT, DPAGENT_VALIDATE_1678218B_SRC_USER, DPAGENT_VALIDATE_1678218B_WH_DATABASE, DPAGENT_VALIDATE_1678218B_WH_HOST, DPAGENT_VALIDATE_1678218B_WH_PASSWORD, DPAGENT_VALIDATE_1678218B_WH_PORT, DPAGENT_VALIDATE_1678218B_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "real_run": {
+      "artifacts": true,
+      "databases_dropped": true,
+      "s3_remaining": 0
+    },
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_a2_fact__validate__1678218b",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "fact_artist_assignment"
+          ],
+          "passed": 2,
+          "ran": 2,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70",
+            "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_fact__validate__1678218b/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "passed": 2,
+        "ran": 2,
+        "required": 2,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      }
+    ],
+    "run_2": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "fact_artist_assignment"
+          ],
+          "passed": 2,
+          "ran": 2,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70",
+            "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_fact__validate__1678218b/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "passed": 2,
+        "ran": 2,
+        "required": 2,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      }
+    ]
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-c49c5abb4f67b122",
+  "expected_hash": "sha256:1c2dc7327023871b4fd51a88515779454c3d461db1eb40c4950d5a7e1c7b9f6c",
+  "fixture_hash": "sha256:19ebb8e7c2e28036aaa1c55b534dbfd0b49365739504bcf393338fc5bea8cfb4",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:fa1f489f478981a8e7b6c9cdc8fcb81dbd534b521dc165b8503e6bfca47eab08",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    44,
+    45
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "validation_overall": "pass",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

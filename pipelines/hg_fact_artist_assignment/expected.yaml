@@ -1,0 +1,21 @@
+# Calculated by hand from fixture.yaml and HG's model - never read back from the pipeline's output.
+#   one row per x_music_plan_detail_price row (LEFT JOIN res_partner ON partner_id = id) -> 7 rows
+#   fact_artist_assignment_sk = dbt_utils.generate_surrogate_key(['x.id'])
+#                             = md5(coalesce(cast(x.id as text), '_dbt_utils_surrogate_key_null_'))
+#                             = md5('10') ... md5('16')   (hashes computed with Python hashlib.md5)
+#   production_plan_detail_id = nullif(trim(cast(detail_id as text)), '')
+#   artist_id                 = nullif(trim(cast(partner_id as text)), '')   -> NULL when partner_id is NULL
+#   artist_name               = nullif(trim(rp.name), '')
+#       id 2 " Nghiêm Đức Tài " -> trimmed; id 3 "   " -> NULL; id 4 NULL -> NULL;
+#       partner 99 does not exist -> NULL (the row is kept: LEFT JOIN); partner NULL -> NULL
+table: fact_artist_assignment
+schema: silver
+row_count: 7
+rows:
+  - {fact_artist_assignment_sk: d3d9446802a44259755d38e6d163e820, production_plan_detail_id: "298", artist_id: "1",  artist_name: "Nguyễn Lâm Tùng"}
+  - {fact_artist_assignment_sk: 6512bd43d9caa6e02c990b0a82652dca, production_plan_detail_id: "117", artist_id: "2",  artist_name: "Nghiêm Đức Tài"}
+  - {fact_artist_assignment_sk: c20ad4d76fe97759aa27a0c99bff6710, production_plan_detail_id: "117", artist_id: "3",  artist_name: null}
+  - {fact_artist_assignment_sk: c51ce410c124a10e0db5e4b97fc2af39, production_plan_detail_id: "55",  artist_id: "4",  artist_name: null}
+  - {fact_artist_assignment_sk: aab3238922bcc25a6f606eb525ffdc56, production_plan_detail_id: "56",  artist_id: "99", artist_name: null}
+  - {fact_artist_assignment_sk: 9bf31c7ff062936a96d3c8bd1f8f2ff3, production_plan_detail_id: "57",  artist_id: null, artist_name: null}
+  - {fact_artist_assignment_sk: c74d97b01eae257e44aa9d5bade97baf, production_plan_detail_id: "298", artist_id: "5",  artist_name: "Alice"}

@@ -1,0 +1,75 @@
+version: 2
+
+# staging = bảng nguồn RAW (mỗi bảng 1 entry). Do EL nạp từ MinIO.
+
+sources:
+  - name: staging
+    schema: staging
+    tables:
+      - name: channel   # raw: Channel (channel_organization)
+      - name: channel_project   # raw: Channel_Project (channel_project)
+      - name: company   # raw: Company (channel_organization)
+      - name: department   # raw: Department (channel_organization)
+      - name: departmentlevel # raw: DepartmentLevel (channel_organization)
+      - name: distribution_media_history   # raw: distribution_media_history (hg_stock)
+      - name: editings   # raw: Editings (editing_management)
+      - name: groups   # raw: groups (hg_stock)
+      - name: hr_employee   # raw: hr_employee (odoo_pg)
+      - name: network   # raw: Network (channel_network)
+      - name: position   # raw: Position (channel_organization)
+      - name: project   # raw: Project (channel_project)
+      - name: purchase_order   # raw: purchase_order (odoo_pg)
+      - name: purchase_order_line   # raw: purchase_order_line (odoo_pg)
+      - name: res_partner   # raw: res_partner (odoo_pg)
+      - name: resource   # raw: Resource (editing_management)
+      - name: resource_editings   # raw: Resource_Editings (editing_management)
+      - name: resource_file_info   # raw: resource_file_info (hg_stock)
+      - name: roles   # raw: roles (hg_stock)
+      - name: sale_order_line   # raw: sale_order_line (odoo_pg)
+      - name: user   # raw: User (channel_organization)
+      - name: user_departments   # raw: user_departments (hg_stock)
+      - name: userdepartmentposition   # raw: UserDepartmentPosition (channel_organization)
+      - name: users   # raw: users (hg_stock)
+      - name: x_acceptance_cert   # raw: x_acceptance_cert (odoo_pg)
+      - name: x_music_plan   # raw: x_music_plan (odoo_pg)
+      - name: x_music_plan_detail   # raw: x_music_plan_detail (odoo_pg)
+      - name: x_music_plan_detail_price   # raw: x_music_plan_detail_price (odoo_pg)
+      - name: x_music_song   # raw: x_music_song (odoo_pg)
+      - name: x_product_genre   # raw: x_product_genre (odoo_pg)
+      - name: x_product_subgenre   # raw: x_product_subgenre (odoo_pg)
+      - name: x_project   # raw: x_project (odoo_pg)
+      - name: resource_before_odoo
+      - name: partners
+      - name: purchased_resource
+      - name: purchase_cost
+      - name: channel_video_info
+      - name: channel_video_metric
+      - name: sale
+      - name: resource_storage_history
+      - name: stream_distro
+      - name: usd_rate
+      - name: review
+      - name: review_user
+      - name: user_comment_version 
+      - name: recording_sound_version 
+      - name: recording_sound
+      - name: version_needs_comment
+      - name: channel_deal   # raw: Channel_Deal (channel.service.relationship)
+      - name: cms            # raw: CMS (channel.service.network)
+      - name: res_company   # raw: res_company (odoo_pg)
+      - name: hr_department   # raw: hr_department (odoo_pg)
+      - name: hr_job          # raw: hr_job (odoo_pg)
+      - name: channel_user
+      - name: channel_company
+      - name: resource_files
+      - name: tracking_video_publish_infos
+      - name: channeldepartment
+      - name: user_editing
+      - name: repository_name_alias   # bảng alias thủ công, insert tay, không qua EL
+      - name: resource_performance  # raw: file excel tracking video publish
+      - name: res_users
+      - name: sale_order 
+      - name: resource_folders
+      - name: resource_file_action
+      - name: distro_infomation
+      - name: resource_infomation_add

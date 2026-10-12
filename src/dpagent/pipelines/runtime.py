@@ -435,7 +435,7 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
         # thử" - confirmed for real, this pack's static profiles.yml has no
         # per-pipeline indirection of any kind).
         if pipeline.dbt_project is not None:
-            proc = _run_own_dbt_project(pipeline, target)
+            proc = _run_own_dbt_project(pipeline, target, run_id=run_id)
         else:
             with _dbt_profiles_dir(pipeline) as profiles_dir:
                 proc = _run([_dbt_bin(), "run", "--select", *target.models,
@@ -461,7 +461,8 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
 
 
-def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage):
+def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage, *,
+                         run_id: int | None = None):
     """Runs a stage of a pipeline that owns its dbt project (HG's
     `dwh_dbt/`) - `dbt deps` (if it has packages; the committed lock must
     survive it unchanged), a check that every selector selects at least one
@@ -511,7 +512,7 @@ def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage):
                 "versions is exactly what the lock exists to prevent", label="deps")
         # dbt exits 0 and runs NOTHING for a selector that selects nothing -
         # without this the stage would be reported as a successful transform.
-        problems = dbtproject.check_selectors(dbt, base, [target])
+        models, problems = dbtproject.stage_models(dbt, base, target)
         if problems:
             return _failed("\n".join(problems), label="selectors")
         if dbtproject.has_seeds(work):     # honours seed-paths, nested directories included
@@ -519,8 +520,47 @@ def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage):
                         what=f"dbt seed for {target.name!r}")
             if proc.returncode != 0:
                 return _failed(proc.stderr or proc.stdout, label="seed", rc=proc.returncode)
-        return _run([dbt, "run", "--select", *target.models, *base], pipeline=pipeline,
+        proc = _run([dbt, "run", "--select", *target.models, *base], pipeline=pipeline,
                     kind="transform", what=f"dbt run for {target.name!r}")
+        if proc.returncode != 0:
+            return proc
+        # The project's own tests on what this stage built - `dbt run` alone builds a model and
+        # says nothing about whether it satisfies its declared tests (HG declares unique /
+        # not_null on every surrogate key). The verdict comes from dbt's artifacts checked
+        # against the manifest (dbtproject.dbt_test_verdict): failed or unknown fails the stage.
+        test_target = Path(tmp) / "test_target"
+        test = _run([dbt, "test", "--select", *target.models, "--target-path", str(test_target),
+                     *base], pipeline=pipeline, kind="transform",
+                    what=f"dbt test for {target.name!r}")
+        verdict = dbtproject.dbt_test_verdict(test_target / "run_results.json",
+                                              test_target / "manifest.json", models,
+                                              exit_code=test.returncode)
+        _record_dbt_tests(pipeline, target, verdict, run_id)
+        if verdict["status"] in dbtproject.TEST_STAGE_FAILS:
+            detail = "; ".join(verdict["failing"]) or verdict["reason"]
+            if test.returncode != 0 and not verdict["failing"]:
+                detail += ": " + (test.stderr or test.stdout).strip()[-1500:]
+            return _failed(f"dbt test {verdict['status']} for {target.name!r}: {detail}",
+                           label="test", rc=test.returncode or 1)
+        return proc
+
+
+def _record_dbt_tests(pipeline: loader.Pipeline, target: loader.Stage, verdict: dict,
+                      run_id: int | None) -> None:
+    from . import dbtproject
+    status = verdict["status"]
+    message = (f"{pipeline.name}/{target.name}: dbt test {status} - ran {verdict['ran']} "
+               f"({verdict['passed']} passed, {verdict['failed']} failed, "
+               f"{verdict['errored']} errored, {verdict['warned']} warned, "
+               f"{verdict['skipped']} skipped) of {len(verdict['required'])} required"
+               + (f": {verdict['reason']}" if verdict["reason"] else "")
+               + (": " + "; ".join(verdict["failing"]) if verdict["failing"] else ""))
+    data = {"stage": target.name, **{k: v for k, v in verdict.items() if k != "failing"}}
+    if len(data["tests"]) > dbtproject.TEST_RECORD_LIMIT:
+        data["tests"] = data["tests"][:dbtproject.TEST_RECORD_LIMIT]
+        data["truncated"] = True
+    level = {"passed": "info", "failed": "error", "error": "error"}.get(status, "warn")
+    state.event("dbt.test." + status, message[:2000], run_id=run_id, level=level, data=data)
 
 
 def _failed(message: str, *, label: str = "", rc: int = 1):

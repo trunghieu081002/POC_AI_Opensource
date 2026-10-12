@@ -69,8 +69,29 @@ def _paths(pipeline):
     return pipeline.root / "fixture.yaml", pipeline.root / "expected.yaml"
 
 
-def _journal_run(pipeline, clone, *, status="ok", gate_status="passed", gated=True):
+def _dbt_test_data(stage, kind="passed", **override):
+    """A recorded dbt test verdict shaped like runtime._record_dbt_tests writes it."""
+    required = [f"test.p.unique_{stage}_sk", f"test.p.not_null_{stage}_sk"]
+    tests = [{"test": u, "status": "pass" if kind == "passed" or i else "fail", "failures": None}
+             for i, u in enumerate(required)]
+    data = {"stage": stage, "status": kind, "reason": "", "exit_code": 0 if kind == "passed" else 1,
+            "models": [stage], "ran": 2, "passed": 2 if kind == "passed" else 1,
+            "failed": 0 if kind == "passed" else 1, "errored": 0, "warned": 0, "skipped": 0,
+            "required": required, "missing": [], "untested_models": [], "tests": tests}
+    data.update(override)
+    return data
+
+
+def _journal_run(pipeline, clone, *, status="ok", gate_status="passed", gated=True,
+                 dbt_test="passed", dbt_test_data=None):
     rid = state.start_run("data", clone)
+    if pipeline.dbt_project is not None and dbt_test:
+        for stage in pipeline.stages:
+            if stage.engine == "dbt":
+                data = _dbt_test_data(stage.name, dbt_test, **(dbt_test_data or {}))
+                state.event(f"dbt.test.{dbt_test}", f"{clone}/{stage.name}: dbt test ran 2",
+                            run_id=rid, level="info" if dbt_test == "passed" else "error",
+                            data=data)
     if gated:
         for stage in pipeline.stages:
             srow = state.start_stage(rid, clone, stage.name)
@@ -450,7 +471,7 @@ def hg(tmp_path, monkeypatch):
 
 
 def _hg_validated(hg, *, source_down=True, s3_remaining=0, batches=3, batch_status="loaded",
-                  report_tweak=None):
+                  report_tweak=None, dbt_test="passed", dbt_test_data=None):
     def tweak(report):
         report.bronze_staging = True
         report.dbt_project = True
@@ -468,7 +489,8 @@ def _hg_validated(hg, *, source_down=True, s3_remaining=0, batches=3, batch_stat
 
     fx = hg.root / "fixture.yaml"
     ex = hg.root / "expected.yaml"
-    report = _good_report(hg, clone="hg_dbt_branch__validate_abc")
+    report = _good_report(hg, clone="hg_dbt_branch__validate_abc", dbt_test=dbt_test,
+                          dbt_test_data=dbt_test_data)
     tweak(report)
     section = fixture.fixture_report_dict(
         report, pipeline_hash=approval.content_hash(hg),
@@ -675,3 +697,46 @@ def test_three_loaded_rows_of_one_batch_are_not_three_batches(hg):
     with pytest.raises(evidence.EvidenceRefused, match="at least 3 bronze batches"):
         approval.promote(_two_table(hg), "alice", fixture_path=hg.root / "fixture.yaml",
                          expected_path=hg.root / "expected.yaml")
+
+
+
+def test_a_failed_dbt_test_in_the_journal_refuses_promotion(hg):
+    """The run can only be ok if dbt test passed - but the journal is checked anyway, so
+    evidence whose runs recorded a failed (or no) dbt test can never promote."""
+    _hg_validated(hg, dbt_test="failed")
+    _hg_refused(hg, "stage 'silver': dbt test is 'failed'")
+
+
+def test_no_dbt_test_record_for_an_owned_projects_stage_refuses_promotion(hg):
+    _hg_validated(hg, dbt_test=None)
+    _hg_refused(hg, "no dbt test record for stage 'gold'")
+
+
+# The A2 gate judges the record's raw per-test results, not the event's name: each of these is
+# recorded as `dbt.test.passed` and must still be refused.
+@pytest.mark.parametrize("data, reason", [
+    ({"ran": 0, "passed": 0, "required": [], "tests": []}, "no required dbt test on record"),
+    ({"tests": [{"test": "test.p.unique_silver_sk", "status": "skipped"},
+                {"test": "test.p.not_null_silver_sk", "status": "pass"}]},
+     "required test test.p.unique_silver_sk is 'skipped'"),
+    ({"tests": [{"test": "test.p.not_null_silver_sk", "status": "pass"}]},
+     "required test test.p.unique_silver_sk is 'not run'"),
+    ({"untested_models": ["dim_other"]}, "model(s) with no dbt test"),
+    ({"exit_code": 2}, "dbt test exited 2"),
+    ({"truncated": True}, "does not carry its per-test results"),
+    ({"tests": None}, "does not carry its per-test results"),
+    ({"status": None}, "dbt test is 'unrecorded'"),
+])
+def test_a_passed_label_without_the_results_to_back_it_refuses_promotion(hg, data, reason):
+    _hg_validated(hg, dbt_test_data=data)
+    _hg_refused(hg, reason)
+
+
+@pytest.mark.parametrize("status, reason", [
+    ("not_applicable", "dbt test is 'not_applicable'"),
+    ("incomplete", "dbt test is 'incomplete'"),
+    ("error", "dbt test is 'error'"),
+])
+def test_a_stage_whose_tests_were_not_applicable_or_unknown_refuses_promotion(hg, status, reason):
+    _hg_validated(hg, dbt_test=status, dbt_test_data={"status": status})
+    _hg_refused(hg, reason)

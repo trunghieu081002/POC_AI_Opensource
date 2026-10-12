@@ -1722,6 +1722,30 @@ def gate_summary_for_run(run_id: int) -> dict:
     return summary
 
 
+def dbt_tests_for_run(run_id: int) -> list[dict]:
+    """The `dbt test` outcome of each stage of one run, as runtime recorded it in the journal
+    (`dbt.test.<status>`, dbtproject.dbt_test_verdict) - an owned dbt project's tests are part of
+    the run's evidence, not just its exit code. `data` is the raw record the A2 gate re-checks."""
+    from ..engine import state
+    out = []
+    for e in state.events_for(run_id):
+        if not str(e["kind"]).startswith("dbt.test."):
+            continue
+        try:
+            data = json.loads(e["data_json"] or "{}")
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        out.append({"kind": e["kind"], "stage": data.get("stage"),
+                    "status": data.get("status"), "ran": data.get("ran", 0),
+                    "passed": data.get("passed", 0), "failed": data.get("failed", 0),
+                    "errored": data.get("errored", 0), "skipped": data.get("skipped", 0),
+                    "required": len(data.get("required") or []),
+                    "message": str(e["message"])[:600], "data": data})
+    return out
+
+
 def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
                         fixture_hash: str = "", expected_hash: str = "") -> dict:
     """The steps-4-5 section of `.synth-validation.yaml` - everything the
@@ -1818,6 +1842,8 @@ def fixture_report_dict(report: FixtureRunReport, *, pipeline_hash: str = "",
                        "run_2": _cmp_status(report.comparison_after_run2),
                        "idempotent": report.idempotent},
         "gates": {"run_1": _gates(run1_id), "run_2": _gates(run2_id)},
+        "dbt_tests": {"run_1": dbt_tests_for_run(run1_id) if run1_id is not None else [],
+                      "run_2": dbt_tests_for_run(run2_id) if run2_id is not None else []},
         "cleanup": {
             "pipeline_artifacts": ("pass" if report.cleanup_ok else
                                    "fail" if report.cleanup_attempted else "not_attempted"),

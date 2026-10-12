@@ -1,0 +1,64 @@
+# The first piece of HG rebuilt on dpagent with more than one table (docs/hg-fact-artist-assignment.md):
+# x_music_plan_detail_price + res_partner -> one bronze batch (one snapshot, both tables or neither) ->
+# staging -> HG's OWN silver.fact_artist_assignment (LEFT JOIN, dbt_utils.generate_surrogate_key,
+# source('staging', ...)) -> HG's own dbt tests (unique / not_null on the key) -> dpagent's gates.
+# Everything under dwh_dbt/ is phulee9/hgmedia's, verbatim (commit e9cbff0), except the
+# _silver_models.yml subset (only this model's entry) and the package-lock regenerated for dbt 1.8.
+name: hg_fact_artist_assignment
+summary: x_music_plan_detail_price + res_partner -> bronze -> staging -> HG silver.fact_artist_assignment (+ dbt tests)
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${HG_POC_SOURCE_HOST}"
+    port: "${HG_POC_SOURCE_PORT:-5432}"
+    database: "${HG_POC_SOURCE_NAME}"
+    user: "${HG_POC_SOURCE_USER}"
+    password: "${HG_POC_SOURCE_PASSWORD}"
+  tables: [x_music_plan_detail_price, res_partner]
+
+warehouse:
+  host: "${HG_POC_WH_HOST:-localhost}"
+  port: "${HG_POC_WH_PORT:-5432}"
+  database: "${HG_POC_WH_NAME:-warehouse}"
+  user: "${HG_POC_WH_USER}"
+  password: "${HG_POC_WH_PASSWORD}"
+  schema: silver
+
+# HG's source('staging', ...) reads schema `staging`.
+landing_dataset_name: staging
+
+bronze_staging: true
+bronze:
+  endpoint: "${HG_POC_BRONZE_ENDPOINT}"
+  bucket: "${HG_POC_BRONZE_BUCKET:-hg-bronze}"
+  access_key: "${HG_POC_BRONZE_ACCESS_KEY}"
+  secret_key: "${HG_POC_BRONZE_SECRET_KEY}"
+  prefix: bronze
+
+dbt_project:
+  path: dwh_dbt
+
+stages:
+  - name: landing
+    gates:
+      - type: schema_contract
+        tables:
+          res_partner: {id: bigint, name: text}
+          x_music_plan_detail_price: {id: bigint, detail_id: bigint, partner_id: bigint}
+      - type: row_count_bounds
+        table: x_music_plan_detail_price
+        min: 1
+
+  - name: silver
+    engine: dbt
+    depends_on: landing
+    schema: silver
+    models: [fact_artist_assignment]     # run, then HG's own tests on it (dbt test), then these gates
+    gates:
+      - type: not_null
+        table: fact_artist_assignment
+        columns: [fact_artist_assignment_sk, production_plan_detail_id]
+      - type: unique
+        table: fact_artist_assignment
+        columns: [fact_artist_assignment_sk]
