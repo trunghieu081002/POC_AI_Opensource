@@ -1,0 +1,146 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "dbt tests do not meet the requirement:\nrun_1: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_khsx_detail']\nrun_1: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none\nrun_1: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none\nrun_2: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_khsx_detail']\nrun_2: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none\nrun_2: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none",
+  "attempts": [
+    {
+      "evidence_id": "ev-60e667bf33396751",
+      "n": 1,
+      "outcome": "policy-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_khsx_detail",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_khsx_detail/.synth-validation.yaml",
+    "a3_fact_khsx_detail/dwh_dbt/dbt_project.yml",
+    "a3_fact_khsx_detail/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/silver/fact/fact_khsx_detail.sql",
+    "a3_fact_khsx_detail/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_khsx_detail/dwh_dbt/package-lock.yml",
+    "a3_fact_khsx_detail/dwh_dbt/packages.yml",
+    "a3_fact_khsx_detail/pipeline.yaml"
+  ],
+  "label": "K2-missing-tests",
+  "last_outcome": "policy-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_khsx_detail__validate__a8f19ed1",
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "dbt_tests": {
+      "run_1": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_khsx_detail"
+            ],
+            "passed": 0,
+            "ran": 0,
+            "reason": "no dbt tests are declared on ['fact_khsx_detail']",
+            "required": [],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "not_applicable",
+            "tests": [],
+            "untested_models": [
+              "fact_khsx_detail"
+            ],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.not_applicable",
+          "message": "a3_fact_khsx_detail__validate__a8f19ed1/silver: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['fact_khsx_detail']",
+          "passed": 0,
+          "ran": 0,
+          "required": 0,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "not_applicable"
+        }
+      ],
+      "run_2": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_khsx_detail"
+            ],
+            "passed": 0,
+            "ran": 0,
+            "reason": "no dbt tests are declared on ['fact_khsx_detail']",
+            "required": [],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "not_applicable",
+            "tests": [],
+            "untested_models": [
+              "fact_khsx_detail"
+            ],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.not_applicable",
+          "message": "a3_fact_khsx_detail__validate__a8f19ed1/silver: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['fact_khsx_detail']",
+          "passed": 0,
+          "ran": 0,
+          "required": 0,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "not_applicable"
+        }
+      ]
+    },
+    "deploy_error": "",
+    "overall": "pass",
+    "run_ids": [
+      6,
+      7
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run_1: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_khsx_detail']",
+      "run_1: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none",
+      "run_1: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none",
+      "run_2: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_khsx_detail']",
+      "run_2: required a `unique` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none",
+      "run_2: required a `not_null` test on fact_khsx_detail.fact_khsx_detail_sk: dbt ran none"
+    ]
+  },
+  "tokens": 18
+}

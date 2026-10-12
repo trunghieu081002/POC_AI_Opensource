@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: fact_khsx_detail
+    columns:
+      - name: fact_khsx_detail_sk
+        tests:
+          - unique
+          - not_null

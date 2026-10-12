@@ -1,0 +1,153 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "run_1: failed\n[run 8] dbt.test.failed: a3_fact_khsx_detail__validate__e9d3e5ff/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] transform.failed: dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] pipeline.failed: DAG run 8 reached terminal state: failed",
+      "drafted_files": [
+        "dwh_dbt/models/silver/_silver_models.yml",
+        "dwh_dbt/models/silver/fact/fact_khsx_detail.sql",
+        "dwh_dbt/models/staging/_sources.yml",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-c5ee49d6efd177af",
+      "fed_back": "run_1: failed\n[run 8] dbt.test.failed: a3_fact_khsx_detail__validate__e9d3e5ff/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] transform.failed: dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))\n[run 8] pipeline.failed: DAG run 8 reached terminal state: failed",
+      "files": {
+        "dwh_dbt/models/silver/_silver_models.yml": "sha256:8627eb376c2b5b6c3b2d8583f77e55b97ac9d95069fc0363caa75d6907f5a942",
+        "dwh_dbt/models/silver/fact/fact_khsx_detail.sql": "sha256:a761229605ea2d9ae392d9021b110476dc2948b4b75f7f556a9a9ca8d51edc98",
+        "dwh_dbt/models/staging/_sources.yml": "sha256:39c81888378e94ee8cc0cf7c65e072fe5ea7ba63df1c8836af3edd54a8c473bc",
+        "pipeline.yaml": "sha256:c8336c7b91c7d7f6bb0f0bfb9446728d2c5c8d7d47485b0397b262e429560762"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "validation-fail",
+      "source": "llm",
+      "template_files": {
+        "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+        "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+        "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+        "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+      },
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_fact_khsx_detail__validate__e9d3e5ff",
+        "comparison": {
+          "idempotent": false,
+          "run_1": "not_run",
+          "run_2": "not_run"
+        },
+        "deploy_error": "",
+        "overall": "fail",
+        "run_events": [
+          {
+            "kind": "extract.start",
+            "level": "info",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff via odoo_postgres",
+            "run": 8
+          },
+          {
+            "kind": "extract.done",
+            "level": "info",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff extract complete: x_music_plan_detail +7",
+            "run": 8
+          },
+          {
+            "kind": "gate.passed",
+            "level": "info",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff/landing row_count_bounds: ok",
+            "run": 8
+          },
+          {
+            "kind": "stage.passed",
+            "level": "info",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff/landing gates passed",
+            "run": 8
+          },
+          {
+            "kind": "transform.start",
+            "level": "info",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff/silver via dbt",
+            "run": 8
+          },
+          {
+            "kind": "dbt.test.failed",
+            "level": "error",
+            "message": "a3_fact_khsx_detail__validate__e9d3e5ff/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))",
+            "run": 8
+          },
+          {
+            "kind": "transform.failed",
+            "level": "error",
+            "message": "dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.not_null_fact_khsx_detail_status.e53ca88922 fail (2 failing row(s))",
+            "run": 8
+          },
+          {
+            "kind": "pipeline.failed",
+            "level": "error",
+            "message": "DAG run 8 reached terminal state: failed",
+            "run": 8
+          }
+        ],
+        "run_ids": [
+          8
+        ],
+        "run_status": {
+          "run_1": "failed",
+          "run_2": "not_run"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0,
+    "transient_retries": 0,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-12T10:19:19+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:1981c7627116efc8c666157f3549e10bff0bf780db4f5a136d0b51eb99ef9f3b",
+      "system_sha256": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:d48444af84a67b98c98be074628d18d4a0cae07c6321c32c35257c6dd7ffd92c"
+    }
+  ],
+  "case": "a3_fact_khsx_detail",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:f1374e644582db38dc3b2f066d398dd3ae73154843290383d833cc98517a2e4a",
+    "dbt_template": "hg_dwh_dbt",
+    "dbt_template_files": {
+      "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+      "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+      "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+      "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+    },
+    "expected": "sha256:d2037b11c058e32097eb5c059c02dac561c4f6068693409d3af1231e07f7d5fe",
+    "fixture": "sha256:d4f8d673e8e32032005a2f4f344f75da5d2d0fe87d23886f8dabab68da76d32c",
+    "request_yaml": "sha256:183ba145b0f35110216246e2e31a62cc095c76ce059937d63bab95a9325953c0",
+    "source_schema": "sha256:2a2d2a9e2a0143d75f6591315540fc10bdfedf682e0c0a8f5e01fab7033c751e",
+    "synth_system_prompt": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+    "synth_system_prompt_name": "synth_dbt_project"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "/tmp/a3_bppnhy4s/pipelines/a3_fact_khsx_detail",
+  "started_at": "2026-10-12T10:19:19+00:00",
+  "trace_version": 1
+}

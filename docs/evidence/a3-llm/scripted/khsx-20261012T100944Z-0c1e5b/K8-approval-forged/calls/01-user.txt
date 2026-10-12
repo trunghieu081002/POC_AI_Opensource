@@ -1,0 +1,133 @@
+Pipeline name: a3_fact_khsx_detail
+Operator hint: Source connection fields use the secret refs above. Use the warehouse refs given.
+
+BRD / report spec:
+# Bảng sự kiện: chi tiết kế hoạch sản xuất (fact_khsx_detail)
+
+HG cần một bảng sự kiện ở tầng silver, mỗi dòng là **một dòng chi tiết kế hoạch sản xuất (KHSX)**,
+để các báo cáo sau ghép với kế hoạch, người quản lý sản xuất và người phụ trách A&R.
+Nguồn: bảng `x_music_plan_detail` (xem schema nguồn đã xác minh).
+
+## Phạm vi dòng
+
+1. Mỗi dòng của bảng nguồn cho **đúng một** dòng đầu ra. Không lọc theo trạng thái (dòng nháp,
+   đã duyệt, đã huỷ… đều giữ), không gộp, không bỏ dòng nào.
+2. `id` là khoá chính của nguồn: không NULL, không trùng.
+
+## Đầu ra
+
+Bảng `fact_khsx_detail` trong schema `silver`, nạp lại toàn bộ mỗi lần chạy (full snapshot).
+
+| Cột | Kiểu | Lấy từ | Quy tắc |
+|---|---|---|---|
+| `fact_khsx_detail_sk` | text | `id` | khoá thay thế (surrogate key) theo chuẩn kho HG: macro `generate_surrogate_key` của gói `dbt_utils` (đã có sẵn trong template), áp dụng trên **đúng một cột** `id` |
+| `production_plan_detail_id` | text | `id` | mã chi tiết KHSX |
+| `production_plan_id` | text | `plan_id` | mã kế hoạch |
+| `production_manager` | text | `produce_manager` | mã người quản lý sản xuất |
+| `ar_manager` | text | `ar_id` | mã người phụ trách A&R |
+| `status` | text | `state` | trạng thái của dòng chi tiết |
+
+Quy tắc chung cho **mọi cột trừ khoá thay thế**: giá trị được chuyển sang text, cắt khoảng trắng
+đầu/cuối; giá trị NULL, rỗng hoặc chỉ gồm khoảng trắng thành **NULL**. Giá trị NULL ở các cột nguồn
+không làm pipeline lỗi và dòng đó vẫn được giữ.
+
+Không đưa vào đầu ra bất kỳ cột nguồn nào khác (ví dụ `quality`, `original_song_name`).
+
+## Kiểm tra chất lượng (bắt buộc)
+
+- dbt test trên `fact_khsx_detail.fact_khsx_detail_sk`: **`unique`** và **`not_null`**, cả hai với
+  mức độ (severity) **`error`** — vi phạm phải làm stage lỗi, không chỉ cảnh báo.
+- Bảng nguồn đã nạp phải có ít nhất 1 dòng.
+- `fact_khsx_detail_sk` và `production_plan_detail_id` không được NULL trong bảng đầu ra.
+
+
+Verified source schema (real table/column names and types - do not invent any not listed here):
+Source: PostgreSQL (Odoo), connector `odoo_postgres`, table `public.x_music_plan_detail` (the only
+table needed). Only the columns below exist in this feed.
+
+| column             | type   | meaning |
+|--------------------|--------|---------|
+| id                 | bigint | production-plan detail id; primary key (never NULL, never repeated) |
+| plan_id            | bigint | the production plan this detail belongs to; may be NULL |
+| produce_manager    | bigint | user id of the production manager; may be NULL |
+| ar_id              | bigint | user id of the A&R person; may be NULL |
+| state              | text   | workflow state (e.g. draft, approved, cancel); may be NULL, empty, whitespace only, or carry leading/trailing spaces |
+| quality            | text   | quality grade - not used by this report |
+| original_song_name | text   | free text - not used by this report |
+
+Landing: dpagent's extract copies the table as received (nothing dropped, nothing cast) into the
+landing dataset named by the manifest's `landing_dataset_name`. HG's convention, which the dbt
+project template follows, is the schema `staging`: set `landing_dataset_name: staging`, and the
+extracted table is `staging.x_music_plan_detail`, read in dbt as `source('staging', 'x_music_plan_detail')`.
+The output table lives in the schema `silver` (the pipeline's `warehouse.schema`).
+
+
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${A3_WH_HOST:-localhost}', 'port': '${A3_WH_PORT:-5432}', 'database': '${A3_WH_NAME:-warehouse}', 'user': '${A3_WH_USER}', 'password': '${A3_WH_PASSWORD}', 'schema': 'silver'}
+
+Secret refs available: 
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+
+Capability catalog (the only connectors/engines/gates you may use):
+Connectors: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server
+Transform engines: dbt, procedure
+Gate types (required fields):
+  - business_rule: ['name', 'sql', 'expect', 'table', 'id_column'] (no other keys are accepted)
+  - freshness: ['tables', 'column', 'max_age'] - shape: tables: [..], column: <timestamp column>, max_age: '24h'|'30m'|'7d' (no other keys are accepted)
+  - not_null: ['table', 'columns'] - shape: table: <table>, columns: [<column>, ..] (no other keys are accepted)
+  - referential_integrity: ['table', 'column', 'references'] (no other keys are accepted)
+  - row_count_bounds: ['table'] - shape: table: <table>; optional min/max: integers (optional: ['min', 'max', 'max_delta_pct']; no other keys are accepted)
+  - schema_contract: ['tables'] - shape: tables: {table_name: {column_name: postgres_type}} (no other keys are accepted)
+  - unique: ['table', 'columns'] - shape: table: <table>, columns: [<column>, ..] (no other keys are accepted)
+
+dbt project directory: dwh_dbt
+Template 'hg_dwh_dbt' - copied into dwh_dbt/ verbatim; these files are NOT yours to return:
+--- dwh_dbt/dbt_project.yml ---
+name: 'dwh_hgmedia'
+version: '1.0.0'
+config-version: 2
+
+profile: 'dwh_hgmedia'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+# Template (dpagent, derived from phulee9/hgmedia dwh_dbt at e9cbff0): full snapshot only - every
+# silver/gold model is a table; HG's incremental fact config is deliberately not carried over.
+models:
+  dwh_hgmedia:
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold
+
+
+--- dwh_dbt/macros/generate_schema_name.sql ---
+{% macro generate_schema_name(custom_schema_name, node) -%}
+    {%- if custom_schema_name is none -%}
+        {{ target.schema }}
+    {%- else -%}
+        {{ custom_schema_name | trim }}
+    {%- endif -%}
+{%- endmacro %}
+
+--- dwh_dbt/package-lock.yml ---
+packages:
+  - package: dbt-labs/dbt_utils
+    version: 1.4.1
+sha1_hash: e6424ba9e5a22487e47f023803aa4f0411946808
+
+
+--- dwh_dbt/packages.yml ---
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.1.0", "<2.0.0"]
+
+
+
+Emit the pipeline JSON.
