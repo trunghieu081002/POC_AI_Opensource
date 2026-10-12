@@ -1,0 +1,9 @@
+# From phulee9/hgmedia dwh_dbt/models/silver/_silver_models.yml (commit e9cbff0) - ONLY the entry of the
+# one model this pipeline builds; the other entries describe models that are not in this project.
+version: 2
+
+models:
+  - name: fact_artist_assignment
+    columns:
+      - name: fact_artist_assignment_sk
+        tests: [unique, not_null]

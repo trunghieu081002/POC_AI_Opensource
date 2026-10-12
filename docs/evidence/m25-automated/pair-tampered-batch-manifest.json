@@ -2,96 +2,100 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "73aa3582-6c23-40c8-80ad-9a2b2bbb02ad",
+        "batch_id": "c9646b2a-e2a9-420e-b34c-9e42daaef089",
         "loaded_rows": 5,
-        "manifest_sha256": "167e1b06c3fd18d45a5d9d3286ba14cb8320ee31c2213b308c38c9c470ac5dcb",
+        "manifest_sha256": "d053453de6cae61316bf5a2ab7c99f4e782db386fb3d70c67ad49024c1279728",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "73aa3582-6c23-40c8-80ad-9a2b2bbb02ad",
+        "batch_id": "c9646b2a-e2a9-420e-b34c-9e42daaef089",
         "loaded_rows": 7,
-        "manifest_sha256": "f18b2c68dac2b703b94a72d2448a1d6b9a2d5bb1781e30247422d1928ff7d95d",
+        "manifest_sha256": "1f280b803feebd243af62595fc1b6c676b636e6c0eaf881e080a1c49f28095eb",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       },
       {
-        "batch_id": "0178e421-d18c-47f9-a24a-22342588098c",
+        "batch_id": "dbdfe35b-92ac-4606-b801-d284e777fade",
         "loaded_rows": 5,
-        "manifest_sha256": "f4ca183783b377f7322c7a5e1412f98e73a681e92fc4bfc6b53cfc814f5295a8",
+        "manifest_sha256": "026caf5d23cdea876fe10c479057e0278eea535e0c3f28d73cc61a4766f9f10b",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "0178e421-d18c-47f9-a24a-22342588098c",
+        "batch_id": "dbdfe35b-92ac-4606-b801-d284e777fade",
         "loaded_rows": 7,
-        "manifest_sha256": "8ec443569a6195bc3df76bc30e180ae6f767367fa8219c6fd198be602499a791",
+        "manifest_sha256": "7ba741fa425b77f5538a03b9cf9471d36e4291fe8c294055ff7aa19d659e327e",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       },
       {
-        "batch_id": "e4636510-7a5e-4181-8e2c-b0f8d801520d",
+        "batch_id": "cb5b349b-2248-460e-b40a-6e91bae7dddd",
         "loaded_rows": null,
-        "manifest_sha256": "050c01bd4da95013b240904356aef39dde759d4a2456e1ce3e3f00f1ad9e3f68",
+        "manifest_sha256": "7552a3c528af4e9eaa71f110f2c38faf55fc24a8bb2fccf0b69a8de1bfdf43f7",
         "object_count": 1,
         "status": "extracted",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "e4636510-7a5e-4181-8e2c-b0f8d801520d",
+        "batch_id": "cb5b349b-2248-460e-b40a-6e91bae7dddd",
         "loaded_rows": null,
-        "manifest_sha256": "2a00135f30a0d3cce89c643fc55ea4d9af6a0e6ce047cd672e5101c05a001214",
+        "manifest_sha256": "732842dfc1f09d2f7e4a7f7f2bacd350234edf2ddbe1643c9058e7376da544b2",
         "object_count": 1,
         "status": "extracted",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       }
     ],
-    "namespace": "dpagent-validate/f8e72f70",
+    "namespace": "dpagent-validate/5e26d922",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 15,
       "objects_remaining_after_purge": 0
     },
     "source_down_load": {
-      "batch_id": "e4636510-7a5e-4181-8e2c-b0f8d801520d",
+      "batch_id": "cb5b349b-2248-460e-b40a-6e91bae7dddd",
       "detail": "",
-      "error": "LOAD with the source gone failed: bronze load failed for 'hg_bronze_pair__validate__f8e72f70' batch e4636510-7a5e-4181-8e2c-b0f8d801520d:\nbronze: batch manifest sha256 a4d07b0949d11f8fb4d7cec73bdea539a6b000ac57b49da87495addd3570ac4b does not match the registry's af28b1af9f3861da0fc17507a9649682c5ff3b4129f143f83b5beb81b082ee1d - refusing a batch manifest that changed after it was published",
+      "error": "LOAD with the source gone failed: bronze load failed for 'hg_bronze_pair__validate__5e26d922' batch cb5b349b-2248-460e-b40a-6e91bae7dddd:\nbronze: batch manifest sha256 561a8cdd5598332125991b749655c15bf606c88abae3d7694821ed7f21a8c7b9 does not match the registry's 3b38b0f642784b2fe5ccf121a7fbce34b302b7ddcb85238ffd63cf8ef8e3efb0 - refusing a batch manifest that changed after it was published",
       "landing_matches_fixture": false,
       "loaded": false,
       "ok": false,
       "source_dropped": true,
-      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_87a40b234b\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_87a40b234b\"",
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_73848a4db3\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_73848a4db3\"",
       "source_unreachable": true
     }
   },
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_F8E72F70_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_F8E72F70_BRONZE_BUCKET, DPAGENT_VALIDATE_F8E72F70_BRONZE_ENDPOINT, DPAGENT_VALIDATE_F8E72F70_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_F8E72F70_SRC_DATABASE, DPAGENT_VALIDATE_F8E72F70_SRC_HOST, DPAGENT_VALIDATE_F8E72F70_SRC_PASSWORD, DPAGENT_VALIDATE_F8E72F70_SRC_PORT, DPAGENT_VALIDATE_F8E72F70_SRC_USER, DPAGENT_VALIDATE_F8E72F70_WH_DATABASE, DPAGENT_VALIDATE_F8E72F70_WH_HOST, DPAGENT_VALIDATE_F8E72F70_WH_PASSWORD, DPAGENT_VALIDATE_F8E72F70_WH_PORT, DPAGENT_VALIDATE_F8E72F70_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_5E26D922_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_5E26D922_BRONZE_BUCKET, DPAGENT_VALIDATE_5E26D922_BRONZE_ENDPOINT, DPAGENT_VALIDATE_5E26D922_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_5E26D922_SRC_DATABASE, DPAGENT_VALIDATE_5E26D922_SRC_HOST, DPAGENT_VALIDATE_5E26D922_SRC_PASSWORD, DPAGENT_VALIDATE_5E26D922_SRC_PORT, DPAGENT_VALIDATE_5E26D922_SRC_USER, DPAGENT_VALIDATE_5E26D922_WH_DATABASE, DPAGENT_VALIDATE_5E26D922_WH_HOST, DPAGENT_VALIDATE_5E26D922_WH_PASSWORD, DPAGENT_VALIDATE_5E26D922_WH_PORT, DPAGENT_VALIDATE_5E26D922_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_bronze_pair__validate__f8e72f70",
+  "clone_name": "hg_bronze_pair__validate__5e26d922",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
     "run_2": "pass"
   },
+  "dbt_tests": {
+    "run_1": [],
+    "run_2": []
+  },
   "deploy_error": "",
-  "evidence_id": "ev-a581f917709c50e3",
+  "evidence_id": "ev-6889001df02a0eb3",
   "expected_hash": "sha256:4ea7769c5d6fafddba848c96c9ef316d974e47dcf31e56bce37cb93399887999",
   "fixture_hash": "sha256:59c68189c508e4609779a1ec030cc6faf07b0a7f1237d1eb41a9e6b73ca0b613",
   "gates": {
@@ -160,8 +164,8 @@
       "source-down proof: ok is False",
       "source-down proof: loaded is False",
       "source-down proof: landing_matches_fixture is False",
-      "bronze batch e4636510-7a5e-4181-8e2c-b0f8d801520d is 'extracted', not 'loaded'",
-      "bronze batch e4636510-7a5e-4181-8e2c-b0f8d801520d is 'extracted', not 'loaded'"
+      "bronze batch cb5b349b-2248-460e-b40a-6e91bae7dddd is 'extracted', not 'loaded'",
+      "bronze batch cb5b349b-2248-460e-b40a-6e91bae7dddd is 'extracted', not 'loaded'"
     ]
   },
   "recovered_after_scenario": {
@@ -180,7 +184,7 @@
   },
   "tamper": {
     "damage": {
-      "overwrote": "dpagent-validate/f8e72f70/hg_bronze_pair__validate__f8e72f70/_batches/e4636510-7a5e-4181-8e2c-b0f8d801520d/_batch.json"
+      "overwrote": "dpagent-validate/5e26d922/hg_bronze_pair__validate__5e26d922/_batches/cb5b349b-2248-460e-b40a-6e91bae7dddd/_batch.json"
     },
     "landing_intact_after_refused_load": {
       "res_partner": true,
