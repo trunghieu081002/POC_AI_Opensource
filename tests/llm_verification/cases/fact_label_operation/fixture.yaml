@@ -1,0 +1,49 @@
+# Hand-written input for the validator ONLY - the model never sees it. Business basis: HG's
+# silver.fact_label_operation at phulee9/hgmedia e9cbff0 (dwh_dbt/models/silver/fact/fact_label_operation.sql).
+# Each song is here for one rule of brd.md (the comment says which).
+tables:
+  - name: x_music_song
+    columns:
+      id: bigint
+      active: boolean
+      isrc: text
+      release_state: text
+      release_date: date
+      distro: double precision
+      purchase_order_id: double precision
+      name: text
+    rows:
+      # same ISRC, ids 102 and 101 (listed first): 101 is kept, its certificate (5001, padded link) is used
+      - {id: 102, active: true,  isrc: "VNA012300001",    release_state: "draft",       release_date: "2026-02-01", distro: 13, purchase_order_id: 5002, name: "Song 102"}
+      - {id: 101, active: true,  isrc: "VNA012300001",    release_state: "released",    release_date: "2026-01-15", distro: 12, purchase_order_id: 5001, name: "Song 101"}
+      # an INACTIVE song with the smallest id of its ISRC: filtered before de-duplication, so 120 is kept, not 150
+      - {id: 90,  active: false, isrc: "VNA012300002",    release_state: "released",    release_date: "2025-12-01", distro: 12, purchase_order_id: 5004, name: "Song 90"}
+      - {id: 150, active: true,  isrc: "VNA012300002",    release_state: "released",    release_date: "2026-03-01", distro: 14, purchase_order_id: 5004, name: "Song 150"}
+      - {id: 120, active: true,  isrc: "VNA012300002",    release_state: "  released ", release_date: null,         distro: null, purchase_order_id: 5003, name: "Song 120"}
+      # filtered out: inactive, active NULL, ISRC NULL / empty / whitespace only
+      - {id: 103, active: false, isrc: "VNA012300003",    release_state: "released",    release_date: "2026-01-20", distro: 12, purchase_order_id: 5001, name: "Song 103"}
+      - {id: 112, active: null,  isrc: "VNA012300007",    release_state: "released",    release_date: "2026-01-21", distro: 12, purchase_order_id: 5001, name: "Song 112"}
+      - {id: 104, active: true,  isrc: null,              release_state: "released",    release_date: "2026-01-22", distro: 12, purchase_order_id: 5001, name: "Song 104"}
+      - {id: 105, active: true,  isrc: "",                release_state: "released",    release_date: "2026-01-23", distro: 12, purchase_order_id: 5001, name: "Song 105"}
+      - {id: 106, active: true,  isrc: "   ",             release_state: "released",    release_date: "2026-01-24", distro: 12, purchase_order_id: 5001, name: "Song 106"}
+      # no certificate: an order with none, and no order at all - both kept with acceptance_url NULL
+      - {id: 107, active: true,  isrc: "VNA012300004",    release_state: "",            release_date: "2026-04-01", distro: 15, purchase_order_id: 5999, name: "Song 107"}
+      - {id: 108, active: true,  isrc: "VNA012300008",    release_state: null,          release_date: "2026-04-02", distro: 15, purchase_order_id: null, name: "Song 108"}
+      # ISRCs that differ only by spaces are DIFFERENT groups (grouping is on the raw value): both kept
+      - {id: 109, active: true,  isrc: " VNA012300005 ",  release_state: "released",    release_date: "2026-05-01", distro: 16, purchase_order_id: 5006, name: "Song 109"}
+      - {id: 110, active: true,  isrc: "VNA012300005",    release_state: "released",    release_date: "2026-05-02", distro: 16, purchase_order_id: 5005, name: "Song 110"}
+      # a padded ISRC on its own, sharing order 5001's certificate with song 101
+      - {id: 111, active: true,  isrc: "  VNA012300006",  release_state: "released",    release_date: "2026-05-03", distro: 17, purchase_order_id: 5001, name: "Song 111"}
+  - name: x_acceptance_cert
+    columns:
+      id: bigint
+      purchase_order_id: double precision
+      acceptance_link: text
+      name: text
+    rows:
+      - {id: 1, purchase_order_id: 5001, acceptance_link: " https://cert.hg/5001 ", name: "Cert 5001"}
+      - {id: 2, purchase_order_id: 5002, acceptance_link: "https://cert.hg/5002",   name: "Cert 5002"}
+      - {id: 3, purchase_order_id: 5003, acceptance_link: "   ",                    name: "Cert 5003 (blank link)"}
+      - {id: 4, purchase_order_id: 5004, acceptance_link: "https://cert.hg/5004",   name: "Cert 5004"}
+      - {id: 5, purchase_order_id: 5005, acceptance_link: "https://cert.hg/5005",   name: "Cert 5005"}
+      - {id: 6, purchase_order_id: 5010, acceptance_link: "https://cert.hg/5010",   name: "Cert of an order with no song"}

@@ -1,0 +1,41 @@
+name: a3_fact_label_operation
+summary: Silver layer fact table fact_label_operation recording songs with ISRC and
+  acceptance cert URLs
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${A3_SRC_HOST}
+    port: ${A3_SRC_PORT}
+    database: ${A3_SRC_NAME}
+    user: ${A3_SRC_USER}
+    password: ${A3_SRC_PASSWORD}
+  tables:
+  - x_music_song
+  - x_acceptance_cert
+warehouse:
+  host: ${A3_WH_HOST:-localhost}
+  port: ${A3_WH_PORT:-5432}
+  database: ${A3_WH_NAME:-warehouse}
+  user: ${A3_WH_USER}
+  password: ${A3_WH_PASSWORD}
+  schema: silver
+landing_dataset_name: staging
+dbt_project:
+  path: dwh_dbt
+stages:
+- name: landing
+  gates:
+  - type: row_count_bounds
+    table: x_music_song
+    min: 1
+  - type: unique
+    table: x_acceptance_cert
+    columns:
+    - purchase_order_id
+- name: silver
+  engine: dbt
+  depends_on: landing
+  schema: silver
+  models:
+  - fact_label_operation
+  gates: []

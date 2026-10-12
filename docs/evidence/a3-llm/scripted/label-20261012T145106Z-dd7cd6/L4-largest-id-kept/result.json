@@ -1,0 +1,142 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "run_1: the output table does not match the independently calculated expected result (not shown to you). Re-read each BRD rule against your SQL.",
+  "attempts": [
+    {
+      "evidence_id": "ev-aeaa46cb60ad23ef",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_label_operation",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_label_operation/.synth-validation.yaml",
+    "a3_fact_label_operation/dwh_dbt/dbt_project.yml",
+    "a3_fact_label_operation/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_label_operation/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_label_operation/dwh_dbt/models/silver/fact/fact_label_operation.sql",
+    "a3_fact_label_operation/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_label_operation/dwh_dbt/package-lock.yml",
+    "a3_fact_label_operation/dwh_dbt/packages.yml",
+    "a3_fact_label_operation/pipeline.yaml"
+  ],
+  "label": "L4-largest-id-kept",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_label_operation__validate__6d7e13ab",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "fail",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab via odoo_postgres",
+        "run": 8
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab extract complete: x_acceptance_cert +6, x_music_song +15",
+        "run": 8
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/landing row_count_bounds: ok",
+        "run": 8
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/landing unique: ok",
+        "run": 8
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/landing gates passed",
+        "run": 8
+      },
+      {
+        "kind": "transform.start",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/silver via dbt",
+        "run": 8
+      },
+      {
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "run": 8
+      },
+      {
+        "kind": "transform.done",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/silver transform complete",
+        "run": 8
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/silver not_null: ok",
+        "run": 8
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__6d7e13ab/silver gates passed",
+        "run": 8
+      },
+      {
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 8 reached terminal state: ok",
+        "run": 8
+      }
+    ],
+    "run_ids": [
+      8
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'fail', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1"
+    ]
+  },
+  "tokens": 18
+}

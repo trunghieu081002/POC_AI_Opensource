@@ -1,0 +1,28 @@
+# Calculated by hand from fixture.yaml and brd.md - never read back from any pipeline's output; the model never
+# sees it (tests/test_llm_label_operation.py recomputes it from the fixture with an independent Python version).
+#   1. filter: active = true AND trim(isrc) non-empty  -> drops 90, 103 (inactive), 112 (active NULL), 104/105/106
+#   2. LEFT JOIN certificates on purchase_order_id     -> 107 (order 5999) and 108 (no order) kept, url NULL
+#   3. one row per RAW isrc, smallest id:
+#        "VNA012300001": 101, 102 -> 101         "VNA012300002": 150, 120 -> 120 (90 was filtered out)
+#        " VNA012300005 " -> 109 and "VNA012300005" -> 110: two groups, both kept
+#   4. text: trimmed, NULL/''/blank -> NULL; release_date -> timestamp; distro 12 (double) -> "12"
+#      sk = md5(cast(id as text)) (dbt_utils.generate_surrogate_key(['id']); hashes from Python hashlib.md5)
+#      101 uses cert 5001 " https://cert.hg/5001 " -> trimmed; 120 uses cert 5003 "   " -> NULL
+table: fact_label_operation
+schema: silver
+row_count: 7
+required_dbt_tests:
+  - {model: fact_label_operation, column: fact_label_operation_sk, tests: [unique, not_null], severity: error}
+# brd.md "Nhiều chứng nhận ... blocker B1": the run must FAIL rather than pick a certificate
+required_gates:
+  - {stage: landing, type: unique, table: x_acceptance_cert, columns: [purchase_order_id]}
+columns: {fact_label_operation_sk: text, resource_id: text, release_status: text,
+          release_date: timestamp without time zone, acceptance_url: text, isrc: text, distributor: text}
+rows:
+  - {fact_label_operation_sk: 38b3eff8baf56627478ec76a704e9b52, resource_id: "101", release_status: released, release_date: "2026-01-15T00:00:00", acceptance_url: "https://cert.hg/5001", isrc: VNA012300001, distributor: "12"}
+  - {fact_label_operation_sk: da4fb5c6e93e74d3df8527599fa62642, resource_id: "120", release_status: released, release_date: null,                  acceptance_url: null,                   isrc: VNA012300002, distributor: null}
+  - {fact_label_operation_sk: a97da629b098b75c294dffdc3e463904, resource_id: "107", release_status: null,     release_date: "2026-04-01T00:00:00", acceptance_url: null,                   isrc: VNA012300004, distributor: "15"}
+  - {fact_label_operation_sk: a3c65c2974270fd093ee8a9bf8ae7d0b, resource_id: "108", release_status: null,     release_date: "2026-04-02T00:00:00", acceptance_url: null,                   isrc: VNA012300008, distributor: "15"}
+  - {fact_label_operation_sk: 2723d092b63885e0d7c260cc007e8b9d, resource_id: "109", release_status: released, release_date: "2026-05-01T00:00:00", acceptance_url: null,                   isrc: VNA012300005, distributor: "16"}
+  - {fact_label_operation_sk: 5f93f983524def3dca464469d2cf9f3e, resource_id: "110", release_status: released, release_date: "2026-05-02T00:00:00", acceptance_url: "https://cert.hg/5005", isrc: VNA012300005, distributor: "16"}
+  - {fact_label_operation_sk: 698d51a19d8a121ce581499d7b701668, resource_id: "111", release_status: released, release_date: "2026-05-03T00:00:00", acceptance_url: "https://cert.hg/5001", isrc: VNA012300006, distributor: "17"}

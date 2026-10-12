@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: fact_label_operation
+    description: Silver fact table capturing music recordings with ISRC, release state, and acceptance cert links.
+    columns:
+      - name: fact_label_operation_sk
+        description: Surrogate key generated via dbt_utils.generate_surrogate_key on song id.
+        tests:
+          - unique:
+              severity: error
+          - not_null:
+              severity: error
+      - name: resource_id
+        description: Song id as text.
+      - name: release_status
+        description: Trimmed release state or NULL.
+      - name: release_date
+        description: Release date converted to timestamp without timezone.
+      - name: acceptance_url
+        description: Trimmed acceptance certificate link or NULL.
+      - name: isrc
+        description: Trimmed ISRC code.
+      - name: distributor
+        description: Distributor id formatted as text integer or NULL.
