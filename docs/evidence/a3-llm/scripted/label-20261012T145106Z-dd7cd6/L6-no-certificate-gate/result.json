@@ -1,0 +1,190 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "the pipeline does not meet the requirement:\nrequired a `unique` gate on x_acceptance_cert ['purchase_order_id'] in stage 'landing': not declared",
+  "attempts": [
+    {
+      "evidence_id": "ev-695a6f8818393702",
+      "n": 1,
+      "outcome": "policy-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_label_operation",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_label_operation/.synth-validation.yaml",
+    "a3_fact_label_operation/dwh_dbt/dbt_project.yml",
+    "a3_fact_label_operation/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_label_operation/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_label_operation/dwh_dbt/models/silver/fact/fact_label_operation.sql",
+    "a3_fact_label_operation/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_label_operation/dwh_dbt/package-lock.yml",
+    "a3_fact_label_operation/dwh_dbt/packages.yml",
+    "a3_fact_label_operation/pipeline.yaml"
+  ],
+  "label": "L6-no-certificate-gate",
+  "last_outcome": "policy-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_label_operation__validate__a435edaa",
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "dbt_tests": {
+      "run_1": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_label_operation"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+              "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "not_null",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+              },
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "unique",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_label_operation__validate__a435edaa/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ],
+      "run_2": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_label_operation"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+              "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "not_null",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+              },
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "unique",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_label_operation__validate__a435edaa/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ]
+    },
+    "deploy_error": "",
+    "overall": "pass",
+    "run_ids": [
+      10,
+      11
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "required a `unique` gate on x_acceptance_cert ['purchase_order_id'] in stage 'landing': not declared"
+    ]
+  },
+  "tokens": 18
+}
