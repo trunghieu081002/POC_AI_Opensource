@@ -9,7 +9,7 @@
     "warehouse_database": "not_attempted",
     "warehouse_role": "not_attempted"
   },
-  "clone_name": "m25_monthly_sales__validate__2eecd078",
+  "clone_name": "m25_monthly_sales__validate__1841274f",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -43,6 +43,6 @@
     "run_1": "not_run",
     "run_2": "not_run"
   },
-  "unavailable_reason": "could not provision a throwaway Postgres database: ERROR:  database \"dpagent_fixture_src_2eecd07844\" already exists",
+  "unavailable_reason": "could not provision a throwaway Postgres database: ERROR:  database \"dpagent_fixture_src_1841274faf\" already exists",
   "validator": {}
 }

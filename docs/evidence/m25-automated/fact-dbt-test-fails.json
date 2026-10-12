@@ -2,25 +2,25 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "77b8e406-9d81-4447-a720-f6af33731db9",
+        "batch_id": "3bb24512-095e-44cc-b9a8-836e95889b62",
         "loaded_rows": 5,
-        "manifest_sha256": "5d2ef12536a2d1a51eeadcb8efce6e5323084d17f44e3a972615215b70d5e031",
+        "manifest_sha256": "95d5b677a0c8fad74120ab5b5cca676ed228311ace3ac8d9aef1db0406645d04",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 5
       },
       {
-        "batch_id": "77b8e406-9d81-4447-a720-f6af33731db9",
+        "batch_id": "3bb24512-095e-44cc-b9a8-836e95889b62",
         "loaded_rows": 7,
-        "manifest_sha256": "8ae82d10c5ea45eab968671607bbca53993913d6c0cd63c501e744edbf6eb0cb",
+        "manifest_sha256": "bd7adc89409112406660c697e78f45fd6cafbacf9fc118c2be25032443d85900",
         "object_count": 1,
         "status": "loaded",
         "table_name": "x_music_plan_detail_price",
         "total_rows": 7
       }
     ],
-    "namespace": "dpagent-validate/5085f504",
+    "namespace": "dpagent-validate/5ae21f47",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 5,
@@ -31,14 +31,14 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_5085F504_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_5085F504_BRONZE_BUCKET, DPAGENT_VALIDATE_5085F504_BRONZE_ENDPOINT, DPAGENT_VALIDATE_5085F504_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_5085F504_SRC_DATABASE, DPAGENT_VALIDATE_5085F504_SRC_HOST, DPAGENT_VALIDATE_5085F504_SRC_PASSWORD, DPAGENT_VALIDATE_5085F504_SRC_PORT, DPAGENT_VALIDATE_5085F504_SRC_USER, DPAGENT_VALIDATE_5085F504_WH_DATABASE, DPAGENT_VALIDATE_5085F504_WH_HOST, DPAGENT_VALIDATE_5085F504_WH_PASSWORD, DPAGENT_VALIDATE_5085F504_WH_PORT, DPAGENT_VALIDATE_5085F504_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_5AE21F47_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_5AE21F47_BRONZE_BUCKET, DPAGENT_VALIDATE_5AE21F47_BRONZE_ENDPOINT, DPAGENT_VALIDATE_5AE21F47_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_5AE21F47_SRC_DATABASE, DPAGENT_VALIDATE_5AE21F47_SRC_HOST, DPAGENT_VALIDATE_5AE21F47_SRC_PASSWORD, DPAGENT_VALIDATE_5AE21F47_SRC_PORT, DPAGENT_VALIDATE_5AE21F47_SRC_USER, DPAGENT_VALIDATE_5AE21F47_WH_DATABASE, DPAGENT_VALIDATE_5AE21F47_WH_HOST, DPAGENT_VALIDATE_5AE21F47_WH_PASSWORD, DPAGENT_VALIDATE_5AE21F47_WH_PORT, DPAGENT_VALIDATE_5AE21F47_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_fact_artist_assignment__validate__5085f504",
+  "clone_name": "hg_fact_artist_assignment__validate__5ae21f47",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -47,19 +47,61 @@
   "dbt_tests": {
     "run_1": [
       {
+        "data": {
+          "errored": 0,
+          "exit_code": 1,
+          "failed": 1,
+          "missing": [],
+          "models": [
+            "fact_artist_assignment"
+          ],
+          "passed": 2,
+          "ran": 3,
+          "reason": "a test failed or errored",
+          "required": [
+            "test.dwh_hgmedia.not_null_fact_artist_assignment_artist_name.2c0d82f595",
+            "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70",
+            "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "failed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_fact_artist_assignment_sk.fce94cef70"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_artist_assignment_fact_artist_assignment_sk.ae2b7f929c"
+            },
+            {
+              "failures": 4,
+              "status": "fail",
+              "test": "test.dwh_hgmedia.not_null_fact_artist_assignment_artist_name.2c0d82f595"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
         "errored": 0,
         "failed": 1,
         "kind": "dbt.test.failed",
-        "message": "hg_fact_artist_assignment__validate__5085f504/silver: dbt test ran 3 - 2 passed, 1 failed, 0 errored, 0 warned: test.dwh_hgmedia.not_null_fact_artist_assignment_artist_name.2c0d82f595 fail (4 failing row(s))",
+        "message": "hg_fact_artist_assignment__validate__5ae21f47/silver: dbt test failed - ran 3 (2 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 3 required: a test failed or errored: test.dwh_hgmedia.not_null_fact_artist_assignment_artist_name.2c0d82f595 fail (4 failing row(s))",
         "passed": 2,
         "ran": 3,
-        "stage": "silver"
+        "required": 3,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "failed"
       }
     ],
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-56a4d7647dd138ec",
+  "evidence_id": "ev-6d7677a154a0accc",
   "expected_hash": "sha256:1c2dc7327023871b4fd51a88515779454c3d461db1eb40c4950d5a7e1c7b9f6c",
   "fixture_hash": "sha256:19ebb8e7c2e28036aaa1c55b534dbfd0b49365739504bcf393338fc5bea8cfb4",
   "gates": {
@@ -102,9 +144,8 @@
       "expected exactly 2 run ids, the evidence has 1",
       "bronze pipeline but no source-removed proof in the evidence",
       "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
-      "run_1: run 39 finished 'failed' in the journal",
-      "run_1: dbt test failed in stage 'silver': hg_fact_artist_assignment__validate__5085f504/silver: dbt test ran 3 - 2 passed, 1 failed, 0 errored, 0 warned: test.dwh_hgmedia.not_null_fact_artist_assignment_artist_name.2c0d82f595 fail (4 failing row(s))",
-      "run_1: no passing dbt test record for stage 'silver' in the journal",
+      "run_1: run 40 finished 'failed' in the journal",
+      "run_1: stage 'silver': dbt test is 'failed': a test failed or errored",
       "run_1: gated stage 'silver' has no gate verdict in the journal"
     ]
   },
@@ -115,7 +156,7 @@
   },
   "report_version": 2,
   "run_ids": [
-    39
+    40
   ],
   "run_status": {
     "run_1": "failed",

@@ -2,62 +2,62 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "505a3b25-2685-4806-a744-cd0ee5c3639a",
+        "batch_id": "9a921bbf-d4e7-4553-8c47-27031d3e2ace",
         "loaded_rows": 6,
-        "manifest_sha256": "065d832d29fd7fc70b4cb6905a25411cc385c65678d0434950ddbe24961836ed",
+        "manifest_sha256": "f6417979b252229bd51596426fd85ad6530e235f7120380712914e2586e5523c",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "a87f3b4b-3dd6-415d-8078-51121a275163",
+        "batch_id": "ac513a56-ad08-445f-a751-8f7d6f66ee2b",
         "loaded_rows": 6,
-        "manifest_sha256": "8cc209d2862a12938031775f6887d8420e5778c4fb8db42a591076ba14952c5f",
+        "manifest_sha256": "9446954f4bb0f2f14b90b21d8d6328fd41d003a2e0dcdf4be0133415badb8088",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       },
       {
-        "batch_id": "07a3b96d-28f8-4159-8803-fe4a16beeb2a",
+        "batch_id": "54edb228-4cf6-4b66-bf1c-c6c2e5f5e264",
         "loaded_rows": 6,
-        "manifest_sha256": "38fa5bbb5773adede339a3732a4aa192711c9174a2aa66fa991a66e067410c4e",
+        "manifest_sha256": "9fbf52f0a3fa619c0c3a238b0ef8f89bcf0a4fefcf9398b5ef393d38c32e9619",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/8015fdcf",
+    "namespace": "dpagent-validate/6d89c483",
     "s3": {
-      "error": "6 object(s) still under dpagent-validate/8015fdcf/ after the purge",
+      "error": "6 object(s) still under dpagent-validate/6d89c483/ after the purge",
       "objects_found_at_teardown": 0,
       "objects_remaining_after_purge": 6
     },
     "source_down_load": {
-      "batch_id": "07a3b96d-28f8-4159-8803-fe4a16beeb2a",
+      "batch_id": "54edb228-4cf6-4b66-bf1c-c6c2e5f5e264",
       "detail": "res_partner: 6 row(s) matched exactly",
       "error": "",
       "landing_matches_fixture": true,
       "loaded": true,
       "ok": true,
       "source_dropped": true,
-      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_5a1b7c7985\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_5a1b7c7985\"",
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_1d50536371\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_1d50536371\"",
       "source_unreachable": true
     }
   },
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_8015FDCF_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_8015FDCF_BRONZE_BUCKET, DPAGENT_VALIDATE_8015FDCF_BRONZE_ENDPOINT, DPAGENT_VALIDATE_8015FDCF_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_8015FDCF_SRC_DATABASE, DPAGENT_VALIDATE_8015FDCF_SRC_HOST, DPAGENT_VALIDATE_8015FDCF_SRC_PASSWORD, DPAGENT_VALIDATE_8015FDCF_SRC_PORT, DPAGENT_VALIDATE_8015FDCF_SRC_USER, DPAGENT_VALIDATE_8015FDCF_WH_DATABASE, DPAGENT_VALIDATE_8015FDCF_WH_HOST, DPAGENT_VALIDATE_8015FDCF_WH_PASSWORD, DPAGENT_VALIDATE_8015FDCF_WH_PORT, DPAGENT_VALIDATE_8015FDCF_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
-    "s3_objects": "fail: 6 object(s) still under dpagent-validate/8015fdcf/ after the purge",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_6D89C483_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_6D89C483_BRONZE_BUCKET, DPAGENT_VALIDATE_6D89C483_BRONZE_ENDPOINT, DPAGENT_VALIDATE_6D89C483_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_6D89C483_SRC_DATABASE, DPAGENT_VALIDATE_6D89C483_SRC_HOST, DPAGENT_VALIDATE_6D89C483_SRC_PASSWORD, DPAGENT_VALIDATE_6D89C483_SRC_PORT, DPAGENT_VALIDATE_6D89C483_SRC_USER, DPAGENT_VALIDATE_6D89C483_WH_DATABASE, DPAGENT_VALIDATE_6D89C483_WH_HOST, DPAGENT_VALIDATE_6D89C483_WH_PASSWORD, DPAGENT_VALIDATE_6D89C483_WH_PORT, DPAGENT_VALIDATE_6D89C483_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "fail: 6 object(s) still under dpagent-validate/6d89c483/ after the purge",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__8015fdcf",
+  "clone_name": "hg_dbt_branch__validate__6d89c483",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
@@ -66,47 +66,193 @@
   "dbt_tests": {
     "run_1": [
       {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "dim_artist",
+            "dim_artist_active"
+          ],
+          "passed": 4,
+          "ran": 4,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299",
+            "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e",
+            "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951",
+            "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__8015fdcf/silver: dbt test ran 4 - 4 passed, 0 failed, 0 errored, 0 warned",
+        "message": "hg_dbt_branch__validate__6d89c483/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
-        "stage": "silver"
+        "required": 4,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
       },
       {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "mart_artist_summary"
+          ],
+          "passed": 0,
+          "ran": 0,
+          "reason": "no dbt tests are declared on ['mart_artist_summary']",
+          "required": [],
+          "skipped": 0,
+          "stage": "gold",
+          "status": "not_applicable",
+          "tests": [],
+          "untested_models": [
+            "mart_artist_summary"
+          ],
+          "warned": 0
+        },
         "errored": 0,
         "failed": 0,
-        "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__8015fdcf/gold: no dbt tests are declared for ['mart_artist_summary']",
+        "kind": "dbt.test.not_applicable",
+        "message": "hg_dbt_branch__validate__6d89c483/gold: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['mart_artist_summary']",
         "passed": 0,
         "ran": 0,
-        "stage": "gold"
+        "required": 0,
+        "skipped": 0,
+        "stage": "gold",
+        "status": "not_applicable"
       }
     ],
     "run_2": [
       {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "dim_artist",
+            "dim_artist_active"
+          ],
+          "passed": 4,
+          "ran": 4,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299",
+            "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e",
+            "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951",
+            "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+            },
+            {
+              "failures": 0,
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__8015fdcf/silver: dbt test ran 4 - 4 passed, 0 failed, 0 errored, 0 warned",
+        "message": "hg_dbt_branch__validate__6d89c483/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
-        "stage": "silver"
+        "required": 4,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
       },
       {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "mart_artist_summary"
+          ],
+          "passed": 0,
+          "ran": 0,
+          "reason": "no dbt tests are declared on ['mart_artist_summary']",
+          "required": [],
+          "skipped": 0,
+          "stage": "gold",
+          "status": "not_applicable",
+          "tests": [],
+          "untested_models": [
+            "mart_artist_summary"
+          ],
+          "warned": 0
+        },
         "errored": 0,
         "failed": 0,
-        "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__8015fdcf/gold: no dbt tests are declared for ['mart_artist_summary']",
+        "kind": "dbt.test.not_applicable",
+        "message": "hg_dbt_branch__validate__6d89c483/gold: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['mart_artist_summary']",
         "passed": 0,
         "ran": 0,
-        "stage": "gold"
+        "required": 0,
+        "skipped": 0,
+        "stage": "gold",
+        "status": "not_applicable"
       }
     ]
   },
   "deploy_error": "",
-  "evidence_id": "ev-f2bcbb1ffe8088d7",
+  "evidence_id": "ev-a079eb03ac8cc7bc",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -209,9 +355,11 @@
     "reasons": [
       "validation overall is 'fail'",
       "cleanup overall is 'fail', not 'pass'",
-      "cleanup s3_objects is 'fail: 6 object(s) still under dpagent-validate/8015fdcf/ after the purge', not 'pass'",
+      "cleanup s3_objects is 'fail: 6 object(s) still under dpagent-validate/6d89c483/ after the purge', not 'pass'",
       "S3: 6 object(s) remain after purge (must be exactly 0)",
-      "S3 cleanup error: 6 object(s) still under dpagent-validate/8015fdcf/ after the purge"
+      "S3 cleanup error: 6 object(s) still under dpagent-validate/6d89c483/ after the purge",
+      "run_1: stage 'gold': dbt test is 'not_applicable': no dbt tests are declared on ['mart_artist_summary']",
+      "run_2: stage 'gold': dbt test is 'not_applicable': no dbt tests are declared on ['mart_artist_summary']"
     ]
   },
   "recovered_after_scenario": {

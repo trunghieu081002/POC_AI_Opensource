@@ -1,10 +1,10 @@
 {
   "bronze": {
     "batches": [],
-    "namespace": "dpagent-validate/2fc97e75",
+    "namespace": "dpagent-validate/2673b203",
     "s3": {
       "error": "",
-      "objects_found_at_teardown": 0,
+      "objects_found_at_teardown": 2,
       "objects_remaining_after_purge": 0
     },
     "source_down_load": null
@@ -12,14 +12,14 @@
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "fail",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_2FC97E75_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_2FC97E75_BRONZE_BUCKET, DPAGENT_VALIDATE_2FC97E75_BRONZE_ENDPOINT, DPAGENT_VALIDATE_2FC97E75_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_2FC97E75_SRC_DATABASE, DPAGENT_VALIDATE_2FC97E75_SRC_HOST, DPAGENT_VALIDATE_2FC97E75_SRC_PASSWORD, DPAGENT_VALIDATE_2FC97E75_SRC_PORT, DPAGENT_VALIDATE_2FC97E75_SRC_USER, DPAGENT_VALIDATE_2FC97E75_WH_DATABASE, DPAGENT_VALIDATE_2FC97E75_WH_HOST, DPAGENT_VALIDATE_2FC97E75_WH_PASSWORD, DPAGENT_VALIDATE_2FC97E75_WH_PORT, DPAGENT_VALIDATE_2FC97E75_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_2673B203_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_2673B203_BRONZE_BUCKET, DPAGENT_VALIDATE_2673B203_BRONZE_ENDPOINT, DPAGENT_VALIDATE_2673B203_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_2673B203_SRC_DATABASE, DPAGENT_VALIDATE_2673B203_SRC_HOST, DPAGENT_VALIDATE_2673B203_SRC_PASSWORD, DPAGENT_VALIDATE_2673B203_SRC_PORT, DPAGENT_VALIDATE_2673B203_SRC_USER, DPAGENT_VALIDATE_2673B203_WH_DATABASE, DPAGENT_VALIDATE_2673B203_WH_HOST, DPAGENT_VALIDATE_2673B203_WH_PASSWORD, DPAGENT_VALIDATE_2673B203_WH_PORT, DPAGENT_VALIDATE_2673B203_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__2fc97e75",
+  "clone_name": "hg_dbt_branch__validate__2673b203",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -30,7 +30,7 @@
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-942ad928be72131a",
+  "evidence_id": "ev-e8005522b9eaf478",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {
@@ -59,8 +59,8 @@
       "bronze pipeline but no source-removed proof in the evidence",
       "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 0",
       "run_1: run 22 finished 'cancelled' in the journal",
-      "run_1: no passing dbt test record for stage 'silver' in the journal",
-      "run_1: no passing dbt test record for stage 'gold' in the journal",
+      "run_1: no dbt test record for stage 'silver' in the journal",
+      "run_1: no dbt test record for stage 'gold' in the journal",
       "run_1: gated stage 'landing' has no gate verdict in the journal",
       "run_1: gated stage 'silver' has no gate verdict in the journal",
       "run_1: gated stage 'gold' has no gate verdict in the journal"

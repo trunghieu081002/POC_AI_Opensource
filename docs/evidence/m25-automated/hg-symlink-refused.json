@@ -2,7 +2,7 @@
   "cleanup": {
     "overall": "not_attempted"
   },
-  "detail": "/tmp/tmp2duc6apb/hg_dbt_branch/pipeline.yaml: dbt_project 'dwh_dbt': macros/leak.sql is a symlink (-> /etc/passwd) - a dbt project may not contain symlinks: the target is outside what the approval hash covers",
+  "detail": "/tmp/tmpfty5dk3z/hg_dbt_branch/pipeline.yaml: dbt_project 'dwh_dbt': macros/leak.sql is a symlink (-> /etc/passwd) - a dbt project may not contain symlinks: the target is outside what the approval hash covers",
   "overall": "refused",
   "recovered_after_scenario": {
     "databases": [],

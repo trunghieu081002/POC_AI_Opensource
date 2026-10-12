@@ -9,7 +9,7 @@
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "m25_monthly_sales__validate__fb6454e3",
+  "clone_name": "m25_monthly_sales__validate__5da95aa9",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
