@@ -348,6 +348,8 @@ def fake_runtime(root, tmp_path, monkeypatch):
 
     def fake_run(cmd, *, pipeline, kind, what, **kw):
         calls.append(cmd[1])
+        if cmd[1] == "test":
+            _write_test_artifacts(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(runtime, "_dbt_profiles_dir", fake_profiles)
@@ -482,16 +484,51 @@ def test_runtime_runs_dbt_seed_for_seeds_in_a_custom_seed_path(fake_runtime, roo
 
 # ------------------------------------------------------------------ dbt test is part of the stage
 
-def _tests_write(results, rc=0):
-    """A fake `_run` whose `dbt test` writes `results` to run_results.json under --target-path."""
+def _selected(cmd):
+    i = cmd.index("--select") + 1
+    out = []
+    while i < len(cmd) and not cmd[i].startswith("--"):
+        out.append(cmd[i])
+        i += 1
+    return out
+
+
+def _write_test_artifacts(cmd, results=None, attached=None, *, manifest=True, run_results=True):
+    """What a real `dbt test --target-path T` leaves in T: run_results.json and manifest.json.
+    `attached` = {test unique_id: [model names]} for the manifest; by default one passing
+    `not_null_<model>_sk` test per selected model."""
+    target = Path(cmd[cmd.index("--target-path") + 1])
+    target.mkdir(parents=True, exist_ok=True)
+    models = _selected(cmd)
+    if attached is None:
+        attached = {f"test.p.not_null_{m}_sk": [m] for m in models}
+    if results is None:
+        results = [{"unique_id": u, "status": "pass"} for u in attached]
+    nodes = {f"model.p.{m}": {"resource_type": "model", "name": m}
+             for ms in attached.values() for m in ms}
+    nodes.update({f"model.p.{m}": {"resource_type": "model", "name": m} for m in models})
+    nodes.update({u: {"resource_type": "test", "name": u.split(".")[-1],
+                      "depends_on": {"nodes": [f"model.p.{m}" for m in ms]}}
+                  for u, ms in attached.items()})
+    if run_results:
+        (target / "run_results.json").write_text(json.dumps({"results": results}))
+    if manifest:
+        (target / "manifest.json").write_text(json.dumps({"nodes": nodes}))
+
+
+_SILVER_TESTS = {"test.p.unique_dim_artist_sk": ["dim_artist"],
+                 "test.p.not_null_dim_artist_sk": ["dim_artist"],
+                 "test.p.not_null_dim_artist_active_sk": ["dim_artist_active"]}
+
+
+def _tests_write(results=None, rc=0, attached=_SILVER_TESTS, **artifacts):
+    """A fake `_run` whose `dbt test` leaves the given artifacts under --target-path."""
     calls = []
 
     def fake(cmd, *, pipeline, kind, what, **kw):
         calls.append(cmd[1])
         if cmd[1] == "test":
-            target = Path(cmd[cmd.index("--target-path") + 1])
-            target.mkdir(parents=True, exist_ok=True)
-            (target / "run_results.json").write_text(json.dumps({"results": results}))
+            _write_test_artifacts(cmd, results, attached, **artifacts)
             return subprocess.CompletedProcess(cmd, rc, stdout="", stderr="")
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
     fake.calls = calls
@@ -501,7 +538,7 @@ def _tests_write(results, rc=0):
 def _silver(fake_runtime, fake):
     calls, mp, tmp_path = fake_runtime
     mp.setattr(runtime, "_dbt_bin", lambda: _fake_dbt(tmp_path, {"dim_artist": "dim_artist",
-                                                                  "dim_artist_active": "x"}))
+                                                                  "dim_artist_active": "dim_artist_active"}))
     mp.setattr(runtime, "_run", fake)
     p = loader.load("hg_dbt_branch")
     return runtime._run_own_dbt_project(p, p.stages[1], run_id=None)
@@ -513,20 +550,26 @@ def _events(kind_prefix):
         "select kind, level, message, data_json from events where kind like ?", (kind_prefix + "%",))]
 
 
+def _passing(*skip):
+    return [{"unique_id": u, "status": "pass"} for u in _SILVER_TESTS if u not in skip]
+
+
 def test_dbt_test_runs_on_the_stages_selection_after_dbt_run(fake_runtime):
-    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "pass"},
-                         {"unique_id": "test.p.not_null_dim_artist_sk", "status": "pass"},
-                         {"unique_id": "model.p.dim_artist", "status": "success"}])
+    fake = _tests_write(_passing() + [{"unique_id": "model.p.dim_artist", "status": "success"}])
     proc = _silver(fake_runtime, fake)
     assert proc.returncode == 0
     assert fake.calls[-2:] == ["run", "test"]
     ev = _events("dbt.test")
-    assert ev and ev[0]["kind"] == "dbt.test.passed" and "ran 2 - 2 passed" in ev[0]["message"]
+    assert len(ev) == 1 and ev[0]["kind"] == "dbt.test.passed"
+    assert "ran 3 (3 passed, 0 failed" in ev[0]["message"] and "of 3 required" in ev[0]["message"]
+    data = json.loads(ev[0]["data_json"])
+    assert data["status"] == "passed" and sorted(data["required"]) == sorted(_SILVER_TESTS)
+    assert dbtproject.dbt_test_record_problems(data) == []
 
 
 def test_a_failing_dbt_test_fails_the_stage(fake_runtime):
-    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "fail", "failures": 2},
-                         {"unique_id": "test.p.not_null_dim_artist_sk", "status": "pass"}], rc=1)
+    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "fail", "failures": 2}]
+                        + _passing("test.p.unique_dim_artist_sk"), rc=1)
     proc = _silver(fake_runtime, fake)
     assert proc.returncode != 0
     assert "[dbt test]" in proc.stderr and "unique_dim_artist_sk fail (2 failing row(s))" in proc.stderr
@@ -534,26 +577,88 @@ def test_a_failing_dbt_test_fails_the_stage(fake_runtime):
     assert ev[0]["kind"] == "dbt.test.failed" and ev[0]["level"] == "error"
 
 
-def test_a_test_reported_as_failed_fails_the_stage_even_if_dbt_exited_0(fake_runtime):
-    fake = _tests_write([{"unique_id": "test.p.x", "status": "error"}], rc=0)
+def test_a_test_reported_as_errored_fails_the_stage_even_if_dbt_exited_0(fake_runtime):
+    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "error"}]
+                        + _passing("test.p.unique_dim_artist_sk"), rc=0)
     assert _silver(fake_runtime, fake).returncode != 0
+    assert _events("dbt.test")[0]["kind"] == "dbt.test.failed"
 
 
 def test_dbt_test_exiting_non_zero_without_results_fails_the_stage(fake_runtime):
-    calls, mp, tmp_path = fake_runtime
-
     def fake(cmd, *, pipeline, kind, what, **kw):
         return subprocess.CompletedProcess(cmd, 2 if cmd[1] == "test" else 0, stdout="",
                                            stderr="Compilation Error in test" if cmd[1] == "test" else "")
     proc = _silver(fake_runtime, fake)
     assert proc.returncode != 0 and "Compilation Error in test" in proc.stderr
+    assert _events("dbt.test")[0]["kind"] == "dbt.test.error"
 
 
-def test_no_declared_tests_is_recorded_not_hidden(fake_runtime):
-    fake = _tests_write([])
+# Each case below used to be recorded as `dbt.test.passed` (review of #36): dbt exits 0 and
+# nothing said "failed". Unknown is not "no tests", and "no tests" is not "passed".
+@pytest.mark.parametrize("artifacts, kind, needle", [
+    ({"run_results": False}, "error", "dbt test wrote no run_results.json"),
+    ({"manifest": False}, "error", "dbt test wrote no manifest.json"),
+    ({"results": [{"unique_id": "test.p.unique_dim_artist_sk", "status": "skipped"}]
+      + _passing("test.p.unique_dim_artist_sk")}, "failed", "unique_dim_artist_sk skipped"),
+    ({"results": _passing("test.p.not_null_dim_artist_active_sk")}, "failed",
+     "did not run: test.p.not_null_dim_artist_active_sk"),
+], ids=["no-run-results", "no-manifest", "skipped", "required-not-selected"])
+def test_missing_artifacts_skipped_or_unselected_tests_fail_the_stage(fake_runtime, artifacts, kind, needle):
+    proc = _silver(fake_runtime, _tests_write(**artifacts))
+    assert proc.returncode != 0 and needle in proc.stderr, proc.stderr
+    ev = _events("dbt.test")
+    assert len(ev) == 1 and ev[0]["kind"] == f"dbt.test.{kind}" and ev[0]["level"] == "error"
+    assert dbtproject.dbt_test_record_problems(json.loads(ev[0]["data_json"]))
+
+
+def test_broken_run_results_json_is_an_error_not_zero_tests(fake_runtime):
+    def fake(cmd, *, pipeline, kind, what, **kw):
+        if cmd[1] == "test":
+            _write_test_artifacts(cmd, attached=_SILVER_TESTS)
+            (Path(cmd[cmd.index("--target-path") + 1]) / "run_results.json").write_text("{not json")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    proc = _silver(fake_runtime, fake)
+    assert proc.returncode != 0 and "run_results.json is unreadable" in proc.stderr
+    assert _events("dbt.test")[0]["kind"] == "dbt.test.error"
+
+
+def test_no_declared_tests_is_not_applicable_not_passed(fake_runtime):
+    assert _silver(fake_runtime, _tests_write([], attached={})).returncode == 0
+    ev = _events("dbt.test")
+    assert ev[0]["kind"] == "dbt.test.not_applicable" and ev[0]["level"] == "warn"
+    assert "no dbt tests are declared" in ev[0]["message"]
+    assert dbtproject.dbt_test_record_problems(json.loads(ev[0]["data_json"])) == [
+        "dbt test is 'not_applicable': no dbt tests are declared on ['dim_artist', 'dim_artist_active']"]
+
+
+def test_a_model_of_the_stage_without_any_test_is_incomplete(fake_runtime):
+    only_one = {u: m for u, m in _SILVER_TESTS.items() if m == ["dim_artist"]}
+    assert _silver(fake_runtime, _tests_write(attached=only_one)).returncode == 0
+    ev = _events("dbt.test")
+    assert ev[0]["kind"] == "dbt.test.incomplete" and "dim_artist_active" in ev[0]["message"]
+    assert dbtproject.dbt_test_record_problems(json.loads(ev[0]["data_json"]))
+
+
+def test_a_warn_severity_test_passes_as_dbt_says_and_is_counted(fake_runtime):
+    fake = _tests_write([{"unique_id": "test.p.unique_dim_artist_sk", "status": "warn", "failures": 1}]
+                        + _passing("test.p.unique_dim_artist_sk"))
     assert _silver(fake_runtime, fake).returncode == 0
     ev = _events("dbt.test")
-    assert "no dbt tests are declared" in ev[0]["message"]
+    assert ev[0]["kind"] == "dbt.test.passed" and "1 warned" in ev[0]["message"]
+
+
+def test_a_test_on_a_model_outside_the_stage_is_not_required(tmp_path):
+    rr, mf = tmp_path / "rr.json", tmp_path / "m.json"
+    rr.write_text(json.dumps({"results": [{"unique_id": "test.p.a", "status": "pass"}]}))
+    mf.write_text(json.dumps({"nodes": {
+        "model.p.a": {"resource_type": "model", "name": "a"},
+        "model.p.b": {"resource_type": "model", "name": "b"},
+        "test.p.a": {"resource_type": "test", "depends_on": {"nodes": ["model.p.a"]}},
+        "test.p.b": {"resource_type": "test", "depends_on": {"nodes": ["model.p.b"]}}}}))
+    v = dbtproject.dbt_test_verdict(rr, mf, ["a"], exit_code=0)
+    assert v["status"] == "passed" and v["required"] == ["test.p.a"]
+    assert dbtproject.dbt_test_verdict(rr, mf, ["a", "b"], exit_code=0)["status"] == "failed"
+    assert dbtproject.dbt_test_verdict(rr, mf, ["a"], exit_code=1)["status"] == "failed"
 
 
 def test_a_failed_dbt_run_never_runs_dbt_test(fake_runtime):

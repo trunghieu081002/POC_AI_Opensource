@@ -40,14 +40,29 @@ whose partner does not exist (`partner_id 99`), one with no partner, a partner a
 ## `dbt test` is now part of every owned-project dbt stage
 
 `runtime._run_own_dbt_project`: `deps` (lock must not change) → selector check → `seed` → `run --select <stage>` →
-**`test --select <stage>`**. Its outcome comes from dbt's own `run_results.json`, not the exit code alone, and is
-recorded in the journal (`dbt.test.passed` / `dbt.test.failed`, with how many tests ran, passed, failed, errored, and
-which). A failing or erroring test fails the stage (and so the run). A stage with no declared tests is recorded as
-such — not hidden.
+**`test --select <stage>`**. The verdict (`dbtproject.dbt_test_verdict`) comes from dbt's own artifacts, never from
+the exit code alone and never from "nothing said failed": `run_results.json` (what ran, how each test ended) is checked
+against `manifest.json` — the **required** tests are every test the manifest attaches to a model the stage's selectors
+select, independently of what happened to run.
 
-The fixture report carries `dbt_tests` per run, and the **A2 promote gate** now asks the journal: for a pipeline that
-owns a dbt project, each run must hold a *passing* `dbt test` record for **every** dbt stage; a failed one, or a missing
-one, refuses promotion.
+| Journal event | When | Stage | A2 promote |
+|---|---|---|---|
+| `dbt.test.passed` | every required test ran and passed (a `severity: warn` test counts as dbt says, and is counted as warned), and every model of the stage has at least one test | ok | accepted, after re-checking the raw per-test results it carries |
+| `dbt.test.failed` | a test failed or errored; a required test **did not run** (selector / indirect selection left it out) or was **skipped**; or dbt exited non-zero | **fails** | refused |
+| `dbt.test.error` | `run_results.json` or `manifest.json` missing, unreadable, or not dbt's shape — nothing is known, which is not "no tests" | **fails** | refused |
+| `dbt.test.not_applicable` | the stage's models have no test at all | ok | refused |
+| `dbt.test.incomplete` | some model of the stage has no test | ok | refused |
+
+The event's data carries the raw record (status, required test ids, each test's status, missing tests, untested
+models, dbt's exit code). The fixture report carries it per run under `dbt_tests`, and the **A2 promote gate**
+(`evidence._journal_reasons` → `dbtproject.dbt_test_record_problems`) re-judges it from the journal — not from the
+event's name: for a pipeline that owns a dbt project, each run must hold a record for **every** dbt stage whose
+required set is non-empty and whose every required test is on record as passed (or warned), with no untested model
+and a zero exit code. A record labelled `passed` with 0 tests, a skipped or missing required test, or a truncated
+record is refused.
+
+A project that genuinely declares no tests runs, and is reported `not_applicable` — never "dbt tests passed". Whether
+such a project may be promoted under some other policy is not decided here; today A2 refuses it.
 
 ## Verified for real
 
@@ -57,6 +72,7 @@ one, refuses promotion.
 |---|---|
 | `fact-correct-twice` | validation twice through the real DAG: `silver.fact_artist_assignment` equals the hand-calculated 7 rows both times; HG's 2 tests passed in both runs (journal); 3 batches × 2 tables loaded; source dropped → LOAD still loads both; S3 15 objects at teardown, 0 after; promote accepted |
 | `fact-dbt-test-fails` | a `not_null` test on `artist_name` (4 of the 7 rows are NULL by design): `dbt run` succeeds, `dbt test` fails → stage fails, run fails, the failing test is on record, promote refused, cleanup complete |
+| `fact-no-tests` | the model's tests removed: both runs ok, each recorded `dbt.test.not_applicable` with 0 required tests (from the real dbt manifest), promote refused naming it |
 | `fact-promote-deploy-run` | validate → promote → **real deploy (not draft)** → Airflow run: output equals expected, gates passed, dbt tests passed, every approved file published byte-identical (the `maturity:` label excepted); then editing the model, the tests yml or the sources yml loses the approval and deploy refuses; editing fixture/expected makes promote refuse; restoring restores the approval; undeploy and S3 cleanup verified |
 
 The run's results are in `docs/evidence/m25-automated/` (see its README).

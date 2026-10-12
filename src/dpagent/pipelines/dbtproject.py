@@ -270,23 +270,164 @@ def list_selected_models(dbt_bin: str, base_args: list[str], selector: str,
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
-def check_selectors(dbt_bin: str, base_args: list[str], stages: list) -> list[str]:
-    """For every selector of every dbt stage: it must select at least one
-    model. Returns the problems (empty = fine). Checked per selector, not per
-    stage - a stage `[dim_artist, dim_artsit]` whose typo selects nothing
+def stage_models(dbt_bin: str, base_args: list[str], stage) -> tuple[list[str], list[str]]:
+    """(the models a dbt stage's selectors select, the problems). Every
+    selector must select at least one model - checked per selector, not per
+    stage: a stage `[dim_artist, dim_artsit]` whose typo selects nothing
     would otherwise run the one that matched and report success for a stage
     the manifest claims builds two things."""
+    models: list[str] = []
+    problems: list[str] = []
+    for selector in stage.models:
+        try:
+            selected = list_selected_models(dbt_bin, base_args, selector)
+        except DbtProjectError as exc:
+            problems.append(f"stage {stage.name!r}: {exc}")
+            continue
+        if not selected:
+            problems.append(
+                f"stage {stage.name!r}: selector {selector!r} selects 0 models "
+                f"(dbt would exit 0 with 'Nothing to do' and the stage would look "
+                f"successful) - fix the selector or the project")
+        models.extend(m for m in selected if m not in models)
+    return models, problems
+
+
+def check_selectors(dbt_bin: str, base_args: list[str], stages: list) -> list[str]:
+    """For every selector of every dbt stage: it must select at least one
+    model. Returns the problems (empty = fine)."""
     problems = []
     for stage in stages:
-        for selector in stage.models:
-            try:
-                selected = list_selected_models(dbt_bin, base_args, selector)
-            except DbtProjectError as exc:
-                problems.append(f"stage {stage.name!r}: {exc}")
-                continue
-            if not selected:
-                problems.append(
-                    f"stage {stage.name!r}: selector {selector!r} selects 0 models "
-                    f"(dbt would exit 0 with 'Nothing to do' and the stage would look "
-                    f"successful) - fix the selector or the project")
+        problems.extend(stage_models(dbt_bin, base_args, stage)[1])
+    return problems
+
+
+# ------------------------------------------------------------ dbt test verdict
+
+# A `dbt test` outcome is one of these - never inferred from the exit code, and never "passed"
+# because nothing said otherwise:
+#   passed          every test the manifest attaches to the stage's models ran and passed (a
+#                   `severity: warn` test that found rows counts as dbt says: warned, not failed),
+#                   and every one of those models has at least one test
+#   failed          a test failed or errored, a test the manifest requires did not run or was
+#                   skipped, or dbt exited non-zero                                 -> stage fails
+#   error           run_results.json / manifest.json missing or unreadable: nothing is known
+#                   about the tests, which is not the same as "no tests"           -> stage fails
+#   not_applicable  the stage's models have no tests at all                         -> stage runs,
+#   incomplete      some of the stage's models have no tests                           A2 refuses
+TEST_STAGE_FAILS = frozenset({"failed", "error"})
+TEST_RECORD_LIMIT = 1000
+
+
+def _read_json(path: Path, what: str) -> tuple[dict | None, str]:
+    import json
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, f"dbt test wrote no {what}"
+    except (OSError, ValueError) as exc:
+        return None, f"dbt test's {what} is unreadable: {exc}"
+    if not isinstance(data, dict):
+        return None, f"dbt test's {what} is not a JSON object"
+    return data, ""
+
+
+def dbt_test_verdict(run_results: Path, manifest: Path, models: list[str], *, exit_code: int) -> dict:
+    """What one stage's `dbt test` proved, from dbt's own artifacts: `run_results.json` (what
+    ran, how it ended) checked against `manifest.json` (which tests exist on the models the
+    stage built - `models`, from `stage_models`). The required set comes from the manifest, not
+    from what happened to run, so a selector or an indirect-selection mode that leaves a test
+    out is caught, as is a skipped test."""
+    out = {"status": "error", "reason": "", "exit_code": exit_code, "models": list(models),
+           "ran": 0, "passed": 0, "failed": 0, "errored": 0, "warned": 0, "skipped": 0,
+           "required": [], "missing": [], "untested_models": [], "failing": [], "tests": []}
+    results, problem = _read_json(run_results, "run_results.json")
+    if results is not None and not isinstance(results.get("results"), list):
+        results, problem = None, "dbt test's run_results.json has no results list"
+    man, man_problem = _read_json(manifest, "manifest.json")
+    if man is not None and not isinstance(man.get("nodes"), dict):
+        man, man_problem = None, "dbt test's manifest.json has no nodes"
+    if results is None or man is None:
+        out["reason"] = "; ".join(p for p in (problem, man_problem) if p)
+        return out
+
+    nodes = man["nodes"]
+    model_ids = {uid for uid, n in nodes.items()
+                 if isinstance(n, dict) and n.get("resource_type") == "model"
+                 and n.get("name") in models}
+    tested: set[str] = set()
+    required = []
+    for uid, n in sorted(nodes.items()):
+        if not isinstance(n, dict) or n.get("resource_type") != "test":
+            continue
+        on = set((n.get("depends_on") or {}).get("nodes") or []) & model_ids
+        if on:
+            required.append(uid)
+            tested |= on
+    out["required"] = required
+    out["untested_models"] = sorted(n for n in models
+                                    if not any(nodes[u].get("name") == n for u in tested))
+
+    seen: dict[str, str] = {}
+    for r in results["results"]:
+        uid = str((r or {}).get("unique_id", "")) if isinstance(r, dict) else ""
+        if not uid.startswith("test."):
+            continue
+        status = str(r.get("status", ""))
+        seen[uid] = status
+        out["ran"] += 1
+        key = {"pass": "passed", "fail": "failed", "error": "errored", "warn": "warned",
+               "skipped": "skipped"}.get(status, "errored")
+        out[key] += 1
+        out["tests"].append({"test": uid, "status": status, "failures": r.get("failures")})
+        if key in ("failed", "errored", "skipped"):
+            out["failing"].append(f"{uid} {status}"
+                                  + (f" ({r.get('failures')} failing row(s))" if r.get("failures") else ""))
+    out["missing"] = [u for u in required if u not in seen]
+
+    if out["failed"] or out["errored"]:
+        out["status"], out["reason"] = "failed", "a test failed or errored"
+    elif out["missing"]:
+        out["status"] = "failed"
+        out["reason"] = (f"{len(out['missing'])} test(s) the manifest attaches to "
+                         f"{models} did not run: {', '.join(out['missing'][:10])}")
+    elif any(seen.get(u) == "skipped" for u in required):
+        out["status"], out["reason"] = "failed", "a required test was skipped"
+    elif exit_code != 0:
+        out["status"], out["reason"] = "failed", f"dbt test exited {exit_code}"
+    elif not required:
+        out["status"], out["reason"] = "not_applicable", f"no dbt tests are declared on {models}"
+    elif out["untested_models"]:
+        out["status"] = "incomplete"
+        out["reason"] = f"model(s) with no dbt test: {', '.join(out['untested_models'])}"
+    else:
+        out["status"] = "passed"
+    return out
+
+
+def dbt_test_record_problems(data: dict) -> list[str]:
+    """The A2 gate's own re-check of a recorded verdict (the event's data, not its name):
+    `passed` must be backed by the raw per-test results it carries."""
+    status = data.get("status")
+    if status != "passed":
+        return [f"dbt test is {status or 'unrecorded'!r}"
+                + (f": {data.get('reason')}" if data.get("reason") else "")]
+    problems = []
+    tests = data.get("tests")
+    required = data.get("required")
+    if not isinstance(tests, list) or not isinstance(required, list) or data.get("truncated"):
+        return ["the dbt test record does not carry its per-test results"]
+    by_id = {t.get("test"): t.get("status") for t in tests if isinstance(t, dict)}
+    if not required:
+        problems.append("no required dbt test on record")
+    for uid in required:
+        if by_id.get(uid) not in ("pass", "warn"):
+            problems.append(f"required test {uid} is {by_id.get(uid) or 'not run'!r}")
+    bad = [u for u, s in by_id.items() if s not in ("pass", "warn")]
+    if bad:
+        problems.append(f"test(s) not passed: {', '.join(bad[:10])}")
+    if data.get("untested_models"):
+        problems.append(f"model(s) with no dbt test: {data['untested_models']}")
+    if data.get("exit_code") != 0:
+        problems.append(f"dbt test exited {data.get('exit_code')}")
     return problems

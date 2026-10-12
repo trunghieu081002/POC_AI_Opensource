@@ -1724,8 +1724,8 @@ def gate_summary_for_run(run_id: int) -> dict:
 
 def dbt_tests_for_run(run_id: int) -> list[dict]:
     """The `dbt test` outcome of each stage of one run, as runtime recorded it in the journal
-    (`dbt.test.passed` / `dbt.test.failed`, with dbt's own counts) - an owned dbt project's tests
-    are part of the run's evidence, not just its exit code."""
+    (`dbt.test.<status>`, dbtproject.dbt_test_verdict) - an owned dbt project's tests are part of
+    the run's evidence, not just its exit code. `data` is the raw record the A2 gate re-checks."""
     from ..engine import state
     out = []
     for e in state.events_for(run_id):
@@ -1735,9 +1735,14 @@ def dbt_tests_for_run(run_id: int) -> list[dict]:
             data = json.loads(e["data_json"] or "{}")
         except ValueError:
             data = {}
-        out.append({"kind": e["kind"], "stage": data.get("stage"), "ran": data.get("ran", 0),
+        if not isinstance(data, dict):
+            data = {}
+        out.append({"kind": e["kind"], "stage": data.get("stage"),
+                    "status": data.get("status"), "ran": data.get("ran", 0),
                     "passed": data.get("passed", 0), "failed": data.get("failed", 0),
-                    "errored": data.get("errored", 0), "message": str(e["message"])[:600]})
+                    "errored": data.get("errored", 0), "skipped": data.get("skipped", 0),
+                    "required": len(data.get("required") or []),
+                    "message": str(e["message"])[:600], "data": data})
     return out
 
 

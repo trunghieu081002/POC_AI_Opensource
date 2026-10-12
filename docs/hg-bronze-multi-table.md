@@ -33,5 +33,6 @@ host built from packs (`scripts/m25-acceptance-ci.sh --profile bronze`):
 | `pair-missing-table` | a third, non-existent table fails the whole batch: every registry row `failed`, run 1 failed, nothing promotable |
 | `pair-tampered-object` | one object of one table overwritten after EXTRACT → LOAD refused (sha256), **both** landing tables still equal the fixture, validation fails, promote refused |
 | `pair-tampered-batch-manifest` | the batch manifest rewritten to "forget" a table → LOAD refused, landing intact in both tables |
+| `pair-load-fails-midway` | the tamper cases are refused *before* any landing is touched; this one fails *inside* the transaction: a marker row is added to landing `res_partner` and a trigger that raises is put on landing `x_music_plan_detail_price`; LOAD replaces `res_partner` first, then fails on the second table → both tables still hold the old landing (marker included), both registry rows still `extracted`; trigger removed, the same batch LOADed again → both loaded, marker gone |
 
 Not here: incremental, other connectors, a transform on top (next: HG's `fact_artist_assignment` with `dbt test`).

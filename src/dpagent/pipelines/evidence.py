@@ -47,6 +47,7 @@ from pathlib import Path
 from .. import __version__
 from ..engine import state
 from . import approval as approval_mod
+from . import dbtproject
 from . import fixture as fixture_mod
 from . import validate as validate_mod
 from .loader import Pipeline
@@ -346,15 +347,21 @@ def _journal_reasons(fx: dict, pipeline: Pipeline) -> list[str]:
         if live != recorded.get(slot):
             r.append(f"{slot}: gate verdicts in the report differ from the journal for run {run_id}")
         if pipeline.dbt_project is not None:
-            # an owned dbt project's own tests ran on every dbt stage of this run, and passed
+            # an owned dbt project's own tests ran on every dbt stage of this run, and passed -
+            # judged from the record's raw per-test results, not from the event's name
             tests = fixture_mod.dbt_tests_for_run(int(run_id))
-            for t in tests:
-                if t["kind"] != "dbt.test.passed":
-                    r.append(f"{slot}: dbt test failed in stage {t['stage']!r}: {t['message']}")
             for st in pipeline.stages:
-                if st.engine == "dbt" and not any(t["stage"] == st.name and t["kind"] == "dbt.test.passed"
-                                                  for t in tests):
-                    r.append(f"{slot}: no passing dbt test record for stage {st.name!r} in the journal")
+                if st.engine != "dbt":
+                    continue
+                mine = [t for t in tests if t["stage"] == st.name]
+                if not mine:
+                    r.append(f"{slot}: no dbt test record for stage {st.name!r} in the journal")
+                for t in mine:
+                    problems = dbtproject.dbt_test_record_problems(t["data"])
+                    if t["kind"] != "dbt.test.passed" and not problems:
+                        problems = [f"recorded as {t['kind']!r}"]
+                    for p in problems:
+                        r.append(f"{slot}: stage {st.name!r}: {p}")
         for stage in gated:
             verdicts = live.get(stage)
             if not verdicts:

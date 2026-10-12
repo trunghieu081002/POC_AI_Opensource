@@ -899,6 +899,70 @@ def run_pair_tampered_batch_manifest(tmp_path: Path) -> dict:
     return _tamper_during_source_down_load(tmp_path, tamper)
 
 
+_MIDWAY_MARKER = -424242
+
+
+def run_pair_load_fails_midway(tmp_path: Path) -> dict:
+    """LOAD fails on the SECOND table after the first has already been replaced inside the
+    transaction (the tamper scenarios are refused before any landing is touched). Before the
+    source-down LOAD: a marker row is added to landing res_partner (so "old" is distinguishable
+    from the batch's content) and a trigger that raises is put on landing
+    x_music_plan_detail_price. LOAD replaces res_partner first (tables in name order), then hits
+    the trigger: both tables must still hold the old landing (marker included) and the batch must
+    still be 'extracted'. Then the trigger is removed and the same batch is LOADed again: it must
+    load completely - a failed LOAD leaves a batch that can be retried."""
+    original_proof = fixture._source_down_proof
+    seen: dict = {}
+
+    def proof(clone, fixture_obj, src_db, wh_db):
+        real_load = bronze.run_load
+        landing = fixture._landing_dataset(clone)
+
+        def sql(statement: str) -> str:
+            proc = fixture._psql(wh_db, "-v", "ON_ERROR_STOP=1", "-A", "-t", "-c", statement)
+            if proc.returncode != 0:
+                raise RuntimeError(f"{statement[:80]}: {(proc.stderr or proc.stdout).strip()[-300:]}")
+            return proc.stdout.strip()
+
+        def landing_state(batch_id):
+            return {
+                "res_partner_rows": int(sql(f"SELECT count(*) FROM {landing}.res_partner")),
+                "res_partner_marker": int(sql(f"SELECT count(*) FROM {landing}.res_partner "
+                                              f"WHERE id = {_MIDWAY_MARKER}")),
+                "x_music_rows": int(sql(f"SELECT count(*) FROM {landing}.x_music_plan_detail_price")),
+                "batch_status": sorted(sql(
+                    f"SELECT table_name || '=' || status FROM dpagent_meta.bronze_batches "
+                    f"WHERE batch_id = '{batch_id}' ORDER BY table_name").split()),
+            }
+
+        def failing_then_retried_load(*, pipeline, batch_id, **k):
+            sql(f"INSERT INTO {landing}.res_partner (id, name) VALUES ({_MIDWAY_MARKER}, 'old landing');"
+                f"CREATE FUNCTION {landing}._m25_refuse() RETURNS trigger LANGUAGE plpgsql AS "
+                f"$$BEGIN RAISE EXCEPTION 'm25 injected failure on the second landing table'; END$$;"
+                f"CREATE TRIGGER m25_refuse BEFORE INSERT ON {landing}.x_music_plan_detail_price "
+                f"FOR EACH STATEMENT EXECUTE FUNCTION {landing}._m25_refuse();")
+            seen["before"] = landing_state(batch_id)
+            try:
+                real_load(pipeline=pipeline, batch_id=batch_id, **k)
+                seen["first_load"] = "loaded (the injected failure did not fire)"
+            except Exception as exc:                 # noqa: BLE001 - the expected outcome
+                seen["first_load"] = f"failed: {str(exc)[-400:]}"
+            seen["after_failed_load"] = landing_state(batch_id)
+            sql(f"DROP TRIGGER m25_refuse ON {landing}.x_music_plan_detail_price;"
+                f"DROP FUNCTION {landing}._m25_refuse();")
+            result = real_load(pipeline=pipeline, batch_id=batch_id, **k)   # the retry
+            seen["after_retry"] = landing_state(batch_id)
+            return result
+
+        with _patched(bronze, "run_load", failing_then_retried_load):
+            return original_proof(clone, fixture_obj, src_db, wh_db)
+
+    with _patched(fixture, "_source_down_proof", proof):
+        out = _pair(tmp_path)
+    out["midway"] = seen
+    return out
+
+
 FACT_DIR = REPO_ROOT / "pipelines" / "hg_fact_artist_assignment"
 
 
@@ -914,6 +978,16 @@ def run_fact_dbt_test_fails(tmp_path: Path) -> dict:
         f = work / "dwh_dbt" / "models" / "silver" / "_silver_models.yml"
         f.write_text(f.read_text() + "      - name: artist_name\n        tests: [not_null]\n")
     return _run_hg(tmp_path, source=FACT_DIR, mutate=failing_test)
+
+
+def run_fact_no_tests(tmp_path: Path) -> dict:
+    """The model with its tests removed: dbt run and dbt test both exit 0 and nothing fails - this
+    used to be recorded as `dbt.test.passed`. Now it is `not_applicable` (from the real manifest:
+    no test attached to the stage's model); the run itself is fine, promote must refuse."""
+    def no_tests(work):
+        f = work / "dwh_dbt" / "models" / "silver" / "_silver_models.yml"
+        f.write_text(f.read_text().replace("        tests: [unique, not_null]\n", ""))
+    return _run_hg(tmp_path, source=FACT_DIR, mutate=no_tests)
 
 
 def run_fact_promote_deploy_run(tmp_path: Path) -> dict:
@@ -960,8 +1034,10 @@ BRONZE_SCENARIOS_FN = {
     "pair-missing-table": run_pair_missing_table,
     "pair-tampered-object": run_pair_tampered_object,
     "pair-tampered-batch-manifest": run_pair_tampered_batch_manifest,
+    "pair-load-fails-midway": run_pair_load_fails_midway,
     "fact-correct-twice": run_fact_correct_twice,
     "fact-dbt-test-fails": run_fact_dbt_test_fails,
+    "fact-no-tests": run_fact_no_tests,
     "fact-promote-deploy-run": run_fact_promote_deploy_run,
 }
 SCENARIOS.update(BRONZE_SCENARIOS_FN)
@@ -1192,7 +1268,30 @@ def _pair_tampered(needle: str):
     return check
 
 
+def _pair_midway(result: dict) -> tuple[bool, str]:
+    m = result.get("midway") or {}
+    before, failed, retry = m.get("before") or {}, m.get("after_failed_load") or {}, m.get("after_retry") or {}
+    problems = []
+    need = lambda cond, msg: None if cond else problems.append(msg)     # noqa: E731
+    need("m25 injected failure on the second landing table" in (m.get("first_load") or ""),
+         f"the first LOAD must fail on the injected trigger: {m.get('first_load')!r}")
+    # old landing = batch 2's 5 + 7 rows, plus the marker in res_partner
+    need(before == {"res_partner_rows": 6, "res_partner_marker": 1, "x_music_rows": 7,
+                    "batch_status": ["res_partner=extracted", "x_music_plan_detail_price=extracted"]},
+         f"before={before}")
+    need(failed == before, f"the failed LOAD changed something: before={before} after={failed}")
+    need(retry == {"res_partner_rows": 5, "res_partner_marker": 0, "x_music_rows": 7,
+                   "batch_status": ["res_partner=loaded", "x_music_plan_detail_price=loaded"]},
+         f"after_retry={retry}")
+    ok, detail = _pair_correct(result)       # the retried batch completes the normal proof
+    need(ok, detail)
+    return (not problems), ("; ".join(problems) if problems else
+                            "LOAD failed on table 2 after table 1 was replaced: both rolled back, "
+                            "batch still extracted; retry loaded both")
+
+
 EXPECTATIONS.update({
+    "pair-load-fails-midway": _pair_midway,
     "pair-correct-twice": _pair_correct,
     "pair-missing-table": _pair_missing,
     "pair-tampered-object": _pair_tampered("sha256"),
@@ -1205,9 +1304,29 @@ def _fact_correct(result: dict) -> tuple[bool, str]:
     tests = result.get("dbt_tests") or {}
     for run in ("run_1", "run_2"):
         evs = tests.get(run) or []
-        if not any(e["kind"] == "dbt.test.passed" and e.get("ran", 0) >= 2 for e in evs):
-            problems.append(f"{run}: no passing dbt test record with >=2 tests: {evs}")
+        good = [e for e in evs if e["kind"] == "dbt.test.passed" and e.get("status") == "passed"
+                and e.get("required", 0) == 2 and e.get("passed", 0) == 2
+                and not dbtproject.dbt_test_record_problems(e.get("data") or {})]
+        if len(evs) != 1 or not good:
+            problems.append(f"{run}: want one passed record of HG's 2 required tests: {evs}")
     return (not problems), ("; ".join(problems) if problems else "matched expectation")
+
+
+def _fact_no_tests(result: dict) -> tuple[bool, str]:
+    problems = []
+    if result.get("run_status") != {"run_1": "ok", "run_2": "ok"}:
+        problems.append(f"the runs themselves should be ok: {result.get('run_status')}")
+    for run in ("run_1", "run_2"):
+        evs = (result.get("dbt_tests") or {}).get(run) or []
+        if [e["kind"] for e in evs] != ["dbt.test.not_applicable"] or evs[0].get("required") != 0:
+            problems.append(f"{run}: want one not_applicable record with 0 required tests: {evs}")
+    pr = result.get("promote") or {}
+    if pr.get("accepted") is not False or not any("not_applicable" in r for r in pr.get("reasons", [])):
+        problems.append(f"promote must be refused naming not_applicable: {pr}")
+    if (result.get("cleanup") or {}).get("overall") != "pass":
+        problems.append(f"cleanup={result.get('cleanup')}")
+    return (not problems), ("; ".join(problems) if problems else
+                            "no declared tests: recorded not_applicable (not passed); promote refused")
 
 
 def _fact_test_fails(result: dict) -> tuple[bool, str]:
@@ -1230,6 +1349,7 @@ def _fact_test_fails(result: dict) -> tuple[bool, str]:
 EXPECTATIONS.update({
     "fact-correct-twice": _fact_correct,
     "fact-dbt-test-fails": _fact_test_fails,
+    "fact-no-tests": _fact_no_tests,
     "fact-promote-deploy-run": _a2,
 })
 

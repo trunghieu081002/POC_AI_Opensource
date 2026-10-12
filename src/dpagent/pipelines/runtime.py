@@ -512,7 +512,7 @@ def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage, *,
                 "versions is exactly what the lock exists to prevent", label="deps")
         # dbt exits 0 and runs NOTHING for a selector that selects nothing -
         # without this the stage would be reported as a successful transform.
-        problems = dbtproject.check_selectors(dbt, base, [target])
+        models, problems = dbtproject.stage_models(dbt, base, target)
         if problems:
             return _failed("\n".join(problems), label="selectors")
         if dbtproject.has_seeds(work):     # honours seed-paths, nested directories included
@@ -526,60 +526,41 @@ def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage, *,
             return proc
         # The project's own tests on what this stage built - `dbt run` alone builds a model and
         # says nothing about whether it satisfies its declared tests (HG declares unique /
-        # not_null on every surrogate key). A failing or erroring test fails the stage.
+        # not_null on every surrogate key). The verdict comes from dbt's artifacts checked
+        # against the manifest (dbtproject.dbt_test_verdict): failed or unknown fails the stage.
         test_target = Path(tmp) / "test_target"
         test = _run([dbt, "test", "--select", *target.models, "--target-path", str(test_target),
                      *base], pipeline=pipeline, kind="transform",
                     what=f"dbt test for {target.name!r}")
-        summary = _dbt_test_summary(test_target / "run_results.json")
-        _record_dbt_tests(pipeline, target, summary, run_id)
-        if test.returncode != 0 or summary["failed"] or summary["errored"]:
-            failing = "; ".join(summary["failing"]) or (test.stderr or test.stdout).strip()[-1500:]
-            return _failed(f"dbt test failed for {target.name!r}: {failing}", label="test",
-                           rc=test.returncode or 1)
+        verdict = dbtproject.dbt_test_verdict(test_target / "run_results.json",
+                                              test_target / "manifest.json", models,
+                                              exit_code=test.returncode)
+        _record_dbt_tests(pipeline, target, verdict, run_id)
+        if verdict["status"] in dbtproject.TEST_STAGE_FAILS:
+            detail = "; ".join(verdict["failing"]) or verdict["reason"]
+            if test.returncode != 0 and not verdict["failing"]:
+                detail += ": " + (test.stderr or test.stdout).strip()[-1500:]
+            return _failed(f"dbt test {verdict['status']} for {target.name!r}: {detail}",
+                           label="test", rc=test.returncode or 1)
         return proc
 
 
-def _dbt_test_summary(path: Path) -> dict:
-    """Counts from dbt's own run_results.json - which tests ran and how each ended - never
-    inferred from the exit code alone."""
-    out = {"ran": 0, "passed": 0, "failed": 0, "errored": 0, "warned": 0, "skipped": 0,
-           "failing": [], "tests": []}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return out
-    for r in data.get("results", []):
-        uid = str(r.get("unique_id", ""))
-        if not uid.startswith("test."):
-            continue
-        status = str(r.get("status", ""))
-        out["ran"] += 1
-        key = {"pass": "passed", "fail": "failed", "error": "errored", "warn": "warned",
-               "skipped": "skipped"}.get(status, "errored")
-        out[key] += 1
-        out["tests"].append({"test": uid, "status": status, "failures": r.get("failures")})
-        if key in ("failed", "errored"):
-            out["failing"].append(f"{uid} {status}"
-                                  + (f" ({r.get('failures')} failing row(s))" if r.get("failures") else ""))
-    return out
-
-
-def _record_dbt_tests(pipeline: loader.Pipeline, target: loader.Stage, summary: dict,
+def _record_dbt_tests(pipeline: loader.Pipeline, target: loader.Stage, verdict: dict,
                       run_id: int | None) -> None:
-    bad = summary["failed"] + summary["errored"]
-    if summary["ran"] == 0:
-        message = f"{pipeline.name}/{target.name}: no dbt tests are declared for {target.models}"
-    else:
-        message = (f"{pipeline.name}/{target.name}: dbt test ran {summary['ran']} - "
-                   f"{summary['passed']} passed, {summary['failed']} failed, "
-                   f"{summary['errored']} errored, {summary['warned']} warned"
-                   + (": " + "; ".join(summary["failing"]) if summary["failing"] else ""))
-    state.event("dbt.test." + ("failed" if bad else "passed"), message[:2000], run_id=run_id,
-                level="error" if bad else "info",
-                data={"stage": target.name, "ran": summary["ran"], "passed": summary["passed"],
-                      "failed": summary["failed"], "errored": summary["errored"],
-                      "tests": summary["tests"][:50]})
+    from . import dbtproject
+    status = verdict["status"]
+    message = (f"{pipeline.name}/{target.name}: dbt test {status} - ran {verdict['ran']} "
+               f"({verdict['passed']} passed, {verdict['failed']} failed, "
+               f"{verdict['errored']} errored, {verdict['warned']} warned, "
+               f"{verdict['skipped']} skipped) of {len(verdict['required'])} required"
+               + (f": {verdict['reason']}" if verdict["reason"] else "")
+               + (": " + "; ".join(verdict["failing"]) if verdict["failing"] else ""))
+    data = {"stage": target.name, **{k: v for k, v in verdict.items() if k != "failing"}}
+    if len(data["tests"]) > dbtproject.TEST_RECORD_LIMIT:
+        data["tests"] = data["tests"][:dbtproject.TEST_RECORD_LIMIT]
+        data["truncated"] = True
+    level = {"passed": "info", "failed": "error", "error": "error"}.get(status, "warn")
+    state.event("dbt.test." + status, message[:2000], run_id=run_id, level=level, data=data)
 
 
 def _failed(message: str, *, label: str = "", rc: int = 1):
