@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fact_khsx_detail
+    description: "Bang su kien chi tiet ke hoach san xuat (KHSX)"
+    columns:
+      - name: fact_khsx_detail_sk
+        description: "Surrogate key generated from id"
+        tests:
+          - unique:
+              config:
+                severity: error
+          - not_null:
+              config:
+                severity: error
+      - name: production_plan_detail_id
+        description: "Ma chi tiet KHSX (id)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: production_plan_id
+        description: "Ma ke hoach (plan_id)"
+      - name: production_manager
+        description: "Ma nguoi quan ly san xuat (produce_manager)"
+      - name: ar_manager
+        description: "Ma nguoi phu trach A&R (ar_id)"
+      - name: status
+        description: "Trang thai dong chi tiet (state)"

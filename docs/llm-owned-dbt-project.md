@@ -87,6 +87,14 @@ records the system prompt's and every template file's sha256). If the prompt or 
 after looking at a real run, the next run is a **new trial** and this case no longer counts as an
 unseen problem.
 
+## Status (2026-10-12)
+
+Met for `gemini/gemini-3.8-flash` on `fact_khsx_detail`: `llm-first-draft`, one call, 0 revisions / 0 format
+repairs / 0 human edits / 0 provider errors; validated twice, promoted, deployed and run for real with the right
+output and the required tests passed; 8 files published byte-identical; `leaks=0`. Scripted 9/9. Evidence and caveats:
+[`docs/evidence/a3-llm/README.md`](evidence/a3-llm/README.md). This case has now been seen: a later prompt or product
+change makes the next run a new trial, and a new unseen problem is needed for a claim about generalisation.
+
 ## Not claimed
 
 One model, one problem, one source table, full snapshot. No incremental models, no connector beyond

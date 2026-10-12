@@ -1,0 +1,27 @@
+{
+  "complete": true,
+  "inconclusive": [],
+  "mode": "real",
+  "not_met": [],
+  "run_id": "20261012T113944Z-91d8b7",
+  "runs": [
+    {
+      "calls": 1,
+      "classification": "llm-first-draft",
+      "counts": {
+        "format_repairs": 0,
+        "human_edits": 0,
+        "pipeline_revisions": 0,
+        "provider_errors": 0,
+        "provider_errors_transient": 0
+      },
+      "criteria_problems": [],
+      "expectation_problems": null,
+      "label": "R3-build-fact-khsx-detail",
+      "last_outcome": "validated",
+      "model": "gemini/gemini-3.8-flash",
+      "tokens": 8161
+    }
+  ],
+  "suite": "khsx"
+}
