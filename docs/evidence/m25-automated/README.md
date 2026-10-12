@@ -14,7 +14,12 @@ directory is Step 3's own proof: that the *automation* -
 for real, on a disposable host it builds itself (a systemd container,
 not the VM), without a human running each command by hand.
 
-## Latest run: dbt test verdict from the manifest, LOAD failing mid-transaction (2026-10-12)
+## Latest run: regression on the owned-dbt-project branch (2026-10-12)
+
+`--profile bronze` on commit `510301b` (A2 now reads `expected.yaml`'s `required_dbt_tests` and `columns`, dbt test
+records carry each test's name/column/severity): **31/31 matched**, `leaks=0` — no change in any scenario's outcome.
+
+## Previous run: dbt test verdict from the manifest, LOAD failing mid-transaction (2026-10-12)
 
 `bash scripts/m25-acceptance-ci.sh --profile bronze` — host built from packs (all seven pack suites passed),
 **31/31 scenarios matched**, host audit **`leaks=0`**; [`run-info.txt`](run-info.txt): commit `151b5d2`, working

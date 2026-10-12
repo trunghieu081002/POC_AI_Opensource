@@ -35,6 +35,11 @@ contains neither HG's SQL nor any fixture/expected value) — the BRD said what 
 chose the project layout, materialization, schemas and packages. A first-try pass here says nothing about harder
 problems (joins, incremental models, ambiguous rules) or other models.
 
+### Regression on this branch (commit `510301b`)
+
+`scripted/20261012T134026Z-4c19ed` — `--a3 scripted` (the artist_summary suite S1–S8): **8/8**, `leaks=0`.
+`--profile bronze` matrix: **31/31**, `leaks=0` (`docs/evidence/m25-automated/`, commit `42048fd`).
+
 ### `scripted/khsx-20261012T100944Z-0c1e5b` — `--a3 scripted --a3-suite khsx` (not evidence about a model)
 
 Commit `cea84fa`, 9/9 met, `leaks=0`. K1 good project: the full chain above, 8 files byte-identical, every hashed
