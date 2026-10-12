@@ -39,15 +39,23 @@ import run_matrix  # noqa: E402  (its leak detection and the promote probe are r
 
 CASES = Path(__file__).resolve().parent / "cases"
 BUILD, AMBIGUOUS = "artist_summary", "revenue_ambiguous"
-KHSX = "fact_khsx_detail"      # an owned dbt project drafted from a template (docs/llm-owned-dbt-project.md)
+KHSX = "fact_khsx_detail"
+LABEL = "fact_label_operation"  # two tables, LEFT JOIN, filter, one row per raw ISRC (smallest id)      # an owned dbt project drafted from a template (docs/llm-owned-dbt-project.md)
 NAME = "a3_artist_summary"
 
 
-def _private_case(case_name: str, tmp: Path) -> llm_verify.Case:
+def _private_case(case_name: str, tmp: Path, mutate_fixture=None) -> llm_verify.Case:
     """A copy of the case in a scratch directory: the post-validation edits must
-    never touch the repository's own fixture/expected."""
+    never touch the repository's own fixture/expected. `mutate_fixture(doc)` changes the copy's
+    fixture for one scenario (data the pipeline must refuse)."""
     dest = tmp / "case"
     shutil.copytree(CASES / case_name, dest)
+    if mutate_fixture is not None:
+        import yaml
+        f = dest / "fixture.yaml"
+        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        mutate_fixture(doc)
+        f.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return llm_verify.load_case(dest)
 
 
@@ -104,11 +112,11 @@ def _edits_invalidate(case: llm_verify.Case, workdir: Path, evidence_id: str) ->
 
 
 def run_one(case_name: str, out_dir: Path, label: str, *, max_calls: int, max_revisions: int,
-            deploy: bool = True, transient_retries: int = 0) -> dict:
+            deploy: bool = True, transient_retries: int = 0, mutate_fixture=None) -> dict:
     before = run_matrix._throwaway_names()
     with tempfile.TemporaryDirectory(prefix="a3_") as tmp_s:
         tmp = Path(tmp_s)
-        case = _private_case(case_name, tmp)
+        case = _private_case(case_name, tmp, mutate_fixture)
         workdir = tmp / "pipelines"
         trace, records = llm_verify.run_case(case, workdir, max_calls=max_calls,
                                              max_revisions=max_revisions,
@@ -262,16 +270,15 @@ def scripted_scenarios(out: Path) -> list[dict]:
     return rows
 
 
-def khsx_scripted_scenarios(out: Path) -> list[dict]:
-    """The owned-dbt-project path (a template + model-written files) on a real host, with hand-
-    written replies (scripted_drafts/khsx_*): the right project, then each way it must be blocked."""
+def _owned_tools(case_name: str, out: Path, rows: list):
+    """Scenario runner and expectations shared by the owned-dbt-project suites (khsx, label)."""
     os.environ.setdefault("GEMINI_API_KEY", "scripted-not-a-key")
     os.environ["DPAGENT_MODEL"] = "scripted/stand-in-for-a-model"
-    rows = []
 
-    def scenario(label, replies, expect, *, revisions=0, calls=4, deploy=True):
+    def scenario(label, replies, expect, *, revisions=0, calls=4, deploy=True, mutate_fixture=None):
         _install(replies)
-        result = run_one(KHSX, out, label, max_calls=calls, max_revisions=revisions, deploy=deploy)
+        result = run_one(case_name, out, label, max_calls=calls, max_revisions=revisions,
+                         deploy=deploy, mutate_fixture=mutate_fixture)
         problems = expect(result)
         problems += llm_verify.leak_problems(result["leaked_and_recovered"])
         result["expectation_problems"] = problems
@@ -327,6 +334,14 @@ def khsx_scripted_scenarios(out: Path) -> list[dict]:
             return p
         return check
 
+    return scenario, chain_ok, not_promotable, refused_file
+
+
+def khsx_scripted_scenarios(out: Path) -> list[dict]:
+    """The owned-dbt-project path (a template + model-written files) on a real host, with hand-
+    written replies (scripted_drafts/khsx_*): the right project, then each way it must be blocked."""
+    rows: list = []
+    scenario, chain_ok, not_promotable, refused_file = _owned_tools(KHSX, out, rows)
     scenario("K1-good-project-first-try", [scripted.bundle("khsx_good")],
              lambda r: chain_ok(r) + ([] if r["classification"] == "llm-first-draft"
                                       else [f"classification {r['classification']}"]))
@@ -349,6 +364,35 @@ def khsx_scripted_scenarios(out: Path) -> list[dict]:
              lambda r: chain_ok(r) + ([] if r["classification"] == "llm-after-1-revision(s)"
                                       else [f"classification {r['classification']}"]),
              revisions=2)
+    return rows
+
+
+def label_scripted_scenarios(out: Path) -> list[dict]:
+    """fact_label_operation with hand-written replies (scripted_drafts/lab_*): the right project,
+    then the wrong ones the BRD's rules must catch - each differs from lab_good in one place."""
+    rows: list = []
+    scenario, chain_ok, not_promotable, refused_file = _owned_tools(LABEL, out, rows)
+    mismatch = "does not match the independently calculated expected result"
+
+    scenario("L1-good-project-first-try", [scripted.bundle("lab_good")],
+             lambda r: chain_ok(r) + ([] if r["classification"] == "llm-first-draft"
+                                      else [f"classification {r['classification']}"]))
+    scenario("L2-inner-join", [scripted.bundle("lab_inner_join")], not_promotable("validation-fail", mismatch))
+    scenario("L3-no-active-filter", [scripted.bundle("lab_no_active_filter")],
+             not_promotable("validation-fail", mismatch))
+    scenario("L4-largest-id-kept", [scripted.bundle("lab_wrong_row")], not_promotable("validation-fail", mismatch))
+    scenario("L5-groups-on-trimmed-isrc", [scripted.bundle("lab_trimmed_grouping")],
+             not_promotable("validation-fail", mismatch))
+    scenario("L6-no-certificate-gate", [scripted.bundle("lab_no_cert_gate")],
+             not_promotable("policy-fail", "x_acceptance_cert"))
+
+    def second_cert_for_order_5001(doc):
+        cert = next(t for t in doc["tables"] if t["name"] == "x_acceptance_cert")
+        cert["rows"].append({"id": 7, "purchase_order_id": 5001,
+                             "acceptance_link": "https://cert.hg/5001-b", "name": "second cert of 5001"})
+    # blocker B1: two certificates for one order - the RIGHT project must fail at its gate, not pick one
+    scenario("L7-two-certificates-one-order-fails", [scripted.bundle("lab_good")],
+             not_promotable("validation-fail", "unique"), mutate_fixture=second_cert_for_order_5001)
     return rows
 
 
@@ -395,6 +439,26 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
     return rows
 
 
+def owned_real_scenarios(case_name: str, label: str, out: Path, max_calls: int,
+                         max_revisions: int) -> list[dict]:
+    """One real-model run on an owned-dbt-project case (see khsx_real_scenarios)."""
+    llm_verify.ensure_opted_in(max_calls)
+    if not llm.available():
+        print("no provider credential in the environment", file=sys.stderr)
+        raise SystemExit(2)
+    print(f"model: {llm.get_model()}  call ceiling: {max_calls}  revisions: {max_revisions}", flush=True)
+    retries = int(os.environ.get("A3_TRANSIENT_RETRIES", "5"))
+    r = run_one(case_name, out, label, max_calls=max_calls, max_revisions=max_revisions,
+                transient_retries=retries)
+    r["criteria_problems"] = llm_verify.build_problems(r)
+    dr = r.get("deploy_run") or {}
+    if dr and (dr.get("dbt_test_problems") or not dr.get("dbt_tests")):
+        r["criteria_problems"].append(f"real run's dbt tests: {dr.get('dbt_test_problems') or 'none on record'}")
+    print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  {label} {r['classification']}  "
+          f"calls={r['calls']}  counts={r['counts']}  {r['criteria_problems']}", flush=True)
+    return [r]
+
+
 def khsx_real_scenarios(out: Path, max_calls: int, max_revisions: int) -> list[dict]:
     """One real-model run on the owned-dbt-project case: the prompt, template and code are the
     committed ones (the CI script refuses a dirty tree and records the commit); every call and
@@ -426,9 +490,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--max-calls", type=int, default=0)
     ap.add_argument("--max-revisions", type=int, default=2)
     ap.add_argument("--ambiguous-runs", type=int, default=3)
-    ap.add_argument("--suite", choices=["artist", "khsx"], default="artist",
+    ap.add_argument("--suite", choices=["artist", "khsx", "label"], default="artist",
                     help="artist: the A3 artist_summary case + ambiguous BRD; khsx: the owned dbt "
-                         "project from a template (fact_khsx_detail)")
+                         "project from a template (fact_khsx_detail); label: fact_label_operation")
     args = ap.parse_args(argv)
 
     pre = fixture_mod.preflight_fixture_host(
@@ -442,7 +506,11 @@ def main(argv: list[str]) -> int:
     out.mkdir(parents=True)
     print(f"run id: {run_id}", flush=True)
     try:
-        if args.suite == "khsx":
+        if args.suite == "label":
+            rows = (label_scripted_scenarios(out) if args.mode == "scripted"
+                    else owned_real_scenarios(LABEL, "R4-build-fact-label-operation", out,
+                                              args.max_calls, args.max_revisions))
+        elif args.suite == "khsx":
             rows = (khsx_scripted_scenarios(out) if args.mode == "scripted"
                     else khsx_real_scenarios(out, args.max_calls, args.max_revisions))
         else:

@@ -18,3 +18,12 @@ model-written files are here; the template is added by `synth`):
 * `khsx_warn_severity/` the mandatory tests at `severity: warn` -> they "pass", but not as required
 
 Nothing here is evidence about a model. The model's own drafts are under `docs/evidence/a3-llm/`.
+
+For `cases/fact_label_operation/` (same template; each wrong draft differs from `lab_good` in one place):
+
+* `lab_good/`              a correct implementation (row_number over the raw ISRC - not HG's DISTINCT ON)
+* `lab_inner_join/`        INNER instead of LEFT JOIN -> songs without a certificate disappear
+* `lab_no_active_filter/`  no `active` filter -> an inactive song wins its ISRC group
+* `lab_wrong_row/`         keeps the largest id
+* `lab_trimmed_grouping/`  groups on the trimmed ISRC -> " X " and "X" collapse into one row
+* `lab_no_cert_gate/`      no `unique` gate on the certificates' order -> blocker B1 unguarded

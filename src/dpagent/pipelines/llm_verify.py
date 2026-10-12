@@ -80,6 +80,7 @@ class Case:
     expected_path: Path | None
     # the mandatory dbt tests, from expected.yaml (validator-side, never shown to the model)
     required_tests: list[dict] = field(default_factory=list)
+    required_gates: list[dict] = field(default_factory=list)      # expected.yaml, likewise
 
     def input_hashes(self) -> dict:
         out = {"brd": _sha(self.brd), "source_schema": _sha(self.schema),
@@ -121,10 +122,12 @@ def load_case(case_dir: Path) -> Case:
     if kind == "build" and not (fx.is_file() and ex.is_file()):
         raise ValueError(f"{case_dir}: a build case needs fixture.yaml and expected.yaml")
     from . import fixture as fixture_mod
-    required = fixture_mod.load_expected(ex).required_dbt_tests if ex.is_file() else []
+    contract = fixture_mod.load_expected(ex) if ex.is_file() else None
+    required = contract.required_dbt_tests if contract else []
     return Case(dir=case_dir, name=meta["name"], kind=kind, brd=brd, schema=schema,
                 request=request, fixture_path=fx if fx.is_file() else None,
-                expected_path=ex if ex.is_file() else None, required_tests=list(required))
+                expected_path=ex if ex.is_file() else None, required_tests=list(required),
+                required_gates=list(contract.required_gates) if contract else [])
 
 
 # ------------------------------------------------------------------ the trace
@@ -406,14 +409,20 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 "overall", "run_status", "comparison", "run_ids", "clone_name",
                 "unavailable_reason", "deploy_error")}
             attempt.validation["cleanup"] = (section.get("cleanup") or {}).get("overall")
-            if section.get("overall") == "pass" and pipeline.dbt_project is not None:
+            if section.get("overall") == "pass" and (pipeline.dbt_project is not None or case.required_gates):
+                from . import fixture as fixture_mod
                 attempt.validation["dbt_tests"] = section.get("dbt_tests")
-                problems = dbt_test_problems(section.get("dbt_tests") or {}, case.required_tests)
+                gate_problems = fixture_mod.required_gate_problems(pipeline, case.required_gates)
+                problems = list(gate_problems)
+                if pipeline.dbt_project is not None:
+                    problems += dbt_test_problems(section.get("dbt_tests") or {}, case.required_tests)
                 if problems:
                     # the output matched, but the project's tests do not meet the BRD / #37's
                     # policy: not promotable - told to the model like any validator finding
                     attempt.outcome = "policy-fail"
-                    attempt.fed_back = "dbt tests do not meet the requirement:\n" + "\n".join(
+                    header = ("the pipeline does not meet the requirement:" if gate_problems
+                              else "dbt tests do not meet the requirement:")      # #38's wording
+                    attempt.fed_back = header + "\n" + "\n".join(
                         dict.fromkeys(problems))
                     attempt.detail = attempt.fed_back[:1500]
                     revision = synth_mod.Revision(result.drafted_files, attempt.fed_back)

@@ -781,3 +781,14 @@ def test_a_required_dbt_test_missing_or_of_the_wrong_kind_refuses_promotion(hg, 
                 else _described(stage, column="other")}
     _hg_validated(hg, dbt_test_data=data)
     _hg_refused(hg, reason)
+
+
+def test_a_required_gate_the_manifest_does_not_declare_refuses_promotion(hg):
+    import yaml as _yaml
+    f = hg.root / "expected.yaml"
+    doc = _yaml.safe_load(f.read_text())
+    doc["required_gates"] = [{"stage": "landing", "type": "unique", "table": "res_partner",
+                              "columns": ["id"]}]
+    f.write_text(_yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    _hg_validated(hg)
+    _hg_refused(hg, "required a `unique` gate on res_partner ['id'] in stage 'landing': not declared")

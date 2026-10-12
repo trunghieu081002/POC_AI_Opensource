@@ -624,6 +624,9 @@ class ExpectedResult:
     # Top level only: dbt tests an owned project MUST run and pass (acceptance policy; A2 checks
     # them in the journal) - [{model, column, tests: [...], severity}].
     required_dbt_tests: list[dict] = field(default_factory=list)
+    # Top level only: gates the manifest MUST declare (acceptance policy; A2 checks the manifest,
+    # the journal already requires every gate to have passed) - [{stage, type, table, columns}].
+    required_gates: list[dict] = field(default_factory=list)
 
 
 def _parse_expected(data: dict, where: str) -> ExpectedResult:
@@ -643,12 +646,54 @@ def _parse_expected(data: dict, where: str) -> ExpectedResult:
                           schema=str(schema or ""), columns=columns)
 
 
+def _parse_required_gates(raw, where: str) -> list[dict]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(f"{where}: required_gates must be a list")
+    out = []
+    for i, g in enumerate(raw):
+        cols = g.get("columns") if isinstance(g, dict) else None
+        if not (isinstance(g, dict) and set(g) <= {"stage", "type", "table", "columns"}
+                and all(isinstance(g.get(k), str) and g[k] for k in ("stage", "type", "table"))
+                and (cols is None or (isinstance(cols, list) and cols
+                                      and all(isinstance(c, str) and c for c in cols)))):
+            raise ValueError(f"{where}: required_gates[{i}] needs stage, type, table "
+                             f"(and optionally columns: [..]), nothing else")
+        out.append({"stage": g["stage"], "type": g["type"], "table": g["table"],
+                    "columns": list(cols) if cols else None})
+    return out
+
+
+def required_gate_problems(pipeline, required: list[dict]) -> list[str]:
+    """Each required gate must be declared by the manifest: same stage, type and table, and -
+    when the requirement names columns - exactly that column set (a `unique` on [a, b] does not
+    make [a] unique)."""
+    problems = []
+    stages = {s.name: s for s in pipeline.stages}
+    for req in required:
+        want = (f"a `{req['type']}` gate on {req['table']}"
+                + (f" {req['columns']}" if req["columns"] else "") + f" in stage {req['stage']!r}")
+        stage = stages.get(req["stage"])
+        if stage is None:
+            problems.append(f"required {want}: the pipeline has no stage {req['stage']!r}")
+            continue
+        hit = any(g.type == req["type"] and g.params.get("table") == req["table"]
+                  and (req["columns"] is None
+                       or sorted(g.params.get("columns") or []) == sorted(req["columns"]))
+                  for g in stage.gates)
+        if not hit:
+            problems.append(f"required {want}: not declared")
+    return problems
+
+
 def load_expected(path: Path) -> ExpectedResult:
     from . import dbtproject
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     result = _parse_expected(data, str(path))
     result.required_dbt_tests = dbtproject.parse_required_tests(
         data.get("required_dbt_tests"), str(path))
+    result.required_gates = _parse_required_gates(data.get("required_gates"), str(path))
     for i, extra in enumerate(data.get("also") or []):
         result.also.append(_parse_expected(extra or {}, f"{path}: also[{i}]"))
     return result

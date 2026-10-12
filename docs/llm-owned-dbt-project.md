@@ -99,3 +99,32 @@ change makes the next run a new trial, and a new unseen problem is needed for a 
 
 One model, one problem, one source table, full snapshot. No incremental models, no connector beyond
 `odoo_postgres`, no model-chosen packages, macros or seeds.
+
+## Second case: `fact_label_operation` — two tables, LEFT JOIN, filter, one row per ISRC
+
+`tests/llm_verification/cases/fact_label_operation/`; business basis: HG's `silver.fact_label_operation` at
+phulee9/hgmedia `e9cbff0`. Same synth, system prompt (sha256 `72429722…`) and template as `fact_khsx_detail` for the
+first trial — pinned by `tests/test_llm_label_operation.py`.
+
+The BRD states HG's model exactly, in order: (1) keep `active = true` songs whose **trimmed** ISRC is non-empty;
+(2) LEFT JOIN the certificate of the song's purchase order (kept without one); (3) one row per ISRC **as stored —
+not trimmed** (`" X"` and `"X"` are two ISRCs, as HG's `DISTINCT ON (b.isrc)` does), the smallest `id`, among the
+songs that survived (1); (4) trim / blank → NULL on output, `release_date` as timestamp.
+
+**Blocker B1 — several certificates for one order.** HG's model is non-deterministic there (`DISTINCT ON` picks any
+of the joined certificates). There is no business rule, so none is invented: the BRD says so, keeps it as an open
+question for HG, and requires the pipeline to **fail rather than choose** — a `unique` gate on
+`x_acceptance_cert.purchase_order_id` at landing. That requirement is `required_gates` in `expected.yaml` (new),
+checked against the manifest by the harness and **by A2**; the fixture holds no such order.
+
+| Scripted scenario | Must happen |
+|---|---|
+| L1 right project | the full chain (validate twice → promote → real deploy/run → output = expected → bytes → edits) |
+| L2 INNER JOIN · L3 no `active` filter · L4 largest id kept · L5 groups on the trimmed ISRC | each runs, the output does not match → not promotable |
+| L6 no certificate gate | output matches, `policy-fail` (the required gate is not declared); A2 refuses |
+| L7 two certificates for one order (fixture changed for this scenario only) | the **right** project fails at its gate — it does not pick a certificate |
+
+```bash
+bash scripts/m25-acceptance-ci.sh --a3 scripted --a3-suite label
+bash scripts/m25-acceptance-ci.sh --a3 real --a3-suite label --max-calls 6 --max-revisions 2
+```

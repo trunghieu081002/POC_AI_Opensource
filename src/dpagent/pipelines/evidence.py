@@ -397,7 +397,9 @@ def check_for_promote(pipeline: Pipeline, *, fixture_path: Path, expected_path: 
     expected_hash = fixture_mod.hash_file(expected_path)
     reasons = _policy_reasons(payload, pipeline, fixture_hash, expected_hash)
     try:
-        required_tests = fixture_mod.load_expected(expected_path).required_dbt_tests
+        contract = fixture_mod.load_expected(expected_path)
+        required_tests = contract.required_dbt_tests
+        reasons += fixture_mod.required_gate_problems(pipeline, contract.required_gates)
     except (ValueError, OSError) as exc:
         reasons.append(f"expected file {str(expected_path)!r} is not usable: {exc}")
         required_tests = []
