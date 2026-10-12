@@ -146,4 +146,4 @@ Met for `gemini/gemini-3.8-flash` on the `artist_summary` case — `docs/evidenc
 (classification `llm-after-1-revision(s)`; the first draft failed validation on a schema-qualified contract table, the
 second passed and went through promote → real deploy → run → edit checks) — with the caveats in the evidence README:
 one model, one problem, a prompt tuned while looking at this case, first draft not right. Not shown: other models, other
-problems, multi-table or owned-dbt-project drafts (synth still writes only `pipeline.yaml` + `models/`/`procedures/` SQL).
+problems, multi-table drafts. Owned dbt project drafted from a template: [llm-owned-dbt-project.md](llm-owned-dbt-project.md).

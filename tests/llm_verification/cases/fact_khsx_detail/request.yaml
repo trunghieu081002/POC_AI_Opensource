@@ -1,0 +1,26 @@
+# What the harness hands to `synth` (the BRD and schema are the two files beside this one).
+# Nothing here, and nothing the model is shown, contains the expected result or HG's SQL.
+name: a3_fact_khsx_detail
+kind: build
+warehouse_schema: silver
+# An owned dbt project drafted from a template (docs/llm-owned-dbt-project.md): the template's
+# files are copied verbatim, the model writes pipeline.yaml and files under <project>/models/.
+dbt_template: hg_dwh_dbt
+dbt_project_path: dwh_dbt
+# The BRD's mandatory tests are enforced from expected.yaml's `required_dbt_tests` (validator-side;
+# A2 checks them in the journal against what dbt's manifest says each test is).
+# Same reason as artist_summary: the harness deploys the validated draft for real against
+# throwaway databases, so it uses its own warehouse refs, never the host-wide WAREHOUSE_DB_*.
+warehouse_refs:
+  host: "${A3_WH_HOST:-localhost}"
+  port: "${A3_WH_PORT:-5432}"
+  database: "${A3_WH_NAME:-warehouse}"
+  user: "${A3_WH_USER}"
+  password: "${A3_WH_PASSWORD}"
+secrets:
+  A3_SRC_HOST: source Postgres host
+  A3_SRC_PORT: source Postgres port
+  A3_SRC_NAME: source database name
+  A3_SRC_USER: source database user
+  A3_SRC_PASSWORD: source database password
+hint: "Source connection fields use the secret refs above. Use the warehouse refs given."

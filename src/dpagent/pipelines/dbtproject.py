@@ -379,7 +379,17 @@ def dbt_test_verdict(run_results: Path, manifest: Path, models: list[str], *, ex
         key = {"pass": "passed", "fail": "failed", "error": "errored", "warn": "warned",
                "skipped": "skipped"}.get(status, "errored")
         out[key] += 1
-        out["tests"].append({"test": uid, "status": status, "failures": r.get("failures")})
+        node = nodes.get(uid) if isinstance(nodes.get(uid), dict) else {}
+        meta = node.get("test_metadata") or {}
+        on = [nodes[m].get("name") for m in (node.get("depends_on") or {}).get("nodes") or []
+              if isinstance(nodes.get(m), dict) and nodes[m].get("resource_type") == "model"]
+        # what the test IS, from dbt's manifest - lets a policy ask "is there a unique test on this
+        # column of this model, failing the run (severity error)?" without trusting any YAML text
+        out["tests"].append({"test": uid, "status": status, "failures": r.get("failures"),
+                             "name": meta.get("name"),
+                             "column": (meta.get("kwargs") or {}).get("column_name"),
+                             "models": on,
+                             "severity": str((node.get("config") or {}).get("severity") or "").lower()})
         if key in ("failed", "errored", "skipped"):
             out["failing"].append(f"{uid} {status}"
                                   + (f" ({r.get('failures')} failing row(s))" if r.get("failures") else ""))
@@ -431,3 +441,45 @@ def dbt_test_record_problems(data: dict) -> list[str]:
     if data.get("exit_code") != 0:
         problems.append(f"dbt test exited {data.get('exit_code')}")
     return problems
+
+
+def required_test_problems(tests: list[dict], required: list[dict]) -> list[str]:
+    """Acceptance policy on top of the verdict: each `{model, column, tests: [...], severity}` in
+    `required` (expected.yaml's `required_dbt_tests`, never the draft's own YAML) must be among the
+    tests dbt RAN (`tests` = the per-test entries of a verdict, as dbt's manifest describes them),
+    with that severity, and have passed."""
+    problems = []
+    for req in required:
+        sev = str(req.get("severity") or "error").lower()
+        for name in req["tests"]:
+            want = f"a `{name}` test on {req['model']}.{req['column']}"
+            hits = [t for t in tests if t.get("name") == name and t.get("column") == req["column"]
+                    and req["model"] in (t.get("models") or [])]
+            if not hits:
+                problems.append(f"required {want}: dbt ran none")
+            elif not any(t.get("severity") == sev for t in hits):
+                problems.append(f"required {want} has severity "
+                                f"{sorted({str(t.get('severity')) for t in hits})}; required {sev!r}")
+            elif not any(t.get("severity") == sev and t.get("status") == "pass" for t in hits):
+                problems.append(f"required {want} did not pass")
+    return problems
+
+
+def parse_required_tests(raw, where: str) -> list[dict]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(f"{where}: required_dbt_tests must be a list")
+    out = []
+    for i, req in enumerate(raw):
+        if not (isinstance(req, dict) and isinstance(req.get("model"), str) and req["model"]
+                and isinstance(req.get("column"), str) and req["column"]
+                and isinstance(req.get("tests"), list) and req["tests"]
+                and all(isinstance(t, str) and t for t in req["tests"])
+                and str(req.get("severity", "error")).lower() in ("error", "warn")
+                and set(req) <= {"model", "column", "tests", "severity"}):
+            raise ValueError(f"{where}: required_dbt_tests[{i}] needs model, column, tests "
+                             f"(and optionally severity: error|warn), nothing else")
+        out.append({"model": req["model"], "column": req["column"], "tests": list(req["tests"]),
+                    "severity": str(req.get("severity", "error")).lower()})
+    return out

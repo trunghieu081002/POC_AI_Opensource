@@ -78,11 +78,20 @@ class Case:
     request: synth_mod.SynthRequest
     fixture_path: Path | None
     expected_path: Path | None
+    # the mandatory dbt tests, from expected.yaml (validator-side, never shown to the model)
+    required_tests: list[dict] = field(default_factory=list)
 
     def input_hashes(self) -> dict:
         out = {"brd": _sha(self.brd), "source_schema": _sha(self.schema),
                "request_yaml": _sha((self.dir / "request.yaml").read_bytes()),
-               "synth_system_prompt": _sha(llm.load_prompt("synth_pipeline"))}
+               "synth_system_prompt_name": synth_mod.system_prompt_name(self.request),
+               "synth_system_prompt": _sha(llm.load_prompt(synth_mod.system_prompt_name(self.request)))}
+        if self.request.dbt_template:
+            # what the model did NOT write: frozen, recorded file by file
+            out["dbt_template"] = self.request.dbt_template
+            out["dbt_template_files"] = {
+                f"{self.request.dbt_project_path}/{rel}": _sha(text)
+                for rel, text in synth_mod.template_files(self.request.dbt_template).items()}
         # held back from the model, recorded so the evidence names what judged it
         if self.fixture_path:
             out["fixture"] = _sha(self.fixture_path.read_bytes())
@@ -104,14 +113,18 @@ def load_case(case_dir: Path) -> Case:
         name=meta["name"], brd=brd, source_schema=schema,
         warehouse=dict(meta.get("warehouse_refs") or _STANDARD_WAREHOUSE_REFS,
                        schema=meta.get("warehouse_schema", meta["name"])),
-        secret_refs=dict(meta.get("secrets") or {}), hint=meta.get("hint", ""))
+        secret_refs=dict(meta.get("secrets") or {}), hint=meta.get("hint", ""),
+        dbt_template=str(meta.get("dbt_template") or ""),
+        dbt_project_path=str(meta.get("dbt_project_path") or "dwh_dbt"))
     fx = case_dir / "fixture.yaml"
     ex = case_dir / "expected.yaml"
     if kind == "build" and not (fx.is_file() and ex.is_file()):
         raise ValueError(f"{case_dir}: a build case needs fixture.yaml and expected.yaml")
+    from . import fixture as fixture_mod
+    required = fixture_mod.load_expected(ex).required_dbt_tests if ex.is_file() else []
     return Case(dir=case_dir, name=meta["name"], kind=kind, brd=brd, schema=schema,
                 request=request, fixture_path=fx if fx.is_file() else None,
-                expected_path=ex if ex.is_file() else None)
+                expected_path=ex if ex.is_file() else None, required_tests=list(required))
 
 
 # ------------------------------------------------------------------ the trace
@@ -131,6 +144,7 @@ class Attempt:
     validation: dict = field(default_factory=dict)
     fed_back: str = ""              # what the model was told on the NEXT ask (never expected)
     format_repairs: int = 0         # extra calls inside THIS attempt because the reply was not valid JSON
+    template_files: dict[str, str] = field(default_factory=dict)  # path -> sha256 (not model-written)
 
 
 @dataclass
@@ -212,7 +226,8 @@ def write_trace(trace: Trace, records: list[llm.CallRecord], out_dir: Path) -> P
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calls").mkdir(exist_ok=True)
     texts: dict[Path, str] = {}
-    texts[out_dir / "system-prompt.md"] = records[0].system if records else llm.load_prompt("synth_pipeline")
+    texts[out_dir / "system-prompt.md"] = (records[0].system if records else llm.load_prompt(
+        trace.inputs.get("synth_system_prompt_name") or "synth_pipeline"))
     for rec in records:
         texts[out_dir / "calls" / f"{rec.index:02d}-user.txt"] = rec.user
         texts[out_dir / "calls" / f"{rec.index:02d}-response.txt"] = rec.response
@@ -284,6 +299,28 @@ def _run_error_events(section: dict, events: list[dict] | None = None) -> list[s
     return bad[:8]
 
 
+# ------------------------------------------------------------------ dbt tests (owned projects)
+
+def dbt_test_problems(dbt_tests: dict, required: list[dict]) -> list[str]:
+    """`dbt_tests` = {run label: [journal records, fixture.dbt_tests_for_run]}. Every record must be
+    `passed` (the #37 verdict, re-checked from its raw data), and every mandatory test
+    (expected.yaml's `required_dbt_tests` - the same list A2 enforces) must be among the tests dbt
+    actually ran and passed, matched on what dbt's manifest says the test is (name, column,
+    model, severity), never on the drafted YAML's text."""
+    from . import dbtproject
+    problems: list[str] = []
+    for run, records in sorted((dbt_tests or {}).items()):
+        if not records:
+            problems.append(f"{run}: no dbt test record")
+            continue
+        for rec in records:
+            for p in dbtproject.dbt_test_record_problems(rec.get("data") or {}):
+                problems.append(f"{run}: stage {rec.get('stage')!r}: {p}")
+        ran = [t for rec in records for t in ((rec.get("data") or {}).get("tests") or [])]
+        problems += [f"{run}: {p}" for p in dbtproject.required_test_problems(ran, required)]
+    return problems
+
+
 # ------------------------------------------------------------------ the orchestration
 
 Runner = Callable[..., tuple]     # (pipeline, step3_report, fixture_path, expected_path) -> (report, section, id)
@@ -312,6 +349,17 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
             try:
                 result = synth_mod.synth(case.request, pipelines_dir=workdir, overwrite=True,
                                          revision=revision)
+            except synth_mod.DraftRefused as exc:
+                # a file the writer will not write (outside the allowlist, a template file, the
+                # approval): nothing was written; the model is told which and may correct it
+                attempt.call_indexes = list(range(before + 1, len(records) + 1))
+                attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
+                attempt.outcome = "refused-file"
+                attempt.detail = str(exc)[:600]
+                attempt.fed_back = f"the draft was refused before anything was written: {exc}"
+                last_reply = records[-1].response if records else ""
+                revision = synth_mod.Revision({"(previous reply)": last_reply[:20000]}, attempt.fed_back)
+                continue
             except (llm.LLMError, ValueError, KeyError, TypeError, AttributeError) as exc:
                 attempt.call_indexes = list(range(before + 1, len(records) + 1))
                 attempt.format_repairs = max(0, sum(1 for r in records[before:] if not r.transient) - 1)
@@ -330,6 +378,7 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 break
             attempt.drafted_files = dict(result.drafted_files)
             attempt.files = {rel: _sha(text) for rel, text in result.drafted_files.items()}
+            attempt.template_files = {rel: _sha(text) for rel, text in result.template_files.items()}
             if case.kind == "ambiguous":
                 attempt.outcome = "built-anyway"
                 attempt.detail = "the BRD is missing information that changes the numbers; the model built a pipeline instead of asking"
@@ -357,6 +406,18 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
                 "overall", "run_status", "comparison", "run_ids", "clone_name",
                 "unavailable_reason", "deploy_error")}
             attempt.validation["cleanup"] = (section.get("cleanup") or {}).get("overall")
+            if section.get("overall") == "pass" and pipeline.dbt_project is not None:
+                attempt.validation["dbt_tests"] = section.get("dbt_tests")
+                problems = dbt_test_problems(section.get("dbt_tests") or {}, case.required_tests)
+                if problems:
+                    # the output matched, but the project's tests do not meet the BRD / #37's
+                    # policy: not promotable - told to the model like any validator finding
+                    attempt.outcome = "policy-fail"
+                    attempt.fed_back = "dbt tests do not meet the requirement:\n" + "\n".join(
+                        dict.fromkeys(problems))
+                    attempt.detail = attempt.fed_back[:1500]
+                    revision = synth_mod.Revision(result.drafted_files, attempt.fed_back)
+                    continue
             if section.get("overall") == "pass":
                 attempt.outcome = "validated"
                 break
@@ -375,6 +436,7 @@ def run_case(case: Case, workdir: Path, *, max_calls: int, max_revisions: int = 
 
 def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expected_path: Path,
                        evidence_id: str, *, drafted_files: dict[str, str] | None = None,
+                       required_tests: list[dict] | None = None,
                        wait_timeout: float = 900.0) -> dict:
     """Promote THE VALIDATED DRAFT (A2 gate), deploy it for real (not
     --allow-draft) against throwaway source/warehouse databases, run the real
@@ -432,6 +494,10 @@ def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expect
                         out["gates"] = gates
                         out["gates_passed"] = bool(gates) and all(
                             g["status"] == "passed" for v in gates.values() for g in v)
+                        if promoted.dbt_project is not None:
+                            out["dbt_tests"] = fixture_mod.dbt_tests_for_run(run_id)
+                            out["dbt_test_problems"] = dbt_test_problems(
+                                {"deployed_run": out["dbt_tests"]}, required_tests or [])
                     if drafted_files is not None:
                         out["published_bytes"] = check_published_bytes(
                             promoted.name, drafted_files,
@@ -453,6 +519,7 @@ def promote_deploy_run(pipeline: loader_mod.Pipeline, fixture_path: Path, expect
     out["ok"] = bool(out["deployed"] and out["run_status"] == "ok"
                      and (out["comparison"] or {}).get("ok") and out["gates_passed"]
                      and out["undeploy_verified"] and out["databases_dropped"]
+                     and not out.get("dbt_test_problems")
                      and (drafted_files is None or (out.get("published_bytes") or {}).get("ok")))
     return out
 
@@ -481,7 +548,8 @@ def check_published_bytes(name: str, drafted_files: dict[str, str], *, published
             if not path.is_file():
                 checked[label] = {"path": str(path), "missing": True, "equal": False}
                 continue
-            got = _sha(_strip_label(rel, path.read_text(encoding="utf-8")))
+            # bytes as published (read_text() would translate CRLF and hide a difference)
+            got = _sha(_strip_label(rel, path.read_bytes().decode("utf-8", errors="replace")))
             checked[label] = {"path": str(path), "drafted": want, "published": got,
                               "missing": False, "equal": want == got}
     return {"checked": checked, "ok": bool(checked) and all(c["equal"] for c in checked.values())}

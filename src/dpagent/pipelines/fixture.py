@@ -617,6 +617,13 @@ class ExpectedResult:
     # More tables that must also match, each hand-written like the main one -
     # an intermediate layer (HG's silver) checked as well as the final one.
     also: list["ExpectedResult"] = field(default_factory=list)
+    # Optional `{column: postgres data_type}`: when given, the table must have EXACTLY these
+    # columns with these types (information_schema's data_type, e.g. `text`, `bigint`) - for a
+    # contract that says "these columns and no others" (otherwise extra columns are ignored).
+    columns: dict[str, str] | None = None
+    # Top level only: dbt tests an owned project MUST run and pass (acceptance policy; A2 checks
+    # them in the journal) - [{model, column, tests: [...], severity}].
+    required_dbt_tests: list[dict] = field(default_factory=list)
 
 
 def _parse_expected(data: dict, where: str) -> ExpectedResult:
@@ -628,13 +635,20 @@ def _parse_expected(data: dict, where: str) -> ExpectedResult:
     schema = data.get("schema", "")
     if schema and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(schema)):
         raise ValueError(f"{where}: schema {schema!r} must be a plain SQL identifier")
+    columns = data.get("columns")
+    if columns is not None and (not isinstance(columns, dict) or not columns or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in columns.items())):
+        raise ValueError(f"{where}: columns must be a non-empty mapping of column -> data_type")
     return ExpectedResult(table=table, rows=rows, row_count=data.get("row_count"),
-                          schema=str(schema or ""))
+                          schema=str(schema or ""), columns=columns)
 
 
 def load_expected(path: Path) -> ExpectedResult:
+    from . import dbtproject
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     result = _parse_expected(data, str(path))
+    result.required_dbt_tests = dbtproject.parse_required_tests(
+        data.get("required_dbt_tests"), str(path))
     for i, extra in enumerate(data.get("also") or []):
         result.also.append(_parse_expected(extra or {}, f"{path}: also[{i}]"))
     return result
@@ -793,6 +807,10 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
             False, f"could not read {schema}.{expected.table}'s own column types "
                   f"(needed to compare numeric and text columns correctly): {exc}")
     numeric_columns = {c for c, t in column_types.items() if t in _NUMERIC_COLUMN_TYPES}
+    if expected.columns is not None and column_types != expected.columns:
+        return ComparisonResult(
+            False, f"{schema}.{expected.table} columns {dict(sorted(column_types.items()))} are not "
+                   f"exactly the expected {dict(sorted(expected.columns.items()))}")
 
     if expected.rows:
         column_sets = {frozenset(row.keys()) for row in expected.rows}
