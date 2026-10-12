@@ -1,0 +1,49 @@
+# Two HG source tables through ONE bronze batch (docs/hg-bronze-multi-table.md): one consistent
+# snapshot, one batch id, a manifest per table plus a batch manifest, and one LOAD transaction that
+# replaces both landing tables together. Landing only - no transform yet. The tables are the two
+# HG's silver.fact_artist_assignment reads (phulee9/hgmedia, dwh_dbt/models/staging/_sources.yml);
+# the next milestone puts HG's model on top of exactly this landing.
+name: hg_bronze_pair
+summary: res_partner + x_music_plan_detail_price -> one bronze batch -> staging (both tables or neither)
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${HG_POC_SOURCE_HOST}"
+    port: "${HG_POC_SOURCE_PORT:-5432}"
+    database: "${HG_POC_SOURCE_NAME}"
+    user: "${HG_POC_SOURCE_USER}"
+    password: "${HG_POC_SOURCE_PASSWORD}"
+  tables: [res_partner, x_music_plan_detail_price]
+
+warehouse:
+  host: "${HG_POC_WH_HOST:-localhost}"
+  port: "${HG_POC_WH_PORT:-5432}"
+  database: "${HG_POC_WH_NAME:-warehouse}"
+  user: "${HG_POC_WH_USER}"
+  password: "${HG_POC_WH_PASSWORD}"
+  schema: silver
+
+landing_dataset_name: staging
+
+bronze_staging: true
+bronze:
+  endpoint: "${HG_POC_BRONZE_ENDPOINT}"
+  bucket: "${HG_POC_BRONZE_BUCKET:-hg-bronze}"
+  access_key: "${HG_POC_BRONZE_ACCESS_KEY}"
+  secret_key: "${HG_POC_BRONZE_SECRET_KEY}"
+  prefix: bronze
+
+stages:
+  - name: landing
+    gates:
+      - type: schema_contract
+        tables:
+          res_partner: {id: bigint, name: text}
+          x_music_plan_detail_price: {id: bigint, detail_id: bigint, partner_id: bigint}
+      - type: row_count_bounds
+        table: res_partner
+        min: 1
+      - type: row_count_bounds
+        table: x_music_plan_detail_price
+        min: 1

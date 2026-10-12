@@ -634,3 +634,44 @@ def test_reading_evidence_from_a_read_only_journal_that_predates_the_table(tmp_p
     finally:
         state.close()
         state.DB_PATH.chmod(0o644)
+
+
+def _two_table(hg):
+    import dataclasses
+    return dataclasses.replace(hg, source=dataclasses.replace(
+        hg.source, tables=["res_partner", "x_music_plan_detail_price"]))
+
+
+def _batches(tables_per_batch):
+    return [{"batch_id": f"b{i}", "table_name": t, "status": "loaded", "object_count": 1,
+             "total_rows": 5, "loaded_rows": 5, "manifest_sha256": f"x{i}{t}"}
+            for i, tables in enumerate(tables_per_batch) for t in tables]
+
+
+def test_bronze_evidence_counts_batches_not_registry_rows_and_wants_every_table_in_each(hg):
+    """Several tables per batch = several registry rows per batch id."""
+    both = ["res_partner", "x_music_plan_detail_price"]
+    _hg_validated(hg, report_tweak=lambda r: setattr(r, "bronze_batches", _batches([both] * 3)))
+    two = _two_table(hg)
+    approval.promote(two, "alice", fixture_path=hg.root / "fixture.yaml",
+                     expected_path=hg.root / "expected.yaml")                 # accepted
+
+
+def test_a_batch_missing_one_of_the_pipelines_tables_is_refused(hg):
+    both = ["res_partner", "x_music_plan_detail_price"]
+    _hg_validated(hg, report_tweak=lambda r: setattr(
+        r, "bronze_batches", _batches([both, both, ["res_partner"]])))
+    two = _two_table(hg)
+    before = untouched(hg)
+    with pytest.raises(evidence.EvidenceRefused, match=r"has 1 table\(s\) in the registry, the pipeline reads 2"):
+        approval.promote(two, "alice", fixture_path=hg.root / "fixture.yaml",
+                         expected_path=hg.root / "expected.yaml")
+    assert untouched(hg) == before
+
+
+def test_three_loaded_rows_of_one_batch_are_not_three_batches(hg):
+    both = ["res_partner", "x_music_plan_detail_price"]
+    _hg_validated(hg, report_tweak=lambda r: setattr(r, "bronze_batches", _batches([both])))
+    with pytest.raises(evidence.EvidenceRefused, match="at least 3 bronze batches"):
+        approval.promote(_two_table(hg), "alice", fixture_path=hg.root / "fixture.yaml",
+                         expected_path=hg.root / "expected.yaml")

@@ -1,0 +1,24 @@
+# The landing is "as received": nothing dropped, cast or trimmed - so it equals the fixture,
+# for BOTH tables, in the `staging` landing schema. (Calculated from fixture.yaml by reading it,
+# never read back from the pipeline's own output.)
+table: res_partner
+schema: staging
+row_count: 5
+rows:
+  - {id: 1, name: "Nguyễn Lâm Tùng"}
+  - {id: 2, name: " Nghiêm Đức Tài "}
+  - {id: 3, name: "   "}
+  - {id: 4, name: null}
+  - {id: 5, name: "Alice"}
+also:
+  - table: x_music_plan_detail_price
+    schema: staging
+    row_count: 7
+    rows:
+      - {id: 10, detail_id: 298, partner_id: 1}
+      - {id: 11, detail_id: 117, partner_id: 2}
+      - {id: 12, detail_id: 117, partner_id: 3}
+      - {id: 13, detail_id: 55,  partner_id: 4}
+      - {id: 14, detail_id: 56,  partner_id: 99}
+      - {id: 15, detail_id: 57,  partner_id: null}
+      - {id: 16, detail_id: 298, partner_id: 5}

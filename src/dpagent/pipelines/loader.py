@@ -161,6 +161,8 @@ class DbtProject:
 # The only connector the bronze split is built and proven for so far
 # (docs/hg-bronze-staging.md) - a manifest asking for it with any other
 # connector is refused at load, not silently run down the old path.
+# One snapshot / one transaction holds all of a pipeline's tables; the cap keeps that honest.
+MAX_BRONZE_TABLES = 20
 BRONZE_CONNECTORS = {"odoo_postgres"}
 
 
@@ -463,11 +465,15 @@ def _validate_bronze(raw, bronze_staging: bool, source: Source, where: str) -> B
         raise PipelineError(
             f"{where}: bronze_staging is only built for {sorted(BRONZE_CONNECTORS)} "
             f"so far, not {source.connector!r}")
-    if len(source.tables) != 1:
+    if not 1 <= len(source.tables) <= MAX_BRONZE_TABLES:
         raise PipelineError(
-            f"{where}: bronze_staging loads exactly one source table per pipeline "
-            f"for now (got {len(source.tables)}) - each LOAD is one transaction "
-            f"on one table, and atomicity across tables is not built")
+            f"{where}: bronze_staging takes 1 to {MAX_BRONZE_TABLES} source tables per "
+            f"pipeline (got {len(source.tables)}) - they are read in one snapshot and "
+            f"loaded in one transaction")
+    if len({t.rpartition('.')[2] for t in source.tables}) != len(source.tables):
+        raise PipelineError(
+            f"{where}: bronze_staging needs distinct table names (the landing table is "
+            f"named after the table, schema dropped): {list(source.tables)}")
     if source.incremental:
         raise PipelineError(
             f"{where}: bronze_staging is full-snapshot only for now - remove "
