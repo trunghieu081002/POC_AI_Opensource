@@ -1,0 +1,3 @@
+container_dns=1.1.1.1
+method=temporary docker run wrapper
+global_dns_unchanged=yes

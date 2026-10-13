@@ -1,0 +1,99 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1,
+        2,
+        3
+      ],
+      "detail": "LLMError: model did not return valid JSON after 3 tries: Expecting value: line 1 column 1 (char 0)",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 2,
+      "index": 1,
+      "outcome": "llm-error",
+      "source": "llm",
+      "template_files": {},
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0,
+    "transient_retries": 0,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-13T02:15:23+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:6fc3bd7755c7324d0c5cee488788f86a72fc1b94c4cf8992cb5dc0927bf29319",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:bc2b889608e373f8c68bd16e52db5394294383924a05169fbc81b9178a9cd82e"
+    },
+    {
+      "at": "2026-10-13T02:15:23+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 2,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:129fa721a0de45615a57d8012758b793e8b08d0177abe3ae255b8ac670fa0427",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:695c80c75e65657323dab7c9720793129a1f79b2d7e12d1fc27f6a591cda818a"
+    },
+    {
+      "at": "2026-10-13T02:15:23+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 3,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:1785cfc3bc6ac7738e8b38cdccd1af12563c2b9070e07af336a1bf8c0f772b6a",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:695c80c75e65657323dab7c9720793129a1f79b2d7e12d1fc27f6a591cda818a"
+    }
+  ],
+  "case": "a3_artist_summary",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:36e0209bb62fcbfde68c128ff7afa807c8d502afe6140d8df606345ca1b0166a",
+    "expected": "sha256:7f1ae9b465a89df6080c2897213a6752f61bbcbd19a6948372158a14ce614747",
+    "fixture": "sha256:d9e63258a3e9f6174bd8c00c7f9c6e2c90aafe2448d3549bafd36d0c56ec4941",
+    "request_yaml": "sha256:4e776d660fe8b8251b08cedc4721e148034af3c51de9385d5d56717a64f88d9a",
+    "source_schema": "sha256:e65fb99fc478eeda5b6c86337cd9d01782dd4ddc1a90cf49b4d53efbd3aee2e4",
+    "synth_system_prompt": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+    "synth_system_prompt_name": "synth_pipeline"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "",
+  "started_at": "2026-10-13T02:15:23+00:00",
+  "trace_version": 1
+}

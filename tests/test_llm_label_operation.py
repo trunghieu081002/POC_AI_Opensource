@@ -91,7 +91,7 @@ def test_the_acceptance_contract_requires_the_tests_and_the_certificate_gate():
     assert exp.required_dbt_tests == [{"model": "fact_label_operation", "column": "fact_label_operation_sk",
                                        "tests": ["unique", "not_null"], "severity": "error"}]
     assert exp.required_gates == [{"stage": "landing", "type": "unique", "table": "x_acceptance_cert",
-                                   "columns": ["purchase_order_id"]}]
+                                   "columns": ["purchase_order_id"], "on_violation": "fail"}]
     assert exp.columns["release_date"] == "timestamp without time zone" and len(exp.columns) == 7
 
 
@@ -127,6 +127,8 @@ def test_a_gate_on_other_columns_is_not_the_required_one(tmp_path):
     [{"stage": "landing", "type": "unique"}],
     [{"stage": "landing", "type": "unique", "table": "t", "columns": []}],
     [{"stage": "landing", "type": "unique", "table": "t", "extra": 1}],
+    *[[{"stage": "landing", "type": "unique", "table": "t", "on_violation": v}]
+      for v in (None, False, True, 0, "quarantine", "FAIL")],
 ])
 def test_a_malformed_required_gate_is_refused(tmp_path, bad):
     f = tmp_path / "expected.yaml"
@@ -186,3 +188,37 @@ def test_the_case_reuses_38s_prompt_and_template_unchanged():
     assert a["synth_system_prompt"] == b["synth_system_prompt"]
     assert a["synth_system_prompt"] == "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88"
     assert a["dbt_template_files"] == b["dbt_template_files"]
+
+
+@pytest.mark.parametrize("threshold", [0, 50, 100])
+def test_fail_required_gate_refuses_any_stage_quarantine(tmp_path, threshold):
+    p = _draft(tmp_path, "lab_good")
+    p.stages[0].quarantine = loader.Quarantine(threshold)
+    exp = fixture.load_expected(CASE_DIR / "expected.yaml")
+    assert fixture.required_gate_problems(p, exp.required_gates) == [
+        "required a `unique` gate on x_acceptance_cert ['purchase_order_id'] in stage "
+        "'landing': on_violation: fail forbids stage quarantine"]
+    legacy = [{k: v for k, v in req.items() if k != "on_violation"} for req in exp.required_gates]
+    assert fixture.required_gate_problems(p, legacy) == []
+    assert fixture.required_gate_problems(p, []) == []
+
+
+def test_clean_output_with_quarantine_is_policy_fail_in_harness(provider, tmp_path, monkeypatch):
+    case = llm_verify.load_case(CASE_DIR)
+    reply = scripted.bundle("lab_good")
+    manifest = yaml.safe_load(reply["files"]["pipeline.yaml"])
+    manifest["stages"][0]["quarantine"] = {"reject_threshold_pct": 100}
+    reply["files"]["pipeline.yaml"] = yaml.safe_dump(manifest, sort_keys=False)
+    provider([reply])
+    # Isolate gate policy: output and dbt-test policy are already passing.
+    monkeypatch.setattr(llm_verify, "dbt_test_problems", lambda *args: [])
+
+    def runner(pipeline, step3, fx, ex):
+        return None, {"overall": "pass", "run_status": {"run_1": "ok", "run_2": "ok"},
+                      "comparison": {"run_1": "pass", "run_2": "pass", "idempotent": True},
+                      "cleanup": {"overall": "pass"}, "run_ids": []}, "ev"
+
+    trace, _ = llm_verify.run_case(case, tmp_path / "w", max_calls=1, max_revisions=0, runner=runner)
+    assert trace.attempts[-1].outcome == "policy-fail"
+    assert "on_violation: fail forbids stage quarantine" in trace.attempts[-1].detail
+    assert not (tmp_path / "w" / case.name / ".approved.yaml").exists()

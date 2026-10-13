@@ -1,0 +1,13 @@
+{
+  "commit": "fc18c74eb4341772c171718a6483dcf0969d994f",
+  "tree": "a037dcf9c88e56575be4b1e2819719ba71fe969d",
+  "working_tree_clean": true,
+  "checkout": "/tmp/dpagent-b1-clean-fc18c74",
+  "command": "DPAGENT_DB=/tmp/dpagent-b1-unit-final/dpagent.db PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /tmp/dpagent-b1-venv/bin/python -m pytest -p no:cacheprovider",
+  "result": {
+    "passed": 1254,
+    "skipped": 25
+  },
+  "runner_syntax_check": "bash -n scripts/m25-acceptance-ci.sh: passed",
+  "exit_code": 0
+}

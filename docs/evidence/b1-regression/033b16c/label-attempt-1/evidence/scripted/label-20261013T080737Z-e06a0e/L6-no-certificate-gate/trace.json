@@ -1,0 +1,224 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "the pipeline does not meet the requirement:\nrequired a `unique` gate on x_acceptance_cert ['purchase_order_id'] in stage 'landing': not declared",
+      "drafted_files": [
+        "dwh_dbt/models/silver/_silver_models.yml",
+        "dwh_dbt/models/silver/fact/fact_label_operation.sql",
+        "dwh_dbt/models/staging/_sources.yml",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-2f8110528e93b9af",
+      "fed_back": "the pipeline does not meet the requirement:\nrequired a `unique` gate on x_acceptance_cert ['purchase_order_id'] in stage 'landing': not declared",
+      "files": {
+        "dwh_dbt/models/silver/_silver_models.yml": "sha256:8d2062c48953299ee18c12a606fb47f23ce292f24f23f98fc81c8079bc1d7c40",
+        "dwh_dbt/models/silver/fact/fact_label_operation.sql": "sha256:bf90e429aaa8407ed78bceac471654d92ed317a5def9e6717d35c298585c6f46",
+        "dwh_dbt/models/staging/_sources.yml": "sha256:0332306469fc66b9cbb5edbe66048ed53d8411cbe1da737ae9dde13699fdaa90",
+        "pipeline.yaml": "sha256:bd7755b4b7b2b5bd2c1fdda2d1c087cbd7a6a771e9ed33cb32800552d9b8af1e"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "policy-fail",
+      "source": "llm",
+      "template_files": {
+        "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+        "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+        "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+        "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+      },
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "a3_fact_label_operation__validate__97c4d132",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "dbt_tests": {
+          "run_1": [
+            {
+              "data": {
+                "errored": 0,
+                "exit_code": 0,
+                "failed": 0,
+                "missing": [],
+                "models": [
+                  "fact_label_operation"
+                ],
+                "passed": 2,
+                "ran": 2,
+                "reason": "",
+                "required": [
+                  "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+                  "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                ],
+                "skipped": 0,
+                "stage": "silver",
+                "status": "passed",
+                "tests": [
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "not_null",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+                  },
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "unique",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                  }
+                ],
+                "untested_models": [],
+                "warned": 0
+              },
+              "errored": 0,
+              "failed": 0,
+              "kind": "dbt.test.passed",
+              "message": "a3_fact_label_operation__validate__97c4d132/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+              "passed": 2,
+              "ran": 2,
+              "required": 2,
+              "skipped": 0,
+              "stage": "silver",
+              "status": "passed"
+            }
+          ],
+          "run_2": [
+            {
+              "data": {
+                "errored": 0,
+                "exit_code": 0,
+                "failed": 0,
+                "missing": [],
+                "models": [
+                  "fact_label_operation"
+                ],
+                "passed": 2,
+                "ran": 2,
+                "reason": "",
+                "required": [
+                  "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+                  "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                ],
+                "skipped": 0,
+                "stage": "silver",
+                "status": "passed",
+                "tests": [
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "unique",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+                  },
+                  {
+                    "column": "fact_label_operation_sk",
+                    "failures": 0,
+                    "models": [
+                      "fact_label_operation"
+                    ],
+                    "name": "not_null",
+                    "severity": "error",
+                    "status": "pass",
+                    "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+                  }
+                ],
+                "untested_models": [],
+                "warned": 0
+              },
+              "errored": 0,
+              "failed": 0,
+              "kind": "dbt.test.passed",
+              "message": "a3_fact_label_operation__validate__97c4d132/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+              "passed": 2,
+              "ran": 2,
+              "required": 2,
+              "skipped": 0,
+              "stage": "silver",
+              "status": "passed"
+            }
+          ]
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          10,
+          11
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 0,
+    "transient_retries": 0,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-13T08:22:11+00:00",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "scripted/stand-in-for-a-model",
+      "response_sha256": "sha256:9c28a6d0879e9ee6db6313fb6f517bdec9f9b001db146ad8c2a954d207e46622",
+      "system_sha256": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 11,
+        "total_tokens": 18
+      },
+      "user_sha256": "sha256:eafd38408620d66a4a7cb626dd821443bdaef70e90b030601d0262ad4f793b46"
+    }
+  ],
+  "case": "a3_fact_label_operation",
+  "classification": "not-validated",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:ba33b0b8de44d11d0640151609e4cb5ce111f52ae90f2289e50d2a05663cb581",
+    "dbt_template": "hg_dwh_dbt",
+    "dbt_template_files": {
+      "dwh_dbt/dbt_project.yml": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+      "dwh_dbt/macros/generate_schema_name.sql": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+      "dwh_dbt/package-lock.yml": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+      "dwh_dbt/packages.yml": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+    },
+    "expected": "sha256:0ae861054ad49fd540209ee1283e45c5879b40eaa6a8f074f1e92fae6419b645",
+    "fixture": "sha256:e53bf211036fd96bc17956317e7147b3f41004c34bba2cbb81c90ff481ec9b3f",
+    "request_yaml": "sha256:54f485e90ce77c681726c38c8047f4979a154c2e1442920065b738ec45425741",
+    "source_schema": "sha256:7f034ac7f125e5f2bac6d09c302bba37a99e30d781aba8ccc8b7bbe1a437ac55",
+    "synth_system_prompt": "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88",
+    "synth_system_prompt_name": "synth_dbt_project"
+  },
+  "kind": "build",
+  "model": "scripted/stand-in-for-a-model",
+  "pipeline_dir": "/tmp/a3_dn68ilrf/pipelines/a3_fact_label_operation",
+  "started_at": "2026-10-13T08:22:11+00:00",
+  "trace_version": 1
+}

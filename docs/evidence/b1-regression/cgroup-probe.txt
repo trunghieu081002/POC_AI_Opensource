@@ -1,0 +1,15 @@
+Docker Desktop / WSL2, initial runner default: private cgroup namespace.
+Observed /proc/1/cgroup: 0::/../../init.scope.
+PostgreSQL service journal: New main PID 7279 does not belong to service, and PID file is not owned by root. Refusing.
+Bronze bootstrap timed out at PostgreSQL config; no acceptance matrix ran.
+
+Separate disposable probe used --cgroupns=host with the same systemd image and bind mount.
+Observed /proc/1/cgroup: 0::/docker/a836e582f3bacc1011682940fa6e6aa6dcd50da3cbec9d01afd8d2bf1e9bd4ea/init.scope.
+A non-root (nobody) Type=forking service with a non-root PID file started and deactivated successfully:
+Oct 12 16:27:11 systemd[1]: Started /bin/bash -c sleep 30 & echo $! > /tmp/b1-fork-probe.pid.
+Oct 12 16:27:39 systemd[1]: b1-fork-probe.service: Deactivated successfully.
+
+M25_CGROUPNS is an optional runner setting; default behavior stays unchanged.
+These observations diagnose the host, not B1 acceptance. Full regression must still pass on rebuilt hosts.
+
+Later the probe became degraded only because getty@tty1.service failed (no console in the headless container). The disposable image now masks that console unit; product packs are unchanged.

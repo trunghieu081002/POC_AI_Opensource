@@ -117,12 +117,20 @@ question for HG, and requires the pipeline to **fail rather than choose** — a 
 `x_acceptance_cert.purchase_order_id` at landing. That requirement is `required_gates` in `expected.yaml` (new),
 checked against the manifest by the harness and **by A2**; the fixture holds no such order.
 
+The B1 contract also declares `on_violation: fail`: the required stage must have **no quarantine**,
+at any rejection threshold. A quarantine could otherwise remove ambiguous certificates and continue,
+so matching stage/type/table/columns alone is insufficient. Harness and A2 share this check.
+Requirements without `on_violation` retain their existing declaration-only policy.
+
 | Scripted scenario | Must happen |
 |---|---|
 | L1 right project | the full chain (validate twice → promote → real deploy/run → output = expected → bytes → edits) |
 | L2 INNER JOIN · L3 no `active` filter · L4 largest id kept · L5 groups on the trimmed ISRC | each runs, the output does not match → not promotable |
 | L6 no certificate gate | output matches, `policy-fail` (the required gate is not declared); A2 refuses |
 | L7 two certificates for one order (fixture changed for this scenario only) | the **right** project fails at its gate — it does not pick a certificate |
+| L8 correct certificate gate + landing quarantine at 100%, clean fixture | output and cleanup pass, but harness policy and A2 refuse; approval unchanged |
+
+L7 also checks the journal: landing failed, silver never ran, promotion was refused, and cleanup passed.
 
 ```bash
 bash scripts/m25-acceptance-ci.sh --a3 scripted --a3-suite label

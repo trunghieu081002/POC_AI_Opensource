@@ -792,3 +792,31 @@ def test_a_required_gate_the_manifest_does_not_declare_refuses_promotion(hg):
     f.write_text(_yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
     _hg_validated(hg)
     _hg_refused(hg, "required a `unique` gate on res_partner ['id'] in stage 'landing': not declared")
+
+
+@pytest.mark.parametrize("require_fail", [False, True])
+@pytest.mark.parametrize("existing_approval", [False, True])
+def test_required_gate_fail_policy_refuses_quarantine_without_changing_approval(
+        pipeline, require_fail, existing_approval):
+    if existing_approval:
+        validated(pipeline)
+        promote(pipeline)
+    manifest = pipeline.root / "pipeline.yaml"
+    doc = yaml.safe_load(manifest.read_text())
+    doc["stages"][0]["gates"].append({"type": "unique", "table": "t", "columns": ["id"]})
+    doc["stages"][0]["quarantine"] = {"reject_threshold_pct": 100}
+    manifest.write_text(yaml.safe_dump(doc, sort_keys=False))
+    pipeline = loader.load(pipeline.name, pipeline.root.parent)
+    expected = pipeline.root / "expected.yaml"
+    doc = yaml.safe_load(expected.read_text())
+    required = {"stage": "landing", "type": "unique", "table": "t", "columns": ["id"]}
+    if require_fail:
+        required["on_violation"] = "fail"
+    doc["required_gates"] = [required]
+    expected.write_text(yaml.safe_dump(doc, sort_keys=False))
+    # Fresh sealed evidence bound to this exact content with two successful journal runs.
+    validated(pipeline)
+    if require_fail:
+        assert_refused(pipeline, "on_violation: fail forbids stage quarantine")
+    else:
+        promote(pipeline)  # Existing contracts keep their declaration-only policy.

@@ -1,0 +1,4 @@
+container_dns=8.8.8.8,8.8.4.4
+dns_options=single-request-reopen,timeout:2,attempts:3
+method=temporary docker run wrapper
+global_dns_unchanged=yes

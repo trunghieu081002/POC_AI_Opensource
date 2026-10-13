@@ -1,0 +1,39 @@
+name: a3_revenue_ambiguous
+summary: Artist summary from res_partner (scripted reference draft - written by a
+  person, NOT by a model)
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${A3_SRC_HOST}
+    port: ${A3_SRC_PORT:-5432}
+    database: ${A3_SRC_NAME}
+    user: ${A3_SRC_USER}
+    password: ${A3_SRC_PASSWORD}
+  tables:
+  - res_partner
+warehouse:
+  host: ${A3_WH_HOST:-localhost}
+  port: ${A3_WH_PORT:-5432}
+  database: ${A3_WH_NAME:-warehouse}
+  user: ${A3_WH_USER}
+  password: ${A3_WH_PASSWORD}
+  schema: a3_artist_summary
+stages:
+- name: landing
+  gates:
+  - type: row_count_bounds
+    table: res_partner
+    min: 1
+- name: curated
+  engine: dbt
+  depends_on: landing
+  models:
+  - artist_summary
+  gates:
+  - type: not_null
+    table: artist_summary
+    columns:
+    - artists
+    - distinct_names
+    - min_id
+    - max_id

@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: staging
+    schema: staging
+    tables:
+      - name: x_music_song
+      - name: x_acceptance_cert

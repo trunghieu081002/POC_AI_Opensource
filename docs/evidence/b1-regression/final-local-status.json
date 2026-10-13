@@ -1,0 +1,53 @@
+{
+  "branch": "fix/b1-fail-required-gate",
+  "base_commit": "1805adc14415321b39e182145fed5a920d6ad630",
+  "source_commit": "033b16c7c78af90c4f43292a6888e4cb52c55ee5",
+  "source_tree": "1a03ede545210b1924bca84d016c0a101c2419df",
+  "regression_status": "complete",
+  "execution_order": [
+    "unit",
+    "label",
+    "artist",
+    "bronze",
+    "unit-exit-confirmation"
+  ],
+  "unit": {
+    "passed": 1254,
+    "skipped": 25,
+    "exit": 0,
+    "evidence": "033b16c/unit-exit-confirmation",
+    "original_exit_capture_missing": true,
+    "original_log_retained": true
+  },
+  "label": {
+    "matched": 8,
+    "total": 8,
+    "exit": 0,
+    "leaks": 0
+  },
+  "artist": {
+    "matched": 8,
+    "total": 8,
+    "exit": 0,
+    "leaks": 0,
+    "simulated_api_timeout_expected": true
+  },
+  "bronze": {
+    "matched": 31,
+    "total": 31,
+    "exit": 0,
+    "leaks": 0,
+    "full_success": true,
+    "drop_failure_real_session_verified": true
+  },
+  "github": {
+    "source_branch_pushed": true,
+    "source_remote_commit": "033b16c7c78af90c4f43292a6888e4cb52c55ee5",
+    "pr_url": "https://github.com/trunghieu081002/POC_AI_Opensource/pull/40"
+  },
+  "disposable_regression_containers_remaining": 0,
+  "production_deployed": false,
+  "real_model_calls": false,
+  "source_changes_during_closure": false,
+  "prior_failed_attempts_retained": true
+}

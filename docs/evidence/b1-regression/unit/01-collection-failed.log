@@ -1,0 +1,21 @@
+
+==================================== ERRORS ====================================
+______________ ERROR collecting tests/test_pipelines_validate.py _______________
+tests/test_pipelines_validate.py:54: in <module>
+    not __import__("pathlib").Path(validate._dbt_bin()).exists(),
+                                   ^^^^^^^^^^^^^^^^^^^
+src/dpagent/pipelines/validate.py:89: in _dbt_bin
+    record = state.get_install("dbt")
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpagent/engine/state.py:419: in get_install
+    return conn().execute("SELECT * FROM installs WHERE pack=?", (pack,)).fetchone()
+           ^^^^^^
+src/dpagent/engine/state.py:206: in conn
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+/usr/lib/python3.12/pathlib.py:1313: in mkdir
+    os.mkdir(self, mode)
+E   PermissionError: [Errno 13] Permission denied: '/var/lib/dpagent'
+=========================== short test summary info ============================
+ERROR tests/test_pipelines_validate.py - PermissionError: [Errno 13] Permissi...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 43.69s

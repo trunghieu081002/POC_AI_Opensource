@@ -1,0 +1,424 @@
+{
+  "approval_file_exists": true,
+  "attempt_detail": "",
+  "attempts": [
+    {
+      "evidence_id": "ev-ff755680e64ae55d",
+      "n": 1,
+      "outcome": "validated",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_label_operation",
+  "classification": "llm-first-draft",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "deploy_run": {
+    "comparison": {
+      "detail": "7 row(s) matched exactly",
+      "ok": true
+    },
+    "databases_dropped": true,
+    "dbt_test_problems": [],
+    "dbt_tests": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "fact_label_operation"
+          ],
+          "passed": 2,
+          "ran": 2,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+            "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "fact_label_operation_sk",
+              "failures": 0,
+              "models": [
+                "fact_label_operation"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+            },
+            {
+              "column": "fact_label_operation_sk",
+              "failures": 0,
+              "models": [
+                "fact_label_operation"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "a3_fact_label_operation/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+        "passed": 2,
+        "ran": 2,
+        "required": 2,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      }
+    ],
+    "deployed": true,
+    "error": "",
+    "gates": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": 15,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 6,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        }
+      ]
+    },
+    "gates_passed": true,
+    "ok": true,
+    "promote": {
+      "accepted": true,
+      "approval_hash": "sha256:db0799cc9d53a4cc7badd01945bd821ede4e4c5c4a5e73c89826168710192f8f",
+      "evidence_id": "ev-ff755680e64ae55d",
+      "maturity": "reviewed",
+      "verification": "verified"
+    },
+    "published_bytes": {
+      "checked": {
+        "published/dwh_dbt/dbt_project.yml": {
+          "drafted": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/dbt_project.yml",
+          "published": "sha256:2616f4949389a60d4dd09fa9fa6f60fdffef75f4bf2270b02d6f15852ddfb9fb"
+        },
+        "published/dwh_dbt/macros/generate_schema_name.sql": {
+          "drafted": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/macros/generate_schema_name.sql",
+          "published": "sha256:6a38a097198efa10589585c4eab6c7dc40b2590f3500f312013f2180cf2cc2a3"
+        },
+        "published/dwh_dbt/models/silver/_silver_models.yml": {
+          "drafted": "sha256:8d2062c48953299ee18c12a606fb47f23ce292f24f23f98fc81c8079bc1d7c40",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/models/silver/_silver_models.yml",
+          "published": "sha256:8d2062c48953299ee18c12a606fb47f23ce292f24f23f98fc81c8079bc1d7c40"
+        },
+        "published/dwh_dbt/models/silver/fact/fact_label_operation.sql": {
+          "drafted": "sha256:bf90e429aaa8407ed78bceac471654d92ed317a5def9e6717d35c298585c6f46",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/models/silver/fact/fact_label_operation.sql",
+          "published": "sha256:bf90e429aaa8407ed78bceac471654d92ed317a5def9e6717d35c298585c6f46"
+        },
+        "published/dwh_dbt/models/staging/_sources.yml": {
+          "drafted": "sha256:0332306469fc66b9cbb5edbe66048ed53d8411cbe1da737ae9dde13699fdaa90",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/models/staging/_sources.yml",
+          "published": "sha256:0332306469fc66b9cbb5edbe66048ed53d8411cbe1da737ae9dde13699fdaa90"
+        },
+        "published/dwh_dbt/package-lock.yml": {
+          "drafted": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/package-lock.yml",
+          "published": "sha256:59d562a39c469e62a1911a79b46d56bcd1bbbd73193090f4564a774c71f0278b"
+        },
+        "published/dwh_dbt/packages.yml": {
+          "drafted": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/dwh_dbt/packages.yml",
+          "published": "sha256:40554b4277d679dc28878cfb4e834fc6e3ccd17173b92ec312d77b21043c0cd1"
+        },
+        "published/pipeline.yaml": {
+          "drafted": "sha256:0610ce155420dc68caae4a31914d7462e7138000b06b7d48dd23a12b3eef0100",
+          "equal": true,
+          "missing": false,
+          "path": "/opt/dpagent/pipelines/a3_fact_label_operation/pipeline.yaml",
+          "published": "sha256:0610ce155420dc68caae4a31914d7462e7138000b06b7d48dd23a12b3eef0100"
+        }
+      },
+      "ok": true
+    },
+    "run_id": 5,
+    "run_status": "ok",
+    "undeploy_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "undeploy_verified": true
+  },
+  "edit_checks": {
+    "edits": {
+      "expected": {
+        "approval_still_valid": true,
+        "approval_unchanged": true,
+        "deploy_refused": false,
+        "promote_accepted": false
+      },
+      "fixture": {
+        "approval_still_valid": true,
+        "approval_unchanged": true,
+        "deploy_refused": false,
+        "promote_accepted": false
+      },
+      "manifest": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      },
+      "model": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      },
+      "models-yml": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      },
+      "template-dbt_project.yml": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      },
+      "template-macro": {
+        "approval_still_valid": false,
+        "approval_unchanged": true,
+        "deploy_refused": true,
+        "promote_accepted": false
+      }
+    },
+    "ok": true,
+    "problems": [],
+    "restored_is_valid_again": true
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_label_operation/.synth-validation.yaml",
+    "a3_fact_label_operation/dwh_dbt/dbt_project.yml",
+    "a3_fact_label_operation/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_label_operation/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_label_operation/dwh_dbt/models/silver/fact/fact_label_operation.sql",
+    "a3_fact_label_operation/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_label_operation/dwh_dbt/package-lock.yml",
+    "a3_fact_label_operation/dwh_dbt/packages.yml",
+    "a3_fact_label_operation/pipeline.yaml"
+  ],
+  "label": "L1-good-project-first-try",
+  "last_outcome": "validated",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_label_operation__validate__da20295a",
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "dbt_tests": {
+      "run_1": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_label_operation"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+              "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "not_null",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+              },
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "unique",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_label_operation__validate__da20295a/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ],
+      "run_2": [
+        {
+          "data": {
+            "errored": 0,
+            "exit_code": 0,
+            "failed": 0,
+            "missing": [],
+            "models": [
+              "fact_label_operation"
+            ],
+            "passed": 2,
+            "ran": 2,
+            "reason": "",
+            "required": [
+              "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be",
+              "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+            ],
+            "skipped": 0,
+            "stage": "silver",
+            "status": "passed",
+            "tests": [
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "not_null",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.not_null_fact_label_operation_fact_label_operation_sk.ce4587f9be"
+              },
+              {
+                "column": "fact_label_operation_sk",
+                "failures": 0,
+                "models": [
+                  "fact_label_operation"
+                ],
+                "name": "unique",
+                "severity": "error",
+                "status": "pass",
+                "test": "test.dwh_hgmedia.unique_fact_label_operation_fact_label_operation_sk.17089a5ab2"
+              }
+            ],
+            "untested_models": [],
+            "warned": 0
+          },
+          "errored": 0,
+          "failed": 0,
+          "kind": "dbt.test.passed",
+          "message": "a3_fact_label_operation__validate__da20295a/silver: dbt test passed - ran 2 (2 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 2 required",
+          "passed": 2,
+          "ran": 2,
+          "required": 2,
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed"
+        }
+      ]
+    },
+    "deploy_error": "",
+    "overall": "pass",
+    "run_ids": [
+      3,
+      4
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 18,
+  "validation_stages": {
+    "3": [
+      {
+        "stage": "landing",
+        "status": "passed"
+      },
+      {
+        "stage": "silver",
+        "status": "passed"
+      }
+    ],
+    "4": [
+      {
+        "stage": "landing",
+        "status": "passed"
+      },
+      {
+        "stage": "silver",
+        "status": "passed"
+      }
+    ]
+  }
+}

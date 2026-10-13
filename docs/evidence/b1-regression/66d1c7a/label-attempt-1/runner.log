@@ -1,0 +1,4 @@
+[36m::[0m preconditions ok - commit 66d1c7ad46f73902d5761e8fcef130b0fea1e28e, building/reusing image dpagent-m25-disposable
+sha256:5486249178a4f6c3f8a4c47f94cdcf60ad8bf0bc4504b9e6301e575a7afeb74e
+[32mok[0m image dpagent-m25-disposable ready
+[31mXX[0m systemd never reached 'running' inside the container (got: degraded) - 'docker logs dpagent-m25-acceptance-3428' for why

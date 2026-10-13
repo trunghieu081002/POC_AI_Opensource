@@ -61,11 +61,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IMAGE="dpagent-m25-disposable"
 CONTAINER="dpagent-m25-acceptance-$$"
-RESULTS_DIR="${REPO_ROOT}/docs/evidence/m25-automated"
+# Optional per-run destination keeps failed and successful regression evidence side by side.
+RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/m25-automated}"
 case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
 case "$A3_SUITE" in artist|khsx|label) ;; *) echo "--a3-suite must be artist, khsx or label" >&2; exit 2 ;; esac
 if [ -n "$A3" ]; then
-  RESULTS_DIR="${REPO_ROOT}/docs/evidence/a3-llm"
+  RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/a3-llm}"
   PROFILE=core      # A3 needs no object store
   if [ "$A3" = real ] || [ "$A3" = both ]; then
     # fail before building anything if the opt-in is missing
@@ -133,7 +134,11 @@ trap cleanup EXIT
 # -------------------------------------------------------------- launch
 
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
-docker run -d --name "${CONTAINER}" \
+
+# WSL/Docker Desktop may need host cgroup namespaces with this bind mount for systemd PID ownership.
+CGROUPNS_ARGS=()
+[ -z "${M25_CGROUPNS:-}" ] || CGROUPNS_ARGS=(--cgroupns "${M25_CGROUPNS}")
+docker run -d --name "${CONTAINER}" "${CGROUPNS_ARGS[@]}" \
   --privileged \
   --tmpfs /run --tmpfs /run/lock \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
@@ -260,6 +265,7 @@ mkdir -p "${RESULTS_DIR}"
   echo "tree=${TREE}"
   echo "working_tree_clean=$([ -z "$DIRTY" ] && echo yes || echo NO)"
   echo "profile=${PROFILE}"
+  echo "cgroupns=$(docker inspect -f '{{.HostConfig.CgroupnsMode}}' "${CONTAINER}")"
   echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "${RESULTS_DIR}/run-info.txt"
 if [ -n "$A3" ]; then

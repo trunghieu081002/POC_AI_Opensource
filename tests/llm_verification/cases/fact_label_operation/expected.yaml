@@ -15,7 +15,7 @@ required_dbt_tests:
   - {model: fact_label_operation, column: fact_label_operation_sk, tests: [unique, not_null], severity: error}
 # brd.md "Nhiều chứng nhận ... blocker B1": the run must FAIL rather than pick a certificate
 required_gates:
-  - {stage: landing, type: unique, table: x_acceptance_cert, columns: [purchase_order_id]}
+  - {stage: landing, type: unique, table: x_acceptance_cert, columns: [purchase_order_id], on_violation: fail}
 columns: {fact_label_operation_sk: text, resource_id: text, release_status: text,
           release_date: timestamp without time zone, acceptance_url: text, isrc: text, distributor: text}
 rows:

@@ -1,0 +1,1 @@
+Stopped disposable container dpagent-m25-acceptance-6040 during bootstrap after diagnosing incompatible private cgroup namespace on this Docker/WSL host. No A3 scenarios ran. Retained original runner log and exit code; a new clean host is required.

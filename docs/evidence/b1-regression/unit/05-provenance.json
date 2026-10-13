@@ -1,0 +1,14 @@
+{
+  "commit": "cbac310741ea82ab11e2c3031222a4c64a1f1322",
+  "tree": "e53b41c894995080b4781c43c99119e1f3039b77",
+  "working_tree_clean": true,
+  "checkout": "/tmp/dpagent-b1-clean-cbac310",
+  "command": "DPAGENT_DB=/tmp/dpagent-b1-unit-cbac/dpagent.db PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /tmp/dpagent-b1-venv/bin/python -m pytest -p no:cacheprovider",
+  "exit_code": 0,
+  "result": {
+    "passed": 1254,
+    "skipped": 25,
+    "seconds": 155.18
+  },
+  "harness_syntax_check": "ast.parse(tests/m25_acceptance/run_matrix.py): passed"
+}

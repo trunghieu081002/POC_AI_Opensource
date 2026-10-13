@@ -361,11 +361,24 @@ def run_drop_failure(tmp_path: Path) -> dict:
             if prefix == "dpagent_fixture_wh":
                 captured["database"] = db.database
                 captured["user"] = db.user
+                # Keep stdin open: psql holds an idle connection until teardown, regardless
+                # of how long real validation takes (a fixed pg_sleep can expire too early).
                 captured["proc"] = subprocess.Popen(
-                    ["psql", "-h", db.host, "-U", db.user, "-d", db.database,
-                     "-c", "SELECT pg_sleep(120)"],
+                    ["psql", "-h", db.host, "-U", db.user, "-d", db.database],
                     env={"PGPASSWORD": db.password, "PATH": "/usr/bin:/bin"},
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    if captured["proc"].poll() is not None:
+                        raise RuntimeError("DROP-failure holder could not connect")
+                    probe = pg_throwaway._run_as_postgres(
+                        f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db.database}' "
+                        f"AND usename = '{db.user}';", timeout=5, tuples_only=True)
+                    if probe is not None and probe.returncode == 0 and probe.stdout.strip() == "1":
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError("DROP-failure holder did not become ready")
             yield db
 
     try:
@@ -374,6 +387,8 @@ def run_drop_failure(tmp_path: Path) -> dict:
     finally:
         proc = captured.get("proc")
         if proc is not None:
+            if proc.stdin is not None:
+                proc.stdin.close()
             proc.terminate()
             try:
                 proc.wait(timeout=5)

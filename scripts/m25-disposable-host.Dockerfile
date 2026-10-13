@@ -10,9 +10,11 @@
 # tmpfs - see scripts/m25-acceptance-ci.sh for the exact `docker run`. A
 # plain `docker run` of this image without that is exactly the FAQ's "does
 # not work" case: /sbin/init needs real cgroup access to manage services.
+# This headless test host has no tty1; a failing getty would mark an otherwise healthy host degraded.
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       systemd systemd-sysv dbus ca-certificates sudo \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && systemctl mask getty@tty1.service
 CMD ["/sbin/init"]

@@ -625,7 +625,8 @@ class ExpectedResult:
     # them in the journal) - [{model, column, tests: [...], severity}].
     required_dbt_tests: list[dict] = field(default_factory=list)
     # Top level only: gates the manifest MUST declare (acceptance policy; A2 checks the manifest,
-    # the journal already requires every gate to have passed) - [{stage, type, table, columns}].
+    # the journal already requires every gate to have passed). Optional on_violation: fail forbids
+    # quarantine on the required stage, so rejected rows cannot be removed and execution continued.
     required_gates: list[dict] = field(default_factory=list)
 
 
@@ -654,21 +655,24 @@ def _parse_required_gates(raw, where: str) -> list[dict]:
     out = []
     for i, g in enumerate(raw):
         cols = g.get("columns") if isinstance(g, dict) else None
-        if not (isinstance(g, dict) and set(g) <= {"stage", "type", "table", "columns"}
+        if not (isinstance(g, dict) and set(g) <= {"stage", "type", "table", "columns", "on_violation"}
                 and all(isinstance(g.get(k), str) and g[k] for k in ("stage", "type", "table"))
+                and ("on_violation" not in g or g["on_violation"] == "fail")
                 and (cols is None or (isinstance(cols, list) and cols
                                       and all(isinstance(c, str) and c for c in cols)))):
             raise ValueError(f"{where}: required_gates[{i}] needs stage, type, table "
-                             f"(and optionally columns: [..]), nothing else")
+                             f"(and optionally columns: [..], on_violation: fail), nothing else")
         out.append({"stage": g["stage"], "type": g["type"], "table": g["table"],
-                    "columns": list(cols) if cols else None})
+                    "columns": list(cols) if cols else None,
+                    **({"on_violation": "fail"} if "on_violation" in g else {})})
     return out
 
 
 def required_gate_problems(pipeline, required: list[dict]) -> list[str]:
     """Each required gate must be declared by the manifest: same stage, type and table, and -
     when the requirement names columns - exactly that column set (a `unique` on [a, b] does not
-    make [a] unique)."""
+    make [a] unique). on_violation: fail also forbids stage quarantine at any threshold;
+    requirements without it retain the existing declaration-only policy."""
     problems = []
     stages = {s.name: s for s in pipeline.stages}
     for req in required:
@@ -678,6 +682,8 @@ def required_gate_problems(pipeline, required: list[dict]) -> list[str]:
         if stage is None:
             problems.append(f"required {want}: the pipeline has no stage {req['stage']!r}")
             continue
+        if req.get("on_violation") == "fail" and stage.quarantine is not None:
+            problems.append(f"required {want}: on_violation: fail forbids stage quarantine")
         hit = any(g.type == req["type"] and g.params.get("table") == req["table"]
                   and (req["columns"] is None
                        or sorted(g.params.get("columns") or []) == sorted(req["columns"]))
