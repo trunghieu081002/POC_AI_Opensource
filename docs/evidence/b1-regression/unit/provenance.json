@@ -1,0 +1,27 @@
+{
+  "commit": "66d1c7ad46f73902d5761e8fcef130b0fea1e28e",
+  "tree": "54218e4bba43ca11c74d5bce4e965a4f10e9025f",
+  "working_tree_clean": true,
+  "checkout": "/tmp/dpagent-b1-clean-66d1c7a",
+  "command": "DPAGENT_DB=/tmp/dpagent-b1-unit-clean/dpagent.db PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /tmp/dpagent-b1-venv/bin/python -m pytest -p no:cacheprovider",
+  "result": {
+    "passed": 1254,
+    "skipped": 25,
+    "exit_code": 0
+  },
+  "earlier_attempts": [
+    {
+      "log": "01-collection-failed.log",
+      "reason": "Default /var/lib/dpagent journal directory inaccessible to unprivileged WSL user; collection failed"
+    },
+    {
+      "log": "02-full-suite.log",
+      "reason": "Windows checkout used in WSL; CRLF shell files; this is not the clean Linux acceptance run",
+      "result": {
+        "failed": 45,
+        "passed": 1209,
+        "skipped": 25
+      }
+    }
+  ]
+}

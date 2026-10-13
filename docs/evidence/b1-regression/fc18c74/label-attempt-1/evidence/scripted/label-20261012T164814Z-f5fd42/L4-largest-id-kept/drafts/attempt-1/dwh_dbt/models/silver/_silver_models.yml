@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: fact_label_operation
+    columns:
+      - name: fact_label_operation_sk
+        tests:
+          - unique
+          - not_null

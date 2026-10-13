@@ -1,0 +1,136 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "run_1: the output table does not match the independently calculated expected result (not shown to you). Re-read each BRD rule against your SQL.",
+  "attempts": [
+    {
+      "evidence_id": "ev-9460061689000aaf",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "artist_summary",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_artist_summary/.synth-validation.yaml",
+    "a3_artist_summary/models/artist_summary.sql",
+    "a3_artist_summary/pipeline.yaml"
+  ],
+  "label": "S4-wrong-result",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_artist_summary__validate__2d8a35ef",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "fail",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef via odoo_postgres",
+        "run": 11
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef extract complete: res_partner +10",
+        "run": 11
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/landing row_count_bounds: ok",
+        "run": 11
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/landing gates passed",
+        "run": 11
+      },
+      {
+        "kind": "transform.start",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/curated via dbt",
+        "run": 11
+      },
+      {
+        "kind": "transform.done",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/curated transform complete",
+        "run": 11
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/curated not_null: ok",
+        "run": 11
+      },
+      {
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "a3_artist_summary__validate__2d8a35ef/curated gates passed",
+        "run": 11
+      },
+      {
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 11 reached terminal state: ok",
+        "run": 11
+      }
+    ],
+    "run_ids": [
+      11
+    ],
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'fail', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1"
+    ]
+  },
+  "tokens": 18,
+  "validation_stages": {
+    "11": [
+      {
+        "stage": "landing",
+        "status": "passed"
+      },
+      {
+        "stage": "curated",
+        "status": "passed"
+      }
+    ]
+  }
+}

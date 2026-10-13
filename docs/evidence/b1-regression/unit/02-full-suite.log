@@ -1,0 +1,1143 @@
+FFFFFFFFFFFF............................................................ [  5%]
+...................FFFFFFFFFFFFFFFFssFsFsFsFsFsssFs..................... [ 11%]
+.......F................................................................ [ 16%]
+........................................................................ [ 22%]
+........FFFFFFF...................................................s..... [ 28%]
+........................................................................ [ 33%]
+.................FFF.................................................... [ 39%]
+...........................................sss.......................... [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 56%]
+........................................................................ [ 61%]
+........................................................................ [ 67%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+.................................................................ssssss. [ 84%]
+...........................................................sss.s........ [ 90%]
+.........s.............................................................. [ 95%]
+.......................................................                  [100%]
+=================================== FAILURES ===================================
+___________________ test_blocks_when_systemd_is_not_present ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_blocks_when_systemd_is_no0')
+
+    @requires_bash
+    def test_blocks_when_systemd_is_not_present(tmp_path):
+        # A reachable backend so the *only* thing that can fail is the systemd
+        # check - proves this check exists independent of every other preflight
+        # condition, not just that the whole script failed for some reason.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+    
+            result = run_preflight(tmp_path, svc_mgr="unknown", backend_port=port)
+    
+>       assert "systemd, which is not present" in result.stderr
+E       AssertionError: assert 'systemd, which is not present' in '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n'
+E        +  where '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n' = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh'], returncode=2, ..., stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n').stderr
+
+tests/test_airflow_preflight.py:69: AssertionError
+__________ test_passes_when_systemd_is_present_and_backend_reachable ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_passes_when_systemd_is_pr0')
+
+    @requires_bash
+    def test_passes_when_systemd_is_present_and_backend_reachable(tmp_path):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+    
+            result = run_preflight(tmp_path, svc_mgr="systemd", backend_port=port)
+    
+>       assert "preflight passed" in result.stderr
+E       AssertionError: assert 'preflight passed' in '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n'
+E        +  where '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n' = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh'], returncode=2, ..., stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 2: set: pipefail\n: invalid option name\n').stderr
+
+tests/test_airflow_preflight.py:83: AssertionError
+_____________________ test_warns_when_selinux_is_enforcing _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_warns_when_selinux_is_enf0')
+
+    @requires_bash
+    def test_warns_when_selinux_is_enforcing(tmp_path):
+        result = run_preflight(tmp_path, getenforce_output="Enforcing")
+>       assert "SELinux is Enforcing" in result.stderr
+E       AssertionError: assert 'SELinux is Enforcing' in '/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail\n: invalid option name\n'
+E        +  where '/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail\n: invalid option name\n' = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh'], returncode=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail\n: invalid option name\n').stderr
+
+tests/test_base_preflight.py:61: AssertionError
+__________________ test_no_warning_when_selinux_is_permissive __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_no_warning_when_selinux_i0')
+
+    @requires_bash
+    def test_no_warning_when_selinux_is_permissive(tmp_path):
+        result = run_preflight(tmp_path, getenforce_output="Permissive")
+        assert "SELinux" not in result.stderr
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail
+E         : invalid option name
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh'], returncode=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail\n: invalid option name\n').returncode
+
+tests/test_base_preflight.py:69: AssertionError
+__________________ test_no_warning_when_getenforce_is_absent ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_no_warning_when_getenforc0')
+
+    @requires_bash
+    def test_no_warning_when_getenforce_is_absent(tmp_path):
+        result = run_preflight(tmp_path, getenforce_output=None)
+        assert "SELinux" not in result.stderr
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail
+E         : invalid option name
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh'], returncode=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 4: set: pipefail\n: invalid option name\n').returncode
+
+tests/test_base_preflight.py:76: AssertionError
+__ test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone __
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_fresh_tarball_extract_ins0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone(tmp_path):
+        """The P0 regression, end to end: run exactly as if bootstrap.sh were
+        sitting inside a just-extracted tarball (DPAGENT_SOURCE_DIR pointing at
+        that directory, as scripts/setup.sh now sets it) - PREFIX must end up
+        holding *that* source, and no git clone of any URL - CHANGEME or
+        otherwise - may be attempted."""
+        source = _fake_extracted_tarball(tmp_path)
+        prefix = tmp_path / "prefix"
+    
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(prefix),
+        })
+    
+        assert "CHANGEME" not in result.stdout + result.stderr
+        assert "cloning" not in (result.stdout + result.stderr).lower()
+>       assert (prefix / "MARKER.txt").exists(), (
+            f"PREFIX does not hold the local source's own file - stdout/stderr:\n"
+            f"{result.stdout}\n{result.stderr}")
+E       AssertionError: PREFIX does not hold the local source's own file - stdout/stderr:
+E         
+E         /mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail
+E         : invalid option name
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_fresh_tarball_extract_ins0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:145: AssertionError
+____ test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it _____
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_explicit_source_dir_wins_0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it(tmp_path):
+        """Auto-detection (bootstrap.sh's own parent has a pyproject.toml) must
+        not be the only way DPAGENT_SOURCE_DIR gets used - an operator naming a
+        directory explicitly, with bootstrap.sh copied somewhere else entirely
+        (its own single-file "scp scripts/bootstrap.sh" use case), must still
+        work."""
+        source = _fake_extracted_tarball(tmp_path, name="elsewhere")
+        prefix = tmp_path / "prefix"
+        isolated_cwd = tmp_path / "isolated"
+        isolated_cwd.mkdir()
+    
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(prefix),
+        }, cwd=isolated_cwd)
+    
+>       assert (prefix / "MARKER.txt").exists(), result.stdout + result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail
+E         : invalid option name
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_explicit_source_dir_wins_0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:171: AssertionError
+_ test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo __
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_auto_detected_source_dir_0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo(tmp_path):
+        """An operator who set DPAGENT_TARBALL or DPAGENT_REPO on purpose must
+        not have it silently overridden just because bootstrap.sh happens to be
+        sitting next to a real checkout (this repo's own scripts/ directory)."""
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_TARBALL": "https://example.invalid/does-not-exist.tar.gz",
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+        })
+        combined = result.stdout + result.stderr
+>       assert "example.invalid" in combined or "fetching the release tarball" in combined
+E       AssertionError: assert ('example.invalid' in '/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail\n: invalid option name\n' or 'fetching the release tarball' in '/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail\n: invalid option name\n')
+
+tests/test_bootstrap_fetch.py:185: AssertionError
+________ test_no_source_configured_fails_loudly_not_a_placeholder_clone ________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_no_source_configured_fail0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_no_source_configured_fails_loudly_not_a_placeholder_clone(tmp_path):
+        """Bootstrap.sh copied alone (its own documented single-file use case)
+        into a directory with nothing else, no env vars set: must refuse
+        clearly, never fall back to a CHANGEME URL."""
+        isolated = tmp_path / "alone"
+        isolated.mkdir()
+        shutil.copy(BOOTSTRAP, isolated / "bootstrap.sh")
+    
+        result = subprocess.run(
+            [BASH, str(isolated / "bootstrap.sh")],
+            capture_output=True, text=True, timeout=30,
+            env={**os.environ, "PATH": f"{_fake_bin(tmp_path)}:{os.environ['PATH']}",
+                "DPAGENT_PYTHON": MODERN_PYTHON,
+                "DPAGENT_PREFIX": str(tmp_path / "prefix")})
+    
+        combined = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "CHANGEME" not in combined
+>       assert "no source to install from" in combined
+E       AssertionError: assert 'no source to install from' in '/tmp/pytest-of-hocjr15/pytest-1/test_no_source_configured_fail0/alone/bootstrap.sh: line 33: set: pipefail\n: invalid option name\n'
+
+tests/test_bootstrap_fetch.py:209: AssertionError
+______________ test_rerunning_with_the_same_source_is_idempotent _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_rerunning_with_the_same_s0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_rerunning_with_the_same_source_is_idempotent(tmp_path):
+        """Second bootstrap run must not error out differently or duplicate
+        anything - re-syncing identical source into an already-populated PREFIX
+        is a no-op beyond re-copying the same bytes."""
+        source = _fake_extracted_tarball(tmp_path)
+        prefix = tmp_path / "prefix"
+        env_extra = {"DPAGENT_SOURCE_DIR": str(source), "DPAGENT_PREFIX": str(prefix)}
+    
+        first = _run_bootstrap(tmp_path, env_extra)
+>       assert (prefix / "MARKER.txt").exists(), first.stdout + first.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail
+E         : invalid option name
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_rerunning_with_the_same_s0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:223: AssertionError
+________________ test_with_llm_unset_installs_the_plain_package ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_with_llm_unset_installs_t0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_with_llm_unset_installs_the_plain_package(tmp_path):
+        source = _fake_extracted_tarball(tmp_path)
+        result = _run_bootstrap_to_extra_resolution(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+        })
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail
+E         : invalid option name
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh'], returncode=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail\n: invalid option name\n').returncode
+
+tests/test_bootstrap_fetch.py:243: AssertionError
+_____________________ test_with_llm_set_adds_the_llm_extra _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_with_llm_set_adds_the_llm0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_with_llm_set_adds_the_llm_extra(tmp_path):
+        source = _fake_extracted_tarball(tmp_path)
+        result = _run_bootstrap_to_extra_resolution(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+            "DPAGENT_WITH_LLM": "1",
+        })
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail
+E         : invalid option name
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/usr/bin/bash', '/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh'], returncode=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/scripts/bootstrap.sh: line 33: set: pipefail\n: invalid option name\n').returncode
+
+tests/test_bootstrap_fetch.py:256: AssertionError
+______ test_dp_ensure_user_reaches_the_create_branch_when_user_is_absent _______
+
+    @requires_bash
+    def test_dp_ensure_user_reaches_the_create_branch_when_user_is_absent():
+        """The exact bug: `dp_user_exists "$user" && return 0` aborted the whole
+        script under set -e before useradd ever ran, because the normal case (user
+        absent) makes the left side of `&&` false."""
+        result = run('''
+    dp_user_exists() { return 1; }   # simulate: this user does not exist yet
+    useradd() { echo "USERADD_CALLED $*"; }
+    dp_ensure_user testuser /home/testuser /bin/bash
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:70: AssertionError
+______________ test_dp_ensure_user_skips_cleanly_when_user_exists ______________
+
+    @requires_bash
+    def test_dp_ensure_user_skips_cleanly_when_user_exists():
+        result = run('''
+    dp_user_exists() { return 0; }
+    useradd() { echo "SHOULD_NOT_BE_CALLED"; }
+    dp_ensure_user testuser
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:83: AssertionError
+____________ test_dp_write_without_an_owner_argument_does_not_abort ____________
+
+    @requires_bash
+    def test_dp_write_without_an_owner_argument_does_not_abort():
+        """The bug: `[ -n "$owner" ] && chown ...` aborted every dp_write call that
+        omitted the owner arg — which is most of them (dbt's project files,
+        airflow's env file, postgres's own drop-in has an owner but many don't)."""
+        target = "/tmp/dp_sh_test_write_no_owner.txt"
+        result = run(f'''
+    printf 'hello' | dp_write {target} 0644
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:98: AssertionError
+________________ test_dp_write_with_an_owner_still_calls_chown _________________
+
+    @requires_bash
+    def test_dp_write_with_an_owner_still_calls_chown():
+        calls_file = "/tmp/dp_sh_test_chown_calls.txt"
+        Path(calls_file).unlink(missing_ok=True)
+        target = "/tmp/dp_sh_test_write_with_owner.txt"
+        result = run(f'''
+    chown() {{ echo "$*" >> {calls_file}; }}
+    printf 'hello' | dp_write {target} 0644 root:root
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:113: AssertionError
+_ test_dp_wait_for_port_returns_immediately_under_real_run_when_dry_run_only_meant_to_skip _
+
+    @requires_bash
+    def test_dp_wait_for_port_returns_immediately_under_real_run_when_dry_run_only_meant_to_skip():
+        """The bug: `[ "$DP_DRY_RUN" = "1" ] && return 0` aborted the ENTIRE calling
+        script on every real (non-dry-run) invocation, because DP_DRY_RUN=0 makes
+        the left side false and the bare `&&` statement's exit status non-zero."""
+        result = run('''
+    dp_port_busy() { return 0; }   # simulate: the port is already up
+    dp_wait_for_port 5432 5
+    echo "REACHED_END"
+    ''', env={"DP_DRY_RUN": "0"})
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:130: AssertionError
+___________ test_dp_wait_for_port_still_skips_polling_under_dry_run ____________
+
+    @requires_bash
+    def test_dp_wait_for_port_still_skips_polling_under_dry_run():
+        result = run('''
+    dp_port_busy() { echo "SHOULD_NOT_POLL"; return 1; }
+    dp_wait_for_port 5432 5
+    echo "REACHED_END"
+    ''', env={"DP_DRY_RUN": "1"})
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:141: AssertionError
+__________ test_dp_svc_exists_true_and_false_both_reach_the_end_bare ___________
+
+    @requires_bash
+    def test_dp_svc_exists_true_and_false_both_reach_the_end_bare():
+        """Called as a bare statement (not inside if/while), which is exactly the
+        style that would have exposed the old `A && B` body as broken."""
+        result = run('''
+    systemctl() {
+      case "$1" in
+        list-unit-files) [ "$MOCK_UNIT_EXISTS" = "1" ] ;;
+        cat) [ "$MOCK_UNIT_EXISTS" = "1" ] ;;
+      esac
+    }
+    dp_svc_exists nonexistent-unit || true
+    echo "REACHED_END"
+    ''', env={"MOCK_UNIT_EXISTS": "0"})
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:160: AssertionError
+_____________ test_dp_find_python_returns_nothing_when_none_match ______________
+
+    @requires_bash
+    def test_dp_find_python_returns_nothing_when_none_match():
+        result = run('''
+    if dp_find_python 3 8 3 12 >/dev/null 2>&1; then
+      echo "UNEXPECTED_MATCH"
+    else
+      echo "NO_MATCH_AS_EXPECTED"
+    fi
+    ''', env={"PATH": "/nonexistent"})
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:173: AssertionError
+___________________ test_dp_ensure_group_creates_when_absent ___________________
+
+    @requires_bash
+    def test_dp_ensure_group_creates_when_absent():
+        result = run('''
+    dp_group_exists() { return 1; }
+    groupadd() { echo "GROUPADD_CALLED $*"; }
+    dp_ensure_group dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:185: AssertionError
+_______________ test_dp_ensure_group_skips_cleanly_when_present ________________
+
+    @requires_bash
+    def test_dp_ensure_group_skips_cleanly_when_present():
+        result = run('''
+    dp_group_exists() { return 0; }
+    groupadd() { echo "SHOULD_NOT_BE_CALLED"; }
+    dp_ensure_group dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:198: AssertionError
+__________ test_dp_join_group_is_a_noop_when_the_user_does_not_exist ___________
+
+    @requires_bash
+    def test_dp_join_group_is_a_noop_when_the_user_does_not_exist():
+        """dbt and airflow have no `requires` on each other - whichever installs
+        first must not fail just because its peer is not there yet."""
+        result = run('''
+    dp_user_exists() { return 1; }
+    usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+    dp_join_group airflow dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:213: AssertionError
+__________ test_dp_join_group_is_a_noop_when_the_group_does_not_exist __________
+
+    @requires_bash
+    def test_dp_join_group_is_a_noop_when_the_group_does_not_exist():
+        result = run('''
+    dp_user_exists() { return 0; }
+    dp_group_exists() { return 1; }
+    usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+    dp_join_group airflow dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:227: AssertionError
+________________ test_dp_join_group_joins_when_not_yet_a_member ________________
+
+    @requires_bash
+    def test_dp_join_group_joins_when_not_yet_a_member():
+        """The exact bug this guards: `grep -qx "$group" && return 0` aborted the
+        whole script under set -e the instant the user was NOT yet a member -
+        the normal, first-time case - because a bare `A && B` statement's exit
+        status is A's when A is false."""
+        result = run('''
+    dp_user_exists() { return 0; }
+    dp_group_exists() { return 0; }
+    id() { echo "airflow wheel"; }   # not yet a member of dbtread
+    usermod() { echo "USERMOD_CALLED $*"; }
+    dp_join_group airflow dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:246: AssertionError
+____________ test_dp_join_group_skips_cleanly_when_already_a_member ____________
+
+    @requires_bash
+    def test_dp_join_group_skips_cleanly_when_already_a_member():
+        result = run('''
+    dp_user_exists() { return 0; }
+    dp_group_exists() { return 0; }
+    id() { echo "airflow wheel dbtread"; }
+    usermod() { echo "SHOULD_NOT_BE_CALLED"; }
+    dp_join_group airflow dbtread
+    echo "REACHED_END"
+    ''')
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:261: AssertionError
+_________ test_dp_fetch_fails_loudly_when_neither_tool_exists_for_real _________
+
+    @requires_bash
+    def test_dp_fetch_fails_loudly_when_neither_tool_exists_for_real():
+        """A real run with neither curl nor wget installed is a genuine host
+        problem and must still stop - only the dry-run preview gets a pass."""
+        result = run('''
+    dp_have() { return 1; }
+    dp_fetch https://example.invalid/file /tmp/dp_sh_test_fetch.out
+    echo "SHOULD_NOT_REACH_END"
+    ''', env={"DP_DRY_RUN": "0"})
+        assert result.returncode != 0
+>       assert "neither curl nor wget is available" in result.stderr
+E       assert 'neither curl nor wget is available' in "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n"
+E        +  where "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n" = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").stderr
+
+tests/test_dp_sh.py:276: AssertionError
+__ test_dp_fetch_previews_with_curl_under_dry_run_when_neither_installed_yet ___
+
+    @requires_bash
+    def test_dp_fetch_previews_with_curl_under_dry_run_when_neither_installed_yet():
+        """The exact bug: postgres's own repo step installs curl and then calls
+        dp_fetch a few lines later. Under --dry-run that install is simulated, so
+        on a genuinely fresh host curl does not exist yet - and dp_fetch used to
+        dp_fail here instead of previewing, aborting the whole --dry-run plan
+        partway through. Never seen on a host that already had curl installed for
+        an unrelated reason, which is exactly how this stayed hidden."""
+        # dp_run's own dry-run branch only prints and returns - it never actually
+        # execs "$@" - so there is no real curl/wget to mock here; reaching the
+        # end at all, instead of dp_fail aborting first, is the assertion.
+        result = run('''
+    dp_have() { return 1; }
+    dp_fetch https://example.invalid/file /tmp/dp_sh_test_fetch.out
+    echo "REACHED_END"
+    ''', env={"DP_DRY_RUN": "1"})
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: /mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\r': command not found
+E         
+E       assert 127 == 0
+E        +  where 127 = CompletedProcess(args=['/usr/bin/bash', '-c', 'set -euo pipefail\nsource "/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/...ncode=127, stdout='', stderr="/mnt/d/DPAGENT/POC_AI_Opensource/packs/_lib/dp.sh: line 14: $'\\r': command not found\n").returncode
+
+tests/test_dp_sh.py:296: AssertionError
+__________ test_every_step_survives_dry_run_in_order[airflow-ubuntu] ___________
+
+pack_name = 'airflow', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda335d30>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: airflow/user (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/10-user.sh: line 2: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/10-user.sh: line 2: set: pipefail...n_ms=41, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r0/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+____________ test_every_step_survives_dry_run_in_order[base-ubuntu] ____________
+
+pack_name = 'base', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda335f40>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: base/packages (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/10-packages.sh: line 3: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/10-packages.sh: line 3: set: pipefai...n_ms=41, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r2/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+____________ test_every_step_survives_dry_run_in_order[dbt-ubuntu] _____________
+
+pack_name = 'dbt', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda335670>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: dbt/venv (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/10-venv.sh: line 2: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/10-venv.sh: line 2: set: pipefail\n: ...n_ms=45, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r4/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+____________ test_every_step_survives_dry_run_in_order[dlt-ubuntu] _____________
+
+pack_name = 'dlt', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda37ddc0>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: dlt/venv (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/steps/10-venv.sh: line 2: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/steps/10-venv.sh: line 2: set: pipefail\n: ...n_ms=40, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r6/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+__________ test_every_step_survives_dry_run_in_order[postgres-ubuntu] __________
+
+pack_name = 'postgres', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r8')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda37d8e0>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: postgres/repo (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/10-repo.sh: line 4: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/10-repo.sh: line 4: set: pipefai...n_ms=49, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r8/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+_________ test_every_step_survives_dry_run_in_order[seaweedfs-ubuntu] __________
+
+pack_name = 'seaweedfs', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r12')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda3e44d0>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: seaweedfs/user (ubuntu) failed under --dry-run (rc=2):
+E             /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/10-user.sh: line 2: set: pipefail
+E             : invalid option name
+E           assert 2 == 0
+E            +  where 2 = Result(rc=2, stdout='', stderr='/mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/10-user.sh: line 2: set: pipefa..._ms=35, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_every_step_survives_dry_r12/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:104: AssertionError
+____________________ test_run_command_can_call_a_dp_helper _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hocjr15/pytest-1/test_run_command_can_call_a_dp0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718fda32e390>
+
+    @requires_bash
+    def test_run_command_can_call_a_dp_helper(tmp_path, monkeypatch):
+        """The exact regression: python-modern's guard is the bare snippet
+        `dp_find_python 3 8 3 13 >/dev/null 2>&1`, with no `source` of its own -
+        every guard/when snippet in every pack is written this way, assuming the
+        same environment a step script gets. Before dp.sh was sourced here, this
+        failed with "command not found" (rc 127), i.e. always false, so the step
+        it guards ran unconditionally even when already satisfied."""
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+        result = executor.run_command(
+            'command -v dp_ok >/dev/null 2>&1',
+            env={"DP_LIB": DP_LIB, "PATH": "/usr/bin:/bin"},
+            run_id="test-run",
+        )
+>       assert result.rc == 0, result.stderr
+E       AssertionError: 
+E       assert 1 == 0
+E        +  where 1 = Result(rc=1, stdout='', stderr='', duration_ms=17, timed_out=False, log_path='/tmp/pytest-of-hocjr15/pytest-1/test_run_command_can_call_a_dp0/test-run.jsonl').rc
+
+tests/test_executor.py:36: AssertionError
+_________________ test_every_shipped_pack_lints_clean[airflow] _________________
+
+name = 'airflow'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] airflow/steps/20-venv.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/20-venv.sh: line 20: syntax error: unexpected end of file
+E         [error] airflow/steps/30-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/30-install.sh: line 32: syntax error: unexpected end of file
+E         [error] airflow/steps/40-config.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/40-config.sh: line 63: syntax error: unexpected end of file
+E         [error] airflow/steps/60-admin-user.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/steps/60-admin-user.sh: line 34: syntax error: unexpected end of file
+E         [error] airflow/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 79: warning: here-document at line 61 delimited by end-of-file (wanted `PY')
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/preflight.sh: line 80: syntax error: unexpected end of file
+E         [error] airflow/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/verify.sh: line 14: syntax error near unexpected token `$'{\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/verify.sh: line 14: `check() {
+E         '
+E         [error] airflow/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/rollback.sh: line 16: syntax error near unexpected token `$'do\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/rollback.sh: line 16: `for unit in airflow-webserver airflow-scheduler; do
+E         '
+E       assert not [Issue(level='error', where='airflow/steps/20-venv.sh', message='bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/p...ar unexpected token `$'{\\r''\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/airflow/verify.sh: line 14: `check() {\n'"), ...]
+
+tests/test_packs.py:24: AssertionError
+__________________ test_every_shipped_pack_lints_clean[base] ___________________
+
+name = 'base'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] base/steps/10-packages.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/10-packages.sh: line 20: syntax error near unexpected token `elif'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/10-packages.sh: line 20: `elif dp_is_rhel; then
+E         '
+E         [error] base/steps/20-locale.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/20-locale.sh: line 11: syntax error near unexpected token `$'{\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/20-locale.sh: line 11: `have_locale() {
+E         '
+E         [error] base/steps/30-time-sync.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/30-time-sync.sh: line 36: syntax error near unexpected token `$'do\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/steps/30-time-sync.sh: line 36: `  for _ in $(seq 1 15); do
+E         '
+E         [error] base/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 13: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/preflight.sh: line 13: `case "${DP_OS_FAMILY:-}" in
+E         '
+E         [error] base/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/verify.sh: line 42: syntax error: unexpected end of file
+E         [error] base/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/rollback.sh: line 26: syntax error: unexpected end of file
+E       assert not [Issue(level='error', where='base/steps/10-packages.sh', message="bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/...syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/base/rollback.sh: line 26: syntax error: unexpected end of file')]
+
+tests/test_packs.py:24: AssertionError
+___________________ test_every_shipped_pack_lints_clean[dbt] ___________________
+
+name = 'dbt'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] dbt/steps/10-venv.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/10-venv.sh: line 38: syntax error: unexpected end of file
+E         [error] dbt/steps/20-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/20-install.sh: line 16: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/20-install.sh: line 16: `case "$ADAPTER" in
+E         '
+E         [error] dbt/steps/30-project.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/steps/30-project.sh: line 87: syntax error: unexpected end of file
+E         [error] dbt/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/preflight.sh: line 41: warning: here-document at line 23 delimited by end-of-file (wanted `PY')
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/preflight.sh: line 42: syntax error: unexpected end of file
+E         [error] dbt/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/verify.sh: line 31: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/verify.sh: line 31: `  case "$version_line" in
+E         '
+E         [error] dbt/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/rollback.sh: line 17: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/rollback.sh: line 17: `case "$INSTALL_DIR" in
+E         '
+E       assert not [Issue(level='error', where='dbt/steps/10-venv.sh', message='bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs...ed token `$\'in\\r\'\'\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/dbt/rollback.sh: line 17: `case "$INSTALL_DIR" in\n\'')]
+
+tests/test_packs.py:24: AssertionError
+___________________ test_every_shipped_pack_lints_clean[dlt] ___________________
+
+name = 'dlt'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] dlt/steps/10-venv.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/steps/10-venv.sh: line 19: syntax error: unexpected end of file
+E         [error] dlt/steps/20-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/steps/20-install.sh: line 58: syntax error: unexpected end of file
+E         [error] dlt/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/preflight.sh: line 44: warning: here-document at line 26 delimited by end-of-file (wanted `PY')
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/preflight.sh: line 45: syntax error: unexpected end of file
+E         [error] dlt/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/verify.sh: line 45: syntax error: unexpected end of file
+E         [error] dlt/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/rollback.sh: line 18: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/rollback.sh: line 18: `case "$INSTALL_DIR" in
+E         '
+E       assert not [Issue(level='error', where='dlt/steps/10-venv.sh', message='bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs...ed token `$\'in\\r\'\'\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/dlt/rollback.sh: line 18: `case "$INSTALL_DIR" in\n\'')]
+
+tests/test_packs.py:24: AssertionError
+________________ test_every_shipped_pack_lints_clean[postgres] _________________
+
+name = 'postgres'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] postgres/steps/10-repo.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/10-repo.sh: line 36: syntax error near unexpected token `elif'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/10-repo.sh: line 36: `elif dp_is_rhel; then
+E         '
+E         [error] postgres/steps/20-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/20-install.sh: line 16: syntax error near unexpected token `elif'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/20-install.sh: line 16: `elif dp_is_rhel; then
+E         '
+E         [error] postgres/steps/30-initdb.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/30-initdb.sh: line 46: syntax error near unexpected token `$'do\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/30-initdb.sh: line 46: `  for _ in $(seq 1 60); do
+E         '
+E         [error] postgres/steps/40-config.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/40-config.sh: line 50: syntax error near unexpected token `}'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/40-config.sh: line 50: `} | dp_write "$DROPIN" 0644 postgres:postgres
+E         '
+E         [error] postgres/steps/50-databases.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/steps/50-databases.sh: line 131: syntax error: unexpected end of file
+E         [error] postgres/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/preflight.sh: line 22: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/preflight.sh: line 22: `case "${DP_OS_FAMILY:-}" in
+E         '
+E         [error] postgres/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/verify.sh: line 32: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/verify.sh: line 32: `  case "$server_version" in
+E         '
+E         [error] postgres/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/rollback.sh: line 50: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/rollback.sh: line 50: `case "$DATADIR" in
+E         '
+E       assert not [Issue(level='error', where='postgres/steps/10-repo.sh', message="bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/...\r\'\'\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/postgres/preflight.sh: line 22: `case "${DP_OS_FAMILY:-}" in\n\''), ...]
+
+tests/test_packs.py:24: AssertionError
+______________ test_every_shipped_pack_lints_clean[python-modern] ______________
+
+name = 'python-modern'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] python-modern/steps/10-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/python-modern/steps/10-install.sh: line 21: syntax error near unexpected token `elif'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/python-modern/steps/10-install.sh: line 21: `elif dp_is_rhel; then
+E         '
+E         [error] python-modern/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/python-modern/preflight.sh: line 13: syntax error near unexpected token `elif'
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/python-modern/preflight.sh: line 13: `elif dp_is_debian; then
+E         '
+E       assert not [Issue(level='error', where='python-modern/steps/10-install.sh', message="bash syntax error: /mnt/d/DPAGENT/POC_AI_Ope...oken `elif'\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/python-modern/preflight.sh: line 13: `elif dp_is_debian; then\n'")]
+
+tests/test_packs.py:24: AssertionError
+________________ test_every_shipped_pack_lints_clean[seaweedfs] ________________
+
+name = 'seaweedfs'
+
+    @pytest.mark.parametrize("name", packs.available())
+    def test_every_shipped_pack_lints_clean(name):
+        blocking = lint.blocking(lint.lint_pack(name))
+>       assert not blocking, "\n".join(str(i) for i in blocking)
+E       AssertionError: [error] seaweedfs/steps/20-install.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/20-install.sh: line 10: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/20-install.sh: line 10: `case "$(uname -m)" in
+E         '
+E         [error] seaweedfs/steps/30-config.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/30-config.sh: line 18: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/30-config.sh: line 18: `case "$ACCESS_KEY$SECRET_KEY" in
+E         '
+E         [error] seaweedfs/steps/50-buckets.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/50-buckets.sh: line 17: syntax error near unexpected token `$'do\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/steps/50-buckets.sh: line 17: `for _ in $(seq 1 30); do
+E         '
+E         [error] seaweedfs/preflight.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/preflight.sh: line 11: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/preflight.sh: line 11: `case "$(uname -m)" in
+E         '
+E         [error] seaweedfs/verify.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/verify.sh: line 25: syntax error: unexpected end of file
+E         [error] seaweedfs/rollback.sh: bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/rollback.sh: line 18: syntax error near unexpected token `$'in\r''
+E         /mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/rollback.sh: line 18: `case "$INSTALL_DIR" in
+E         '
+E       assert not [Issue(level='error', where='seaweedfs/steps/20-install.sh', message='bash syntax error: /mnt/d/DPAGENT/POC_AI_Opensou...en `$\'in\\r\'\'\n/mnt/d/DPAGENT/POC_AI_Opensource/packs/seaweedfs/rollback.sh: line 18: `case "$INSTALL_DIR" in\n\'')]
+
+tests/test_packs.py:24: AssertionError
+_ test_existing_approved_pipelines_still_verify_against_their_committed_hash[demo] _
+
+name = 'demo'
+
+    @pytest.mark.parametrize("name", ["demo", "quickstart", "quickstart_dbt"])
+    def test_existing_approved_pipelines_still_verify_against_their_committed_hash(name):
+        """The pinned hashes in the repo's own .approved.yaml files were written
+        before dbt_project existed - they must still match byte for byte."""
+        p = loader.load(name, REPO / "pipelines")
+        assert p.dbt_project is None
+>       assert approval.is_approved(p) == (True, "")
+E       assert (False, "demo...ted E` again") == (True, '')
+E         
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+tests/test_pipelines_dbtproject.py:150: AssertionError
+_ test_existing_approved_pipelines_still_verify_against_their_committed_hash[quickstart] _
+
+name = 'quickstart'
+
+    @pytest.mark.parametrize("name", ["demo", "quickstart", "quickstart_dbt"])
+    def test_existing_approved_pipelines_still_verify_against_their_committed_hash(name):
+        """The pinned hashes in the repo's own .approved.yaml files were written
+        before dbt_project existed - they must still match byte for byte."""
+        p = loader.load(name, REPO / "pipelines")
+        assert p.dbt_project is None
+>       assert approval.is_approved(p) == (True, "")
+E       assert (False, "quic...ted E` again") == (True, '')
+E         
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+tests/test_pipelines_dbtproject.py:150: AssertionError
+_ test_existing_approved_pipelines_still_verify_against_their_committed_hash[quickstart_dbt] _
+
+name = 'quickstart_dbt'
+
+    @pytest.mark.parametrize("name", ["demo", "quickstart", "quickstart_dbt"])
+    def test_existing_approved_pipelines_still_verify_against_their_committed_hash(name):
+        """The pinned hashes in the repo's own .approved.yaml files were written
+        before dbt_project existed - they must still match byte for byte."""
+        p = loader.load(name, REPO / "pipelines")
+        assert p.dbt_project is None
+>       assert approval.is_approved(p) == (True, "")
+E       AssertionError: assert (False, 'quic...ted E` again') == (True, '')
+E         
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+tests/test_pipelines_dbtproject.py:150: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_airflow_preflight.py::test_blocks_when_systemd_is_not_present
+FAILED tests/test_airflow_preflight.py::test_passes_when_systemd_is_present_and_backend_reachable
+FAILED tests/test_base_preflight.py::test_warns_when_selinux_is_enforcing - A...
+FAILED tests/test_base_preflight.py::test_no_warning_when_selinux_is_permissive
+FAILED tests/test_base_preflight.py::test_no_warning_when_getenforce_is_absent
+FAILED tests/test_bootstrap_fetch.py::test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone
+FAILED tests/test_bootstrap_fetch.py::test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it
+FAILED tests/test_bootstrap_fetch.py::test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo
+FAILED tests/test_bootstrap_fetch.py::test_no_source_configured_fails_loudly_not_a_placeholder_clone
+FAILED tests/test_bootstrap_fetch.py::test_rerunning_with_the_same_source_is_idempotent
+FAILED tests/test_bootstrap_fetch.py::test_with_llm_unset_installs_the_plain_package
+FAILED tests/test_bootstrap_fetch.py::test_with_llm_set_adds_the_llm_extra - ...
+FAILED tests/test_dp_sh.py::test_dp_ensure_user_reaches_the_create_branch_when_user_is_absent
+FAILED tests/test_dp_sh.py::test_dp_ensure_user_skips_cleanly_when_user_exists
+FAILED tests/test_dp_sh.py::test_dp_write_without_an_owner_argument_does_not_abort
+FAILED tests/test_dp_sh.py::test_dp_write_with_an_owner_still_calls_chown - A...
+FAILED tests/test_dp_sh.py::test_dp_wait_for_port_returns_immediately_under_real_run_when_dry_run_only_meant_to_skip
+FAILED tests/test_dp_sh.py::test_dp_wait_for_port_still_skips_polling_under_dry_run
+FAILED tests/test_dp_sh.py::test_dp_svc_exists_true_and_false_both_reach_the_end_bare
+FAILED tests/test_dp_sh.py::test_dp_find_python_returns_nothing_when_none_match
+FAILED tests/test_dp_sh.py::test_dp_ensure_group_creates_when_absent - Assert...
+FAILED tests/test_dp_sh.py::test_dp_ensure_group_skips_cleanly_when_present
+FAILED tests/test_dp_sh.py::test_dp_join_group_is_a_noop_when_the_user_does_not_exist
+FAILED tests/test_dp_sh.py::test_dp_join_group_is_a_noop_when_the_group_does_not_exist
+FAILED tests/test_dp_sh.py::test_dp_join_group_joins_when_not_yet_a_member - ...
+FAILED tests/test_dp_sh.py::test_dp_join_group_skips_cleanly_when_already_a_member
+FAILED tests/test_dp_sh.py::test_dp_fetch_fails_loudly_when_neither_tool_exists_for_real
+FAILED tests/test_dp_sh.py::test_dp_fetch_previews_with_curl_under_dry_run_when_neither_installed_yet
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[airflow-ubuntu]
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[base-ubuntu]
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[dbt-ubuntu]
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[dlt-ubuntu]
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[postgres-ubuntu]
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[seaweedfs-ubuntu]
+FAILED tests/test_executor.py::test_run_command_can_call_a_dp_helper - Assert...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[airflow] - As...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[base] - Asser...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[dbt] - Assert...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[dlt] - Assert...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[postgres] - A...
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[python-modern]
+FAILED tests/test_packs.py::test_every_shipped_pack_lints_clean[seaweedfs] - ...
+FAILED tests/test_pipelines_dbtproject.py::test_existing_approved_pipelines_still_verify_against_their_committed_hash[demo]
+FAILED tests/test_pipelines_dbtproject.py::test_existing_approved_pipelines_still_verify_against_their_committed_hash[quickstart]
+FAILED tests/test_pipelines_dbtproject.py::test_existing_approved_pipelines_still_verify_against_their_committed_hash[quickstart_dbt]
+45 failed, 1209 passed, 25 skipped in 461.32s (0:07:41)

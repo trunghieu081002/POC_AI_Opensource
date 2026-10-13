@@ -1,0 +1,86 @@
+[36m::[0m preconditions ok - commit 66d1c7ad46f73902d5761e8fcef130b0fea1e28e, building/reusing image dpagent-m25-disposable
+sha256:4063bf6da37ede31b53609d08c0633a99b74a70b0a6a5338b6b7c17fb66ebfa4
+[32mok[0m image dpagent-m25-disposable ready
+[32mok[0m container dpagent-m25-acceptance-6040 up, systemd running
+[36m::[0m bootstrapping dpagent and installing postgres+dlt+dbt+airflow (this takes several minutes)
+debconf: delaying package configuration, since apt-utils is not installed
+[36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+[36m::[0m refreshing the package index
+Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease
+Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Reading package lists...
+[36m::[0m installing certificates and a downloader
+Reading package lists...
+Building dependency tree...
+Reading state information...
+ca-certificates is already the newest version (20260601~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+done.
+[36m::[0m installing python and build prerequisites
+Reading package lists...
+Building dependency tree...
+Reading state information...
+gzip is already the newest version (1.10-4ubuntu4.2).
+python3 is already the newest version (3.10.6-1~22.04.1).
+tar is already the newest version (1.34+dfsg-1ubuntu0.1.22.04.6).
+python3-pip is already the newest version (22.0.2+dfsg-1ubuntu0.7).
+python3-venv is already the newest version (3.10.6-1~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+[32mok[0m python 3.10 (python3)
+[36m::[0m installing from the local source at /opt/src/dpagent-src (no network fetch)
+[36m::[0m creating the virtualenv
+[32mok[0m dpagent installed
+dpagent, version 0.4.0
+
+Everything else the packs need — locale, ss, fuser, a synced clock — is itself a
+pack. Install it first and the rest stop failing in confusing ways:
+
+  sudo -E dpagent install base
+
+Then:
+
+  dpagent info                                  what it detected and can install
+  dpagent packs                                 the pack library
+  sudo -E dpagent install postgres --dry-run    print every command, run nothing
+  sudo -E dpagent install postgres              install, then prove it works
+
+An install is not reported as successful until its acceptance suite passes.
+'dpagent status' shows anything that is installed but unproven.
+
+Installing needs no API key. A model is only involved in three places: routing a
+plain-language request (dpagent do), drafting a pack for a tool with no pack yet
+(dpagent synth), and proposing a catalog entry for a failure nothing matched:
+  (litellm already installed - DPAGENT_WITH_LLM was set)
+
+  cp /opt/dpagent/.env.example /opt/dpagent/.env
+  $EDITOR /opt/dpagent/.env                        # GEMINI_API_KEY is free; quote
+                                                 # any value with spaces or $/*
+  set -a; source /opt/dpagent/.env; set +a
+
+Note the -E in 'sudo -E': it keeps your environment, which is how ${SECRETS}
+referenced by a project.yaml and any http_proxy settings reach the agent.
+project: layer2-stack
+╭── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack           steps  why         │
+│  1  base               3  requested   │
+│  2  python-modern      1  dependency  │
+│  3  dbt                4  requested   │
+│  4  dlt                4  requested   │
+│  5  postgres           5  requested   │
+│  6  airflow            7  requested   │
+╰───────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+[31mXX[0m bootstrap/install failed - see output above; nothing in this repo was touched, only the now-discarded container

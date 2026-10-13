@@ -1,0 +1,46 @@
+{
+  "branch": "fix/b1-fail-required-gate",
+  "base_commit": "1805adc14415321b39e182145fed5a920d6ad630",
+  "source_commit": "cbac310741ea82ab11e2c3031222a4c64a1f1322",
+  "source_tree": "e53b41c894995080b4781c43c99119e1f3039b77",
+  "unit": {
+    "passed": 1254,
+    "skipped": 25,
+    "exit": 0
+  },
+  "label": {
+    "matched": 8,
+    "total": 8,
+    "exit": 0,
+    "leaks": 0,
+    "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
+  },
+  "artist": {
+    "matched": 8,
+    "total": 8,
+    "exit": 0,
+    "leaks": 0,
+    "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
+  },
+  "bronze": {
+    "status": "blocked",
+    "full_success": false,
+    "last_full": {
+      "matched": 30,
+      "total": 31,
+      "exit": 1,
+      "leaks": 0,
+      "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
+    },
+    "current_source_attempts": "Both stopped at bootstrap; no matrix on cbac310"
+  },
+  "github": {
+    "pushed": false,
+    "pr_created": false,
+    "git_error": "No credential; cannot prompt with user interactivity disabled",
+    "connector_error": "403 Resource not accessible by integration on blob creation"
+  },
+  "disposable_regression_containers_remaining": 0,
+  "production_deployed": false,
+  "real_model_calls": false
+}

@@ -1,0 +1,35 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "LLMError: model did not return valid JSON after 3 tries: Expecting value: line 1 column 1 (char 0)",
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "llm-error",
+      "source": "llm"
+    }
+  ],
+  "calls": 3,
+  "case": "artist_summary",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 2,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [],
+  "label": "S6-invalid-response",
+  "last_outcome": "llm-error",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 54,
+  "validation_stages": {}
+}

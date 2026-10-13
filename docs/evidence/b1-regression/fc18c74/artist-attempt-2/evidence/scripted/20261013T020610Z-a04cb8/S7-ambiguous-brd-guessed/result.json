@@ -1,0 +1,39 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "the BRD is missing information that changes the numbers; the model built a pipeline instead of asking",
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "built-anyway",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "revenue_ambiguous",
+  "classification": "guessed",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_revenue_ambiguous/.synth-validation.yaml",
+    "a3_revenue_ambiguous/models/artist_summary.sql",
+    "a3_revenue_ambiguous/pipeline.yaml"
+  ],
+  "label": "S7-ambiguous-brd-guessed",
+  "last_outcome": "built-anyway",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "tokens": 18,
+  "validation_stages": {}
+}

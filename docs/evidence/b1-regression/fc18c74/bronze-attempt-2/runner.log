@@ -1,0 +1,75 @@
+[36m::[0m preconditions ok - commit fc18c74eb4341772c171718a6483dcf0969d994f, building/reusing image dpagent-m25-disposable
+sha256:7c7a499ad98e4e58735b36f05eea7823df0873b26cdf58e280f19e7c0440fe99
+[32mok[0m image dpagent-m25-disposable ready
+[32mok[0m container dpagent-m25-acceptance-11935 up, systemd running
+[36m::[0m bootstrapping dpagent and installing postgres+dlt+dbt+airflow (this takes several minutes)
+debconf: delaying package configuration, since apt-utils is not installed
+[36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+[36m::[0m refreshing the package index
+Ign:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Ign:2 http://archive.ubuntu.com/ubuntu jammy InRelease
+Ign:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Ign:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Ign:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Ign:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Ign:2 http://archive.ubuntu.com/ubuntu jammy InRelease
+Ign:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Ign:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Ign:2 http://archive.ubuntu.com/ubuntu jammy InRelease
+Ign:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Ign:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Err:2 http://archive.ubuntu.com/ubuntu jammy InRelease
+  Could not resolve 'archive.ubuntu.com'
+Err:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+  Could not resolve 'archive.ubuntu.com'
+Err:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+  Could not resolve 'archive.ubuntu.com'
+Err:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
+  Could not resolve 'security.ubuntu.com'
+Reading package lists...
+W: Failed to fetch http://archive.ubuntu.com/ubuntu/dists/jammy/InRelease  Could not resolve 'archive.ubuntu.com'
+W: Failed to fetch http://archive.ubuntu.com/ubuntu/dists/jammy-updates/InRelease  Could not resolve 'archive.ubuntu.com'
+W: Failed to fetch http://archive.ubuntu.com/ubuntu/dists/jammy-backports/InRelease  Could not resolve 'archive.ubuntu.com'
+W: Failed to fetch http://security.ubuntu.com/ubuntu/dists/jammy-security/InRelease  Could not resolve 'security.ubuntu.com'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+[36m::[0m installing certificates and a downloader
+Reading package lists...
+Building dependency tree...
+Reading state information...
+ca-certificates is already the newest version (20260601~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+done.
+[36m::[0m installing python and build prerequisites
+Reading package lists...
+Building dependency tree...
+Reading state information...
+gzip is already the newest version (1.10-4ubuntu4.2).
+python3 is already the newest version (3.10.6-1~22.04.1).
+tar is already the newest version (1.34+dfsg-1ubuntu0.1.22.04.6).
+python3-pip is already the newest version (22.0.2+dfsg-1ubuntu0.7).
+python3-venv is already the newest version (3.10.6-1~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+[32mok[0m python 3.10 (python3)
+[36m::[0m installing from the local source at /opt/src/dpagent-src (no network fetch)
+[36m::[0m creating the virtualenv
+WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce032c1c0>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/pip/
+WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce032c3d0>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/pip/
+WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce032c5e0>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/pip/
+WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce032c880>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/pip/
+WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce032ca30>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/pip/
+WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0385180>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/setuptools/
+WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0385450>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/setuptools/
+WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0385600>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/setuptools/
+WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce03857b0>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/setuptools/
+WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0385960>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/setuptools/
+WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0385f30>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/wheel/
+WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0386140>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/wheel/
+WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0386320>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/wheel/
+WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce03864d0>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/wheel/
+WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<pip._vendor.urllib3.connection.HTTPSConnection object at 0x711ce0386680>: Failed to establish a new connection: [Errno -2] Name or service not known')': /simple/wheel/
+ERROR: Could not find a version that satisfies the requirement wheel (from versions: none)
+ERROR: No matching distribution found for wheel
+[31mXX[0m bootstrap/install failed - see output above; nothing in this repo was touched, only the now-discarded container

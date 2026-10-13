@@ -1,0 +1,127 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "run_1: failed\ngate unique in stage landing: failed - 2/7 row(s) in x_acceptance_cert failed unique, no quarantine declared\n[run 12] gate.failed: a3_fact_label_operation__validate__f8651f01/landing unique: 2/7 row(s) in x_acceptance_cert failed unique, no quarantine declared\n[run 12] stage.failed: a3_fact_label_operation__validate__f8651f01/landing halted: unique: 2/7 row(s) in x_acceptance_cert failed unique, no quarantine declared\n[run 12] pipeline.failed: DAG run 12 reached terminal state: failed",
+  "attempts": [
+    {
+      "evidence_id": "ev-b34ef40b3ec499c4",
+      "n": 1,
+      "outcome": "validation-fail",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fact_label_operation",
+  "classification": "not-validated",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "expectation_problems": [],
+  "files_written": [
+    "a3_fact_label_operation/.synth-validation.yaml",
+    "a3_fact_label_operation/dwh_dbt/dbt_project.yml",
+    "a3_fact_label_operation/dwh_dbt/macros/generate_schema_name.sql",
+    "a3_fact_label_operation/dwh_dbt/models/silver/_silver_models.yml",
+    "a3_fact_label_operation/dwh_dbt/models/silver/fact/fact_label_operation.sql",
+    "a3_fact_label_operation/dwh_dbt/models/staging/_sources.yml",
+    "a3_fact_label_operation/dwh_dbt/package-lock.yml",
+    "a3_fact_label_operation/dwh_dbt/packages.yml",
+    "a3_fact_label_operation/pipeline.yaml"
+  ],
+  "label": "L7-two-certificates-one-order-fails",
+  "last_outcome": "validation-fail",
+  "last_validation": {
+    "cleanup": "pass",
+    "clone_name": "a3_fact_label_operation__validate__f8651f01",
+    "comparison": {
+      "idempotent": false,
+      "run_1": "not_run",
+      "run_2": "not_run"
+    },
+    "deploy_error": "",
+    "overall": "fail",
+    "run_events": [
+      {
+        "kind": "extract.start",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__f8651f01 via odoo_postgres",
+        "run": 12
+      },
+      {
+        "kind": "extract.done",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__f8651f01 extract complete: x_acceptance_cert +7, x_music_song +15",
+        "run": 12
+      },
+      {
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "a3_fact_label_operation__validate__f8651f01/landing row_count_bounds: ok",
+        "run": 12
+      },
+      {
+        "kind": "gate.failed",
+        "level": "error",
+        "message": "a3_fact_label_operation__validate__f8651f01/landing unique: 2/7 row(s) in x_acceptance_cert failed unique, no quarantine declared",
+        "run": 12
+      },
+      {
+        "kind": "stage.failed",
+        "level": "error",
+        "message": "a3_fact_label_operation__validate__f8651f01/landing halted: unique: 2/7 row(s) in x_acceptance_cert failed unique, no quarantine declared",
+        "run": 12
+      },
+      {
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 12 reached terminal state: failed",
+        "run": 12
+      }
+    ],
+    "run_ids": [
+      12
+    ],
+    "run_status": {
+      "run_1": "failed",
+      "run_2": "not_run"
+    },
+    "unavailable_reason": ""
+  },
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "scripted/stand-in-for-a-model",
+  "promote_after_failed_validation": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "run_1: run 12 finished 'failed' in the journal",
+      "run_1: no dbt test record for stage 'silver' in the journal",
+      "run_1: required a `unique` test on fact_label_operation.fact_label_operation_sk: dbt ran none",
+      "run_1: required a `not_null` test on fact_label_operation.fact_label_operation_sk: dbt ran none",
+      "run_1: stage 'landing' gate(s) not passed: unique",
+      "run_1: gated stage 'silver' has no gate verdict in the journal"
+    ]
+  },
+  "tokens": 18,
+  "validation_stages": {
+    "12": [
+      {
+        "stage": "landing",
+        "status": "failed"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+Stopped the driver with SIGINT after DROP-failure mismatched its expectation. The old pg_sleep(120) holder could finish before teardown on a slow host. Completed reports and the failure remain unmodified; exit 130, leak audit 0. Remaining scenarios were not completed. Restart the full profile on cbac310 with the durable, readiness-checked holder.
