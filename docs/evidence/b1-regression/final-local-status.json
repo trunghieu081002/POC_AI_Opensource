@@ -1,46 +1,53 @@
 {
   "branch": "fix/b1-fail-required-gate",
   "base_commit": "1805adc14415321b39e182145fed5a920d6ad630",
-  "source_commit": "cbac310741ea82ab11e2c3031222a4c64a1f1322",
-  "source_tree": "e53b41c894995080b4781c43c99119e1f3039b77",
+  "source_commit": "033b16c7c78af90c4f43292a6888e4cb52c55ee5",
+  "source_tree": "1a03ede545210b1924bca84d016c0a101c2419df",
+  "regression_status": "complete",
+  "execution_order": [
+    "unit",
+    "label",
+    "artist",
+    "bronze",
+    "unit-exit-confirmation"
+  ],
   "unit": {
     "passed": 1254,
     "skipped": 25,
-    "exit": 0
+    "exit": 0,
+    "evidence": "033b16c/unit-exit-confirmation",
+    "original_exit_capture_missing": true,
+    "original_log_retained": true
   },
   "label": {
     "matched": 8,
     "total": 8,
     "exit": 0,
-    "leaks": 0,
-    "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
+    "leaks": 0
   },
   "artist": {
     "matched": 8,
     "total": 8,
     "exit": 0,
     "leaks": 0,
-    "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
+    "simulated_api_timeout_expected": true
   },
   "bronze": {
-    "status": "blocked",
-    "full_success": false,
-    "last_full": {
-      "matched": 30,
-      "total": 31,
-      "exit": 1,
-      "leaks": 0,
-      "commit": "fc18c74eb4341772c171718a6483dcf0969d994f"
-    },
-    "current_source_attempts": "Both stopped at bootstrap; no matrix on cbac310"
+    "matched": 31,
+    "total": 31,
+    "exit": 0,
+    "leaks": 0,
+    "full_success": true,
+    "drop_failure_real_session_verified": true
   },
   "github": {
-    "pushed": false,
-    "pr_created": false,
-    "git_error": "No credential; cannot prompt with user interactivity disabled",
-    "connector_error": "403 Resource not accessible by integration on blob creation"
+    "source_branch_pushed": true,
+    "source_remote_commit": "033b16c7c78af90c4f43292a6888e4cb52c55ee5",
+    "pr_url": "https://github.com/trunghieu081002/POC_AI_Opensource/pull/40"
   },
   "disposable_regression_containers_remaining": 0,
   "production_deployed": false,
-  "real_model_calls": false
+  "real_model_calls": false,
+  "source_changes_during_closure": false,
+  "prior_failed_attempts_retained": true
 }

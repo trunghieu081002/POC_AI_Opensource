@@ -1,20 +1,15 @@
-# B1: gate bắt buộc phải fail, không được quarantine rồi tiếp tục
+B1 trước đây chỉ đối chiếu stage/type/table/columns, nên gate đúng cấu trúc có quarantine 100% vẫn có thể loại dòng rồi tiếp tục. Contract mới khai báo `on_violation: fail`; harness và A2 cùng từ chối quarantine trên stage chứa gate bắt buộc. Contract không khai báo trường này giữ hành vi cũ.
 
-`required_gates` trước đây chỉ đối chiếu stage/type/table/columns, nên gate B1 đúng cấu trúc nhưng có quarantine 100% vẫn có thể đi tiếp. Contract mới khai báo `on_violation: fail`; harness và A2 cùng từ chối bất kỳ quarantine nào trên stage chứa gate đó. Contract không khai báo trường này giữ hành vi cũ.
+- L7: hai chứng nhận cùng đơn làm landing lỗi; journal không có silver chạy, không promote, approval không thay đổi, cleanup sạch.
+- L8: fixture sạch, output và dbt tests đạt nhưng quarantine 100% vẫn bị policy/A2 từ chối; approval không thay đổi.
+- DROP-failure giữ kết nối psql đến teardown, xác nhận bằng `pg_stat_activity`. Report thật cho thấy DROP bị chặn bởi 1 session; sau đóng holder không còn tài nguyên cần recovery.
+- Prompt, template và SQL đã sinh giữ nguyên. Runner hỗ trợ thư mục evidence riêng và tùy chọn cgroup namespace cho Docker Desktop/WSL.
 
-- L8: fixture sạch, output và dbt test đạt nhưng quarantine 100% bị policy/A2 từ chối; approval không thay đổi.
-- L7: hai chứng nhận cùng đơn làm landing lỗi; kiểm journal không có silver transform bắt đầu, không promote, cleanup sạch.
-- Prompt, template và SQL đã sinh giữ nguyên. Chỉ chạy scripted, không mở benchmark mới.
-- Runner cho phép output riêng từng lượt, tùy chọn cgroup namespace; image headless tắt getty@tty1 để host Docker Desktop/WSL chạy systemd ổn định.
+Validation chạy trên cùng checkout Linux sạch: commit `033b16c7c78af90c4f43292a6888e4cb52c55ee5`, tree `1a03ede545210b1924bca84d016c0a101c2419df`. Thứ tự: unit → label → artist → bronze; sau đó lặp unit để xác nhận numeric exit code bị thiếu ở lượt đầu. Log và capture lỗi đầu được giữ nguyên, có ghi chú trong evidence.
 
-Evidence nằm trong `docs/evidence/b1-regression/`, gồm cả các lượt thất bại do quyền journal, CRLF và cgroup.
+- Unit: 1254 passed, 25 skipped, captured exit 0 ở lượt confirmation.
+- Label scripted: 8/8, exit 0, leaks=0.
+- Artist scripted: 8/8, exit 0, leaks=0; API timeout mô phỏng là ca đúng kỳ vọng.
+- Full bronze: 31/31, exit 0, leaks=0, gồm fact-promote-deploy-run.
 
-
-## Validation
-
-- Source cuối: `cbac310741ea82ab11e2c3031222a4c64a1f1322`, tree `e53b41c894995080b4781c43c99119e1f3039b77`; full unit checkout Linux sạch: 1254 passed, 25 skipped, exit 0.
-- A3 label: 8/8; A3 artist: 8/8; cả hai exit 0, leaks=0, trên commit `fc18c74` / tree `a037dcf9c88e56575be4b1e2819719ba71fe969d`. Runtime, A3 và nội dung B1 không đổi từ fc18c74 đến cbac310.
-- cbac310 chỉ sửa ca fault injection DROP-failure của driver bronze: giữ kết nối psql idle qua stdin đến teardown, xác nhận kết nối bằng pg_stat_activity; thay timer 120 giây có thể tự hết hạn trước teardown trên host chậm.
-- Bronze chưa khép: lần đầy đủ trên fc18c74 khớp 30/31, leaks=0; ca cuối lỗi DNS dbt Hub. Một lượt khác lệch DROP-failure được giữ nguyên rồi dừng với exit 130, leaks=0. Hai lượt cbac310 chưa qua bootstrap do DNS/preflight PGDG, chưa chạy ma trận.
-
-**Draft / blocked:** cần full bronze 31/31, exit 0, leaks=0 trên cbac310 trước khi đánh dấu regression #39 hoàn tất. Mọi lượt lỗi đều giữ trong `docs/evidence/b1-regression/README.md`. Chưa deploy môi trường thật; chưa gọi model thật hoặc mở benchmark mới.
+Evidence đầy đủ trong [docs/evidence/b1-regression](https://github.com/trunghieu081002/POC_AI_Opensource/tree/fix/b1-fail-required-gate/docs/evidence/b1-regression), gồm mọi lượt thất bại trước đây và closure `033b16c/`. Commit closure chỉ thêm evidence/tài liệu; source được kiểm thử giữ nguyên. Chỉ scripted, không mở benchmark mới, không deploy môi trường thật. Regression của #39 đã khép; cần team review, không tự merge.

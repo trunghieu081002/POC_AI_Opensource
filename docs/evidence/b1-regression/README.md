@@ -1,6 +1,8 @@
 # B1 closure and regression of #39
 
-Final source revision: `cbac310741ea82ab11e2c3031222a4c64a1f1322`, tree `e53b41c894995080b4781c43c99119e1f3039b77`. B1, label and artist were tested on `fc18c74eb4341772c171718a6483dcf0969d994f`, tree `a037dcf9c88e56575be4b1e2819719ba71fe969d`. The only change from fc18c74 to cbac310 is the bronze driver's DROP-failure fault injection: an idle connection held until teardown, with a readiness check, replaces the expiring 120-second sleep. Runtime, A3, prompt, template and generated SQL are identical. Full units passed on cbac310; attempts to run full bronze at that revision were blocked during bootstrap. Every test uses a clean Linux checkout of its recorded revision; per-run `status-before.txt` and `run-info.txt` record cleanliness. Evidence is committed separately after the tested source.
+Final closure revision: `033b16c7c78af90c4f43292a6888e4cb52c55ee5`, tree `1a03ede545210b1924bca84d016c0a101c2419df`. A clean Linux checkout of this exact revision ran sequentially: full units, label scripted, artist scripted, and the complete bronze profile. All test criteria were met. The original unit log reports 1254 passed / 25 skipped, but its numeric exit capture was missing due to nested WSL shell quoting; that log and the blank capture are retained. Full units were repeated at the same clean revision in `unit-exit-confirmation/`: 1254 passed / 25 skipped, captured exit 0. See `033b16c/unit/capture-note.txt`.
+
+Source is unchanged from cbac310; 033b16c only added prior evidence. This closure update adds reports and evidence only, after the tested revision.
 
 ## Contract
 
@@ -8,10 +10,15 @@ Final source revision: `cbac310741ea82ab11e2c3031222a4c64a1f1322`, tree `e53b41c
 
 ## Results
 
-**Status: B1 mechanism proved; full bronze regression remains blocked.** No final bronze run of cbac310 has reached the matrix. Final source passes syntax and full unit validation; the durable DROP-failure holder still needs real-host acceptance. A stable Docker/Linux test host is needed to close regression; Git CLI has no credential and the connected GitHub integration returned 403 on blob creation, so no remote branch or PR was created.
+**Status: B1 and regression of #39 complete.** Latest full bronze run matched 31/31, exit 0, leaks=0, including the durable DROP-failure holder and fact-promote-deploy-run. Label and artist each matched 8/8, exit 0, leaks=0. Full units: 1254 passed, 25 skipped, with captured exit 0 in the confirmation run. All runs share the clean revision/tree above. Earlier unsuccessful attempts below are retained unchanged.
 
 | Run | Result | Evidence |
 |---|---|---|
+| **Closure: unit exit confirmation (033b16c)** | **1254 passed, 25 skipped, captured exit 0** | [unit confirmation](033b16c/unit-exit-confirmation/) |
+| Closure: initial units (033b16c) | 1254 passed, 25 skipped; numeric exit capture missing | [original unit log and capture note](033b16c/unit/) |
+| **Closure: label scripted (033b16c)** | **8/8 matched, exit 0, leaks=0** | [label](033b16c/label-attempt-1/) |
+| **Closure: artist scripted (033b16c)** | **8/8 matched, exit 0, leaks=0** | [artist](033b16c/artist-attempt-1/) |
+| **Closure: full bronze (033b16c)** | **31/31 matched, exit 0, leaks=0** | [bronze](033b16c/bronze-attempt-1/) |
 | Clean Linux unit suite (fc18c74) | 1254 passed, 25 skipped | `unit/04-final-clean-linux-full-suite.log`, `unit/final-provenance.json` |
 | Final clean Linux unit suite (cbac310) | 1254 passed, 25 skipped, exit 0 | `unit/05-harness-fixed-clean-linux-full-suite.log`, `unit/05-provenance.json` |
 | Label scripted | 8/8 matched, exit 0, leaks=0 | `fc18c74/label-attempt-1/` |
@@ -24,6 +31,8 @@ Final source revision: `cbac310741ea82ab11e2c3031222a4c64a1f1322`, tree `e53b41c
 | Artist scripted attempt 2 | 8/8 matched, exit 0, leaks=0 | `fc18c74/artist-attempt-2/` |
 
 ### B1 results on real services, with scripted replies
+
+Reconfirmed on 033b16c in `033b16c/label-attempt-1/evidence/scripted/label-20261013T080737Z-e06a0e/`. Both L7 and L8 have empty `expectation_problems`; A2 refuses and `approval_unchanged: true`.
 
 - L7: two certificates for order 5001 fail the landing unique gate (2/7 rejected). The journal contains only landing/failed, no silver transform start. Promote refuses, approval unchanged, cleanup passes, no recovered leftovers.
 - L8: the correct gate plus landing quarantine at 100%, on the unchanged clean fixture. Both real runs are ok, both comparisons pass and are idempotent, both dbt-test runs pass 2/2. The harness returns policy-fail; A2 refuses solely because `on_violation: fail` forbids stage quarantine. Approval unchanged, cleanup passes, no recovered leftovers.
@@ -61,8 +70,10 @@ For bronze attempt 3, `fc18c74/bronze-attempt-3/docker-wrapper.sh` forwards only
 
 The same wrapper approach is recorded separately in each cbac310 attempt directory. Bootstrap failures occur before leak-audit collection and have no fabricated leaks=0 verdict. All disposable regression containers were removed by the runner, with their outer attempt logs retained. No production host was deployed to.
 
-## Remaining work
+## Closure
 
-1. Run the complete bronze profile on a stable fresh host at cbac310, retaining source SHA/tree, full 31-case summary and final leak audit. Confirm DROP-failure now reports the expected failure while the idle holder is alive, and leaves no resources after recovery.
-2. Confirm 31/31 expectations, exit 0 and leaks=0; retain all failed attempts above.
-3. Authenticate Git CLI or grant repository write access to the GitHub integration, push `fix/b1-fail-required-gate` and open the small PR against main. `PR-description.md` is a prepared draft and explicitly names the pending regression.
+The complete fresh-host sequence finished on 2026-10-13. Host options: Docker Desktop/WSL, `M25_CGROUPNS=host`, default Docker DNS (no wrapper or global DNS changes), and a distinct evidence directory per run. All disposable regression containers were removed.
+
+The durable DROP-failure report records two successful data runs, then PostgreSQL refusing DROP with `There is 1 other session using the database`. Its failed cleanup verdict is retained. Only after the holder closes does scenario cleanup remove its database/role; `recovered_after_scenario` is empty and the final host audit has leaks=0. The final fact-promote-deploy-run completed validation, promote, real deploy/run, published-byte checks, and approval invalidation checks.
+
+No code, prompt, template or generated SQL changed during this closure. No production deployment, real provider call, or new benchmark was performed. GitHub: [PR #40](https://github.com/trunghieu081002/POC_AI_Opensource/pull/40), branch `fix/b1-fail-required-gate`. Team review remains; no merge was performed.
