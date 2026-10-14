@@ -76,10 +76,16 @@ was still installing. Until they pass this report is *unit-tested only*, not *re
 | Scenario | What it must show |
 |---|---|
 | `usage-correct-twice` | validation twice through the real DAG: gold equals the 13 expected rows both times, plus `dim_video` (7) and `fact_editing` (13); 3 batches × 6 tables loaded; source dropped → LOAD still loads; S3 39 objects → 0; HG's tests passed in both stages; promote accepted |
-| `usage-conflicting-ids` | two source rows with one `resource_editings.Id` and different values → `fact_editing_sk` not unique → silver's `dbt test` fails the run, gold never runs, nothing promotable, cleanup complete |
+| `usage-conflicting-ids` | two source rows with one `resource_editings.Id` and different values → `fact_editing_sk` not unique → silver's `dbt test` fails the run; the saved run journal shows silver transform started and its unique test failed, with no gold `transform.start`; promote is refused without changing approval, cleanup complete |
 | `usage-promote-deploy-run` | validate → promote → real deploy → Airflow run → output = expected; every approved file (seed and macro included) published byte-identical; editing the model, tests, seed or macro loses the approval |
 
 ## Limits
+
+Follow-up verification: the original full unit run at merge commit
+`b1a5b6e8aa98ad4b7c57b23e3a8d02c33595f721` passed 1 269 tests with 25 skips;
+its evidence is retained in `docs/evidence/hg-usage-verification/`. The journal
+assertion follow-up and Linux company-host handoff are documented in
+`docs/evidence/hg-usage-journal-fix/HANDOFF.md`. Real-host acceptance remains pending.
 
 * One report, full snapshot. `published_date` assumes the database session time zone is UTC (the fixture's
   `PublishedAt` values are `+00`).
