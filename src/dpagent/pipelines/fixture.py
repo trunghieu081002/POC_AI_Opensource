@@ -801,10 +801,54 @@ def _canon_value(value: object, *, numeric: bool) -> object:
     return str(value)
 
 
-def _canon_row(row: dict, numeric_columns: set[str]) -> str:
-    return json.dumps(
-        {k: _canon_value(v, numeric=k in numeric_columns) for k, v in row.items()},
-        sort_keys=True, ensure_ascii=False)
+def _canon_timestamp(value, *, with_timezone: bool):
+    """Compare typed ISO timestamp values, never date-looking text identifiers.
+
+    timestamptz compares instants and requires an explicit offset; no implicit
+    UTC is assigned to a naive expected value. timestamp without time zone
+    compares wall-clock fields, as PostgreSQL ignores a literal's zone there.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and value in ("infinity", "-infinity"):
+        return value
+    if isinstance(value, _dt.datetime):
+        stamp = value
+    elif isinstance(value, (str, _dt.date)):
+        text = value.strip() if isinstance(value, str) else value.isoformat()
+        # Python's ISO parser truncates excess fractional digits. Refuse any
+        # non-zero precision it cannot represent, rather than hiding a change.
+        import re
+        if any(set(m.group(1)[6:]) - {"0"} for m in re.finditer(r"\.(\d{7,})", text)):
+            raise ValueError("timestamp precision exceeds microseconds")
+        # Python 3.10 accepts colon offsets, while PostgreSQL also emits/
+        # accepts +HH and +HHMM. Only expand an explicit offset after a time;
+        # never mistake the final day of a date-only value for a zone.
+        offset = re.search(r"([+-])(\d{2})(\d{2})?$", text)
+        if offset and re.search(r"[T ]\d{2}:\d{2}", text):
+            text = text[:offset.start()] + offset[1] + offset[2] + ":" + (offset[3] or "00")
+        stamp = _dt.datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    else:
+        raise ValueError("timestamp expected value must be ISO text or datetime")
+    if with_timezone:
+        if stamp.tzinfo is None or stamp.utcoffset() is None:
+            raise ValueError("timestamptz expected value requires an explicit timezone offset")
+        stamp = stamp.astimezone(_dt.timezone.utc)
+    else:
+        stamp = stamp.replace(tzinfo=None)
+    return stamp.isoformat(timespec="microseconds")
+
+
+def _canon_row(row: dict, numeric_columns: set[str], column_types: dict[str, str] | None = None) -> str:
+    types = column_types or {}
+    values = {}
+    for key, value in row.items():
+        kind = types.get(key)
+        if kind in ("timestamp with time zone", "timestamp without time zone"):
+            values[key] = _canon_timestamp(value, with_timezone=kind == "timestamp with time zone")
+        else:
+            values[key] = _canon_value(value, numeric=key in numeric_columns)
+    return json.dumps(values, sort_keys=True, ensure_ascii=False)
 
 
 # Postgres's own information_schema.columns.data_type spellings for every
@@ -898,8 +942,11 @@ def compare_curated(expected: ExpectedResult, warehouse: ThrowawayDB, schema: st
         return ComparisonResult(
             False, f"expected {expected.row_count} row(s), got {len(actual_rows)}")
 
-    actual_sorted = sorted(_canon_row(r, numeric_columns) for r in actual_rows)
-    expected_sorted = sorted(_canon_row(r, numeric_columns) for r in expected.rows)
+    try:
+        actual_sorted = sorted(_canon_row(r, numeric_columns, column_types) for r in actual_rows)
+        expected_sorted = sorted(_canon_row(r, numeric_columns, column_types) for r in expected.rows)
+    except (ValueError, OverflowError) as exc:
+        return ComparisonResult(False, f"could not compare typed timestamps: {exc}")
     if actual_sorted != expected_sorted:
         return ComparisonResult(
             False, f"expected rows:\n  {expected_sorted}\nactual rows:\n  {actual_sorted}")
