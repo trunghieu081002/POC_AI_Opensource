@@ -217,7 +217,7 @@ else
       mv /root/m25-evidence /root/m25-evidence.previous-$(date -u +%Y%m%dT%H%M%S%N)
     fi
     cd /opt/src/dpagent-src
-    git ls-files -z src tests scripts packs suites pipelines examples lib pyproject.toml \
+    git -c safe.directory=/opt/src/dpagent-src ls-files -z src tests scripts packs suites pipelines examples lib pyproject.toml \
       | xargs -0 sha256sum > /tmp/dpagent-source-manifest.txt
     cd /opt/dpagent
     sha256sum -c /tmp/dpagent-source-manifest.txt >/dev/null
