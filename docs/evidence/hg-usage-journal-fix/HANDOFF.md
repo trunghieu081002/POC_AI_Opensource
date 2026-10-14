@@ -24,6 +24,7 @@ no disposable container was created and no real leak audit was possible. Neither
 the three usage scenarios nor the 34-scenario bronze matrix has run here.
 
 Branch `fix/hg-usage-journal-proof` has been pushed for company Linux handoff.
+Draft PR: https://github.com/trunghieu081002/POC_AI_Opensource/pull/42.
 
 ## Commands for Claude on company Linux
 
