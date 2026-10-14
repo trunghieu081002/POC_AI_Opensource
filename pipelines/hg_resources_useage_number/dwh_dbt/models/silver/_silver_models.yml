@@ -1,0 +1,19 @@
+# Tests of the silver models this report reads. Only fact_editing's entry is HG's (phulee9/hgmedia e9cbff0,
+# models/silver/_silver_models.yml). HG declares no test for dim_video or int_excluded_stock_codes (its
+# data_quality_rules.yaml only requires "table has rows"): the two entries below are dpagent's, added because
+# dpagent's A2 gate refuses a dbt stage with an untested model (docs/hg-fact-artist-assignment.md).
+version: 2
+
+models:
+  - name: fact_editing                 # HG's
+    columns:
+      - name: fact_editing_sk
+        tests: [unique, not_null]
+  - name: dim_video                    # dpagent's (not HG's)
+    columns:
+      - name: dim_video_sk
+        tests: [unique, not_null]
+  - name: int_excluded_stock_codes     # dpagent's (not HG's)
+    columns:
+      - name: hg_stock_id
+        tests: [unique, not_null]

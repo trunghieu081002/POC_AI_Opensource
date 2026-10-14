@@ -1005,6 +1005,38 @@ def run_fact_no_tests(tmp_path: Path) -> dict:
     return _run_hg(tmp_path, source=FACT_DIR, mutate=no_tests)
 
 
+USAGE_DIR = REPO_ROOT / "pipelines" / "hg_resources_useage_number"
+
+
+def run_usage_correct_twice(tmp_path: Path) -> dict:
+    return _run_hg(tmp_path, source=USAGE_DIR)
+
+
+def run_usage_conflicting_ids(tmp_path: Path) -> dict:
+    """HG's own warning in fact_editing.sql: identical joined rows are collapsed, but two source rows
+    sharing one resource_editings.Id with DIFFERENT values are not - "the unique test will still expose
+    conflicting rows". Here x3 appears twice with different StartTime: fact_editing_sk is no longer unique,
+    so the silver stage's `dbt test` must fail the run (the output would otherwise even look plausible)."""
+    import yaml
+
+    def conflicting(work):
+        f = work / "fixture.yaml"
+        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        rows = next(t["rows"] for t in doc["tables"] if t["name"] == "resource_editings")
+        rows.append({"Id": "x3", "EditingId": "e-1", "ResourcesId": "r-2", "StartTime": 11, "EndTime": 21})
+        f.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return _run_hg(tmp_path, source=USAGE_DIR, mutate=conflicting)
+
+
+def run_usage_promote_deploy_run(tmp_path: Path) -> dict:
+    return run_a2_promote_deploy_run(
+        tmp_path, source=USAGE_DIR, name="hg_a2_usage",
+        hashed_edits={"model": "dwh_dbt/models/gold/resources_useage_number.sql",
+                      "tests": "dwh_dbt/models/gold/_gold_models.yml",
+                      "seed": "dwh_dbt/seeds/manual_excluded_stock_codes.csv",
+                      "macro": "dwh_dbt/macros/generate_schema_name.sql"})
+
+
 def run_fact_promote_deploy_run(tmp_path: Path) -> dict:
     return run_a2_promote_deploy_run(
         tmp_path, source=FACT_DIR, name="hg_a2_fact",
@@ -1053,6 +1085,9 @@ BRONZE_SCENARIOS_FN = {
     "fact-correct-twice": run_fact_correct_twice,
     "fact-dbt-test-fails": run_fact_dbt_test_fails,
     "fact-no-tests": run_fact_no_tests,
+    "usage-correct-twice": run_usage_correct_twice,
+    "usage-conflicting-ids": run_usage_conflicting_ids,
+    "usage-promote-deploy-run": run_usage_promote_deploy_run,
     "fact-promote-deploy-run": run_fact_promote_deploy_run,
 }
 SCENARIOS.update(BRONZE_SCENARIOS_FN)
@@ -1360,6 +1395,76 @@ def _fact_test_fails(result: dict) -> tuple[bool, str]:
     return (not problems), ("; ".join(problems) if problems else
                             "dbt run succeeded, dbt test failed -> stage failed, nothing promotable")
 
+
+def _usage_row_counts() -> dict[str, int]:
+    import yaml
+    doc = yaml.safe_load((USAGE_DIR / "fixture.yaml").read_text(encoding="utf-8"))
+    return {t["name"]: len(t["rows"]) for t in doc["tables"]}
+
+
+def _usage_correct(result: dict) -> tuple[bool, str]:
+    """Six tables in one batch, three silver models and the gold report, HG's tests on both stages."""
+    problems = []
+    need = lambda cond, msg: None if cond else problems.append(msg)     # noqa: E731
+    need(result.get("overall") == "pass", f"overall={result.get('overall')!r}")
+    need(result.get("run_status") == {"run_1": "ok", "run_2": "ok"}, f"run_status={result.get('run_status')}")
+    need(result.get("comparison", {}).get("idempotent") is True, "not idempotent")
+    c = result.get("cleanup", {})
+    need(c.get("overall") == "pass" and c.get("s3_objects") == "pass", f"cleanup={c}")
+    counts = _usage_row_counts()
+    b = result.get("bronze") or {}
+    by_batch: dict = {}
+    for x in b.get("batches", []):
+        by_batch.setdefault(x["batch_id"], []).append(x)
+    need(len(by_batch) == 3, f"expected 3 batches, got {len(by_batch)}")
+    for bid, rows in by_batch.items():
+        need(sorted(r["table_name"] for r in rows) == sorted(counts), f"batch {bid} tables {[r['table_name'] for r in rows]}")
+        need(all(r["status"] == "loaded" for r in rows), f"batch {bid} statuses {[r['status'] for r in rows]}")
+        need({r["table_name"]: r["loaded_rows"] for r in rows} == counts,
+             f"batch {bid} loaded_rows {[(r['table_name'], r['loaded_rows']) for r in rows]} != {counts}")
+    # 3 batches x (6 tables x (1 parquet + 1 manifest) + 1 batch manifest)
+    need(b.get("s3", {}).get("objects_found_at_teardown") == 3 * (2 * len(counts) + 1), f"s3 {b.get('s3')}")
+    need(b.get("s3", {}).get("objects_remaining_after_purge") == 0, f"s3 {b.get('s3')}")
+    sd = b.get("source_down_load") or {}
+    need(sd.get("ok") is True and sd.get("source_dropped") and sd.get("source_unreachable"), f"source_down_load={sd}")
+    from dpagent.pipelines import dbtproject
+    for run in ("run_1", "run_2"):
+        recs = {e["stage"]: e for e in (result.get("dbt_tests") or {}).get(run, [])}
+        need(sorted(recs) == ["gold", "silver"], f"{run}: dbt test records for {sorted(recs)}")
+        for stage, minimum in (("silver", 6), ("gold", 4)):
+            e = recs.get(stage) or {}
+            need(e.get("kind") == "dbt.test.passed" and e.get("required", 0) >= minimum
+                 and e.get("passed") == e.get("required") and not dbtproject.dbt_test_record_problems(e.get("data") or {}),
+                 f"{run}/{stage}: dbt tests {e.get('kind')} required={e.get('required')} passed={e.get('passed')}")
+    pr = result.get("promote") or {}
+    need(pr.get("accepted") and pr.get("verification") == "verified", f"promote={pr}")
+    return (not problems), ("; ".join(problems) if problems else "matched expectation")
+
+
+def _usage_conflicting(result: dict) -> tuple[bool, str]:
+    problems = []
+    if result.get("overall") != "fail" or (result.get("run_status") or {}).get("run_1") != "failed":
+        problems.append(f"expected run 1 to fail, got {result.get('overall')}/{result.get('run_status')}")
+    evs = (result.get("dbt_tests") or {}).get("run_1") or []
+    if not any(e["kind"] == "dbt.test.failed" and e.get("stage") == "silver"
+               and "unique_fact_editing_fact_editing_sk" in e["message"] for e in evs):
+        problems.append(f"the failing unique test on fact_editing_sk is not on record: {evs}")
+    if any(e.get("stage") == "gold" for e in evs):
+        problems.append("the gold stage ran although silver failed its tests")
+    if (result.get("cleanup") or {}).get("overall") != "pass":
+        problems.append(f"cleanup={result.get('cleanup')}")
+    pr = result.get("promote") or {}
+    if pr.get("accepted") is not False or pr.get("approval_unchanged") is not True:
+        problems.append(f"promote={pr}")
+    return (not problems), ("; ".join(problems) if problems else
+                            "conflicting source ids: silver's unique test failed, gold never ran, nothing promotable")
+
+
+EXPECTATIONS.update({
+    "usage-correct-twice": _usage_correct,
+    "usage-conflicting-ids": _usage_conflicting,
+    "usage-promote-deploy-run": _a2,
+})
 
 EXPECTATIONS.update({
     "fact-correct-twice": _fact_correct,

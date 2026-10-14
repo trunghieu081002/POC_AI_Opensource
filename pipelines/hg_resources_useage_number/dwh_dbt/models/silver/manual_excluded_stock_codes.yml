@@ -1,0 +1,15 @@
+version: 2
+
+seeds:
+  - name: manual_excluded_stock_codes
+    description: >-
+      Historical HGFA codes requested for removal that cannot currently be mapped
+      to the FOREST MUSIC GROUP folder tree.
+    config:
+      column_types:
+        hg_stock_id: text
+    columns:
+      - name: hg_stock_id
+        tests:
+          - not_null
+          - unique
