@@ -1,0 +1,15 @@
+# NOT from HG: HG declares no test on gold.resources_useage_number. These keep the report honest
+# (one row per resource x video; position_group is one of HG's four buckets) and satisfy dpagent's rule
+# that every model of a dbt stage has a test.
+version: 2
+
+models:
+  - name: resources_useage_number
+    columns:
+      - name: resource_video_sk
+        tests: [unique, not_null]
+      - name: position_group
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['1', '2-3', '4-5', '>5']
