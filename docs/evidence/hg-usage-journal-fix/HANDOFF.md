@@ -12,7 +12,18 @@ failure. HG SQL, seed, fixture and independent expected are unchanged.
 
 Targeted tests: 27 passed, exit 0; see `targeted-attempt-1/`. That attempt ran
 the exact recorded source files on the merge base before the fix commit.
-Full-unit and disposable preflight follow-up evidence accompany this handoff.
+Full unit on committed source SHA
+`b2587b3a07a92a313b44cc9079fc9a86e24d4538`: **1 281 passed / 25 skipped**, exit
+**0**, 137.84 seconds. See `final-unit-attempt-1/`. The original 1 269/25 evidence
+remains intact. Follow-up commits only record evidence and handoff documentation;
+the tested source is unchanged.
+
+One host capability check on this revision exits **1**: Docker Desktop WSL
+integration is unavailable. See `host-check-once/`. No bootstrap was attempted,
+no disposable container was created and no real leak audit was possible. Neither
+the three usage scenarios nor the 34-scenario bronze matrix has run here.
+
+Branch `fix/hg-usage-journal-proof` has been pushed for company Linux handoff.
 
 ## Commands for Claude on company Linux
 
@@ -28,10 +39,17 @@ git rev-parse HEAD
 git status --porcelain
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev,llm]'
-export DPAGENT_DB="$PWD/.unit-state/dpagent.db"
-mkdir -p .unit-state
+unit_state=$(mktemp -d /var/tmp/hg-usage-unit.XXXXXX)
+export DPAGENT_DB="$unit_state/dpagent.db"
 # llm dependency is required by offline mocked unit tests; no provider calls.
-.venv/bin/python -m pytest
+unit_out="$PWD/docs/evidence/hg-usage-company/$(git rev-parse HEAD)/unit-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$unit_out"
+git rev-parse HEAD > "$unit_out/sha.txt"
+.venv/bin/python -m pytest > "$unit_out/runner.log" 2>&1
+rc=$?
+printf '%s\n' "$rc" > "$unit_out/exit-code.txt"
+cat "$unit_out/runner.log"
+[ "$rc" -eq 0 ] || exit "$rc"
 
 # The existing orchestrator provisions and tears down the disposable container.
 # Results paths must be unique so failed attempts are retained.
@@ -47,6 +65,7 @@ M25_RESULTS_DIR="$out/evidence" bash scripts/m25-acceptance-ci.sh \
   2>&1 | tee "$out/runner.log"
 rc=${PIPESTATUS[0]}
 printf '%s\n' "$rc" > "$out/exit-code.txt"
+[ "$rc" -eq 0 ] || exit "$rc"
 ```
 
 Stop if the targeted matrix fails. Keep logs and fix the cause without changing
@@ -68,7 +87,7 @@ M25_RESULTS_DIR="$out/evidence" bash scripts/m25-acceptance-ci.sh \
   --profile bronze 2>&1 | tee "$out/runner.log"
 rc=${PIPESTATUS[0]}
 printf '%s\n' "$rc" > "$out/exit-code.txt"
-.venv/bin/python -m pytest
+# Repeat the unit capture above before finalizing the PR if source changed.
 ```
 
 Preserve full-unit logs and exit code too. Confirm seed 5 787 rows, CamelCase
