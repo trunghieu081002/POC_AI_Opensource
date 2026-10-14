@@ -5,6 +5,7 @@ the same adapter/profile connection values as the warehouse being compared.
 No HG models, fixtures, expected results or shared runtime behavior are changed.
 """
 import json
+import re
 import subprocess
 import tempfile
 from dataclasses import replace
@@ -15,12 +16,23 @@ from dpagent.pipelines import fixture, loader, runtime
 MARKER = "DPAGENT_USAGE_SESSION="
 
 
+def decode_observation(stdout):
+    markers = list(re.finditer(re.escape(MARKER), stdout))
+    if len(markers) != 1:
+        raise RuntimeError("dbt session audit did not emit exactly one observation")
+    payload = stdout[markers[0].end():].lstrip()
+    record, _ = json.JSONDecoder().raw_decode(payload)
+    if not isinstance(record, dict):
+        raise RuntimeError("dbt session audit observation is not an object")
+    return record
+
+
 def observe(warehouse, source):
     pipeline = loader.load(source.name, source.parent)
     pipeline = replace(pipeline, warehouse=replace(
         pipeline.warehouse, host=warehouse.host, port=warehouse.port,
         database=warehouse.database, user=warehouse.user, password=warehouse.password))
-    query = """select json_build_object(
+    query = """select jsonb_build_object(
       'database', current_database(), 'user', current_user,
       'timezone', current_setting('TimeZone'),
       'seed_rows', (select count(*) from silver.manual_excluded_stock_codes),
@@ -56,11 +68,7 @@ def observe(warehouse, source):
                 capture_output=True, text=True, timeout=120)
         if proc.returncode:
             raise RuntimeError("dbt session audit failed: " + (proc.stderr or proc.stdout)[-2000:])
-        records = [json.loads(line.split(MARKER, 1)[1]) for line in proc.stdout.splitlines()
-                   if MARKER in line]
-        if len(records) != 1:
-            raise RuntimeError("dbt session audit did not emit exactly one observation")
-        return records[0]
+        return decode_observation(proc.stdout)
 
 
 def problems(observations, source, required):

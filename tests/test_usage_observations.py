@@ -43,3 +43,21 @@ def test_case_folded_bronze_column_is_rejected():
 
 def test_missing_observations_are_not_accepted():
     assert audit.problems([], SOURCE, 2)
+
+
+def test_multiline_postgres_json_is_preserved():
+    stdout = '09:00 ' + audit.MARKER + '{"rows": [{"n":1},\n {"n":2}]}\n09:01 done'
+    assert audit.decode_observation(stdout) == {"rows": [{"n": 1}, {"n": 2}]}
+
+
+@pytest.mark.parametrize("stdout", ["no observation", audit.MARKER + "{}" + audit.MARKER + "{}",
+                                     audit.MARKER + "[]"])
+def test_missing_duplicate_or_nonobject_observation_fails(stdout):
+    with pytest.raises(RuntimeError):
+        audit.decode_observation(stdout)
+
+
+def test_truncated_observation_is_rejected():
+    import json
+    with pytest.raises(json.JSONDecodeError):
+        audit.decode_observation(audit.MARKER + '{"rows": [')
