@@ -85,7 +85,7 @@ def config():
         if old["SUPERSET_SECRET_KEY"] != env["SUPERSET_SECRET_KEY"]:
             raise RuntimeError("Changing the encryption key requires an explicit metadata key rotation")
     write(ROOT/"superset.env","".join(k+"="+json.dumps(v,ensure_ascii=False)+"\n" for k,v in env.items()),0o600,True)
-    for name in ("env_exec.py","superset_config.py","reader.py"):
+    for name in ("env_exec.py","superset_config.py","reader.py","smoke.py"):
         shutil.copyfile(str(SOURCE/name),str(ROOT/name));(ROOT/name).chmod(0o644)
 
 def reader():
@@ -158,7 +158,7 @@ def rollback():
     # Keep the reader ownership receipt to support safe reinstall. Preserve all DBs.
     for path in (VENV,ROOT/"home"):
         if path.exists(): shutil.rmtree(str(path))
-    for name in ("superset.env","superset_config.py","env_exec.py","reader.py"):
+    for name in ("superset.env","superset_config.py","env_exec.py","reader.py","smoke.py"):
         path=ROOT/name
         if path.exists(): path.unlink()
     print("Removed owned service/runtime; metadata, warehouse, reader grants and ownership receipts retained")
