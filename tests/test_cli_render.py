@@ -66,3 +66,23 @@ def test_preflight_failure_output_is_still_shown():
 
     assert "something is wrong" in capture.get()
     assert "preflight failed" in capture.get()
+
+
+def test_subprocess_markup_is_printed_literally():
+    output="Loaded configuration at [/opt/superset/superset_config.py]\n[red]literal tool output[/red] [/orphan]"
+    with render.console.capture() as captured:
+        render.echo_output(output)
+    text=captured.get()
+    assert "[/opt/superset/superset_config.py]" in text
+    assert "[red]literal tool output[/red] [/orphan]" in text
+
+
+def test_literal_subprocess_output_still_redacts_secrets(monkeypatch):
+    from dpagent.engine import params
+    secret="registered-unit-secret-value"
+    monkeypatch.setattr(params,"_SECRETS",{secret})
+    with render.console.capture() as captured:
+        render.echo_output("[red]"+secret+"[/red]",style="red")
+    text=captured.get()
+    assert secret not in text
+    assert "[red]"+params.MASK+"[/red]" in text
