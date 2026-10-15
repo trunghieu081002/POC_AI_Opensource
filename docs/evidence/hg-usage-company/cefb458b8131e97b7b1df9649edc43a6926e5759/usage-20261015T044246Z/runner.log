@@ -1,0 +1,450 @@
+[36m::[0m preconditions ok - commit cefb458b8131e97b7b1df9649edc43a6926e5759, building/reusing image dpagent-m25-disposable
+sha256:cf54ad35d7d62113dc140e01f438ae35beeaa09b8b4a19ad4ed53284922df83a
+[32mok[0m image dpagent-m25-disposable ready
+[32mok[0m container dpagent-m25-acceptance-171123 up, systemd running
+[36m::[0m bootstrapping dpagent and installing postgres+dlt+dbt+airflow (this takes several minutes)
+debconf: delaying package configuration, since apt-utils is not installed
+[36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+[36m::[0m refreshing the package index
+Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
+Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Fetched 129 kB in 2s (65.2 kB/s)
+Reading package lists...
+[36m::[0m installing certificates and a downloader
+Reading package lists...
+Building dependency tree...
+Reading state information...
+ca-certificates is already the newest version (20260601~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+done.
+[36m::[0m installing python and build prerequisites
+Reading package lists...
+Building dependency tree...
+Reading state information...
+gzip is already the newest version (1.10-4ubuntu4.2).
+python3 is already the newest version (3.10.6-1~22.04.1).
+tar is already the newest version (1.34+dfsg-1ubuntu0.1.22.04.6).
+python3-pip is already the newest version (22.0.2+dfsg-1ubuntu0.7).
+python3-venv is already the newest version (3.10.6-1~22.04.1).
+0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
+[32mok[0m python 3.10 (python3)
+[36m::[0m installing from the local source at /opt/src/dpagent-src (no network fetch)
+[36m::[0m creating the virtualenv
+[32mok[0m dpagent installed
+dpagent, version 0.4.0
+
+Everything else the packs need — locale, ss, fuser, a synced clock — is itself a
+pack. Install it first and the rest stop failing in confusing ways:
+
+  sudo -E dpagent install base
+
+Then:
+
+  dpagent info                                  what it detected and can install
+  dpagent packs                                 the pack library
+  sudo -E dpagent install postgres --dry-run    print every command, run nothing
+  sudo -E dpagent install postgres              install, then prove it works
+
+An install is not reported as successful until its acceptance suite passes.
+'dpagent status' shows anything that is installed but unproven.
+
+Installing needs no API key. A model is only involved in three places: routing a
+plain-language request (dpagent do), drafting a pack for a tool with no pack yet
+(dpagent synth), and proposing a catalog entry for a failure nothing matched:
+  sudo /opt/dpagent/.venv/bin/pip install -e '/opt/dpagent[llm]'   # litellm - once
+
+  cp /opt/dpagent/.env.example /opt/dpagent/.env
+  $EDITOR /opt/dpagent/.env                        # GEMINI_API_KEY is free; quote
+                                                 # any value with spaces or $/*
+  set -a; source /opt/dpagent/.env; set +a
+
+Note the -E in 'sudo -E': it keeps your environment, which is how ${SECRETS}
+referenced by a project.yaml and any http_proxy settings reach the agent.
+project: layer2-bronze-stack
+╭── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack           steps  why         │
+│  1  base               3  requested   │
+│  2  python-modern      1  dependency  │
+│  3  dbt                4  requested   │
+│  4  dlt                4  requested   │
+│  5  postgres           5  requested   │
+│  6  seaweedfs          5  requested   │
+│  7  airflow            7  requested   │
+╰───────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+      ok 17862ms
+  2/3 locale · Generate a UTF-8 locale
+      ok 3891ms
+  3/3 time-sync · Enable clock synchronisation
+      ok 91ms
+  verify ok
+      ok python3 runs
+      ok curl runs
+      ok openssl runs
+      ok tar runs
+      ok ss lists sockets
+      ok fuser is present
+      ok pgrep is present
+      ok CA bundle is usable
+      ok locale en_US.UTF-8 available
+      ok clock is synchronised
+      ok base tooling verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ python-modern v1.0.0                                                         │
+│ Ensure a Python 3.8+ interpreter exists, without touching the system python3 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "3.11"}
+  preflight ok
+      :: already satisfied: /usr/bin/python3.10
+      ok preflight passed
+  1/1 install · Install a Python 3.8+ interpreter alongside the system one
+      skip — guard says already applied
+  verify ok
+      ok python-modern verified: /usr/bin/python3.10 (3.10)
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ dbt v1.0.0                                                               │
+│ dbt-core in a dedicated virtualenv, configured against a Postgres target │
+╰──────────────────────────────────────────────────────────────────────────╯
+  params: {"adapter": "postgres", "dbt_version": "1.8.*", "install_dir": 
+"/opt/dbt", "project_dir": "/opt/dbt/project", "profile_name": "default", 
+"target": "dev", "host": "localhost", "port": 5432, "database": "warehouse", 
+"db_schema": "public", "db_user": "dbt_user", "db_password": "***REDACTED***", 
+"threads": 4}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      !! cannot reach localhost:5432 right now - dbt will still install, but 
+'dbt debug' and any real run will fail until the target database is reachable
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 16488ms
+  2/4 install · Install dbt-core and the postgres adapter into the venv
+      ok 89661ms
+  3/4 project · Seed a minimal dbt project and profiles.yml if none exists
+      ok 5684ms
+  4/4 wrapper · Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+      ok 16ms
+  verify ok
+      ok dbt binary present at /opt/dbt/.venv/bin/dbt
+      ok /usr/local/bin/dbt wrapper present
+      :: reported version:   - installed: 1.8.10
+      ok version matches the requested 1.8.*
+      ok dbt verified (liveness only - run 'dbt debug' to check the database 
+connection)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ dlt v1.0.0                                                                   │
+│ dlt (data load tool) in a dedicated virtualenv - extract+load only, never    │
+│ transforms                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"dlt_version": "1.*", "install_dir": "/opt/dlt", "host": "localhost",
+"port": 5432, "database": "dlt_selftest", "db_user": "dlt_user", "db_password": 
+"***REDACTED***"}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      !! cannot reach localhost:5432 right now - dlt will still install, but the
+acceptance suite (a real extract+load) will fail until that target is reachable
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 7322ms
+  2/4 install · Install dlt (postgres destination, sql_database source extras, 
+pymssql driver) into the venv
+      ok 82091ms
+  3/4 wrapper · Put a `dlt` wrapper on PATH
+      ok 16ms
+  4/4 selftest-config · Write the resolved self-test connection config 
+(root-only)
+      ok 30ms
+  verify ok
+      ok dlt binary present at /opt/dlt/.venv/bin/dlt
+      ok /usr/local/bin/dlt wrapper present
+      ok postgres destination and sql_database source both import cleanly
+      ok dlt verified (liveness only - dpagent's own acceptance suite proves an 
+actual extract+load)
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 200, "databases": ["warehouse", "airflow_meta", 
+"dlt_selftest"], "users": [{"name": "dbt_user", "password": "***REDACTED***", 
+"databases": ["warehouse"]}, {"name": "airflow", "password": "***REDACTED***", 
+"databases": ["airflow_meta"]}, {"name": "dlt_user", "password": 
+"***REDACTED***", "databases": ["dlt_selftest"]}], "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      ok 11047ms
+  2/5 install · Install the PostgreSQL server packages
+      ok 27866ms
+  3/5 initdb · Initialise the data directory and start the service
+      skip — guard says already applied
+  4/5 config · Apply port, listen_addresses and connection settings
+      ok 2541ms
+  5/5 databases · Create the requested databases, roles and grants
+      ok 926ms
+  verify ok
+      ok service postgresql is active
+      ok something is listening on 5432
+      ok pg_isready on port 5432
+      ok server answers queries: 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      ok database warehouse exists
+      ok database airflow_meta exists
+      ok database dlt_selftest exists
+      ok postgres 15 verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ seaweedfs v1.0.0  DRAFT                                                      │
+│ SeaweedFS as a single S3-compatible object store (one `weed server`), bound  │
+│ to localhost by default                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "4.48", "sha256_amd64": 
+"4a7d108384d044d95212d1342cdda9533fa55842c1c9b41f606ca3c8a9561124", 
+"sha256_arm64": 
+"557e92c38c5c7d180748eb8e2b2b45e426f8e5282a4caca8e098a90d09f03a07", 
+"install_dir": "/opt/seaweedfs", "data_dir": "/var/lib/seaweedfs", "s3_port": 
+8333, "bind_address": "127.0.0.1", "volume_size_limit_mb": 1024, "volume_max": 
+100, "volume_growth_count": 1, "access_key": "***REDACTED***", "secret_key": 
+"***REDACTED***", "buckets": ["hg-bronze"]}
+  preflight ok
+      ok preflight passed
+  1/5 user · Create the seaweedfs system user and its directories
+      ok 430ms
+  2/5 install · Download the pinned release, verify its sha256, install the weed
+binary
+      ok 9268ms
+  3/5 config · Write the S3 identity file and the root-only credentials file the
+suite reads
+      ok 48ms
+  4/5 service · Install and start the seaweedfs systemd unit
+      ok 4323ms
+  5/5 buckets · Create the requested buckets
+      ok 220ms
+  verify ok
+      ok service seaweedfs is active
+      ok something is listening on 8333
+      ok the S3 API answers a signed ListBuckets with the configured key
+      ok seaweedfs verified (liveness only - dpagent's acceptance suite proves 
+objects round-trip)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ airflow v1.0.0                                                               │
+│ Apache Airflow (LocalExecutor) in a dedicated virtualenv, backed by Postgres │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "2.9.3", "install_dir": "/opt/airflow", "executor": 
+"LocalExecutor", "webserver_port": 8090, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "airflow_meta", "backend_user": "airflow", 
+"backend_password": "***REDACTED***", "admin_user": "admin", "admin_password": 
+"***REDACTED***", "admin_email": "admin@example.com", "load_examples": false}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      ok preflight passed
+  1/7 user · Create the airflow system user and AIRFLOW_HOME
+      ok 340ms
+  2/7 venv · Create a dedicated virtualenv under install_dir
+      ok 6561ms
+  3/7 install · Install apache-airflow and the postgres provider (constrained)
+      ok 114262ms
+  4/7 config · Write the AIRFLOW__* environment file (executor, backend, port, 
+fernet key)
+      ok 136ms
+  5/7 db-migrate · Initialise/upgrade the metadata database schema
+      ok 7850ms
+  6/7 admin-user · Create the admin user if it does not already exist
+      ok 5165ms
+  7/7 services · Install and start the webserver and scheduler systemd units
+      ok 6461ms
+  verify ok
+      ok airflow-scheduler is active
+      ok airflow-webserver is active
+      ok port 8090 is listening
+      ok webserver /health responds
+      ok airflow db check succeeds
+      ok airflow verified
+
+
+╭──────────────────────────── acceptance suite ─────────────────────────────╮
+│ airflow                                                                   │
+│ Prove Airflow actually schedules, runs and correctly reports on real DAGs │
+╰───────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Deploy a DAG that succeeds and one that deliberately fails 6567ms
+  checks
+    PASS The scheduler and webserver systemd units are active 12ms
+    PASS The webserver's own /health endpoint reports the metadatabase healthy 
+23ms
+    PASS A triggered DAG actually runs its task and is reported as succeeded 
+10026ms
+    PASS A DAG whose task fails is reported as failed, not lost or silently 
+green (negative) 4957ms
+  teardown
+    PASS Remove the throwaway DAGs and their run history 3597ms
+  airflow: 4 checks passed
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 461ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 15ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 31ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 106ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 13ms
+  base: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ dbt                                                                          │
+│ Prove dbt actually connects to Postgres, transforms data, and catches bad    │
+│ data                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Write a good and a deliberately-broken throwaway dbt model 30ms
+  checks
+    PASS dbt can actually connect to the configured Postgres target 5243ms
+    PASS dbt run builds a model whose output matches the source data 5711ms
+    PASS A dbt test fails when the underlying data violates it (negative) 8750ms
+    PASS A dbtread member other than whoever ran dbt first can still write to 
+the project 157ms
+  teardown
+    PASS Remove the throwaway models and the tables they built 241ms
+  dbt: 4 checks passed
+
+╭───────────────────────────── acceptance suite ──────────────────────────────╮
+│ dlt                                                                         │
+│ Prove dlt actually extracts and loads real data through both MVP connectors │
+╰─────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create a throwaway source table and a throwaway CSV file 209ms
+  checks
+    PASS sql_database source lands a real Postgres table as-received 1986ms
+    PASS A CSV file lands as-received through the csv connector's mechanism 
+3380ms
+    PASS A source table that does not exist halts extraction instead of moving 
+nothing (negative) 1004ms
+  teardown
+    PASS Remove the throwaway schemas, CSV fixture, and dlt run state 126ms
+  dlt: 3 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 384ms
+  checks
+    PASS A row written is the same row read back 629ms
+    PASS Committed data is still there after a service restart 19091ms
+    PASS A wrong password is refused (negative) 351ms
+    PASS Every database in the spec accepts a connection and a write 527ms
+    PASS The running server reports the port and limits that were asked for 
+301ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 42ms
+  teardown
+    PASS Remove everything the suite created 705ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 6346ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 27ms
+  python-modern: 2 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ seaweedfs                                                                    │
+│ Prove the object store really stores, lists, returns, deletes, persists and  │
+│ refuses what it should                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create a throwaway bucket for the checks 135ms
+  checks
+    PASS Objects (incl. a key with spaces and non-ASCII) come back 
+byte-identical 870ms
+    PASS A prefix listing returns exactly the objects under that prefix, across 
+pages 6111ms
+    PASS Twelve buckets can each be written and read (every bucket is its own 
+collection) 8044ms
+    PASS A request signed with the wrong secret key is refused (negative) 
+(negative) 127ms
+    PASS An object written before a service restart is intact after it 38776ms
+    PASS A deleted object is gone from reads and from listings 323ms
+  teardown
+    PASS remove-bucket-contents 71124ms
+  seaweedfs: 6 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  airflow        passed     4/4  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  dlt            passed     3/3  │
+│  postgres       passed     6/6  │
+│  python-modern  passed     2/2  │
+│  seaweedfs      passed     6/6  │
+╰─────────────────────────────────╯
+╭──────────────────────────────────╮
+│ installed and proven working     │
+│ install run 1 · acceptance run 2 │
+╰──────────────────────────────────╯
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+FAIL  usage-correct-twice          overall=unavailable cleanup=pass - overall='unavailable'; expected 2 dbt session observations, got 0; run_status={'run_1': 'trigger_failed', 'run_2': 'not_run'}; not idempotent; expected 3 batches, got 0; s3 {'objects_found_at_teardown': 0, 'objects_remaining_after_purge': 0, 'error': ''}; source_down_load={}; run_1: dbt test records for []; run_1/silver: dbt tests None required=None passed=None; run_1/gold: dbt tests None required=None passed=None; run_2: dbt test records for []; run_2/silver: dbt tests None required=None passed=None; run_2/gold: dbt tests None required=None passed=None; promote={'accepted': False, 'reasons': ['validation could not complete: could not trigger run 1: /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.\nTraceback (most recent call last):\n  File "/opt/airflow/.venv/bin/airflow", line 6, in <module>\n    sys.exit(main())\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/__main__.py", line 58, in main\n    args.func(args)\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/cli_config.py", line 49, in command\n    return func(*args, **kwargs)\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/cli.py", line 114, in wrapper\n    return f(*args, **kwargs)\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/providers_configuration_loader.py", line 55, in wrapped_function\n    return func(*args, **kwargs)\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/commands/dag_command.py", line 173, in dag_trigger\n    message = api_client.trigger_dag(\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/client/local_client.py", line 35, in trigger_dag\n    dag_run = trigger_dag.trigger_dag(\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/common/trigger_dag.py", line 123, in trigger_dag\n    raise DagNotFound(f"Dag id {dag_id} not found in DagModel")\nairflow.exceptions.DagNotFound: Dag id hg_resources_useage_number__validate__cdbac5ec not found in DagModel', "run 1 status is 'trigger_failed', not 'ok'", "run 2 status is 'not_run', not 'ok'", "run 1 comparison against expected is 'not_run', not 'pass'", "run 2 comparison against expected is 'not_run', not 'pass'", 'the two runs were not idempotent', "validation overall is 'unavailable'", 'expected exactly 2 run ids, the evidence has 1', 'bronze pipeline but no source-removed proof in the evidence', 'expected at least 3 bronze batches (2 runs + the source-down LOAD), got 0', "run_1: run 3 finished 'cancelled' in the journal", "run_1: no dbt test record for stage 'silver' in the journal", "run_1: no dbt test record for stage 'gold' in the journal", 'run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none', 'run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none', 'run_1: required a `unique` test on fact_editing.fact_editing_sk: dbt ran none', 'run_1: required a `not_null` test on fact_editing.fact_editing_sk: dbt ran none', "run_1: gated stage 'landing' has no gate verdict in the journal", "run_1: gated stage 'silver' has no gate verdict in the journal", "run_1: gated stage 'gold' has no gate verdict in the journal"], 'approval_unchanged': True}
+FAIL  usage-conflicting-ids        overall=unavailable cleanup=pass - expected run 1 to fail, got unavailable/{'run_1': 'trigger_failed', 'run_2': 'not_run'}; the failing unique test on fact_editing_sk is not on record: []; run 4: silver transform start missing from journal; run 4: silver unique failure missing from journal
+FAIL  usage-promote-deploy-run     overall=fail cleanup=fail - validation {'overall': 'unavailable', 'cleanup': 'pass', 'evidence_id': 'ev-cebbbcc02f1f29c7'}; promote {'accepted': False, 'reasons': ['validation could not complete: could not trigger run 1: /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.\nTraceback (most recent call last):\n  File "/opt/airflow/.venv/bin/airflow", line 6, in <module>\n    sys.exit(main())\n  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/__main__.py", line 58, in main\n    arg; expected 3 dbt session observations, got 0
+
+0/3 requested scenarios matched their expectation (the 'bronze' profile is 34).
+3 scenario(s) ran but did NOT match their expectation: ['usage-correct-twice', 'usage-conflicting-ids', 'usage-promote-deploy-run']
+31 scenario(s) of the 'bronze' profile were not requested this run: ['a2-promote-deploy-run', 'correct-twice', 'drop-failure', 'fact-correct-twice', 'fact-dbt-test-fails', 'fact-no-tests', 'fact-promote-deploy-run', 'gate-over-threshold', 'gate-under-threshold', 'hg-correct-twice', 'hg-purge-failure-detected', 'hg-selector-typo', 'hg-stray-object-purged', 'hg-symlink-refused', 'hg-timeout', 'hg-wrong-expected', 'late-deploy-failure', 'literal-connection', 'mixed-connection', 'pair-correct-twice', 'pair-load-fails-midway', 'pair-missing-table', 'pair-tampered-batch-manifest', 'pair-tampered-object', 'partial-deploy-failure', 'ref-connection', 'seed-failure', 'source-provisioning-failure', 'timeout', 'warehouse-provisioning-failure', 'wrong-expected']
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/home/oracle/projects/dpagent-verification/tests/m25_acceptance/registry.py", line 45
+    from __future__ import annotations
+    ^
+SyntaxError: future feature annotations is not defined
+[36m::[0m --keep given: leaving dpagent-m25-acceptance-171123 running for inspection (docker rm -f dpagent-m25-acceptance-171123 when done)

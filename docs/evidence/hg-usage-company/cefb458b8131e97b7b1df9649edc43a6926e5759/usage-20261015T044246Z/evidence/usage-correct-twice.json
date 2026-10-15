@@ -1,0 +1,110 @@
+{
+  "bronze": {
+    "batches": [],
+    "namespace": "dpagent-validate/cdbac5ec",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 0,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_CDBAC5EC_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_CDBAC5EC_BRONZE_BUCKET, DPAGENT_VALIDATE_CDBAC5EC_BRONZE_ENDPOINT, DPAGENT_VALIDATE_CDBAC5EC_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_CDBAC5EC_SRC_DATABASE, DPAGENT_VALIDATE_CDBAC5EC_SRC_HOST, DPAGENT_VALIDATE_CDBAC5EC_SRC_PASSWORD, DPAGENT_VALIDATE_CDBAC5EC_SRC_PORT, DPAGENT_VALIDATE_CDBAC5EC_SRC_USER, DPAGENT_VALIDATE_CDBAC5EC_WH_DATABASE, DPAGENT_VALIDATE_CDBAC5EC_WH_HOST, DPAGENT_VALIDATE_CDBAC5EC_WH_PASSWORD, DPAGENT_VALIDATE_CDBAC5EC_WH_PORT, DPAGENT_VALIDATE_CDBAC5EC_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_resources_useage_number__validate__cdbac5ec",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "dbt_tests": {
+    "run_1": [],
+    "run_2": []
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-9cd8f456053d1637",
+  "expected_hash": "sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21",
+  "fixture_hash": "sha256:bc3223e1f44fc4d5ece28258fa03709dd2d83e3001451695096398d8ceed868b",
+  "gates": {
+    "run_1": {},
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "journal": {
+    "3": [
+      {
+        "id": 126,
+        "kind": "pipeline.cancelled",
+        "level": "warn",
+        "message": "hg_resources_useage_number__validate__cdbac5ec was undeployed while this run was still running",
+        "run_id": 3,
+        "stage": null,
+        "ts": "2026-10-15T04:57:33+00:00"
+      }
+    ]
+  },
+  "overall": "unavailable",
+  "pipeline_hash": "sha256:630e24f2f8965bdc4f58fa79ce24ca83935789f32f9eaa9d8ebadd442ffd6946",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "validation could not complete: could not trigger run 1: /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.\nTraceback (most recent call last):\n  File \"/opt/airflow/.venv/bin/airflow\", line 6, in <module>\n    sys.exit(main())\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/__main__.py\", line 58, in main\n    args.func(args)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/cli_config.py\", line 49, in command\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/cli.py\", line 114, in wrapper\n    return f(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/providers_configuration_loader.py\", line 55, in wrapped_function\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/commands/dag_command.py\", line 173, in dag_trigger\n    message = api_client.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/client/local_client.py\", line 35, in trigger_dag\n    dag_run = trigger_dag.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/common/trigger_dag.py\", line 123, in trigger_dag\n    raise DagNotFound(f\"Dag id {dag_id} not found in DagModel\")\nairflow.exceptions.DagNotFound: Dag id hg_resources_useage_number__validate__cdbac5ec not found in DagModel",
+      "run 1 status is 'trigger_failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'unavailable'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 0",
+      "run_1: run 3 finished 'cancelled' in the journal",
+      "run_1: no dbt test record for stage 'silver' in the journal",
+      "run_1: no dbt test record for stage 'gold' in the journal",
+      "run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none",
+      "run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none",
+      "run_1: required a `unique` test on fact_editing.fact_editing_sk: dbt ran none",
+      "run_1: required a `not_null` test on fact_editing.fact_editing_sk: dbt ran none",
+      "run_1: gated stage 'landing' has no gate verdict in the journal",
+      "run_1: gated stage 'silver' has no gate verdict in the journal",
+      "run_1: gated stage 'gold' has no gate verdict in the journal"
+    ]
+  },
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    3
+  ],
+  "run_status": {
+    "run_1": "trigger_failed",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "could not trigger run 1: /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.\nTraceback (most recent call last):\n  File \"/opt/airflow/.venv/bin/airflow\", line 6, in <module>\n    sys.exit(main())\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/__main__.py\", line 58, in main\n    args.func(args)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/cli_config.py\", line 49, in command\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/cli.py\", line 114, in wrapper\n    return f(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/providers_configuration_loader.py\", line 55, in wrapped_function\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/commands/dag_command.py\", line 173, in dag_trigger\n    message = api_client.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/client/local_client.py\", line 35, in trigger_dag\n    dag_run = trigger_dag.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/common/trigger_dag.py\", line 123, in trigger_dag\n    raise DagNotFound(f\"Dag id {dag_id} not found in DagModel\")\nairflow.exceptions.DagNotFound: Dag id hg_resources_useage_number__validate__cdbac5ec not found in DagModel",
+  "usage_observation_problems": [
+    "expected 2 dbt session observations, got 0"
+  ],
+  "usage_observations": [],
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

@@ -1,0 +1,2 @@
+source_revision=cefb458b8131e97b7b1df9649edc43a6926e5759
+Windows caller holds a temporary ES_SYSTEM_REQUIRED request during this SSH command; no persistent power/DNS/service setting changes.

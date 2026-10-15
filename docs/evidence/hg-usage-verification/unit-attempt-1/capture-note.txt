@@ -1,0 +1,1 @@
+Collection interrupted with 4 errors; exit code reconstructed from pytest summary because initial shell capture was empty.

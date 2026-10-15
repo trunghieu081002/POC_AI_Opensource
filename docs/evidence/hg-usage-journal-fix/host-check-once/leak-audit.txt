@@ -1,0 +1,1 @@
+Host capability check only; no bootstrap, container or scenario resources created. Real leak audit unavailable.

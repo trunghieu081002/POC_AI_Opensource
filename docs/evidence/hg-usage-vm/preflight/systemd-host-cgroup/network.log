@@ -1,0 +1,5 @@
+https://pypi.org/simple/click/ 200
+https://apt.postgresql.org/pub/repos/apt/dists/jammy-pgdg/InRelease 200
+https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.10.txt 200
+https://github.com/seaweedfs/seaweedfs/releases/download/4.48/linux_amd64.tar.gz 200
+https://hub.getdbt.com/api/v1/dbt-labs/dbt_utils.json 200

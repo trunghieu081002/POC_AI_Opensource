@@ -1,0 +1,58 @@
+/opt/airflow/home/logs/scheduler/2026-10-15/hg_a2_usage__validate__d27d6370.py.log
+[2026-10-15T04:59:18.178+0000] {processor.py:161} INFO - Started process (PID=13875) to work on /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py
+[2026-10-15T04:59:18.178+0000] {processor.py:830} INFO - Processing file /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py for tasks to queue
+[2026-10-15T04:59:18.180+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:59:18.180+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py
+[2026-10-15T04:59:18.184+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:59:18.183+0000] {dagbag.py:355} ERROR - Failed to import: /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py
+Traceback (most recent call last):
+  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/models/dagbag.py", line 351, in parse
+    loader.exec_module(new_module)
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py", line 16, in <module>
+    from dpagent.pipelines import runtime
+ModuleNotFoundError: No module named 'dpagent'
+[2026-10-15T04:59:18.184+0000] {processor.py:842} WARNING - No viable dags retrieved from /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py
+[2026-10-15T04:59:18.215+0000] {processor.py:183} INFO - Processing /opt/airflow/home/dags/hg_a2_usage__validate__d27d6370.py took 0.045 seconds
+/opt/airflow/home/logs/scheduler/2026-10-15/hg_resources_useage_number__validate__61173243.py.log
+[2026-10-15T04:58:20.704+0000] {processor.py:161} INFO - Started process (PID=13270) to work on /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py
+[2026-10-15T04:58:20.705+0000] {processor.py:830} INFO - Processing file /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py for tasks to queue
+[2026-10-15T04:58:20.707+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:58:20.706+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py
+[2026-10-15T04:58:20.710+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:58:20.710+0000] {dagbag.py:355} ERROR - Failed to import: /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py
+Traceback (most recent call last):
+  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/models/dagbag.py", line 351, in parse
+    loader.exec_module(new_module)
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py", line 16, in <module>
+    from dpagent.pipelines import runtime
+ModuleNotFoundError: No module named 'dpagent'
+[2026-10-15T04:58:20.711+0000] {processor.py:842} WARNING - No viable dags retrieved from /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py
+[2026-10-15T04:58:20.744+0000] {processor.py:183} INFO - Processing /opt/airflow/home/dags/hg_resources_useage_number__validate__61173243.py took 0.048 seconds
+/opt/airflow/home/logs/scheduler/2026-10-15/hg_resources_useage_number__validate__cdbac5ec.py.log
+[2026-10-15T04:57:25.213+0000] {processor.py:161} INFO - Started process (PID=12662) to work on /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py
+[2026-10-15T04:57:25.214+0000] {processor.py:830} INFO - Processing file /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py for tasks to queue
+[2026-10-15T04:57:25.216+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:57:25.215+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py
+[2026-10-15T04:57:25.220+0000] {logging_mixin.py:188} INFO - [2026-10-15T04:57:25.219+0000] {dagbag.py:355} ERROR - Failed to import: /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py
+Traceback (most recent call last):
+  File "/opt/airflow/.venv/lib/python3.10/site-packages/airflow/models/dagbag.py", line 351, in parse
+    loader.exec_module(new_module)
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py", line 16, in <module>
+    from dpagent.pipelines import runtime
+ModuleNotFoundError: No module named 'dpagent'
+[2026-10-15T04:57:25.220+0000] {processor.py:842} WARNING - No viable dags retrieved from /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py
+[2026-10-15T04:57:25.327+0000] {processor.py:183} INFO - Processing /opt/airflow/home/dags/hg_resources_useage_number__validate__cdbac5ec.py took 0.121 seconds
+uid=998(airflow) gid=997(airflow) groups=997(airflow),999(dbtread),1000(dpagent)
+# file: /opt/dpagent
+# owner: 1000
+# group: dpagent
+user::rwx
+user:airflow:--x
+group::---
+mask::--x
+other::---
+
+drwx------. 4 1000 dpagent  45 Oct 15 04:45 /opt/dpagent/src
+drwx------. 9 1000 dpagent 145 Oct 15 04:45 /opt/dpagent/src/dpagent
+-rw-------. 1 1000 dpagent 108 Oct 15 04:40 /opt/dpagent/src/dpagent/__init__.py

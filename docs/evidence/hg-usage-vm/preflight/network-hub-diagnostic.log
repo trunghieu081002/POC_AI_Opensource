@@ -1,0 +1,109 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 13.227.227.16:443...
+* Connected to hub.getdbt.com (13.227.227.16) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+*  CAfile: /etc/ssl/certs/ca-certificates.crt
+*  CApath: /etc/ssl/certs
+* TLSv1.0 (OUT), TLS header, Certificate Status (22):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+} [512 bytes data]
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* TLSv1.2 (IN), TLS header, Certificate Status (22):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* TLSv1.2 (IN), TLS header, Finished (20):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+{ [19 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+{ [3817 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+{ [264 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+{ [36 bytes data]
+* TLSv1.2 (OUT), TLS header, Finished (20):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+} [1 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+} [36 bytes data]
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256
+* ALPN, server accepted to use h2
+* Server certificate:
+*  subject: CN=hub.cdn.getdbt.com
+*  start date: Aug 18 00:00:00 2026 GMT
+*  expire date: Mar  3 23:59:59 2027 GMT
+*  subjectAltName: host "hub.getdbt.com" matched cert's "hub.getdbt.com"
+*  issuer: C=US; O=Amazon; CN=Amazon RSA 2048 M01
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multiplexing
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* Using Stream ID: 1 (easy handle 0x56071ac8aa90)
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+> HEAD /api/v1/dbt-labs/dbt_utils.json HTTP/2
+> Host: hub.getdbt.com
+> user-agent: curl/7.81.0
+> accept: */*
+> 
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [157 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* Connection state changed (MAX_CONCURRENT_STREAMS == 128)!
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+< HTTP/2 200 
+< content-type: application/json
+< content-length: 104639
+< server: AmazonS3
+< last-modified: Tue, 13 Oct 2026 15:28:00 GMT
+< x-amz-version-id: null
+< date: Wed, 14 Oct 2026 04:42:13 GMT
+< etag: "9f3a901566d4742477a1b29babef754e"
+< x-cache: RefreshHit from cloudfront
+< via: 1.1 4a41614d0f8cd8430952e64d3b61f4f6.cloudfront.net (CloudFront)
+< x-amz-cf-pop: HAN51-P2
+< x-amz-cf-id: DZIs8LhNsqopwS2VgeQa8-VIkPhRpQ8PpMW6IWzmhVNnTByihC3qAw==
+< 
+  0  102k    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+* Connection #0 to host hub.getdbt.com left intact
+HTTP/2 200 
+content-type: application/json
+content-length: 104639
+server: AmazonS3
+last-modified: Tue, 13 Oct 2026 15:28:00 GMT
+x-amz-version-id: null
+date: Wed, 14 Oct 2026 04:42:13 GMT
+etag: "9f3a901566d4742477a1b29babef754e"
+x-cache: RefreshHit from cloudfront
+via: 1.1 4a41614d0f8cd8430952e64d3b61f4f6.cloudfront.net (CloudFront)
+x-amz-cf-pop: HAN51-P2
+x-amz-cf-id: DZIs8LhNsqopwS2VgeQa8-VIkPhRpQ8PpMW6IWzmhVNnTByihC3qAw==
+

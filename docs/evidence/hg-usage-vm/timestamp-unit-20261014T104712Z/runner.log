@@ -1,0 +1,22 @@
+F....................................................................... [ 50%]
+.......................................................................  [100%]
+=================================== FAILURES ===================================
+_ test_equivalent_explicit_timestamptz_instants_match[2026-01-10 08:00:00+00-2026-01-10T08:00:00+00:00] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0edc0122c0>
+expected = '2026-01-10 08:00:00+00', actual = '2026-01-10T08:00:00+00:00'
+
+    @pytest.mark.parametrize("expected,actual", [
+        ("2026-01-10 08:00:00+00", "2026-01-10T08:00:00+00:00"),
+        ("2026-01-10T15:00:00+07:00", "2026-01-10T08:00:00Z"),
+        ("2026-01-10T08:00:00.000000+00:00", "2026-01-10T08:00:00+00:00")])
+    def test_equivalent_explicit_timestamptz_instants_match(monkeypatch, expected, actual):
+>       assert compare(monkeypatch, "timestamp with time zone", expected, actual).ok
+E       assert False
+E        +  where False = ComparisonResult(ok=False, detail="could not compare typed timestamps: Invalid isoformat string: '2026-01-10 08:00:00+00'").ok
+E        +    where ComparisonResult(ok=False, detail="could not compare typed timestamps: Invalid isoformat string: '2026-01-10 08:00:00+00'") = compare(<_pytest.monkeypatch.MonkeyPatch object at 0x7f0edc0122c0>, 'timestamp with time zone', '2026-01-10 08:00:00+00', '2026-01-10T08:00:00+00:00')
+
+tests/test_fixture_timestamps.py:21: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_fixture_timestamps.py::test_equivalent_explicit_timestamptz_instants_match[2026-01-10 08:00:00+00-2026-01-10T08:00:00+00:00]
+1 failed, 142 passed in 78.87s (0:01:18)

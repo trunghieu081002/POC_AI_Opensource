@@ -1,0 +1,404 @@
+[
+  {
+    "scenario": "usage-conflicting-ids",
+    "observations": [],
+    "a2": null
+  },
+  {
+    "scenario": "usage-correct-twice",
+    "observations": [
+      {
+        "database": "dpagent_fixture_wh_836501bf38",
+        "excluded_rows": 5787,
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_836501bf38",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_wh_836501bf38",
+        "excluded_rows": 5787,
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_836501bf38",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      }
+    ],
+    "a2": null
+  },
+  {
+    "scenario": "usage-promote-deploy-run",
+    "observations": [
+      {
+        "database": "dpagent_fixture_wh_ea5c05be9b",
+        "excluded_rows": 5787,
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_ea5c05be9b",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_wh_ea5c05be9b",
+        "excluded_rows": 5787,
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_ea5c05be9b",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_a2wh_68c527efa1",
+        "excluded_rows": 5787,
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_a2wh_68c527efa1",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      }
+    ],
+    "a2": {
+      "problems": [],
+      "steps": {
+        "edits_invalidate": {
+          "expected": {
+            "approval_still_valid": true,
+            "approval_unchanged": true,
+            "deploy_refused": false,
+            "promote_accepted": false,
+            "reason": ""
+          },
+          "fixture": {
+            "approval_still_valid": true,
+            "approval_unchanged": true,
+            "deploy_refused": false,
+            "promote_accepted": false,
+            "reason": ""
+          },
+          "macro": {
+            "approval_still_valid": false,
+            "approval_unchanged": true,
+            "deploy_refused": true,
+            "promote_accepted": false,
+            "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T05:20:03+00:00 by 'm25-matrix') - re-"
+          },
+          "model": {
+            "approval_still_valid": false,
+            "approval_unchanged": true,
+            "deploy_refused": true,
+            "promote_accepted": false,
+            "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T05:20:03+00:00 by 'm25-matrix') - re-"
+          },
+          "seed": {
+            "approval_still_valid": false,
+            "approval_unchanged": true,
+            "deploy_refused": true,
+            "promote_accepted": false,
+            "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T05:20:03+00:00 by 'm25-matrix') - re-"
+          },
+          "tests": {
+            "approval_still_valid": false,
+            "approval_unchanged": true,
+            "deploy_refused": true,
+            "promote_accepted": false,
+            "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T05:20:03+00:00 by 'm25-matrix') - re-"
+          }
+        },
+        "promote": {
+          "accepted": true,
+          "evidence_id": "ev-7a69a943609f3add",
+          "is_approved": true,
+          "maturity": "reviewed",
+          "verification": "verified"
+        },
+        "promote_before_validation": {
+          "accepted": false,
+          "approval_unchanged": true,
+          "reasons": [
+            "the pipeline changed since it was validated (hash sha256:9d31c3bbf06f... vs now sha256:b347a3661925...): manifest, procedures, models, dbt project, seeds - validate again",
+            "validation could not complete: could not trigger run 1: /opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.\nTraceback (most recent call last):\n  File \"/opt/airflow/.venv/bin/airflow\", line 6, in <module>\n    sys.exit(main())\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/__main__.py\", line 58, in main\n    args.func(args)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/cli_config.py\", line 49, in command\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/cli.py\", line 114, in wrapper\n    return f(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/providers_configuration_loader.py\", line 55, in wrapped_function\n    return func(*args, **kwargs)\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/cli/commands/dag_command.py\", line 173, in dag_trigger\n    message = api_client.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/client/local_client.py\", line 35, in trigger_dag\n    dag_run = trigger_dag.trigger_dag(\n  File \"/opt/airflow/.venv/lib/python3.10/site-packages/airflow/api/common/trigger_dag.py\", line 123, in trigger_dag\n    raise DagNotFound(f\"Dag id {dag_id} not found in DagModel\")\nairflow.exceptions.DagNotFound: Dag id hg_a2_usage__validate__d27d6370 not found in DagModel",
+            "run 1 status is 'trigger_failed', not 'ok'",
+            "run 2 status is 'not_run', not 'ok'",
+            "run 1 comparison against expected is 'not_run', not 'pass'",
+            "run 2 comparison against expected is 'not_run', not 'pass'",
+            "the two runs were not idempotent",
+            "validation overall is 'unavailable'",
+            "expected exactly 2 run ids, the evidence has 1",
+            "bronze pipeline but no source-removed proof in the evidence",
+            "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 0",
+            "run_1: run 5 finished 'cancelled' in the journal",
+            "run_1: no dbt test record for stage 'silver' in the journal",
+            "run_1: no dbt test record for stage 'gold' in the journal",
+            "run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none",
+            "run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none",
+            "run_1: required a `unique` test on fact_editing.fact_editing_sk: dbt ran none",
+            "run_1: required a `not_null` test on fact_editing.fact_editing_sk: dbt ran none",
+            "run_1: gated stage 'landing' has no gate verdict in the journal",
+            "run_1: gated stage 'silver' has no gate verdict in the journal",
+            "run_1: gated stage 'gold' has no gate verdict in the journal"
+          ]
+        },
+        "real_run": {
+          "cleanup_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+          "cleanup_ok": true,
+          "comparison": {
+            "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly",
+            "ok": true
+          },
+          "databases_dropped": true,
+          "dbt_tests": [
+            {
+              "kind": "dbt.test.passed",
+              "message": "hg_a2_usage/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required"
+            },
+            {
+              "kind": "dbt.test.passed",
+              "message": "hg_a2_usage/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required"
+            }
+          ],
+          "deployed": true,
+          "error": "",
+          "gates_passed": true,
+          "published_files_checked": 14,
+          "published_files_differ": [],
+          "run_id": 11,
+          "run_status": "ok",
+          "s3_remaining": 0
+        },
+        "restored_is_valid_again": true,
+        "validate": {
+          "cleanup": "pass",
+          "evidence_id": "ev-7a69a943609f3add",
+          "overall": "pass"
+        }
+      }
+    }
+  }
+]

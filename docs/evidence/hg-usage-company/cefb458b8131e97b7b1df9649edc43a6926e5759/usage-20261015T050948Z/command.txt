@@ -1,0 +1,1 @@
+PATH=<checkout>/.venv/bin:$PATH M25_CGROUPNS=host bash scripts/m25-acceptance-ci.sh --keep --reuse-container dpagent-m25-acceptance-171123 --profile bronze --scenarios usage-correct-twice,usage-conflicting-ids,usage-promote-deploy-run

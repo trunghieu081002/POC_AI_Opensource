@@ -1008,8 +1008,35 @@ def run_fact_no_tests(tmp_path: Path) -> dict:
 USAGE_DIR = REPO_ROOT / "pipelines" / "hg_resources_useage_number"
 
 
+def _observe_usage(run, *, required):
+    import usage_observations
+    original = fixture.compare_all
+    observations = []
+
+    def compare(expected, warehouse, default_schema):
+        comparison = original(expected, warehouse, default_schema)
+        if comparison.ok:
+            observations.append(usage_observations.observe(warehouse, USAGE_DIR))
+        return comparison
+
+    with _patched(fixture, "compare_all", compare):
+        result = run()
+    result["usage_observations"] = observations
+    result["usage_observation_problems"] = usage_observations.problems(observations, USAGE_DIR, required)
+    run_ids = list(result.get("run_ids") or [])
+    real = ((result.get("a2") or {}).get("steps") or {}).get("real_run") or {}
+    if real.get("run_id"):
+        run_ids.append(real["run_id"])
+    result["journal"] = {str(run_id): [
+        {"id": e["id"], "run_id": e["run_id"], "ts": e["ts"], "kind": e["kind"],
+         "level": e["level"], "message": e["message"],
+         "stage": json.loads(e["data_json"] or "{}").get("stage")}
+        for e in state.events_for(int(run_id))] for run_id in run_ids}
+    return result
+
+
 def run_usage_correct_twice(tmp_path: Path) -> dict:
-    return _run_hg(tmp_path, source=USAGE_DIR)
+    return _observe_usage(lambda: _run_hg(tmp_path, source=USAGE_DIR), required=2)
 
 
 def run_usage_conflicting_ids(tmp_path: Path) -> dict:
@@ -1025,16 +1052,27 @@ def run_usage_conflicting_ids(tmp_path: Path) -> dict:
         rows = next(t["rows"] for t in doc["tables"] if t["name"] == "resource_editings")
         rows.append({"Id": "x3", "EditingId": "e-1", "ResourcesId": "r-2", "StartTime": 11, "EndTime": 21})
         f.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    return _run_hg(tmp_path, source=USAGE_DIR, mutate=conflicting)
+    result = _run_hg(tmp_path, source=USAGE_DIR, mutate=conflicting)
+    # Preserve the actual run journal before the disposable host is destroyed.
+    # No gold dbt-test record alone cannot prove that its transform never started.
+    result["journal"] = {
+        str(run_id): [
+            {"id": ev["id"], "run_id": ev["run_id"], "ts": ev["ts"],
+             "kind": ev["kind"], "level": ev["level"], "message": ev["message"],
+             "stage": json.loads(ev["data_json"] or "{}").get("stage")}
+            for ev in state.events_for(int(run_id))
+        ] for run_id in result.get("run_ids") or []
+    }
+    return result
 
 
 def run_usage_promote_deploy_run(tmp_path: Path) -> dict:
-    return run_a2_promote_deploy_run(
+    return _observe_usage(lambda: run_a2_promote_deploy_run(
         tmp_path, source=USAGE_DIR, name="hg_a2_usage",
         hashed_edits={"model": "dwh_dbt/models/gold/resources_useage_number.sql",
                       "tests": "dwh_dbt/models/gold/_gold_models.yml",
                       "seed": "dwh_dbt/seeds/manual_excluded_stock_codes.csv",
-                      "macro": "dwh_dbt/macros/generate_schema_name.sql"})
+                      "macro": "dwh_dbt/macros/generate_schema_name.sql"}), required=3)
 
 
 def run_fact_promote_deploy_run(tmp_path: Path) -> dict:
@@ -1407,6 +1445,9 @@ def _usage_correct(result: dict) -> tuple[bool, str]:
     problems = []
     need = lambda cond, msg: None if cond else problems.append(msg)     # noqa: E731
     need(result.get("overall") == "pass", f"overall={result.get('overall')!r}")
+    import usage_observations
+    for problem in usage_observations.problems(result.get("usage_observations") or [], USAGE_DIR, 2):
+        problems.append(problem)
     need(result.get("run_status") == {"run_1": "ok", "run_2": "ok"}, f"run_status={result.get('run_status')}")
     need(result.get("comparison", {}).get("idempotent") is True, "not idempotent")
     c = result.get("cleanup", {})
@@ -1451,6 +1492,25 @@ def _usage_conflicting(result: dict) -> tuple[bool, str]:
         problems.append(f"the failing unique test on fact_editing_sk is not on record: {evs}")
     if any(e.get("stage") == "gold" for e in evs):
         problems.append("the gold stage ran although silver failed its tests")
+    run_ids = result.get("run_ids") or []
+    clone = result.get("clone_name")
+    journal = result.get("journal") or {}
+    if not run_ids or not clone:
+        problems.append("missing run ids or clone name for journal proof")
+    for run_id in run_ids:
+        events = journal.get(str(run_id)) or []
+        if not events or any(e.get("run_id") != int(run_id) for e in events):
+            problems.append(f"run {run_id}: missing or mismatched journal")
+        if not any(e.get("kind") == "transform.start"
+                   and e.get("message") == f"{clone}/silver via dbt" for e in events):
+            problems.append(f"run {run_id}: silver transform start missing from journal")
+        if not any(e.get("kind") == "dbt.test.failed" and e.get("stage") == "silver"
+                   and "unique_fact_editing_fact_editing_sk" in e.get("message", "")
+                   for e in events):
+            problems.append(f"run {run_id}: silver unique failure missing from journal")
+        if any(e.get("kind") == "transform.start"
+               and e.get("message", "").startswith(f"{clone}/gold via ") for e in events):
+            problems.append(f"run {run_id}: gold transform started despite silver failure")
     if (result.get("cleanup") or {}).get("overall") != "pass":
         problems.append(f"cleanup={result.get('cleanup')}")
     pr = result.get("promote") or {}
@@ -1460,10 +1520,17 @@ def _usage_conflicting(result: dict) -> tuple[bool, str]:
                             "conflicting source ids: silver's unique test failed, gold never ran, nothing promotable")
 
 
+def _usage_a2(result):
+    import usage_observations
+    ok, detail = _a2(result)
+    problems = usage_observations.problems(result.get("usage_observations") or [], USAGE_DIR, 3)
+    return ok and not problems, "; ".join(([detail] if not ok else []) + problems) or detail
+
+
 EXPECTATIONS.update({
     "usage-correct-twice": _usage_correct,
     "usage-conflicting-ids": _usage_conflicting,
-    "usage-promote-deploy-run": _a2,
+    "usage-promote-deploy-run": _usage_a2,
 })
 
 EXPECTATIONS.update({

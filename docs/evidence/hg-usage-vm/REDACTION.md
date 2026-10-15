@@ -1,0 +1,1 @@
+Network diagnostic response cookies and temporary signed URL query parameters are redacted in the publication copy. Original diagnostic logs and the complete transfer archive remain in the private handoff area outside this repository. Test logs, exit codes, comparison and journal evidence are retained.

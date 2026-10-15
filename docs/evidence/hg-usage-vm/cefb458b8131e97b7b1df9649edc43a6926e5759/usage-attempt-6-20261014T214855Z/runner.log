@@ -1,0 +1,43 @@
+[36m::[0m reusing disposable dpagent-m25-acceptance-12428; synchronizing committed source cefb458b8131e97b7b1df9649edc43a6926e5759 without bootstrap
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+FAIL  usage-correct-twice          overall=fail cleanup=fail - overall='fail'; expected 2 dbt session observations, got 0; run_status={'run_1': 'timeout', 'run_2': 'not_run'}; not idempotent; cleanup={'pipeline_artifacts': 'fail', 'pipeline_artifacts_detail': 'DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_1CD1DA00_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_1CD1DA00_BRONZE_BUCKET, DPAGENT_VALIDATE_1CD1DA00_BRONZE_ENDPOINT, DPAGENT_VALIDATE_1CD1DA00_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_1CD1DA00_SRC_DATABASE, DPAGENT_VALIDATE_1CD1DA00_SRC_HOST, DPAGENT_VALIDATE_1CD1DA00_SRC_PASSWORD, DPAGENT_VALIDATE_1CD1DA00_SRC_PORT, DPAGENT_VALIDATE_1CD1DA00_SRC_USER, DPAGENT_VALIDATE_1CD1DA00_WH_DATABASE, DPAGENT_VALIDATE_1CD1DA00_WH_HOST, DPAGENT_VALIDATE_1CD1DA00_WH_PASSWORD, DPAGENT_VALIDATE_1CD1DA00_WH_PORT, DPAGENT_VALIDATE_1CD1DA00_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone', 'source_database': 'pass', 'source_role': 'pass', 'warehouse_database': 'pass', 'warehouse_role': 'pass', 's3_objects': 'pass', 'overall': 'fail'}; expected 3 batches, got 1; s3 {'objects_found_at_teardown': 13, 'objects_remaining_after_purge': 0, 'error': ''}; source_down_load={}; run_2: dbt test records for []; run_2/silver: dbt tests None required=None passed=None; run_2/gold: dbt tests None required=None passed=None; promote={'accepted': False, 'reasons': ['run 1 timed out (worker not confirmed stopped)', "run 2 status is 'not_run', not 'ok'", "run 1 comparison against expected is 'not_run', not 'pass'", "run 2 comparison against expected is 'not_run', not 'pass'", 'the two runs were not idempotent', "validation overall is 'fail'", 'expected exactly 2 run ids, the evidence has 1', "cleanup pipeline_artifacts is 'fail', not 'pass'", "cleanup overall is 'fail', not 'pass'", 'bronze pipeline but no source-removed proof in the evidence', 'expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1', "run_1: run 18 finished 'cancelled' in the journal", "run_1: gated stage 'gold' has no gate verdict in the journal"], 'approval_unchanged': True}
+ok    usage-conflicting-ids        overall=fail cleanup=pass - conflicting source ids: silver's unique test failed, gold never ran, nothing promotable
+Traceback (most recent call last):
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 1638, in <module>
+    raise SystemExit(main(sys.argv[1:]))
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 1578, in main
+    result = SCENARIOS[name](Path(tmp))
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 1070, in run_usage_promote_deploy_run
+    return _observe_usage(lambda: run_a2_promote_deploy_run(
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 1023, in _observe_usage
+    result = run()
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 1070, in <lambda>
+    return _observe_usage(lambda: run_a2_promote_deploy_run(
+  File "/opt/dpagent/tests/m25_acceptance/run_matrix.py", line 665, in run_a2_promote_deploy_run
+    report, result, evidence_id = evidence.run_and_seal(pipeline, step3, fx_path, ex_path)
+  File "/opt/dpagent/src/dpagent/pipelines/evidence.py", line 172, in run_and_seal
+    result = fixture_mod.run_fixture(pipeline, fx, expected, **run_kwargs)
+  File "/opt/dpagent/src/dpagent/pipelines/fixture.py", line 1747, in run_fixture
+    sleep(poll_interval)
+KeyboardInterrupt
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+[32mok[0m evidence written under /home/m25/projects/hg-usage-acceptance/docs/evidence/hg-usage-vm/cefb458b8131e97b7b1df9649edc43a6926e5759/usage-attempt-6-20261014T214855Z/evidence
+[36m::[0m --keep: leaving dpagent-m25-acceptance-12428 for inspection

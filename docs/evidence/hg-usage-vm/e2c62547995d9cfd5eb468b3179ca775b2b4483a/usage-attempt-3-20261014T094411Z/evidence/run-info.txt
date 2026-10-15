@@ -1,0 +1,6 @@
+commit=e2c62547995d9cfd5eb468b3179ca775b2b4483a
+tree=3cccd904caded2479f56287494e096928408fd30
+working_tree_clean=yes
+profile=bronze
+cgroupns=host
+finished=2026-10-14T10:16:41Z

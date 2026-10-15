@@ -1,0 +1,121 @@
+diff --git a/scripts/m25-acceptance-ci.sh b/scripts/m25-acceptance-ci.sh
+index f0c042d..37db4e0 100755
+--- a/scripts/m25-acceptance-ci.sh
++++ b/scripts/m25-acceptance-ci.sh
+@@ -8,6 +8,7 @@
+ # currently resides on the VM, not in this repository").
+ #
+ #   bash scripts/m25-acceptance-ci.sh                   # build+run+teardown
++#   bash scripts/m25-acceptance-ci.sh --reuse-container dpagent-m25-acceptance-<id>  # reuse only a verified disposable host
+ #   bash scripts/m25-acceptance-ci.sh --keep             # leave the container up on exit (debugging)
+ #   bash scripts/m25-acceptance-ci.sh --scenarios "literal-connection timeout"
+ #   bash scripts/m25-acceptance-ci.sh --profile bronze   # + SeaweedFS (installed by its pack) and the
+@@ -31,6 +32,7 @@
+ set -euo pipefail
+ 
+ KEEP=0
++REUSE_CONTAINER=""
+ SCENARIOS=""
+ PROFILE=core
+ A3=""               # scripted | real: run the A3 LLM-verification driver instead of the matrix
+@@ -41,6 +43,7 @@ A3_MAX_REVISIONS=2
+ while [ $# -gt 0 ]; do
+   case "$1" in
+     --keep) KEEP=1; shift ;;
++    --reuse-container) REUSE_CONTAINER="$2"; shift 2 ;;
+     --scenarios) SCENARIOS="$2"; shift 2 ;;
+     --profile) PROFILE="$2"; shift 2 ;;
+     --a3) A3="$2"; shift 2 ;;                  # scripted | real (docs/llm-verification.md)
+@@ -60,7 +63,22 @@ die()  { printf '\033[31mXX\033[0m %s\n' "$*" >&2; exit 1; }
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ IMAGE="dpagent-m25-disposable"
+-CONTAINER="dpagent-m25-acceptance-$$"
++CONTAINER="${REUSE_CONTAINER:-dpagent-m25-acceptance-$$}"
++case "$CONTAINER" in
++  dpagent-m25-acceptance-*) ;;
++  *) die "--reuse-container must name a dpagent-m25-acceptance-* disposable host" ;;
++esac
++SCENARIO_ARGS=()
++if [ -n "$SCENARIOS" ]; then
++  read -r -a SCENARIO_ARGS <<< "${SCENARIOS//,/ }"
++  for scenario in "${SCENARIO_ARGS[@]}"; do
++    case "$scenario" in
++      ''|*[!a-z0-9-]*) die "invalid scenario name: $scenario" ;;
++    esac
++    grep -Fq "\"${scenario}\":" "${REPO_ROOT}/tests/m25_acceptance/run_matrix.py" \
++      || die "unknown scenario: $scenario (refused before building a host)"
++  done
++fi
+ # Optional per-run destination keeps failed and successful regression evidence side by side.
+ RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/m25-automated}"
+ case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
+@@ -114,6 +132,7 @@ case "$PROFILE" in
+   *) die "unknown --profile ${PROFILE} (core | bronze)" ;;
+ esac
+ 
++if [ -z "$REUSE_CONTAINER" ]; then
+ say "preconditions ok - commit ${COMMIT}, building/reusing image ${IMAGE}"
+ 
+ # ---------------------------------------------------------------- build
+@@ -172,6 +191,40 @@ docker exec -e "DPAGENT_WITH_LLM=${A3:+1}" "${CONTAINER}" bash -lc '
+   dpagent spec '"${SPEC}"' --yes '"${ALLOW_DRAFT}"'
+ ' || die "bootstrap/install failed - see output above; nothing in this repo was touched, only the now-discarded container"
+ 
++else
++  # Only a previous host of THIS orchestrator, backed by this checkout's
++  # read-only bind, may be reused. Never bootstrap the VM/demo itself.
++  [ "$(docker inspect -f '{{.Config.Image}}' "$CONTAINER")" = "$IMAGE" ] \
++    || die "reuse refused: wrong disposable image"
++  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/opt/src/dpagent-src"}}{{.Source}} {{.RW}}{{end}}{{end}}' "$CONTAINER" \
++    | grep -Fxq "${REPO_ROOT} false" || die "reuse refused: source bind is not this checkout read-only"
++  [ "$(docker exec "$CONTAINER" systemctl is-system-running)" = running ] \
++    || die "reuse refused: systemd is not running"
++  docker exec "$CONTAINER" test -x /opt/dpagent/.venv/bin/python \
++    || die "reuse refused: dpagent was not bootstrapped"
++  cleanup() {
++    if [ "$KEEP" -eq 1 ]; then say "--keep: leaving ${CONTAINER} for inspection";
++    else docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; fi
++  }
++  trap cleanup EXIT
++  say "reusing disposable ${CONTAINER}; synchronizing committed source ${COMMIT} without bootstrap"
++  docker exec "$CONTAINER" bash -c '
++    set -euo pipefail
++    tar -C /opt/src/dpagent-src --exclude=.git --exclude=.venv --exclude=__pycache__ \
++      --exclude=.pytest_cache --exclude=docs/evidence --exclude=.env --exclude="*.pyc" -cf - . \
++      | tar -C /opt/dpagent -xf -
++    if [ -d /root/m25-evidence ]; then
++      mv /root/m25-evidence /root/m25-evidence.previous-$(date -u +%Y%m%dT%H%M%S%N)
++    fi
++    cd /opt/src/dpagent-src
++    git ls-files -z src tests scripts packs suites pipelines examples lib pyproject.toml \
++      | xargs -0 sha256sum > /tmp/dpagent-source-manifest.txt
++    cd /opt/dpagent
++    sha256sum -c /tmp/dpagent-source-manifest.txt >/dev/null
++    systemctl restart airflow-scheduler airflow-webserver
++  ' || die "reuse source synchronization/verification failed"
++fi
++
+ # ----------------------------------------------------------- re-verify
+ 
+ docker exec "${CONTAINER}" pg_isready >/dev/null 2>&1 || die "postgres installed but pg_isready failed post-install"
+@@ -223,8 +276,8 @@ if [ -n "$A3" ]; then
+ else
+ say "running the acceptance matrix driver"
+ set +e
+-docker exec -e "M25_ACCEPTANCE_COMMIT=${COMMIT}" "${CONTAINER}" \
+-  bash -c "cd /opt/dpagent && .venv/bin/python tests/m25_acceptance/run_matrix.py --profile ${PROFILE} ${SCENARIOS}"
++docker exec --workdir /opt/dpagent -e "M25_ACCEPTANCE_COMMIT=${COMMIT}" "${CONTAINER}" \
++  .venv/bin/python tests/m25_acceptance/run_matrix.py --profile "$PROFILE" "${SCENARIO_ARGS[@]}"
+ DRIVER_RC=$?
+ set -e
+ fi
+@@ -296,7 +349,7 @@ if [ -n "$A3" ]; then
+     fi
+   done
+ else
+-docker exec "${CONTAINER}" bash -c 'ls /root/m25-evidence/*.json 2>/dev/null' | while read -r remote_path; do
++docker exec "${CONTAINER}" bash -c 'ls /root/m25-evidence/*.json 2>/dev/null || true' | while read -r remote_path; do
+   name="$(basename "$remote_path")"
+   docker cp "${CONTAINER}:${remote_path}" "/tmp/m25-raw-$$-${name}"
+   python3 - "/tmp/m25-raw-$$-${name}" "${RESULTS_DIR}/${name}" "${REPO_ROOT}" <<'PYEOF'

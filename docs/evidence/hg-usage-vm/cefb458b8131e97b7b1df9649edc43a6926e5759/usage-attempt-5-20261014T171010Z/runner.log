@@ -1,0 +1,30 @@
+[36m::[0m reusing disposable dpagent-m25-acceptance-12428; synchronizing committed source cefb458b8131e97b7b1df9649edc43a6926e5759 without bootstrap
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+FAIL  usage-correct-twice          overall=fail cleanup=fail - overall='fail'; expected 2 dbt session observations, got 1; run_status={'run_1': 'ok', 'run_2': 'timeout'}; not idempotent; cleanup={'pipeline_artifacts': 'fail', 'pipeline_artifacts_detail': 'DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_78A37B22_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_78A37B22_BRONZE_BUCKET, DPAGENT_VALIDATE_78A37B22_BRONZE_ENDPOINT, DPAGENT_VALIDATE_78A37B22_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_78A37B22_SRC_DATABASE, DPAGENT_VALIDATE_78A37B22_SRC_HOST, DPAGENT_VALIDATE_78A37B22_SRC_PASSWORD, DPAGENT_VALIDATE_78A37B22_SRC_PORT, DPAGENT_VALIDATE_78A37B22_SRC_USER, DPAGENT_VALIDATE_78A37B22_WH_DATABASE, DPAGENT_VALIDATE_78A37B22_WH_HOST, DPAGENT_VALIDATE_78A37B22_WH_PASSWORD, DPAGENT_VALIDATE_78A37B22_WH_PORT, DPAGENT_VALIDATE_78A37B22_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone', 'source_database': 'pass', 'source_role': 'pass', 'warehouse_database': 'pass', 'warehouse_role': 'pass', 's3_objects': 'pass', 'overall': 'fail'}; expected 3 batches, got 2; s3 {'objects_found_at_teardown': 26, 'objects_remaining_after_purge': 0, 'error': ''}; source_down_load={}; run_2: dbt test records for ['silver']; run_2/gold: dbt tests None required=None passed=None; promote={'accepted': False, 'reasons': ['run 2 timed out (worker not confirmed stopped)', "run 2 comparison against expected is 'not_run', not 'pass'", 'the two runs were not idempotent', "validation overall is 'fail'", "cleanup pipeline_artifacts is 'fail', not 'pass'", "cleanup overall is 'fail', not 'pass'", 'bronze pipeline but no source-removed proof in the evidence', 'expected at least 3 bronze batches (2 runs + the source-down LOAD), got 2', "run_2: run 15 finished 'cancelled' in the journal", "run_2: no dbt test record for stage 'gold' in the journal", 'run_2: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none', 'run_2: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none', "run_2: gated stage 'gold' has no gate verdict in the journal"], 'approval_unchanged': True}
+ok    usage-conflicting-ids        overall=fail cleanup=pass - conflicting source ids: silver's unique test failed, gold never ran, nothing promotable
+FAIL  usage-promote-deploy-run     overall=fail cleanup=fail - validation {'overall': 'fail', 'cleanup': 'fail', 'evidence_id': 'ev-7863186a66f577cc'}; promote {'accepted': False, 'reasons': ['run 1 timed out (worker not confirmed stopped)', "run 2 status is 'not_run', not 'ok'", "run 1 comparison against expected is 'not_run', not 'pass'", "run 2 comparison against expected is 'not_run', not 'pass'", 'the two runs were not idempotent', "validation overall is 'fail'", 'expected exactly 2 run ids, the evidence has 1', "cleanup pipeline_artifacts is 'fail', not 'pass'", "cleanup overall is 'fail', not 'pass'", 'bronze pipeline but no source-removed proof in; expected 3 dbt session observations, got 0
+
+1/3 requested scenarios matched their expectation (the 'bronze' profile is 34).
+2 scenario(s) ran but did NOT match their expectation: ['usage-correct-twice', 'usage-promote-deploy-run']
+31 scenario(s) of the 'bronze' profile were not requested this run: ['a2-promote-deploy-run', 'correct-twice', 'drop-failure', 'fact-correct-twice', 'fact-dbt-test-fails', 'fact-no-tests', 'fact-promote-deploy-run', 'gate-over-threshold', 'gate-under-threshold', 'hg-correct-twice', 'hg-purge-failure-detected', 'hg-selector-typo', 'hg-stray-object-purged', 'hg-symlink-refused', 'hg-timeout', 'hg-wrong-expected', 'late-deploy-failure', 'literal-connection', 'mixed-connection', 'pair-correct-twice', 'pair-load-fails-midway', 'pair-missing-table', 'pair-tampered-batch-manifest', 'pair-tampered-object', 'partial-deploy-failure', 'ref-connection', 'seed-failure', 'source-provisioning-failure', 'timeout', 'warehouse-provisioning-failure', 'wrong-expected']
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+[32mok[0m evidence written under /home/m25/projects/hg-usage-acceptance/docs/evidence/hg-usage-vm/cefb458b8131e97b7b1df9649edc43a6926e5759/usage-attempt-5-20261014T171010Z/evidence
+[36m::[0m --keep: leaving dpagent-m25-acceptance-12428 for inspection

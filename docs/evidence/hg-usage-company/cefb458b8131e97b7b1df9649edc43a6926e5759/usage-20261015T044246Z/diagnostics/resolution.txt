@@ -1,0 +1,6 @@
+Checkout clone inherited umask 077: tracked src directories/files became 0700/0600.
+Bootstrap preserved these modes and the Airflow user could not import dpagent.
+Normalized public tracked code modes in the private checkout; no content or
+business expected changed. Evidence/.git/env files remain private. For the host
+collector use PATH=<checkout>/.venv/bin:$PATH, created with python3.11 -m venv;
+Oracle Linux system Python remains unchanged. Reuse the verified container.

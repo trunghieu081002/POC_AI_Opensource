@@ -1,0 +1,918 @@
+{
+  "usage-conflicting-ids": {
+    "comparison": {
+      "idempotent": false,
+      "run_1": "not_run",
+      "run_2": "not_run"
+    },
+    "run_status": {
+      "run_1": "failed",
+      "run_2": "not_run"
+    },
+    "promote": {
+      "accepted": false,
+      "approval_unchanged": true,
+      "reasons": [
+        "run 1 status is 'failed', not 'ok'",
+        "run 2 status is 'not_run', not 'ok'",
+        "run 1 comparison against expected is 'not_run', not 'pass'",
+        "run 2 comparison against expected is 'not_run', not 'pass'",
+        "the two runs were not idempotent",
+        "validation overall is 'fail'",
+        "expected exactly 2 run ids, the evidence has 1",
+        "bronze pipeline but no source-removed proof in the evidence",
+        "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
+        "run_1: run 8 finished 'failed' in the journal",
+        "run_1: stage 'silver': dbt test is 'failed': a test failed or errored",
+        "run_1: no dbt test record for stage 'gold' in the journal",
+        "run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none",
+        "run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none",
+        "run_1: required a `unique` test on fact_editing.fact_editing_sk did not pass",
+        "run_1: gated stage 'silver' has no gate verdict in the journal",
+        "run_1: gated stage 'gold' has no gate verdict in the journal"
+      ]
+    },
+    "cleanup": {
+      "overall": "pass",
+      "pipeline_artifacts": "pass",
+      "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_0D531B05_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_0D531B05_BRONZE_BUCKET, DPAGENT_VALIDATE_0D531B05_BRONZE_ENDPOINT, DPAGENT_VALIDATE_0D531B05_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_0D531B05_SRC_DATABASE, DPAGENT_VALIDATE_0D531B05_SRC_HOST, DPAGENT_VALIDATE_0D531B05_SRC_PASSWORD, DPAGENT_VALIDATE_0D531B05_SRC_PORT, DPAGENT_VALIDATE_0D531B05_SRC_USER, DPAGENT_VALIDATE_0D531B05_WH_DATABASE, DPAGENT_VALIDATE_0D531B05_WH_HOST, DPAGENT_VALIDATE_0D531B05_WH_PASSWORD, DPAGENT_VALIDATE_0D531B05_WH_PORT, DPAGENT_VALIDATE_0D531B05_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+      "s3_objects": "pass",
+      "source_database": "pass",
+      "source_role": "pass",
+      "warehouse_database": "pass",
+      "warehouse_role": "pass"
+    },
+    "overall": "fail",
+    "run_ids": [
+      8
+    ]
+  },
+  "usage-correct-twice": {
+    "usage_observations": [
+      {
+        "database": "dpagent_fixture_wh_836501bf38",
+        "excluded_rows": 5787,
+        "gold_rows": [
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 4,
+            "hg_stock_id": "HGFA0009",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 5,
+            "hg_stock_id": "HGFA0008",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 6,
+            "hg_stock_id": "HGFA0010",
+            "position_group": ">5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+            "video_id": "V8"
+          }
+        ],
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_836501bf38",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_wh_836501bf38",
+        "excluded_rows": 5787,
+        "gold_rows": [
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 4,
+            "hg_stock_id": "HGFA0009",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 5,
+            "hg_stock_id": "HGFA0008",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 6,
+            "hg_stock_id": "HGFA0010",
+            "position_group": ">5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+            "video_id": "V8"
+          }
+        ],
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_836501bf38",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      }
+    ],
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "promote": {
+      "accepted": true,
+      "evidence_id": "ev-bf23813af9d96af1",
+      "is_approved": true,
+      "maturity": "reviewed",
+      "verification": "verified"
+    },
+    "cleanup": {
+      "overall": "pass",
+      "pipeline_artifacts": "pass",
+      "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_9FFE5EA6_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_9FFE5EA6_BRONZE_BUCKET, DPAGENT_VALIDATE_9FFE5EA6_BRONZE_ENDPOINT, DPAGENT_VALIDATE_9FFE5EA6_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_9FFE5EA6_SRC_DATABASE, DPAGENT_VALIDATE_9FFE5EA6_SRC_HOST, DPAGENT_VALIDATE_9FFE5EA6_SRC_PASSWORD, DPAGENT_VALIDATE_9FFE5EA6_SRC_PORT, DPAGENT_VALIDATE_9FFE5EA6_SRC_USER, DPAGENT_VALIDATE_9FFE5EA6_WH_DATABASE, DPAGENT_VALIDATE_9FFE5EA6_WH_HOST, DPAGENT_VALIDATE_9FFE5EA6_WH_PASSWORD, DPAGENT_VALIDATE_9FFE5EA6_WH_PORT, DPAGENT_VALIDATE_9FFE5EA6_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+      "s3_objects": "pass",
+      "source_database": "pass",
+      "source_role": "pass",
+      "warehouse_database": "pass",
+      "warehouse_role": "pass"
+    },
+    "overall": "pass",
+    "run_ids": [
+      6,
+      7
+    ]
+  },
+  "usage-promote-deploy-run": {
+    "usage_observations": [
+      {
+        "database": "dpagent_fixture_wh_ea5c05be9b",
+        "excluded_rows": 5787,
+        "gold_rows": [
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 4,
+            "hg_stock_id": "HGFA0009",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 5,
+            "hg_stock_id": "HGFA0008",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 6,
+            "hg_stock_id": "HGFA0010",
+            "position_group": ">5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+            "video_id": "V8"
+          }
+        ],
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_ea5c05be9b",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_wh_ea5c05be9b",
+        "excluded_rows": 5787,
+        "gold_rows": [
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 4,
+            "hg_stock_id": "HGFA0009",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 5,
+            "hg_stock_id": "HGFA0008",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 6,
+            "hg_stock_id": "HGFA0010",
+            "position_group": ">5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+            "video_id": "V8"
+          }
+        ],
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_wh_ea5c05be9b",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      },
+      {
+        "database": "dpagent_fixture_a2wh_68c527efa1",
+        "excluded_rows": 5787,
+        "gold_rows": [
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-01-10T08:00:00",
+            "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+            "video_id": "V1"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-02-01T09:30:00",
+            "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+            "video_id": "V2"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "1",
+            "published_date": "2026-03-10T08:00:00",
+            "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+            "video_id": "V7"
+          },
+          {
+            "first_position": 1,
+            "hg_stock_id": "HGFA0001",
+            "position_group": "1",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 2,
+            "hg_stock_id": "HGFA0002",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 3,
+            "hg_stock_id": "HGFA0007",
+            "position_group": "2-3",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 4,
+            "hg_stock_id": "HGFA0009",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 5,
+            "hg_stock_id": "HGFA0008",
+            "position_group": "4-5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+            "video_id": "V8"
+          },
+          {
+            "first_position": 6,
+            "hg_stock_id": "HGFA0010",
+            "position_group": ">5",
+            "published_date": "2026-04-01T00:00:00",
+            "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+            "video_id": "V8"
+          }
+        ],
+        "landing_columns": {
+          "channel": {
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text",
+            "YoutubeChannelId": "text"
+          },
+          "channel_company": {
+            "ChannelId": "text",
+            "CompanyId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean"
+          },
+          "channel_video_info": {
+            "Code": "text",
+            "IsDeleted": "boolean",
+            "PublishedAt": "timestamp with time zone",
+            "Title": "text",
+            "YoutubeChannelId": "text",
+            "YoutubeVideoId": "text"
+          },
+          "editings": {
+            "EditingFileId": "text",
+            "Id": "text",
+            "IsDeleted": "boolean",
+            "Title": "text"
+          },
+          "resource": {
+            "Id": "text",
+            "ResourceFileId": "text",
+            "ResourceType": "bigint",
+            "Title": "text"
+          },
+          "resource_editings": {
+            "EditingId": "text",
+            "EndTime": "double precision",
+            "Id": "text",
+            "ResourcesId": "text",
+            "StartTime": "double precision"
+          }
+        },
+        "seed_rows": 5787,
+        "timestamp_types": {
+          "gold.resources_useage_number.published_date": "timestamp without time zone",
+          "silver.dim_video.published_date": "timestamp without time zone",
+          "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+        },
+        "timezone": "Etc/UTC",
+        "user": "dpagent_fixture_a2wh_68c527efa1",
+        "utc_cast_probe": "2024-01-01 00:00:00"
+      }
+    ],
+    "comparison": {
+      "idempotent": true,
+      "run_1": "pass",
+      "run_2": "pass"
+    },
+    "run_status": {
+      "run_1": "ok",
+      "run_2": "ok"
+    },
+    "cleanup": {
+      "overall": "pass",
+      "pipeline_artifacts": "pass",
+      "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_2B215A4C_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_2B215A4C_BRONZE_BUCKET, DPAGENT_VALIDATE_2B215A4C_BRONZE_ENDPOINT, DPAGENT_VALIDATE_2B215A4C_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_2B215A4C_SRC_DATABASE, DPAGENT_VALIDATE_2B215A4C_SRC_HOST, DPAGENT_VALIDATE_2B215A4C_SRC_PASSWORD, DPAGENT_VALIDATE_2B215A4C_SRC_PORT, DPAGENT_VALIDATE_2B215A4C_SRC_USER, DPAGENT_VALIDATE_2B215A4C_WH_DATABASE, DPAGENT_VALIDATE_2B215A4C_WH_HOST, DPAGENT_VALIDATE_2B215A4C_WH_PASSWORD, DPAGENT_VALIDATE_2B215A4C_WH_PORT, DPAGENT_VALIDATE_2B215A4C_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+      "real_run": {
+        "artifacts": true,
+        "databases_dropped": true,
+        "s3_remaining": 0
+      },
+      "s3_objects": "pass",
+      "source_database": "pass",
+      "source_role": "pass",
+      "warehouse_database": "pass",
+      "warehouse_role": "pass"
+    },
+    "overall": "pass",
+    "run_ids": [
+      9,
+      10
+    ]
+  }
+}

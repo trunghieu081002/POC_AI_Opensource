@@ -1,0 +1,10 @@
+{
+  "container_id": "21f15f99ef992ed4fd5710368fec3be83fa833335b814cd0e60eb08de74a1044",
+  "source_bind_read_only": true,
+  "no_published_ports": true,
+  "no_demo_data_mounts": true,
+  "matrix_stopped": true,
+  "container_removed": true,
+  "baseline_container_ids_present": true,
+  "baseline_container_count": 11
+}

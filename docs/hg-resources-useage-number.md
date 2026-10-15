@@ -69,20 +69,49 @@ Python implementation of HG's models (`tests/hg_resources_reference.py`, which r
 seed); the fixture exercises every rule above; the verbatim files are unchanged; every model of every dbt stage
 has a test; the whole project, seed included, is under the approval hash.
 
-**Not done yet:** the three matrix scenarios (`usage-correct-twice`, `usage-conflicting-ids`,
-`usage-promote-deploy-run`) have **not** been run on a disposable host. A first attempt was stopped while the host
-was still installing. Until they pass this report is *unit-tested only*, not *really verified*.
+**Verified on disposable Linux:** all three usage scenarios passed on source
+`cefb458b8131e97b7b1df9649edc43a6926e5759`. Full bronze, full unit, actual
+timezone and cleanup evidence are recorded in the final verification section below.
 
 | Scenario | What it must show |
 |---|---|
 | `usage-correct-twice` | validation twice through the real DAG: gold equals the 13 expected rows both times, plus `dim_video` (7) and `fact_editing` (13); 3 batches × 6 tables loaded; source dropped → LOAD still loads; S3 39 objects → 0; HG's tests passed in both stages; promote accepted |
-| `usage-conflicting-ids` | two source rows with one `resource_editings.Id` and different values → `fact_editing_sk` not unique → silver's `dbt test` fails the run, gold never runs, nothing promotable, cleanup complete |
+| `usage-conflicting-ids` | two source rows with one `resource_editings.Id` and different values → `fact_editing_sk` not unique → silver's `dbt test` fails the run; the saved run journal shows silver transform started and its unique test failed, with no gold `transform.start`; promote is refused without changing approval, cleanup complete |
 | `usage-promote-deploy-run` | validate → promote → real deploy → Airflow run → output = expected; every approved file (seed and macro included) published byte-identical; editing the model, tests, seed or macro loses the approval |
 
 ## Limits
 
-* One report, full snapshot. `published_date` assumes the database session time zone is UTC (the fixture's
-  `PublishedAt` values are `+00`).
+Follow-up verification: the original full unit run at merge commit
+`b1a5b6e8aa98ad4b7c57b23e3a8d02c33595f721` passed 1 269 tests with 25 skips;
+its evidence is retained in `docs/evidence/hg-usage-verification/`. The journal
+assertion follow-up and Linux company-host handoff are documented in
+`docs/evidence/hg-usage-journal-fix/HANDOFF.md`. Company-host acceptance is recorded below; earlier failed attempts remain preserved.
+
+* One report, full snapshot. The fixture has `PublishedAt` values at `+00`; its actual dbt
+  session was observed as `Etc/UTC`. Future real data requires an explicit business timezone decision.
 * The seed is HG's operational list of 5 787 stock codes, committed as is.
 * Real HG source tables are named `Channel`, `Resource`, … and their EL renames them; connecting dpagent to the real
   source needs a view layer or a rename step that is not built here.
+
+## Final verification after #41 / PR #42
+
+Source `cefb458b8131e97b7b1df9649edc43a6926e5759` passed the company Linux-host
+verification: targeted usage **3/3** (exit 3 means a complete requested subset),
+full bronze **34/34** (exit 0), full unit **1,310 passed / 25 skipped** (exit 0),
+and **0 leaks** in both independent acceptance audits. The stack ran in the
+repository's Ubuntu 22.04 systemd disposable Docker container on Oracle Linux
+8.10. The runner was removed after recording journals and confirming existing
+container IDs remained present. No host demo service or database was changed.
+
+Evidence includes independent silver/gold comparisons, both idempotent runs,
+5,787-row seed/exclusions, CamelCase staging columns, timestamp types and the
+actual **Etc/UTC** dbt session. The conflicting journal has the silver unique
+failure and no gold transform.start; promote is denied without approval change.
+The valid case proves promote/deploy/run and exact owned-project publication.
+UTC wall-time expectations are explicit for this fixture; this does not settle
+the business timezone of future real data. HG SQL, seed and expected were kept.
+
+See [full evidence, failures and reproduction](evidence/hg-usage-company/README.md).
+Historical 1,269/25 and 1,281/25 unit evidence remains preserved. Documentation
+commits after the tested source do not alter its implementation. This acceptance
+does not cover Superset/dashboard or representative production load.

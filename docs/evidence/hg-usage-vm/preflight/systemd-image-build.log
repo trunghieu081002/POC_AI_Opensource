@@ -1,0 +1,155 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  11.13MB
+Step 1/4 : FROM ubuntu:22.04
+ ---> 5ec03bb3441e
+Step 2/4 : ENV DEBIAN_FRONTEND=noninteractive
+ ---> Running in d0be092e8983
+ ---> Removed intermediate container d0be092e8983
+ ---> 3b480dde8eb5
+Step 3/4 : RUN apt-get update && apt-get install -y --no-install-recommends       systemd systemd-sysv dbus ca-certificates sudo     && rm -rf /var/lib/apt/lists/*     && systemctl mask getty@tty1.service
+ ---> Running in 8b24167b3af4
+Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:3 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [4429 kB]
+Get:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Get:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+Get:6 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
+Get:7 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
+Get:8 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
+Get:9 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [96.8 kB]
+Get:10 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1323 kB]
+Get:11 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [7955 kB]
+Get:12 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
+Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1626 kB]
+Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [8243 kB]
+Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [104 kB]
+Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [4757 kB]
+Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [82.9 kB]
+Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [35.6 kB]
+Fetched 49.0 MB in 2min 16s (360 kB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  libapparmor1 libargon2-1 libcryptsetup12 libdbus-1-3 libdevmapper1.02.1
+  libexpat1 libip4tc2 libjson-c5 libkmod2 openssl
+Suggested packages:
+  default-dbus-session-bus | dbus-session-bus systemd-container libfido2-1
+  libtss2-esys-3.0.2-0 libtss2-mu0 libtss2-rc0 policykit-1
+Recommended packages:
+  dmsetup networkd-dispatcher systemd-timesyncd | time-daemon libpam-systemd
+  libnss-systemd
+The following NEW packages will be installed:
+  ca-certificates dbus libapparmor1 libargon2-1 libcryptsetup12 libdbus-1-3
+  libdevmapper1.02.1 libexpat1 libip4tc2 libjson-c5 libkmod2 openssl sudo
+  systemd systemd-sysv
+0 upgraded, 15 newly installed, 0 to remove and 1 not upgraded.
+Need to get 7697 kB of archives.
+After this operation, 25.1 MB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libapparmor1 amd64 3.0.4-2ubuntu2.5 [39.6 kB]
+Get:2 http://archive.ubuntu.com/ubuntu jammy/main amd64 libargon2-1 amd64 0~20171227-0.3 [19.5 kB]
+Get:3 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdevmapper1.02.1 amd64 2:1.02.175-2.1ubuntu5 [139 kB]
+Get:4 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libjson-c5 amd64 0.15-3~ubuntu1.22.04.2 [33.5 kB]
+Get:5 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcryptsetup12 amd64 2:2.4.3-1ubuntu1.3 [211 kB]
+Get:6 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libip4tc2 amd64 1.8.7-1ubuntu5.2 [19.9 kB]
+Get:7 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libkmod2 amd64 29-1ubuntu1.1 [48.1 kB]
+Get:8 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd amd64 249.11-0ubuntu3.22 [4587 kB]
+Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-sysv amd64 249.11-0ubuntu3.22 [10.5 kB]
+Get:10 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 openssl amd64 3.0.2-0ubuntu1.30 [1186 kB]
+Get:11 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 ca-certificates all 20260601~22.04.1 [141 kB]
+Get:12 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdbus-1-3 amd64 1.12.20-2ubuntu4.1 [189 kB]
+Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libexpat1 amd64 2.4.7-1ubuntu0.9 [96.9 kB]
+Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 dbus amd64 1.12.20-2ubuntu4.1 [158 kB]
+Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 sudo amd64 1.9.9-1ubuntu2.7 [820 kB]
+[91mdebconf: delaying package configuration, since apt-utils is not installed
+[0mFetched 7697 kB in 16s (478 kB/s)
+Selecting previously unselected package libapparmor1:amd64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 4393 files and directories currently installed.)
+Preparing to unpack .../0-libapparmor1_3.0.4-2ubuntu2.5_amd64.deb ...
+Unpacking libapparmor1:amd64 (3.0.4-2ubuntu2.5) ...
+Selecting previously unselected package libargon2-1:amd64.
+Preparing to unpack .../1-libargon2-1_0~20171227-0.3_amd64.deb ...
+Unpacking libargon2-1:amd64 (0~20171227-0.3) ...
+Selecting previously unselected package libdevmapper1.02.1:amd64.
+Preparing to unpack .../2-libdevmapper1.02.1_2%3a1.02.175-2.1ubuntu5_amd64.deb ...
+Unpacking libdevmapper1.02.1:amd64 (2:1.02.175-2.1ubuntu5) ...
+Selecting previously unselected package libjson-c5:amd64.
+Preparing to unpack .../3-libjson-c5_0.15-3~ubuntu1.22.04.2_amd64.deb ...
+Unpacking libjson-c5:amd64 (0.15-3~ubuntu1.22.04.2) ...
+Selecting previously unselected package libcryptsetup12:amd64.
+Preparing to unpack .../4-libcryptsetup12_2%3a2.4.3-1ubuntu1.3_amd64.deb ...
+Unpacking libcryptsetup12:amd64 (2:2.4.3-1ubuntu1.3) ...
+Selecting previously unselected package libip4tc2:amd64.
+Preparing to unpack .../5-libip4tc2_1.8.7-1ubuntu5.2_amd64.deb ...
+Unpacking libip4tc2:amd64 (1.8.7-1ubuntu5.2) ...
+Selecting previously unselected package libkmod2:amd64.
+Preparing to unpack .../6-libkmod2_29-1ubuntu1.1_amd64.deb ...
+Unpacking libkmod2:amd64 (29-1ubuntu1.1) ...
+Selecting previously unselected package systemd.
+Preparing to unpack .../7-systemd_249.11-0ubuntu3.22_amd64.deb ...
+Unpacking systemd (249.11-0ubuntu3.22) ...
+Setting up libapparmor1:amd64 (3.0.4-2ubuntu2.5) ...
+Setting up libargon2-1:amd64 (0~20171227-0.3) ...
+Setting up libdevmapper1.02.1:amd64 (2:1.02.175-2.1ubuntu5) ...
+Setting up libjson-c5:amd64 (0.15-3~ubuntu1.22.04.2) ...
+Setting up libcryptsetup12:amd64 (2:2.4.3-1ubuntu1.3) ...
+Setting up libip4tc2:amd64 (1.8.7-1ubuntu5.2) ...
+Setting up libkmod2:amd64 (29-1ubuntu1.1) ...
+Setting up systemd (249.11-0ubuntu3.22) ...
+Created symlink /etc/systemd/system/getty.target.wants/getty@tty1.service → /lib/systemd/system/getty@.service.
+Created symlink /etc/systemd/system/multi-user.target.wants/remote-fs.target → /lib/systemd/system/remote-fs.target.
+Created symlink /etc/systemd/system/dbus-org.freedesktop.resolve1.service → /lib/systemd/system/systemd-resolved.service.
+Created symlink /etc/systemd/system/multi-user.target.wants/systemd-resolved.service → /lib/systemd/system/systemd-resolved.service.
+ln: failed to create symbolic link '/etc/resolv.conf': Device or resource busy
+Created symlink /etc/systemd/system/sysinit.target.wants/systemd-pstore.service → /lib/systemd/system/systemd-pstore.service.
+Initializing machine ID from random generator.
+Selecting previously unselected package systemd-sysv.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 5213 files and directories currently installed.)
+Preparing to unpack .../0-systemd-sysv_249.11-0ubuntu3.22_amd64.deb ...
+Unpacking systemd-sysv (249.11-0ubuntu3.22) ...
+Selecting previously unselected package openssl.
+Preparing to unpack .../1-openssl_3.0.2-0ubuntu1.30_amd64.deb ...
+Unpacking openssl (3.0.2-0ubuntu1.30) ...
+Selecting previously unselected package ca-certificates.
+Preparing to unpack .../2-ca-certificates_20260601~22.04.1_all.deb ...
+Unpacking ca-certificates (20260601~22.04.1) ...
+Selecting previously unselected package libdbus-1-3:amd64.
+Preparing to unpack .../3-libdbus-1-3_1.12.20-2ubuntu4.1_amd64.deb ...
+Unpacking libdbus-1-3:amd64 (1.12.20-2ubuntu4.1) ...
+Selecting previously unselected package libexpat1:amd64.
+Preparing to unpack .../4-libexpat1_2.4.7-1ubuntu0.9_amd64.deb ...
+Unpacking libexpat1:amd64 (2.4.7-1ubuntu0.9) ...
+Selecting previously unselected package dbus.
+Preparing to unpack .../5-dbus_1.12.20-2ubuntu4.1_amd64.deb ...
+Unpacking dbus (1.12.20-2ubuntu4.1) ...
+Selecting previously unselected package sudo.
+Preparing to unpack .../6-sudo_1.9.9-1ubuntu2.7_amd64.deb ...
+Unpacking sudo (1.9.9-1ubuntu2.7) ...
+Setting up libexpat1:amd64 (2.4.7-1ubuntu0.9) ...
+Setting up systemd-sysv (249.11-0ubuntu3.22) ...
+Setting up libdbus-1-3:amd64 (1.12.20-2ubuntu4.1) ...
+Setting up dbus (1.12.20-2ubuntu4.1) ...
+Setting up sudo (1.9.9-1ubuntu2.7) ...
+Setting up openssl (3.0.2-0ubuntu1.30) ...
+Setting up ca-certificates (20260601~22.04.1) ...
+Updating certificates in /etc/ssl/certs...
+121 added, 0 removed; done.
+Processing triggers for libc-bin (2.35-0ubuntu3.15) ...
+Processing triggers for ca-certificates (20260601~22.04.1) ...
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+done.
+[91mCreated symlink /etc/systemd/system/getty@tty1.service → /dev/null.
+[0m ---> Removed intermediate container 8b24167b3af4
+ ---> 8c6de67beeb6
+Step 4/4 : CMD ["/sbin/init"]
+ ---> Running in d9684a502a9c
+ ---> Removed intermediate container d9684a502a9c
+ ---> 193064a76e0b
+Successfully built 193064a76e0b
+Successfully tagged dpagent-m25-disposable:latest

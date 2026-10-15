@@ -1,0 +1,555 @@
+{
+  "a2": {
+    "problems": [
+      "validation {'overall': 'fail', 'cleanup': 'fail', 'evidence_id': 'ev-6e50a46984f996db'}",
+      "promote {'accepted': False, 'reasons': ['run 1 timed out (worker not confirmed stopped)', \"run 2 status is 'not_run', not 'ok'\", \"run 1 comparison against expected is 'not_run', not 'pass'\", \"run 2 comparison against expected is 'not_run', not 'pass'\", 'the two runs were not idempotent', \"validation overall is 'fail'\", 'expected exactly 2 run ids, the evidence has 1', \"cleanup pipeline_artifacts is 'fail', not 'pass'\", \"cleanup overall is 'fail', not 'pass'\", 'bronze pipeline but no source-removed proof in the evidence', 'expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1', \"run_1: run 13 finished 'cancelled' in the journal\", \"run_1: no dbt test record for stage 'gold' in the journal\", 'run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none', 'run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none', \"run_1: gated stage 'gold' has no gate verdict in the journal\"], 'approval_unchanged': True}",
+      "real run {'deployed': False, 'run_status': None, 'comparison': None, 'gates_passed': None, 'cleanup_ok': None, 's3_remaining': None, 'databases_dropped': None, 'error': ''}",
+      "edit fixture: approval was lost for an unhashed file: {'approval_still_valid': False, 'deploy_refused': True, 'promote_accepted': False, 'approval_unchanged': True, 'reason': 'hg_a2_usage is maturity: draft (never reviewed)'}",
+      "edit expected: approval was lost for an unhashed file: {'approval_still_valid': False, 'deploy_refused': True, 'promote_accepted': False, 'approval_unchanged': True, 'reason': 'hg_a2_usage is maturity: draft (never reviewed)'}",
+      "restoring the content did not restore the approval"
+    ],
+    "steps": {
+      "edits_invalidate": {
+        "expected": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        },
+        "fixture": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        },
+        "macro": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        },
+        "model": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        },
+        "seed": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        },
+        "tests": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage is maturity: draft (never reviewed)"
+        }
+      },
+      "promote": {
+        "accepted": false,
+        "approval_unchanged": true,
+        "reasons": [
+          "run 1 timed out (worker not confirmed stopped)",
+          "run 2 status is 'not_run', not 'ok'",
+          "run 1 comparison against expected is 'not_run', not 'pass'",
+          "run 2 comparison against expected is 'not_run', not 'pass'",
+          "the two runs were not idempotent",
+          "validation overall is 'fail'",
+          "expected exactly 2 run ids, the evidence has 1",
+          "cleanup pipeline_artifacts is 'fail', not 'pass'",
+          "cleanup overall is 'fail', not 'pass'",
+          "bronze pipeline but no source-removed proof in the evidence",
+          "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
+          "run_1: run 13 finished 'cancelled' in the journal",
+          "run_1: no dbt test record for stage 'gold' in the journal",
+          "run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none",
+          "run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none",
+          "run_1: gated stage 'gold' has no gate verdict in the journal"
+        ]
+      },
+      "promote_before_validation": {
+        "accepted": false,
+        "approval_unchanged": true,
+        "reasons": [
+          "the pipeline changed since it was validated (hash sha256:2fa8735fc20d... vs now sha256:68a5fa1dcd53...): manifest, procedures, models, dbt project, seeds - validate again",
+          "validation overall is 'fail'",
+          "source-down proof: ok is False",
+          "source-down proof: landing_matches_fixture is False"
+        ]
+      },
+      "real_run": {
+        "cleanup_ok": null,
+        "comparison": null,
+        "databases_dropped": null,
+        "deployed": false,
+        "error": "",
+        "gates_passed": null,
+        "run_status": null,
+        "s3_remaining": null
+      },
+      "restored_is_valid_again": false,
+      "validate": {
+        "cleanup": "fail",
+        "evidence_id": "ev-6e50a46984f996db",
+        "overall": "fail"
+      }
+    }
+  },
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 5,
+        "manifest_sha256": "6941d279f7974e33d2cf0cf8d79caff1b06716fa485a3a5dbf4c66ce8a823757",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 5,
+        "manifest_sha256": "3fc8d921754e6ddc95dfb607b6b7290426dc9742a61cb1c5f987de9414916ecc",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_company",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 11,
+        "manifest_sha256": "0ff04383b68d79ca5a490cd093a5b89bcfb96f0d3ea85ffe9602e8d19d8305ca",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_video_info",
+        "total_rows": 11
+      },
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 6,
+        "manifest_sha256": "f125886469d505155c03a0ae209efd17bf3f7635d84107fc9d8f7d3aa52367f6",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "editings",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 10,
+        "manifest_sha256": "84c099520e49122b82a7fa6f53e0a9e5d490547e357188fff41f2d6d4536cd4d",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource",
+        "total_rows": 10
+      },
+      {
+        "batch_id": "2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "loaded_rows": 18,
+        "manifest_sha256": "57b0662fc74f24f7a505699ad1ea311d799d724e0b2b93bd9b1571872e451dc4",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource_editings",
+        "total_rows": 18
+      }
+    ],
+    "namespace": "dpagent-validate/847d4b65",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 13,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "fail",
+    "pipeline_artifacts": "fail",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_847D4B65_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_847D4B65_BRONZE_BUCKET, DPAGENT_VALIDATE_847D4B65_BRONZE_ENDPOINT, DPAGENT_VALIDATE_847D4B65_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_847D4B65_SRC_DATABASE, DPAGENT_VALIDATE_847D4B65_SRC_HOST, DPAGENT_VALIDATE_847D4B65_SRC_PASSWORD, DPAGENT_VALIDATE_847D4B65_SRC_PORT, DPAGENT_VALIDATE_847D4B65_SRC_USER, DPAGENT_VALIDATE_847D4B65_WH_DATABASE, DPAGENT_VALIDATE_847D4B65_WH_HOST, DPAGENT_VALIDATE_847D4B65_WH_PASSWORD, DPAGENT_VALIDATE_847D4B65_WH_PORT, DPAGENT_VALIDATE_847D4B65_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs; run timed out - this host cannot confirm the Airflow worker actually stopped before cleanup ran (undeploy() does not kill an already-running task), so this is never reported as a complete cleanup even when every artifact checked here is gone",
+    "real_run": {
+      "artifacts": null,
+      "databases_dropped": null,
+      "s3_remaining": null
+    },
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_a2_usage__validate__847d4b65",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "int_excluded_stock_codes",
+            "dim_video",
+            "fact_editing"
+          ],
+          "passed": 6,
+          "ran": 6,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277",
+            "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5",
+            "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e",
+            "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35",
+            "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b",
+            "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_usage__validate__847d4b65/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "passed": 6,
+        "ran": 6,
+        "required": 6,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      }
+    ],
+    "run_2": []
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-6e50a46984f996db",
+  "expected_hash": "sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21",
+  "fixture_hash": "sha256:bc3223e1f44fc4d5ece28258fa03709dd2d83e3001451695096398d8ceed868b",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 11,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 18,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "journal": {
+    "13": [
+      {
+        "id": 326,
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:19:54+00:00"
+      },
+      {
+        "id": 327,
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65: batch 2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a - 55 row(s) in 6 object(s)",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:19:56+00:00"
+      },
+      {
+        "id": 328,
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65: batch 2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:19:58+00:00"
+      },
+      {
+        "id": 329,
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65: batch 2ced1a5b-a2f7-4e37-8d10-22e5359b5e2a loaded - 55 row(s) from 6 object(s)",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:00+00:00"
+      },
+      {
+        "id": 330,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/landing schema_contract: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:04+00:00"
+      },
+      {
+        "id": 331,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/landing row_count_bounds: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:05+00:00"
+      },
+      {
+        "id": 332,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/landing row_count_bounds: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:05+00:00"
+      },
+      {
+        "id": 333,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/landing gates passed",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:05+00:00"
+      },
+      {
+        "id": 334,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver via dbt",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:20:07+00:00"
+      },
+      {
+        "id": 335,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "run_id": 13,
+        "stage": "silver",
+        "ts": "2026-10-14T15:21:22+00:00"
+      },
+      {
+        "id": 336,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver transform complete",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:21:22+00:00"
+      },
+      {
+        "id": 337,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver not_null: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:42+00:00"
+      },
+      {
+        "id": 338,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver unique: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:43+00:00"
+      },
+      {
+        "id": 339,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver not_null: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:43+00:00"
+      },
+      {
+        "id": 340,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver unique: ok",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:45+00:00"
+      },
+      {
+        "id": 341,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__847d4b65/silver gates passed",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:45+00:00"
+      },
+      {
+        "id": 342,
+        "kind": "pipeline.cancelled",
+        "level": "warn",
+        "message": "hg_a2_usage__validate__847d4b65 was undeployed while this run was still running",
+        "run_id": 13,
+        "stage": null,
+        "ts": "2026-10-14T15:25:46+00:00"
+      }
+    ]
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:68a5fa1dcd53558c408c6bc6fe55404bf3ce4ed8895cb4637eeb8fe60b237b1e",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    13
+  ],
+  "run_status": {
+    "run_1": "timeout",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "",
+  "usage_observation_problems": [
+    "expected 3 dbt session observations, got 0"
+  ],
+  "usage_observations": [],
+  "validation_overall": "fail",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

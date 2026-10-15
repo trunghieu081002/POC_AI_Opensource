@@ -1,0 +1,1 @@
+Windows Kernel-Power standby/resume events correlate with the multi-hour gap during run 11 (gold dbt deps). VM kernel recorded CPU soft lockup 314s; cgroup oom and oom_kill are both 0. Failed verdict and cleanup failure are retained. No timeout increase or global service/DNS/power change.
