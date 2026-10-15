@@ -81,14 +81,14 @@ python3 - <<'SECRETS'
 import json,os
 from pathlib import Path
 p=Path("/root/superset-test-secrets.json")
-p.write_text(json.dumps({k:v for k,v in os.environ.items() if k.startswith("SUPERSET_") or k=="WAREHOUSE_WRITER_PASSWORD"}))
+p.write_text(json.dumps({k:v for k,v in os.environ.items() if k in ("SUPERSET_METADATA_PASSWORD","SUPERSET_SECRET_KEY","SUPERSET_ADMIN_PASSWORD","SUPERSET_WAREHOUSE_PASSWORD","WAREHOUSE_WRITER_PASSWORD")}))
 p.chmod(0o600)
 SECRETS
 else
  while IFS= read -r -d '' entry; do export "$entry"; done < <(python3 - <<'RECOVER'
 import json,sys
 for key,value in json.load(open('/root/superset-test-secrets.json')).items():
- if key.startswith('SUPERSET_') or key=='WAREHOUSE_WRITER_PASSWORD':sys.stdout.buffer.write((key+'='+value).encode()+b'\0')
+ if key in ('SUPERSET_METADATA_PASSWORD','SUPERSET_SECRET_KEY','SUPERSET_ADMIN_PASSWORD','SUPERSET_WAREHOUSE_PASSWORD','WAREHOUSE_WRITER_PASSWORD'):sys.stdout.buffer.write((key+'='+value).encode()+b'\0')
 RECOVER
  )
 fi
