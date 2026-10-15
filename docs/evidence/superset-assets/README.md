@@ -25,7 +25,9 @@ The container is the disposable Superset stack from runtime-pack acceptance;
 Oracle Linux is the Docker host, Ubuntu 22.04 is the installed stack OS. Test
 metadata and warehouse tables were actually removed; protected reports and
 fixture artifact files are retained for inspection until owned-container
-teardown. The separate runtime lifecycle fixture is still intentionally retained.
+teardown. The final audit subsequently removed the runtime lifecycle fixture,
+probe table and verified owned container; protected BI reports are retained in
+`final-bi-reports/`. Existing company-container baseline remained 11/11.
 
 Limits: synthetic projects use different column contracts in the configured
 schema. This does not prove the HG pipeline-to-dashboard path, a second business

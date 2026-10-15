@@ -1,0 +1,504 @@
+{
+  "approved_by": "acceptance-fixture",
+  "binding": {
+    "environment": "dev",
+    "superset": "http://127.0.0.1:8088",
+    "warehouse": {
+      "database": "/warehouse",
+      "host": "localhost",
+      "port": 5432,
+      "scheme": "postgresql+psycopg2",
+      "user": "superset_reader"
+    }
+  },
+  "content": {
+    "charts/totals.yaml": {
+      "dataset_uuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5",
+      "params": {
+        "adhoc_filters": [],
+        "datasource": "0__table",
+        "groupby": [
+          "category"
+        ],
+        "metrics": [
+          "n",
+          "total"
+        ],
+        "order_desc": false,
+        "query_mode": "aggregate",
+        "row_limit": 1000,
+        "show_cell_bars": false,
+        "slice_id": 100,
+        "viz_type": "table"
+      },
+      "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [\"category\"], \"metrics\": [\"n\", \"total\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [\"category\"], \"metrics\": [\"n\", \"total\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+      "slice_name": "Independent fixture totals",
+      "uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+      "version": "1.0.0",
+      "viz_type": "table"
+    },
+    "dashboards/overview.yaml": {
+      "dashboard_title": "Fixture overview",
+      "metadata": {
+        "color_scheme": "supersetColors",
+        "cross_filters_enabled": false,
+        "expanded_slices": {},
+        "native_filter_configuration": [
+          {
+            "cascadeParentIds": [],
+            "controlValues": {
+              "enableEmptyFilter": false,
+              "inverseSelection": false,
+              "multiSelect": true,
+              "searchAllOptions": false
+            },
+            "defaultDataMask": {
+              "extraFormData": {},
+              "filterState": {},
+              "ownState": {}
+            },
+            "filterType": "filter_select",
+            "id": "NATIVE_FILTER-dimension",
+            "name": "Category",
+            "scope": {
+              "excluded": [],
+              "rootPath": [
+                "ROOT_ID"
+              ]
+            },
+            "targets": [
+              {
+                "column": {
+                  "name": "category"
+                },
+                "datasetUuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5"
+              }
+            ],
+            "type": "NATIVE_FILTER"
+          }
+        ],
+        "refresh_frequency": 0,
+        "timed_refresh_immune_slices": []
+      },
+      "position": {
+        "CHART-1": {
+          "children": [],
+          "id": "CHART-1",
+          "meta": {
+            "chartId": 100,
+            "height": 50,
+            "sliceName": "Independent fixture totals",
+            "uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+            "width": 12
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID",
+            "ROW-1"
+          ],
+          "type": "CHART"
+        },
+        "DASHBOARD_VERSION_KEY": "v2",
+        "GRID_ID": {
+          "children": [
+            "ROW-1"
+          ],
+          "id": "GRID_ID",
+          "parents": [
+            "ROOT_ID"
+          ],
+          "type": "GRID"
+        },
+        "ROOT_ID": {
+          "children": [
+            "GRID_ID"
+          ],
+          "id": "ROOT_ID",
+          "type": "ROOT"
+        },
+        "ROW-1": {
+          "children": [
+            "CHART-1"
+          ],
+          "id": "ROW-1",
+          "meta": {
+            "background": "BACKGROUND_TRANSPARENT"
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID"
+          ],
+          "type": "ROW"
+        }
+      },
+      "slug": "overview",
+      "uuid": "2987fdfe-1a6d-52d2-a2cd-c13928b76958",
+      "version": "1.0.0"
+    },
+    "databases/warehouse.yaml": {
+      "allow_ctas": false,
+      "allow_cvas": false,
+      "allow_dml": false,
+      "allow_file_upload": false,
+      "database_name": "Warehouse",
+      "expose_in_sqllab": true,
+      "extra": {},
+      "sqlalchemy_uri": "postgresql://",
+      "uuid": "58944002-14da-582d-adb6-85d85bfe2810",
+      "version": "1.0.0"
+    },
+    "datasets/warehouse/data.yaml": {
+      "columns": [
+        {
+          "column_name": "category",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        },
+        {
+          "column_name": "net_units",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "INTEGER"
+        }
+      ],
+      "database_uuid": "58944002-14da-582d-adb6-85d85bfe2810",
+      "filter_select_enabled": true,
+      "metrics": [
+        {
+          "expression": "COUNT(*)",
+          "metric_name": "n",
+          "metric_type": "count"
+        },
+        {
+          "expression": "SUM(\"net_units\")",
+          "metric_name": "total",
+          "metric_type": "sum"
+        }
+      ],
+      "schema": "public",
+      "table_name": "dpagent_selftest_1792056987_bi_2",
+      "uuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5",
+      "version": "1.0.0"
+    },
+    "metadata.yaml": {
+      "timestamp": "2026-01-01T00:00:00+00:00",
+      "type": "assets",
+      "version": "1.0.0"
+    }
+  },
+  "expected": {
+    "checks": [
+      {
+        "chart_uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+        "filters": [
+          {
+            "dashboard_uuid": "2987fdfe-1a6d-52d2-a2cd-c13928b76958",
+            "native_filter_id": "NATIVE_FILTER-dimension",
+            "rows": [
+              {
+                "category": "north",
+                "n": 2,
+                "total": 30
+              }
+            ],
+            "sql": "SELECT \"category\", count(*)::integer AS n, sum(\"net_units\")::integer AS total FROM \"public\".\"dpagent_selftest_1792056987_bi_2\" WHERE \"category\" = 'north' GROUP BY \"category\"",
+            "values": [
+              "north"
+            ]
+          }
+        ],
+        "rows": [
+          {
+            "category": "north",
+            "n": 2,
+            "total": 30
+          },
+          {
+            "category": "south",
+            "n": 1,
+            "total": 40
+          }
+        ],
+        "sql": "SELECT \"category\", count(*)::integer AS n, sum(\"net_units\")::integer AS total FROM \"public\".\"dpagent_selftest_1792056987_bi_2\" GROUP BY \"category\""
+      }
+    ]
+  },
+  "fingerprint": "0af1b115ab17b54fee254c5bc3cfec6080ecce121c04467bc839872c6df18b2f",
+  "ids": {
+    "charts": {
+      "13ba56bc-f39c-5879-b043-20607f988fce": 5
+    },
+    "dashboards": {
+      "2987fdfe-1a6d-52d2-a2cd-c13928b76958": 5
+    },
+    "databases": {
+      "58944002-14da-582d-adb6-85d85bfe2810": 9
+    },
+    "datasets": {
+      "152cf0d6-fdb5-59b8-a041-4b7a10e05da5": 5
+    }
+  },
+  "name": "dpagent_selftest_1792056987-2",
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "category": "south",
+          "n": 1,
+          "total": 40
+        },
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        }
+      ],
+      "chart_uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+      "expected": [
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        },
+        {
+          "category": "south",
+          "n": 1,
+          "total": 40
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "category": "south",
+          "n": 1,
+          "total": 40
+        },
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        }
+      ],
+      "chart_uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+      "expected": [
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        }
+      ],
+      "filters": [
+        {
+          "col": "category",
+          "op": "IN",
+          "val": [
+            "north"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "category": "north",
+          "n": 2,
+          "total": 30
+        }
+      ]
+    }
+  ],
+  "resources": {
+    "charts": {
+      "13ba56bc-f39c-5879-b043-20607f988fce": {
+        "dataset_uuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5",
+        "params": {
+          "adhoc_filters": [],
+          "datasource": "0__table",
+          "groupby": [
+            "category"
+          ],
+          "metrics": [
+            "n",
+            "total"
+          ],
+          "order_desc": false,
+          "query_mode": "aggregate",
+          "row_limit": 1000,
+          "show_cell_bars": false,
+          "slice_id": 100,
+          "viz_type": "table"
+        },
+        "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [\"category\"], \"metrics\": [\"n\", \"total\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [\"category\"], \"metrics\": [\"n\", \"total\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+        "slice_name": "Independent fixture totals",
+        "uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+        "version": "1.0.0",
+        "viz_type": "table"
+      }
+    },
+    "dashboards": {
+      "2987fdfe-1a6d-52d2-a2cd-c13928b76958": {
+        "dashboard_title": "Fixture overview",
+        "metadata": {
+          "color_scheme": "supersetColors",
+          "cross_filters_enabled": false,
+          "expanded_slices": {},
+          "native_filter_configuration": [
+            {
+              "cascadeParentIds": [],
+              "controlValues": {
+                "enableEmptyFilter": false,
+                "inverseSelection": false,
+                "multiSelect": true,
+                "searchAllOptions": false
+              },
+              "defaultDataMask": {
+                "extraFormData": {},
+                "filterState": {},
+                "ownState": {}
+              },
+              "filterType": "filter_select",
+              "id": "NATIVE_FILTER-dimension",
+              "name": "Category",
+              "scope": {
+                "excluded": [],
+                "rootPath": [
+                  "ROOT_ID"
+                ]
+              },
+              "targets": [
+                {
+                  "column": {
+                    "name": "category"
+                  },
+                  "datasetUuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5"
+                }
+              ],
+              "type": "NATIVE_FILTER"
+            }
+          ],
+          "refresh_frequency": 0,
+          "timed_refresh_immune_slices": []
+        },
+        "position": {
+          "CHART-1": {
+            "children": [],
+            "id": "CHART-1",
+            "meta": {
+              "chartId": 100,
+              "height": 50,
+              "sliceName": "Independent fixture totals",
+              "uuid": "13ba56bc-f39c-5879-b043-20607f988fce",
+              "width": 12
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID",
+              "ROW-1"
+            ],
+            "type": "CHART"
+          },
+          "DASHBOARD_VERSION_KEY": "v2",
+          "GRID_ID": {
+            "children": [
+              "ROW-1"
+            ],
+            "id": "GRID_ID",
+            "parents": [
+              "ROOT_ID"
+            ],
+            "type": "GRID"
+          },
+          "ROOT_ID": {
+            "children": [
+              "GRID_ID"
+            ],
+            "id": "ROOT_ID",
+            "type": "ROOT"
+          },
+          "ROW-1": {
+            "children": [
+              "CHART-1"
+            ],
+            "id": "ROW-1",
+            "meta": {
+              "background": "BACKGROUND_TRANSPARENT"
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID"
+            ],
+            "type": "ROW"
+          }
+        },
+        "slug": "overview",
+        "uuid": "2987fdfe-1a6d-52d2-a2cd-c13928b76958",
+        "version": "1.0.0"
+      }
+    },
+    "databases": {
+      "58944002-14da-582d-adb6-85d85bfe2810": {
+        "allow_ctas": false,
+        "allow_cvas": false,
+        "allow_dml": false,
+        "allow_file_upload": false,
+        "database_name": "Warehouse",
+        "expose_in_sqllab": true,
+        "extra": {},
+        "sqlalchemy_uri": "postgresql://",
+        "uuid": "58944002-14da-582d-adb6-85d85bfe2810",
+        "version": "1.0.0"
+      }
+    },
+    "datasets": {
+      "152cf0d6-fdb5-59b8-a041-4b7a10e05da5": {
+        "columns": [
+          {
+            "column_name": "category",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          },
+          {
+            "column_name": "net_units",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "INTEGER"
+          }
+        ],
+        "database_uuid": "58944002-14da-582d-adb6-85d85bfe2810",
+        "filter_select_enabled": true,
+        "metrics": [
+          {
+            "expression": "COUNT(*)",
+            "metric_name": "n",
+            "metric_type": "count"
+          },
+          {
+            "expression": "SUM(\"net_units\")",
+            "metric_name": "total",
+            "metric_type": "sum"
+          }
+        ],
+        "schema": "public",
+        "table_name": "dpagent_selftest_1792056987_bi_2",
+        "uuid": "152cf0d6-fdb5-59b8-a041-4b7a10e05da5",
+        "version": "1.0.0"
+      }
+    }
+  },
+  "status": "undeployed"
+}

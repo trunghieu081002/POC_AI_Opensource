@@ -63,7 +63,7 @@ outside shared artifacts; evidence must be checked for secrets before publishing
 | Capability | Proven | Still required |
 | --- | --- | --- |
 | HG usage/source?gold | #42: usage 3/3, bronze 34/34, unit 1310/25, leaks 0 on cefb458 | Representative data/timezone business decision and load criteria |
-| Superset runtime | Authenticated query, denied writes, dbt recreate, reinstall/restart, rollback/recovery on disposable Ubuntu | Combined shared-renderer bronze regression and final teardown |
+| Superset runtime | Authenticated query, denied writes, dbt recreate, reinstall/restart, rollback/recovery on disposable Ubuntu | Shared source 4e754bf: unit 1326/26, usage 3/3, bronze 34/34, leaks 0; both containers removed. Native RHEL installation remains untested |
 | Native BI artifacts | Real native import, chart/filter vs literal expected and SQL; CLI suite 5/5; stable IDs; scoped update/undeploy | Browser rendering; HG integrated flow; second business pipeline/schema |
 | Operations | Pipeline matrix covers failures, promotion, deployment and cleanup | Explicit schedule/recovery/update evidence for composed BI projects |
 | Load | No representative throughput claim | Data-owner authorization, representative scale and agreed resource/time thresholds |
