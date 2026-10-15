@@ -1,0 +1,86 @@
+{
+  "monthly-sales": {
+    "ids": {
+      "databases": {
+        "ed18cb70-7b2d-52e4-9aa7-3525be65aa4e": 10
+      },
+      "datasets": {
+        "46e8e8fa-cd56-5490-be07-fb90837febbd": 10
+      },
+      "charts": {
+        "5560fb20-e00e-5e94-9acf-1a78f8b799d7": 10
+      },
+      "dashboards": {
+        "187da096-ca28-54b7-91da-d85aaac8f174": 10
+      }
+    },
+    "comparisons": [
+      {
+        "chart_uuid": "5560fb20-e00e-5e94-9acf-1a78f8b799d7",
+        "filters": [],
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "chart_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "sql_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "matched": true
+      },
+      {
+        "chart_uuid": "5560fb20-e00e-5e94-9acf-1a78f8b799d7",
+        "filters": [
+          {
+            "col": "month",
+            "op": "IN",
+            "val": [
+              "2026-01"
+            ]
+          }
+        ],
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "chart_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "sql_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "matched": true
+      }
+    ]
+  }
+}

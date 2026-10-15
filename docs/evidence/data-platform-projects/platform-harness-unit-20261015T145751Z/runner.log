@@ -1,0 +1,58 @@
+...F............                                                         [100%]
+=================================== FAILURES ===================================
+____ test_failure_journal_requires_exact_run_model_and_no_downstream_start _____
+
+self = PosixPath('/root/data-platform-evidence'), mode = 511, parents = False
+exist_ok = True
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           PermissionError: [Errno 13] Permission denied: '/root/data-platform-evidence'
+
+/usr/lib64/python3.11/pathlib.py:1116: PermissionError
+
+During handling of the above exception, another exception occurred:
+
+    def test_failure_journal_requires_exact_run_model_and_no_downstream_start():
+        import json,pytest
+>       check=_journal_checker()
+              ^^^^^^^^^^^^^^^^^^
+
+tests/test_data_project_bi_contracts.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_data_project_bi_contracts.py:40: in _journal_checker
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap_external>:940: in exec_module
+    ???
+<frozen importlib._bootstrap>:241: in _call_with_frames_removed
+    ???
+tests/data_platform_acceptance/run.py:11: in <module>
+    OUT=Path('/root/data-platform-evidence');OUT.mkdir(exist_ok=True)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib64/python3.11/pathlib.py:1125: in mkdir
+    if not exist_ok or not self.is_dir():
+                           ^^^^^^^^^^^^^
+/usr/lib64/python3.11/pathlib.py:1250: in is_dir
+    return S_ISDIR(self.stat().st_mode)
+                   ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/root/data-platform-evidence'), follow_symlinks = True
+
+    def stat(self, *, follow_symlinks=True):
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+>       return os.stat(self, follow_symlinks=follow_symlinks)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       PermissionError: [Errno 13] Permission denied: '/root/data-platform-evidence'
+
+/usr/lib64/python3.11/pathlib.py:1013: PermissionError
+=========================== short test summary info ============================
+FAILED tests/test_data_project_bi_contracts.py::test_failure_journal_requires_exact_run_model_and_no_downstream_start

@@ -1,0 +1,122 @@
+[
+  {
+    "id": 341,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:46+00:00",
+    "level": "info",
+    "kind": "bronze.extract.start",
+    "actor": "engine",
+    "message": "hg_resources_useage_number: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+    "data_json": null
+  },
+  {
+    "id": 342,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:47+00:00",
+    "level": "info",
+    "kind": "bronze.extract.done",
+    "actor": "engine",
+    "message": "hg_resources_useage_number: batch d43ad844-77ef-4477-8116-9e54363c85df - 56 row(s) in 6 object(s)",
+    "data_json": null
+  },
+  {
+    "id": 343,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:48+00:00",
+    "level": "info",
+    "kind": "bronze.load.start",
+    "actor": "engine",
+    "message": "hg_resources_useage_number: batch d43ad844-77ef-4477-8116-9e54363c85df",
+    "data_json": null
+  },
+  {
+    "id": 344,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:49+00:00",
+    "level": "info",
+    "kind": "bronze.load.done",
+    "actor": "engine",
+    "message": "hg_resources_useage_number: batch d43ad844-77ef-4477-8116-9e54363c85df loaded - 56 row(s) from 6 object(s)",
+    "data_json": null
+  },
+  {
+    "id": 345,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:51+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/landing schema_contract: ok",
+    "data_json": "{\"stage_run_id\": 31, \"gate_type\": \"schema_contract\"}"
+  },
+  {
+    "id": 346,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:51+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/landing row_count_bounds: ok",
+    "data_json": "{\"stage_run_id\": 31, \"gate_type\": \"row_count_bounds\"}"
+  },
+  {
+    "id": 347,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:51+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/landing row_count_bounds: ok",
+    "data_json": "{\"stage_run_id\": 31, \"gate_type\": \"row_count_bounds\"}"
+  },
+  {
+    "id": 348,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:51+00:00",
+    "level": "info",
+    "kind": "stage.passed",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/landing gates passed",
+    "data_json": "{\"stage_run_id\": 31}"
+  },
+  {
+    "id": 349,
+    "run_id": 15,
+    "ts": "2026-10-15T10:45:53+00:00",
+    "level": "info",
+    "kind": "transform.start",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/silver via dbt",
+    "data_json": null
+  },
+  {
+    "id": 350,
+    "run_id": 15,
+    "ts": "2026-10-15T10:46:34+00:00",
+    "level": "error",
+    "kind": "dbt.test.failed",
+    "actor": "engine",
+    "message": "hg_resources_useage_number/silver: dbt test failed - ran 6 (5 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 6 required: a test failed or errored: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+    "data_json": "{\"stage\": \"silver\", \"status\": \"failed\", \"reason\": \"a test failed or errored\", \"exit_code\": 1, \"models\": [\"int_excluded_stock_codes\", \"dim_video\", \"fact_editing\"], \"ran\": 6, \"passed\": 5, \"failed\": 1, \"errored\": 0, \"warned\": 0, \"skipped\": 0, \"required\": [\"test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277\", \"test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5\", \"test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e\", \"test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35\", \"test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b\", \"test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862\"], \"missing\": [], \"untested_models\": [], \"tests\": [{\"test\": \"test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277\", \"status\": \"pass\", \"failures\": 0, \"name\": \"not_null\", \"column\": \"dim_video_sk\", \"models\": [\"dim_video\"], \"severity\": \"error\"}, {\"test\": \"test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35\", \"status\": \"pass\", \"failures\": 0, \"name\": \"unique\", \"column\": \"dim_video_sk\", \"models\": [\"dim_video\"], \"severity\": \"error\"}, {\"test\": \"test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5\", \"status\": \"pass\", \"failures\": 0, \"name\": \"not_null\", \"column\": \"fact_editing_sk\", \"models\": [\"fact_editing\"], \"severity\": \"error\"}, {\"test\": \"test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e\", \"status\": \"pass\", \"failures\": 0, \"name\": \"not_null\", \"column\": \"hg_stock_id\", \"models\": [\"int_excluded_stock_codes\"], \"severity\": \"error\"}, {\"test\": \"test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b\", \"status\": \"fail\", \"failures\": 1, \"name\": \"unique\", \"column\": \"fact_editing_sk\", \"models\": [\"fact_editing\"], \"severity\": \"error\"}, {\"test\": \"test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862\", \"status\": \"pass\", \"failures\": 0, \"name\": \"unique\", \"column\": \"hg_stock_id\", \"models\": [\"int_excluded_stock_codes\"], \"severity\": \"error\"}]}"
+  },
+  {
+    "id": 351,
+    "run_id": 15,
+    "ts": "2026-10-15T10:46:34+00:00",
+    "level": "error",
+    "kind": "transform.failed",
+    "actor": "engine",
+    "message": "dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+    "data_json": null
+  },
+  {
+    "id": 352,
+    "run_id": 15,
+    "ts": "2026-10-15T10:46:37+00:00",
+    "level": "error",
+    "kind": "pipeline.failed",
+    "actor": "engine",
+    "message": "DAG run 15 reached terminal state: failed",
+    "data_json": null
+  }
+]

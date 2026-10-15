@@ -1,0 +1,90 @@
+# HG's gold report `resources_useage_number` (phulee9/hgmedia e9cbff0) on dpagent, end to end:
+#   6 source tables -> one bronze batch -> staging -> silver (dim_video, fact_editing, int_excluded_stock_codes)
+#   -> gold.resources_useage_number -> HG's dbt tests + dpagent's gates.
+# The SQL under dwh_dbt/ is HG's, verbatim (docs/hg-resources-useage-number.md lists the few deliberate
+# differences: the full-snapshot dbt_project.yml, and the tests HG does not declare).
+name: hg_resources_useage_number
+summary: HG gold.resources_useage_number - which stock resources appear in which published videos, and where in the video
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_SOURCE_HOST}"
+    port: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_SOURCE_PORT:-5432}"
+    database: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_SOURCE_NAME}"
+    user: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_SOURCE_USER}"
+    password: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_SOURCE_PASSWORD}"
+  tables: [channel, channel_company, channel_video_info, editings, resource, resource_editings]
+
+warehouse:
+  host: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_WH_HOST:-localhost}"
+  port: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_WH_PORT:-5432}"
+  database: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_WH_NAME:-warehouse}"
+  user: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_WH_USER}"
+  password: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_WH_PASSWORD}"
+  schema: silver
+
+landing_dataset_name: staging
+
+bronze_staging: true
+bronze:
+  endpoint: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_BRONZE_ENDPOINT}"
+  bucket: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_BRONZE_BUCKET:-hg-bronze}"
+  access_key: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_BRONZE_ACCESS_KEY}"
+  secret_key: "${PLATFORM_A162E0ED6F7B47B093015964D3A35A5D_BRONZE_SECRET_KEY}"
+  prefix: platform/76c2f38e64a44e69abcdf90f26d455f1
+
+dbt_project:
+  path: dwh_dbt
+
+stages:
+  - name: landing
+    gates:
+      # only the columns HG's models read
+      - type: schema_contract
+        tables:
+          channel: {Id: text, YoutubeChannelId: text}
+          channel_company: {ChannelId: text, CompanyId: text, IsDeleted: boolean}
+          channel_video_info: {YoutubeVideoId: text, YoutubeChannelId: text, Code: text, PublishedAt: timestamp with time zone, Title: text}
+          editings: {Id: text, EditingFileId: text}
+          resource: {Id: text, ResourceFileId: text, ResourceType: bigint}
+          resource_editings: {Id: text, EditingId: text, ResourcesId: text, StartTime: double precision, EndTime: double precision}
+      - type: row_count_bounds
+        table: channel_video_info
+        min: 1
+      - type: row_count_bounds
+        table: resource_editings
+        min: 1
+
+  - name: silver
+    engine: dbt
+    depends_on: landing
+    schema: silver
+    models: [int_excluded_stock_codes, dim_video, fact_editing]    # seed -> run -> HG's tests -> these gates
+    gates:
+      - type: not_null
+        table: dim_video
+        columns: [dim_video_sk, video_id]
+      - type: unique
+        table: dim_video
+        columns: [dim_video_sk]
+      - type: not_null
+        table: fact_editing
+        columns: [fact_editing_sk, editing_code, hg_stock_id]
+      - type: unique
+        table: fact_editing
+        columns: [fact_editing_sk]
+
+  - name: gold
+    engine: dbt
+    depends_on: silver
+    schema: gold
+    models: [resources_useage_number]
+    gates:
+      - type: not_null
+        table: resources_useage_number
+        columns: [resource_video_sk, video_id, hg_stock_id, published_date, first_position, position_group]
+      - type: unique
+        table: resources_useage_number
+        columns: [resource_video_sk]
+maturity: reviewed

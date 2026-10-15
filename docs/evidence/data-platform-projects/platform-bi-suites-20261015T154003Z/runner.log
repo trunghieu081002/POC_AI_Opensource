@@ -1,0 +1,48 @@
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+697ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 463ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 1163ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1219ms
+    PASS Restart preserves the same unique metadata connection and query result 
+9246ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 1045ms
+  superset: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset-assets                                                              │
+│ Native BI approval, independent chart/filter results, stable identities and  │
+│ scoped removal                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create two namespaced warehouse fixtures and record metadata baseline 
+2183ms
+  checks
+    PASS Reject deployment without content-bound approval before any mutation 
+(negative) 765ms
+    PASS Compare two saved charts and native filters with independent SQL and 
+literal expected 5652ms
+    PASS Repeat deployment without changing the exact native UUID and ID sets 
+4431ms
+    PASS Reject wrong expected without altering approval and remove validation 
+clones (negative) 1546ms
+    PASS Update content with stable IDs and remove only one project 6025ms
+  teardown
+    PASS Verify native metadata baseline and remove only owned warehouse fixture
+tables 805ms
+  superset-assets: 5 checks passed
+
+╭─────────── acceptance ────────────╮
+│  suite            result  checks  │
+│  superset         passed     4/4  │
+│  superset-assets  passed     5/5  │
+╰───────────────────────────────────╯

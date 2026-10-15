@@ -1,0 +1,7 @@
+{
+  "auth_files_omitted": true,
+  "runtime_secrets_scanned": true,
+  "private_endpoint_scanned": true,
+  "redacted_files": [],
+  "private_originals_retained": true
+}

@@ -1,0 +1,109 @@
+{
+  "cleanup": "pass",
+  "fingerprint": "5fd104ca43f08685d4ad8f26c4382d3b0760b3bbfcb11393f79823915649d63c",
+  "finished_at": "2026-10-15T10:45:31.947067+00:00",
+  "ids": {
+    "charts": {
+      "229bf6f4-b8f3-5be3-a0e4-8c1088f120f0": 1
+    },
+    "dashboards": {
+      "580d6191-85ed-52e0-a428-b8b9d3b434b7": 1
+    },
+    "databases": {
+      "90c99a6b-cdd1-59de-a383-c2cb0aa278a7": 1
+    },
+    "datasets": {
+      "74906019-dbdc-5384-8ce2-49d00632611e": 1
+    }
+  },
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ],
+      "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+      "expected": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ],
+      "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+      "expected": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ],
+      "filters": [
+        {
+          "col": "video_id",
+          "op": "IN",
+          "val": [
+            "V1"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ]
+    }
+  ],
+  "project": "hg-usage",
+  "resources": {
+    "charts": [
+      "3c34c6da-3bcc-5dfa-8532-4676ee7f334c"
+    ],
+    "dashboards": [
+      "f24446f1-1291-5c28-81b7-9725c64836bd"
+    ],
+    "databases": [
+      "aa4ade6a-fb9e-5110-852f-ee25c723489d"
+    ],
+    "datasets": [
+      "eefaac85-7a88-50b5-8ab3-8700732a3c1f"
+    ]
+  },
+  "status": "pass",
+  "uuid_map": {
+    "3c34c6da-3bcc-5dfa-8532-4676ee7f334c": "229bf6f4-b8f3-5be3-a0e4-8c1088f120f0",
+    "aa4ade6a-fb9e-5110-852f-ee25c723489d": "90c99a6b-cdd1-59de-a383-c2cb0aa278a7",
+    "eefaac85-7a88-50b5-8ab3-8700732a3c1f": "74906019-dbdc-5384-8ce2-49d00632611e",
+    "f24446f1-1291-5c28-81b7-9725c64836bd": "580d6191-85ed-52e0-a428-b8b9d3b434b7"
+  }
+}

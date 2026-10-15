@@ -1,0 +1,127 @@
+diff --git a/tests/data_platform_acceptance/projects.yaml b/tests/data_platform_acceptance/projects.yaml
+index 0f24d23..1bf27a7 100644
+--- a/tests/data_platform_acceptance/projects.yaml
++++ b/tests/data_platform_acceptance/projects.yaml
+@@ -8,6 +8,7 @@ projects:
+     restore_sql: DELETE FROM resource_editings WHERE "Id"='x3' AND "StartTime"=11 AND "EndTime"=21
+     failing_stage: silver
+     unique_model: fact_editing_sk
++    failing_model: fact_editing
+     blocked_stage: gold
+   - pipeline: m25_monthly_sales
+     bi: monthly-sales
+diff --git a/tests/data_platform_acceptance/run.py b/tests/data_platform_acceptance/run.py
+index 793df3d..3e93b04 100644
+--- a/tests/data_platform_acceptance/run.py
++++ b/tests/data_platform_acceptance/run.py
+@@ -1,6 +1,6 @@
+ """Actual pack-composed pipeline/BI operations; business cases live in config."""
+ from __future__ import annotations
+-import contextlib,json,os,shutil,subprocess,sys,time
++import contextlib,json,os,shutil,subprocess,sys,time,uuid
+ from pathlib import Path
+ import yaml
+ ROOT=Path(__file__).resolve().parents[2]
+@@ -8,7 +8,7 @@ sys.path[:0]=[str(ROOT/'src'),str(ROOT/'tests/m25_acceptance')]
+ from dpagent.engine import state
+ from dpagent.pipelines import approval,bronze,deploy,evidence,fixture,loader,pg_throwaway,validate
+ import run_matrix as matrix
+-OUT=Path('/root/data-platform-evidence');OUT.mkdir(exist_ok=True)
++OUT=Path('/root/data-platform-evidence')
+ CONFIG=yaml.safe_load((ROOT/'tests/data_platform_acceptance/projects.yaml').read_text())['projects']
+ REPORT={'status':'fail','projects':{},'cleanup':{}}
+ 
+@@ -41,7 +41,16 @@ def run(p,expected,warehouse,label,want='ok'):
+         if not cmp.ok:raise AssertionError('Independent warehouse expected mismatch')
+     return result
+ 
++def assert_failure_journal(events,run_id,pipeline,item):
++    if not events or any(e['run_id']!=run_id for e in events):raise AssertionError('Missing or mismatched failure journal')
++    stage=item['failing_stage'];blocked=item['blocked_stage']
++    if not any(e['kind']=='transform.start' and e['message']==pipeline+'/'+stage+' via dbt' for e in events):raise AssertionError('Failing stage did not start')
++    failures=[json.loads(e['data_json'] or '{}') for e in events if e['kind']=='dbt.test.failed']
++    if not any(d.get('stage')==stage and any(t.get('name')=='unique' and t.get('column')==item['unique_model'] and item['failing_model'] in t.get('models',[]) and t.get('status')=='fail' for t in d.get('tests',[])) for d in failures):raise AssertionError('Expected model unique failure not observed')
++    if any(e['kind']=='transform.start' and e['message'].startswith(pipeline+'/'+blocked+' via ') for e in events):raise AssertionError('Downstream transform incorrectly started')
++
+ def main():
++    OUT.mkdir(parents=True,exist_ok=True)
+     pipelines=[];sources=[];deployed=[]
+     warehouse=pg_throwaway.ThrowawayDB('localhost','5432','warehouse','dbt_user',os.environ['DBT_DB_PASSWORD'])
+     with contextlib.ExitStack() as stack:
+@@ -49,7 +58,14 @@ def main():
+         work=OUT/'pipeline-sources';work.mkdir()
+         for item in CONFIG:
+             name=item['pipeline'];source=ROOT/'pipelines'/name
+-            if source.joinpath('dwh_dbt').exists():p,fx,ex=matrix._hg_pipeline(work,source=source)
++            if source.joinpath('dwh_dbt').exists():
++                def isolate(directory):
++                    path=directory/'pipeline.yaml';text=path.read_text();prefix='PLATFORM_'+uuid.uuid4().hex.upper()+'_'
++                    text=text.replace('prefix: bronze','prefix: platform/'+uuid.uuid4().hex,1).replace('HG_POC_',prefix)
++                    path.write_text(text)
++                    for key,value in list(os.environ.items()):
++                        if key.startswith('HG_POC_'):os.environ[key.replace('HG_POC_',prefix)]=value
++                p,fx,ex=matrix._hg_pipeline(work,source=source,mutate=isolate)
+             else:
+                 target=work/name;shutil.copytree(source,target,ignore=shutil.ignore_patterns('.approved.yaml','.synth-validation.yaml','build'))
+                 for k in ('M25_ODOO_HOST','M25_ODOO_NAME','M25_ODOO_USER','M25_ODOO_PASSWORD','M25_WH_USER','M25_WH_PASSWORD'):os.environ.setdefault(k,'unused')
+@@ -89,10 +105,7 @@ def main():
+             if item.get('fault_sql'):
+                 before=approval.approval_path(p).read_bytes();sql(src.database,item['fault_sql'])
+                 bad=run(p,fixture.load_expected(ex),warehouse,'injected-failure',want='failed')
+-                events=state.events_for(bad['run_id']);parsed=[{**dict(e),'stage':json.loads(e['data_json'] or '{}').get('stage')} for e in events]
+-                if not any(e['kind']=='transform.start' and e['stage']==item['failing_stage'] for e in parsed):raise AssertionError('Failing stage did not start')
+-                if not any(e['kind']=='dbt.test.failed' and e['stage']==item['failing_stage'] and item['unique_model'] in e['message'] for e in parsed):raise AssertionError('Expected unique failure not observed')
+-                if any(e['kind']=='transform.start' and e['stage']==item['blocked_stage'] for e in parsed):raise AssertionError('Downstream transform incorrectly started')
++                assert_failure_journal(state.events_for(bad['run_id']),bad['run_id'],p.name,item)
+                 if approval.approval_path(p).read_bytes()!=before:raise AssertionError('Data failure changed content approval')
+                 sql(src.database,item['restore_sql']);REPORT['projects'][p.name]['failure']=bad
+                 REPORT['projects'][p.name]['recovery']=run(p,fixture.load_expected(ex),warehouse,'recovery')
+@@ -115,9 +128,16 @@ def main():
+             except Exception as exc:REPORT['cleanup'][p.name]={'error':type(exc).__name__};REPORT['status']='fail'
+         for _,p,_,_,_ in pipelines:
+             if p.bronze_staging:
+-                bronze.purge_namespace(p,p.bronze.prefix);remaining=bronze.count_namespace(p,p.bronze.prefix)
+-                REPORT['cleanup']['bronze_remaining']=remaining
+-                if remaining:REPORT['status']='fail'
++                try:
++                    bronze.purge_namespace(p,p.bronze.prefix);remaining=bronze.count_namespace(p,p.bronze.prefix)
++                    REPORT['cleanup']['bronze_remaining']=remaining
++                    if remaining:REPORT['status']='fail'
++                except Exception as exc:
++                    REPORT['cleanup']['bronze_error']=type(exc).__name__;REPORT['status']='fail'
++        try:stack.close()
++        except Exception as exc:REPORT['cleanup']['source_cleanup_error']=type(exc).__name__;REPORT['status']='fail'
++        REPORT['cleanup']['source_databases_removed']=all(s.cleanup_ok for s in sources)
++        if not REPORT['cleanup']['source_databases_removed']:REPORT['status']='fail'
+         write('summary.json',REPORT)
+     REPORT['cleanup']['source_databases_removed']=all(s.cleanup_ok for s in sources)
+     if not REPORT['cleanup']['source_databases_removed']:REPORT['status']='fail'
+diff --git a/tests/test_data_project_bi_contracts.py b/tests/test_data_project_bi_contracts.py
+index 411d31d..0aaf1b5 100644
+--- a/tests/test_data_project_bi_contracts.py
++++ b/tests/test_data_project_bi_contracts.py
+@@ -31,3 +31,24 @@ def test_projects_use_distinct_schemas_with_same_pack_contract():
+     projects=[a.read_project(yaml.safe_load((ROOT/'projects'/name/'bi.yaml').read_text()),{}) for name in ('hg-usage','monthly-sales')]
+     assert [next(iter(p['resources']['datasets'].values()))['schema'] for p in projects]==['gold','m25_monthly_sales']
+     assert not (set(k for values in projects[0]['resources'].values() for k in values)&set(k for values in projects[1]['resources'].values() for k in values))
++
++
++def _journal_checker():
++    import sys
++    sys.path.insert(0,str(ROOT/'tests/m25_acceptance'))
++    spec=importlib.util.spec_from_file_location('platform_acceptance',ROOT/'tests/data_platform_acceptance/run.py')
++    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    return module.assert_failure_journal
++
++
++def test_failure_journal_requires_exact_run_model_and_no_downstream_start():
++    import json,pytest
++    check=_journal_checker()
++    config={'failing_stage':'silver','blocked_stage':'gold','unique_model':'key','failing_model':'fact'}
++    events=[{'run_id':123,'kind':'transform.start','message':'p/silver via dbt','data_json':None},
++      {'run_id':123,'kind':'dbt.test.failed','message':'failure','data_json':json.dumps({'stage':'silver','tests':[{'name':'unique','column':'key','models':['fact'],'status':'fail'}]})}]
++    check(events,123,'p',config)
++    with pytest.raises(AssertionError):check(events,124,'p',config)
++    with pytest.raises(AssertionError):check(events+[{'run_id':123,'kind':'transform.start','message':'p/gold via dbt','data_json':None}],123,'p',config)
++    wrong=[events[0],{**events[1],'data_json':json.dumps({'stage':'silver','tests':[{'name':'unique','column':'key','models':['other'],'status':'fail'}]})}]
++    with pytest.raises(AssertionError):check(wrong,123,'p',config)

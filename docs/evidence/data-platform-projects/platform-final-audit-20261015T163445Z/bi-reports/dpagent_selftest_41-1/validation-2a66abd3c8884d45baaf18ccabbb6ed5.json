@@ -1,0 +1,118 @@
+{
+  "cleanup": "pass",
+  "fingerprint": "ebeb1a4f5de3c4d6083dc0f7064078aec5ccef36ccd456c0352f1c20e63fabce",
+  "finished_at": "2026-10-15T16:30:04.054350+00:00",
+  "ids": {
+    "charts": {
+      "fc503970-fe9f-5ae9-b2f2-354acf6338db": 37
+    },
+    "dashboards": {
+      "2d62d88d-0dbe-52a1-a7ba-86f26e6c414e": 37
+    },
+    "databases": {
+      "07dc962c-0e74-5e9e-86fb-71c4a2c905f7": 38
+    },
+    "datasets": {
+      "5fd576f8-5e72-52d6-8f81-8371637e58ba": 37
+    }
+  },
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        },
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ],
+      "chart_uuid": "a15f2984-e27f-5a8f-848b-b96b01b36128",
+      "expected": [
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        },
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        },
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ],
+      "chart_uuid": "a15f2984-e27f-5a8f-848b-b96b01b36128",
+      "expected": [
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ],
+      "filters": [
+        {
+          "col": "region",
+          "op": "IN",
+          "val": [
+            "north"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ]
+    }
+  ],
+  "project": "dpagent_selftest_41-1",
+  "resources": {
+    "charts": [
+      "a15f2984-e27f-5a8f-848b-b96b01b36128"
+    ],
+    "dashboards": [
+      "74de0b38-fa33-5867-9b20-c25d913c0cf5"
+    ],
+    "databases": [
+      "cadc4afb-1dd8-54af-b3fc-87ef47e15899"
+    ],
+    "datasets": [
+      "7d98242e-f909-567a-9f4a-339093ec5b04"
+    ]
+  },
+  "status": "pass",
+  "uuid_map": {
+    "74de0b38-fa33-5867-9b20-c25d913c0cf5": "2d62d88d-0dbe-52a1-a7ba-86f26e6c414e",
+    "7d98242e-f909-567a-9f4a-339093ec5b04": "5fd576f8-5e72-52d6-8f81-8371637e58ba",
+    "a15f2984-e27f-5a8f-848b-b96b01b36128": "fc503970-fe9f-5ae9-b2f2-354acf6338db",
+    "cadc4afb-1dd8-54af-b3fc-87ef47e15899": "07dc962c-0e74-5e9e-86fb-71c4a2c905f7"
+  }
+}

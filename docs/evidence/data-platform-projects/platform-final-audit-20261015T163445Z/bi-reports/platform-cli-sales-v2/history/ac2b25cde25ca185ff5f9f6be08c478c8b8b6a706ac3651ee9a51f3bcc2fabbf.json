@@ -1,0 +1,478 @@
+{
+  "approved_by": "cli-fixture-acceptance",
+  "binding": {
+    "environment": "dev",
+    "superset": "http://127.0.0.1:8088",
+    "warehouse": {
+      "database": "/warehouse",
+      "host": "localhost",
+      "port": 5432,
+      "scheme": "postgresql+psycopg2",
+      "user": "superset_reader"
+    }
+  },
+  "content": {
+    "charts/totals.yaml": {
+      "dataset_uuid": "786620dc-0caa-5b87-a659-ac32afcb13ee",
+      "params": {
+        "adhoc_filters": [],
+        "datasource": "0__table",
+        "groupby": [
+          "month"
+        ],
+        "metrics": [
+          "revenue"
+        ],
+        "order_desc": false,
+        "query_mode": "aggregate",
+        "row_limit": 1000,
+        "show_cell_bars": false,
+        "slice_id": 100,
+        "viz_type": "table"
+      },
+      "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [\"month\"], \"metrics\": [\"revenue\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [\"month\"], \"metrics\": [\"revenue\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+      "slice_name": "Monthly sales: independent revenue by calendar month",
+      "uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "version": "1.0.0",
+      "viz_type": "table"
+    },
+    "dashboards/overview.yaml": {
+      "dashboard_title": "Monthly sales: independent revenue by calendar month",
+      "metadata": {
+        "color_scheme": "supersetColors",
+        "cross_filters_enabled": false,
+        "expanded_slices": {},
+        "native_filter_configuration": [
+          {
+            "cascadeParentIds": [],
+            "controlValues": {
+              "enableEmptyFilter": false,
+              "inverseSelection": false,
+              "multiSelect": true,
+              "searchAllOptions": false
+            },
+            "defaultDataMask": {
+              "extraFormData": {},
+              "filterState": {},
+              "ownState": {}
+            },
+            "filterType": "filter_select",
+            "id": "NATIVE_FILTER-dimension",
+            "name": "Month",
+            "scope": {
+              "excluded": [],
+              "rootPath": [
+                "ROOT_ID"
+              ]
+            },
+            "targets": [
+              {
+                "column": {
+                  "name": "month"
+                },
+                "datasetUuid": "786620dc-0caa-5b87-a659-ac32afcb13ee"
+              }
+            ],
+            "type": "NATIVE_FILTER"
+          }
+        ],
+        "refresh_frequency": 0,
+        "timed_refresh_immune_slices": []
+      },
+      "position": {
+        "CHART-1": {
+          "children": [],
+          "id": "CHART-1",
+          "meta": {
+            "chartId": 100,
+            "height": 50,
+            "sliceName": "Monthly sales: independent revenue by calendar month",
+            "uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+            "width": 12
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID",
+            "ROW-1"
+          ],
+          "type": "CHART"
+        },
+        "DASHBOARD_VERSION_KEY": "v2",
+        "GRID_ID": {
+          "children": [
+            "ROW-1"
+          ],
+          "id": "GRID_ID",
+          "parents": [
+            "ROOT_ID"
+          ],
+          "type": "GRID"
+        },
+        "ROOT_ID": {
+          "children": [
+            "GRID_ID"
+          ],
+          "id": "ROOT_ID",
+          "type": "ROOT"
+        },
+        "ROW-1": {
+          "children": [
+            "CHART-1"
+          ],
+          "id": "ROW-1",
+          "meta": {
+            "background": "BACKGROUND_TRANSPARENT"
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID"
+          ],
+          "type": "ROW"
+        }
+      },
+      "slug": "overview",
+      "uuid": "e762f94c-cab1-5906-b8af-1d647b454890",
+      "version": "1.0.0"
+    },
+    "databases/warehouse.yaml": {
+      "allow_ctas": false,
+      "allow_cvas": false,
+      "allow_dml": false,
+      "allow_file_upload": false,
+      "database_name": "Warehouse",
+      "expose_in_sqllab": true,
+      "extra": {},
+      "sqlalchemy_uri": "postgresql://",
+      "uuid": "d10671f0-ff4b-5254-ae57-4503e4b6514a",
+      "version": "1.0.0"
+    },
+    "datasets/warehouse/data.yaml": {
+      "columns": [
+        {
+          "column_name": "month",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        },
+        {
+          "column_name": "revenue",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "NUMERIC"
+        }
+      ],
+      "database_uuid": "d10671f0-ff4b-5254-ae57-4503e4b6514a",
+      "filter_select_enabled": true,
+      "metrics": [
+        {
+          "expression": "SUM(revenue)",
+          "metric_name": "revenue"
+        }
+      ],
+      "schema": "m25_monthly_sales",
+      "table_name": "fct_monthly_sales",
+      "uuid": "786620dc-0caa-5b87-a659-ac32afcb13ee",
+      "version": "1.0.0"
+    },
+    "metadata.yaml": {
+      "timestamp": "2026-01-01T00:00:00+00:00",
+      "type": "assets",
+      "version": "1.0.0"
+    }
+  },
+  "expected": {
+    "checks": [
+      {
+        "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+        "filters": [
+          {
+            "dashboard_uuid": "e762f94c-cab1-5906-b8af-1d647b454890",
+            "native_filter_id": "NATIVE_FILTER-dimension",
+            "rows": [
+              {
+                "month": "2026-01",
+                "revenue": 350.5
+              }
+            ],
+            "sql": "SELECT month, SUM(revenue)::numeric(20,2) AS revenue FROM m25_monthly_sales.fct_monthly_sales WHERE month = '2026-01' GROUP BY month",
+            "values": [
+              "2026-01"
+            ]
+          }
+        ],
+        "rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "sql": "SELECT month, SUM(revenue)::numeric(20,2) AS revenue FROM m25_monthly_sales.fct_monthly_sales GROUP BY month"
+      }
+    ]
+  },
+  "fingerprint": "ac2b25cde25ca185ff5f9f6be08c478c8b8b6a706ac3651ee9a51f3bcc2fabbf",
+  "ids": {
+    "charts": {
+      "5824da31-4a21-5899-96ba-d2b4e18961aa": 30
+    },
+    "dashboards": {
+      "e762f94c-cab1-5906-b8af-1d647b454890": 30
+    },
+    "databases": {
+      "d10671f0-ff4b-5254-ae57-4503e4b6514a": 31
+    },
+    "datasets": {
+      "786620dc-0caa-5b87-a659-ac32afcb13ee": 30
+    }
+  },
+  "name": "platform-cli-sales-v2",
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.250000000
+        }
+      ],
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        }
+      ],
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        }
+      ],
+      "filters": [
+        {
+          "col": "month",
+          "op": "IN",
+          "val": [
+            "2026-01"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        }
+      ]
+    }
+  ],
+  "resources": {
+    "charts": {
+      "5824da31-4a21-5899-96ba-d2b4e18961aa": {
+        "dataset_uuid": "786620dc-0caa-5b87-a659-ac32afcb13ee",
+        "params": {
+          "adhoc_filters": [],
+          "datasource": "0__table",
+          "groupby": [
+            "month"
+          ],
+          "metrics": [
+            "revenue"
+          ],
+          "order_desc": false,
+          "query_mode": "aggregate",
+          "row_limit": 1000,
+          "show_cell_bars": false,
+          "slice_id": 100,
+          "viz_type": "table"
+        },
+        "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [\"month\"], \"metrics\": [\"revenue\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [\"month\"], \"metrics\": [\"revenue\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+        "slice_name": "Monthly sales: independent revenue by calendar month",
+        "uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+        "version": "1.0.0",
+        "viz_type": "table"
+      }
+    },
+    "dashboards": {
+      "e762f94c-cab1-5906-b8af-1d647b454890": {
+        "dashboard_title": "Monthly sales: independent revenue by calendar month",
+        "metadata": {
+          "color_scheme": "supersetColors",
+          "cross_filters_enabled": false,
+          "expanded_slices": {},
+          "native_filter_configuration": [
+            {
+              "cascadeParentIds": [],
+              "controlValues": {
+                "enableEmptyFilter": false,
+                "inverseSelection": false,
+                "multiSelect": true,
+                "searchAllOptions": false
+              },
+              "defaultDataMask": {
+                "extraFormData": {},
+                "filterState": {},
+                "ownState": {}
+              },
+              "filterType": "filter_select",
+              "id": "NATIVE_FILTER-dimension",
+              "name": "Month",
+              "scope": {
+                "excluded": [],
+                "rootPath": [
+                  "ROOT_ID"
+                ]
+              },
+              "targets": [
+                {
+                  "column": {
+                    "name": "month"
+                  },
+                  "datasetUuid": "786620dc-0caa-5b87-a659-ac32afcb13ee"
+                }
+              ],
+              "type": "NATIVE_FILTER"
+            }
+          ],
+          "refresh_frequency": 0,
+          "timed_refresh_immune_slices": []
+        },
+        "position": {
+          "CHART-1": {
+            "children": [],
+            "id": "CHART-1",
+            "meta": {
+              "chartId": 100,
+              "height": 50,
+              "sliceName": "Monthly sales: independent revenue by calendar month",
+              "uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+              "width": 12
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID",
+              "ROW-1"
+            ],
+            "type": "CHART"
+          },
+          "DASHBOARD_VERSION_KEY": "v2",
+          "GRID_ID": {
+            "children": [
+              "ROW-1"
+            ],
+            "id": "GRID_ID",
+            "parents": [
+              "ROOT_ID"
+            ],
+            "type": "GRID"
+          },
+          "ROOT_ID": {
+            "children": [
+              "GRID_ID"
+            ],
+            "id": "ROOT_ID",
+            "type": "ROOT"
+          },
+          "ROW-1": {
+            "children": [
+              "CHART-1"
+            ],
+            "id": "ROW-1",
+            "meta": {
+              "background": "BACKGROUND_TRANSPARENT"
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID"
+            ],
+            "type": "ROW"
+          }
+        },
+        "slug": "overview",
+        "uuid": "e762f94c-cab1-5906-b8af-1d647b454890",
+        "version": "1.0.0"
+      }
+    },
+    "databases": {
+      "d10671f0-ff4b-5254-ae57-4503e4b6514a": {
+        "allow_ctas": false,
+        "allow_cvas": false,
+        "allow_dml": false,
+        "allow_file_upload": false,
+        "database_name": "Warehouse",
+        "expose_in_sqllab": true,
+        "extra": {},
+        "sqlalchemy_uri": "postgresql://",
+        "uuid": "d10671f0-ff4b-5254-ae57-4503e4b6514a",
+        "version": "1.0.0"
+      }
+    },
+    "datasets": {
+      "786620dc-0caa-5b87-a659-ac32afcb13ee": {
+        "columns": [
+          {
+            "column_name": "month",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          },
+          {
+            "column_name": "revenue",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "NUMERIC"
+          }
+        ],
+        "database_uuid": "d10671f0-ff4b-5254-ae57-4503e4b6514a",
+        "filter_select_enabled": true,
+        "metrics": [
+          {
+            "expression": "SUM(revenue)",
+            "metric_name": "revenue"
+          }
+        ],
+        "schema": "m25_monthly_sales",
+        "table_name": "fct_monthly_sales",
+        "uuid": "786620dc-0caa-5b87-a659-ac32afcb13ee",
+        "version": "1.0.0"
+      }
+    }
+  },
+  "status": "deployed"
+}

@@ -1,0 +1,6 @@
+{
+  "baseline_containers": 11,
+  "missing": 0,
+  "remaining_owned_runtime_containers": [],
+  "owned_test_data": "removed with the verified container; no writable host data mounts"
+}

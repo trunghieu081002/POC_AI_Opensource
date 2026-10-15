@@ -1,0 +1,175 @@
+project: disposable-data-platform
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  dlt                  4  requested  │
+│  5  postgres             5  requested  │
+│  6  seaweedfs            5  requested  │
+│  7  airflow              7  requested  │
+│  8  superset             6  requested  │
+│  9  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= seaweedfs — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "projects": [{"name": "platform-cli-sales", "bundle_dir": 
+"projects/platform-cli-sales/bundle", "expected_file": 
+"projects/platform-cli-sales/expected.yaml"}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 1449ms
+  verify ok
+      platform-cli-sales verified validate
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+project: disposable-data-platform
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  dlt                  4  requested  │
+│  5  postgres             5  requested  │
+│  6  seaweedfs            5  requested  │
+│  7  airflow              7  requested  │
+│  8  superset             6  requested  │
+│  9  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= seaweedfs — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"deploy", "approved_by": "cli-fixture-acceptance", "projects": [{"name": 
+"platform-cli-sales", "bundle_dir": "projects/platform-cli-sales/bundle", 
+"expected_file": "projects/platform-cli-sales/expected.yaml", "approved_sha256":
+"7e0340c91c2ad61cf36ef42f448a216e9d8bfa4ddc32ab0a9f63eaa08e17a561"}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 3018ms
+  verify ok
+      platform-cli-sales verified deploy
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+project: disposable-data-platform
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  dlt                  4  requested  │
+│  5  postgres             5  requested  │
+│  6  seaweedfs            5  requested  │
+│  7  airflow              7  requested  │
+│  8  superset             6  requested  │
+│  9  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= seaweedfs — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+= superset-assets — already installed at v0.1.0 with identical params
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+project: disposable-data-platform
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  dlt                  4  requested  │
+│  5  postgres             5  requested  │
+│  6  seaweedfs            5  requested  │
+│  7  airflow              7  requested  │
+│  8  superset             6  requested  │
+│  9  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= seaweedfs — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "projects": [{"name": "platform-cli-sales", "bundle_dir": 
+"projects/platform-cli-sales/bundle", "expected_file": 
+"projects/platform-cli-sales/expected.yaml"}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      skip — checkpointed on a previous run
+  verify failed
+      Traceback (most recent call last):
+        File "/opt/dpagent/packs/superset-assets/assets.py", line 497, in 
+<module>
+          if __name__ == "__main__": main(sys.argv[1])
+        File "/opt/dpagent/packs/superset-assets/assets.py", line 488, in main
+          if record["fingerprint"] != project["fingerprint"]: raise 
+RuntimeError("BI state fingerprint is stale")
+      RuntimeError: BI state fingerprint is stale
+  superset-assets: steps completed but verify failed
+
+╭────────────────────────────────────────────────╮
+│ halted on superset-assets                      │
+│ steps completed but verify failed              │
+│                                                │
+│ re-run to resume — completed steps are skipped │
+╰────────────────────────────────────────────────╯
+Traceback (most recent call last):
+  File "/root/platform-cli-artifact-probe.py", line 39, in <module>
+    changed=apply('validate')
+  File "/root/platform-cli-artifact-probe.py", line 30, in apply
+    subprocess.run(['dpagent','spec',str(path),'--yes','--allow-draft','--no-test'],env=env,check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['dpagent', 'spec', '/root/platform-cli-artifact-spec.yaml', '--yes', '--allow-draft', '--no-test']' returned non-zero exit status 3.

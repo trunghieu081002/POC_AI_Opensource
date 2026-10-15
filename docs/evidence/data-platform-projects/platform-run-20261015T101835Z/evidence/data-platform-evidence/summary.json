@@ -1,0 +1,60 @@
+{
+  "status": "fail",
+  "projects": {
+    "hg_resources_useage_number": {
+      "first_run": {
+        "run_id": 5,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly"
+        }
+      },
+      "second_run": {
+        "run_id": 6,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly"
+        }
+      },
+      "published_files_checked": 14
+    },
+    "m25_monthly_sales": {
+      "first_run": {
+        "run_id": 10,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "2 row(s) matched exactly"
+        }
+      },
+      "scheduled_runs": [
+        {
+          "run_id": "scheduled__2026-10-15T10:39:00+00:00",
+          "state": "success"
+        }
+      ],
+      "second_run": {
+        "run_id": 11,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "2 row(s) matched exactly"
+        }
+      },
+      "published_files_checked": 3
+    }
+  },
+  "cleanup": {
+    "bi": "pass",
+    "m25_monthly_sales": {
+      "ok": true,
+      "detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs"
+    },
+    "hg_resources_useage_number": {
+      "ok": false,
+      "detail": "clone secret(s) still in /opt/airflow/home/pipelines.env: HG_POC_BRONZE_ACCESS_KEY, HG_POC_BRONZE_BUCKET, HG_POC_BRONZE_ENDPOINT, HG_POC_BRONZE_SECRET_KEY, HG_POC_SOURCE_HOST, HG_POC_SOURCE_NAME, HG_POC_SOURCE_PASSWORD, HG_POC_SOURCE_PORT, HG_POC_SOURCE_USER, HG_POC_WH_HOST, HG_POC_WH_NAME, HG_POC_WH_PASSWORD, HG_POC_WH_PORT, HG_POC_WH_USER"
+    }
+  }
+}

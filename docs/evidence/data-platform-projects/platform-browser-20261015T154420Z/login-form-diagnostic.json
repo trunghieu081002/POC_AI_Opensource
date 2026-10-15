@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "url": "http://127.0.0.1:8088/login/",
+  "body": "Settings\n Login\nSign in\nEnter your login and password below:\nUsername:\nPassword:\nSign in",
+  "inputs": [
+    {
+      "name": "",
+      "id": "username",
+      "type": "text",
+      "placeholder": ""
+    },
+    {
+      "name": "",
+      "id": "password",
+      "type": "password",
+      "placeholder": ""
+    }
+  ],
+  "buttons": [
+    "Sign in"
+  ]
+}

@@ -1,0 +1,16 @@
+# Human-authored, hand-calculated against expected.yaml in this same
+# directory - never generated from or checked against this pipeline's own
+# SQL (fixture.py's own module docstring: "never the model grading its own
+# SQL"). Three sale_order rows, two calendar months, chosen so every
+# number in expected.yaml can be verified by hand with nothing more than
+# this file: docs/m25-acceptance.md shows the exact arithmetic.
+tables:
+  - name: sale_order
+    columns:
+      id: bigint
+      write_date: timestamp
+      amount_total: numeric
+    rows:
+      - {id: 1, write_date: "2026-01-05 10:00:00", amount_total: 100.00}
+      - {id: 2, write_date: "2026-01-20 15:30:00", amount_total: 250.50}
+      - {id: 3, write_date: "2026-02-02 09:00:00", amount_total: 75.25}

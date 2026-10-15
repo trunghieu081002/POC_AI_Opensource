@@ -1,0 +1,27 @@
+content_hash: sha256:cbde01980698569f7ee095d226d9737a46613a964bf562ae5b3c5aa830d00641
+approved_by: disposable-integration-acceptance
+approved_at: '2026-10-15T15:26:27+00:00'
+evidence:
+  id: ev-70a21376c40afcc3
+  sealed_sha256: sha256:70a21376c40afcc3cf1e508a8c7e5c1c21c3946310b2507202be60e075b00e8b
+  policy_version: 1
+  report_version: 2
+  validated_at: '2026-10-15T15:26:27+00:00'
+  clone_name: hg_resources_useage_number__validate__29c0fa66
+  run_ids:
+  - 16
+  - 17
+  pipeline_hash: sha256:cbde01980698569f7ee095d226d9737a46613a964bf562ae5b3c5aa830d00641
+  fixture:
+    path: /root/data-platform-evidence/pipeline-sources/hg_resources_useage_number/fixture.yaml
+    hash: sha256:bc3223e1f44fc4d5ece28258fa03709dd2d83e3001451695096398d8ceed868b
+  expected:
+    path: /root/data-platform-evidence/pipeline-sources/hg_resources_useage_number/expected.yaml
+    hash: sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21
+  bronze: true
+  validator:
+    bronze_manifest_format: 1
+    dbt: 1.8.10
+    dpagent: 0.4.0
+    postgres: PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+    report: 2

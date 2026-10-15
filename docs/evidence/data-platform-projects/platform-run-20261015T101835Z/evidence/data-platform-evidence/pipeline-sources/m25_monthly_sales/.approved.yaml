@@ -1,0 +1,27 @@
+content_hash: sha256:0628a05e2db0143ff6bcc38e17ebb0d6cb3b650402dc71e07317cabbd1a3b654
+approved_by: disposable-integration-acceptance
+approved_at: '2026-10-15T10:40:54+00:00'
+evidence:
+  id: ev-28a645c2245c4d33
+  sealed_sha256: sha256:28a645c2245c4d33a260dfd193cc656ca0a7cb1be4c198b55bea551136c21e9d
+  policy_version: 1
+  report_version: 2
+  validated_at: '2026-10-15T10:40:54+00:00'
+  clone_name: m25_monthly_sales__validate__daa39590
+  run_ids:
+  - 7
+  - 8
+  pipeline_hash: sha256:0628a05e2db0143ff6bcc38e17ebb0d6cb3b650402dc71e07317cabbd1a3b654
+  fixture:
+    path: /root/data-platform-evidence/pipeline-sources/m25_monthly_sales/fixture.yaml
+    hash: sha256:086a1eb8d8481d2acfc0f5ebbef40f7b007e0d7d52395434b2d70ffd427d4164
+  expected:
+    path: /root/data-platform-evidence/pipeline-sources/m25_monthly_sales/expected.yaml
+    hash: sha256:fd27b7fe8d72bc246555ab8d064cec351c6875a65bd59d7242d547ffb145bed2
+  bronze: false
+  validator:
+    bronze_manifest_format: 1
+    dbt: 1.8.10
+    dpagent: 0.4.0
+    postgres: PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+    report: 2
