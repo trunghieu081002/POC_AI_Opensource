@@ -1,0 +1,3 @@
+name: monthly-sales
+bundle_dir: projects/monthly-sales/bundle
+expected_file: projects/monthly-sales/expected.yaml

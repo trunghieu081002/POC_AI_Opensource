@@ -1,0 +1,24 @@
+# Literal independent expectations: HG expected fixture / hand-calculated monthly source rows.
+checks:
+- chart_uuid: 3c34c6da-3bcc-5dfa-8532-4676ee7f334c
+  sql: SELECT COUNT(*) AS rows, COUNT(DISTINCT resource_video_sk) AS resource_video_pairs,
+    COUNT(DISTINCT hg_stock_id) AS stock_resources, COUNT(DISTINCT video_id) AS videos
+    FROM gold.resources_useage_number
+  rows:
+  - rows: 13
+    resource_video_pairs: 13
+    stock_resources: 6
+    videos: 4
+  filters:
+  - dashboard_uuid: f24446f1-1291-5c28-81b7-9725c64836bd
+    native_filter_id: NATIVE_FILTER-dimension
+    values:
+    - V1
+    sql: SELECT COUNT(*) AS rows, COUNT(DISTINCT resource_video_sk) AS resource_video_pairs,
+      COUNT(DISTINCT hg_stock_id) AS stock_resources, COUNT(DISTINCT video_id) AS
+      videos FROM gold.resources_useage_number WHERE video_id = 'V1'
+    rows:
+    - rows: 3
+      resource_video_pairs: 3
+      stock_resources: 3
+      videos: 1
