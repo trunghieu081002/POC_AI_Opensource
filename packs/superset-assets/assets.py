@@ -291,7 +291,7 @@ class Client:
     def chart(self, identifier, filters=None, dataset_id=None):
         chart = self.request("GET", "/api/v1/chart/" + str(identifier)).json()["result"]
         if dataset_id is not None and chart["datasource_id"] != dataset_id: raise RuntimeError("Chart binds a different dataset")
-        context = json.loads(chart["query_context"],use_decimal=True)
+        context = json.loads(chart["query_context"],parse_float=Decimal)
         context.setdefault("form_data",{})["slice_id"] = identifier
         context["form_data"]["datasource"] = str(chart["datasource_id"])+"__"+chart["datasource_type"]
         if chart["viz_type"] == "table":
@@ -391,7 +391,7 @@ def deployment_path(project): return STATE / project["name"] / "deployment.json"
 def deploy(client, project, approved_by):
     if not approved_by or project["config"].get("approved_sha256") != project["fingerprint"]:
         raise RuntimeError("BI approval does not match artifact, expected and environment binding")
-    path = deployment_path(project); previous = json.loads(path.read_text(),use_decimal=True) if path.exists() else None
+    path = deployment_path(project); previous = json.loads(path.read_text(),parse_float=Decimal) if path.exists() else None
     if previous and previous["status"] == "deployed" and previous["binding"] != project["binding"]:
         raise RuntimeError("BI binding migration requires explicit undeploy on the old target")
     if previous and previous["status"] != "deployed": previous=None
@@ -432,7 +432,7 @@ def deploy(client, project, approved_by):
 def undeploy(client, name):
     path = STATE / name / "deployment.json"
     if not path.exists(): return
-    record = json.loads(path.read_text(),use_decimal=True)
+    record = json.loads(path.read_text(),parse_float=Decimal)
     if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
     if record["status"] == "undeployed": return
     client.cleanup(record["resources"], receipt=record["ids"])
@@ -471,7 +471,7 @@ def main(action):
         for name in names:
             path = STATE / name / "deployment.json"
             if path.exists():
-                record = json.loads(path.read_text(),use_decimal=True)
+                record = json.loads(path.read_text(),parse_float=Decimal)
                 if record["binding"] != client.binding or record["status"] != "undeployed" or any(client.lookup(record["resources"]).values()):
                     raise RuntimeError("BI undeploy is incomplete")
     elif action == "rollback" or mode == "undeploy":
@@ -484,7 +484,7 @@ def main(action):
     elif action == "verify":
         for project in projects:
             path = STATE / project["name"] / ("deployment.json" if mode == "deploy" else "validation.json")
-            record = json.loads(path.read_text(),use_decimal=True)
+            record = json.loads(path.read_text(),parse_float=Decimal)
             if record["fingerprint"] != project["fingerprint"]: raise RuntimeError("BI state fingerprint is stale")
             if mode == "validate":
                 if record["status"] != "pass" or record["cleanup"] != "pass": raise RuntimeError("BI validation/cleanup did not pass")
