@@ -1,0 +1,31 @@
+suite: superset-assets
+summary: Native BI approval, independent chart/filter results, stable identities and scoped removal
+requires: [superset, postgres, superset-assets]
+setup:
+  - id: fixtures
+    script: setup/00-fixtures.sh
+    timeout: 120
+checks:
+  - id: reject-unapproved
+    script: checks/10-approval.sh
+    negative: true
+    critical: true
+    timeout: 60
+  - id: chart-filter-independent-sql
+    script: checks/20-results.sh
+    critical: true
+    timeout: 180
+  - id: stable-redeploy
+    script: checks/30-redeploy.sh
+    timeout: 180
+  - id: reject-bad-expectation
+    script: checks/40-negative.sh
+    negative: true
+    timeout: 180
+  - id: update-scoped-undeploy
+    script: checks/50-scope.sh
+    timeout: 180
+teardown:
+  - id: owned-fixtures-only
+    script: teardown/99-fixtures.sh
+    timeout: 120
