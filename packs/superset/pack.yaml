@@ -23,6 +23,8 @@ params:
   admin_user: {type: string, default: "admin"}
   admin_password: {type: string, required: true, secret: true}
   admin_email: {type: string, default: "admin@example.com"}
+  warehouse_host: {type: string, default: "localhost", enum: ["localhost", "127.0.0.1", "::1"]}
+  warehouse_port: {type: int, default: 5432}
   warehouse_db: {type: string, default: "warehouse"}
   warehouse_role: {type: string, default: "superset_reader"}
   warehouse_password: {type: string, required: true, secret: true}

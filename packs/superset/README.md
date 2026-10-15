@@ -14,7 +14,7 @@ PR dependencies are in `docs/shared-data-platform-plan.md`.
 The warehouse schemas and actual table creator roles must already exist. The
 example uses the standard public schema; production project schemas are
 configured in the project environment. Reader provisioning uses local postgres
-peer authentication on backend_port. Remote metadata is allowed, but this
+peer authentication on warehouse_port. Remote metadata is allowed, but this
 version provisions only a local PostgreSQL warehouse. It refuses an existing
 reader role without this installation's ownership receipt and refuses inherited
 write privileges; it never changes PUBLIC grants to force a pass.

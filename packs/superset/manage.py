@@ -76,9 +76,9 @@ def install():
 
 def config():
     if not MARKER.exists(): raise RuntimeError("Missing ownership marker")
-    def uri(user,password,database):
-        return "postgresql+psycopg2://{}:{}@{}:{}/{}".format(quote(user,safe=""),quote(password,safe=""),param("backend_host","localhost"),param("backend_port","5432"),quote(database,safe=""))
-    env={"SUPERSET_ADMIN_USER":param("admin_user","admin"),"SUPERSET_ADMIN_PASSWORD":param("admin_password"),"SUPERSET_SECRET_KEY":param("secret_key"),"SUPERSET_METADATA_URI":uri(param("backend_user","superset_meta"),param("backend_password"),param("backend_db","superset_meta")),"SUPERSET_WAREHOUSE_URI":uri(param("warehouse_role","superset_reader"),param("warehouse_password"),param("warehouse_db","warehouse")),"SUPERSET_CONFIG_PATH":str(ROOT/"superset_config.py"),"SUPERSET_HOME":str(ROOT/"home"),"FLASK_APP":"superset"}
+    def uri(user,password,database,host,port):
+        return "postgresql+psycopg2://{}:{}@{}:{}/{}".format(quote(user,safe=""),quote(password,safe=""),("["+host+"]" if ":" in host else host),port,quote(database,safe=""))
+    env={"SUPERSET_ADMIN_USER":param("admin_user","admin"),"SUPERSET_ADMIN_PASSWORD":param("admin_password"),"SUPERSET_SECRET_KEY":param("secret_key"),"SUPERSET_METADATA_URI":uri(param("backend_user","superset_meta"),param("backend_password"),param("backend_db","superset_meta"),param("backend_host","localhost"),param("backend_port","5432")),"SUPERSET_WAREHOUSE_URI":uri(param("warehouse_role","superset_reader"),param("warehouse_password"),param("warehouse_db","warehouse"),param("warehouse_host","localhost"),param("warehouse_port","5432")),"SUPERSET_CONFIG_PATH":str(ROOT/"superset_config.py"),"SUPERSET_HOME":str(ROOT/"home"),"FLASK_APP":"superset"}
     if (ROOT/"superset.env").exists():
         from env_exec import load_environment
         old=load_environment(ROOT/"superset.env")
@@ -90,7 +90,7 @@ def config():
 
 def reader():
     marker=ROOT/"reader-owned.json"
-    identity={"role":param("warehouse_role","superset_reader"),"database":param("warehouse_db","warehouse"),"schemas":json.loads(param("warehouse_schemas")),"creators":json.loads(param("warehouse_creator_roles")),"port":int(param("backend_port","5432"))}
+    identity={"role":param("warehouse_role","superset_reader"),"database":param("warehouse_db","warehouse"),"schemas":json.loads(param("warehouse_schemas")),"creators":json.loads(param("warehouse_creator_roles")),"port":int(param("warehouse_port","5432"))}
     previous=json.loads(marker.read_text()) if marker.exists() else None
     if previous and previous != identity: raise RuntimeError("Reader identity/schema/creator change requires explicit migration")
     payload=dict(identity,password=param("warehouse_password"),owned=previous==identity)

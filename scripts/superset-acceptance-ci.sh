@@ -3,6 +3,8 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 KEEP=0
+exec 9>"${SUPERSET_LOCK_FILE:-${TMPDIR:-/tmp}/dpagent-superset-acceptance-$(id -u).lock}"
+flock -n 9 || { echo "Another Superset acceptance is running" >&2; exit 73; }
 case "${1:-}" in --keep) KEEP=1 ;; '') ;; *) echo 'usage: superset-acceptance-ci.sh [--keep]' >&2; exit 2 ;; esac
 command -v docker >/dev/null
 docker info >/dev/null
@@ -54,6 +56,13 @@ export SUPERSET_SECRET_KEY=$(openssl rand -hex 32)
 export SUPERSET_ADMIN_PASSWORD=$(openssl rand -hex 20)
 export SUPERSET_WAREHOUSE_PASSWORD=$(openssl rand -hex 20)
 export DP_TEST_NS=dpagent_selftest_$(date -u +%s)
+python3 - <<'SECRETS'
+import json,os
+from pathlib import Path
+p=Path("/root/superset-test-secrets.json")
+p.write_text(json.dumps({k:v for k,v in os.environ.items() if k.startswith("SUPERSET_") or k=="WAREHOUSE_WRITER_PASSWORD"}))
+p.chmod(0o600)
+SECRETS
 dpagent spec /opt/dpagent/tests/superset_acceptance/stack.yaml --yes --allow-draft
 /opt/superset/.venv/bin/pip freeze > /root/superset-acceptance/resolved-requirements.txt
 /opt/superset/.venv/bin/python /opt/dpagent/tests/superset_acceptance/lifecycle.py begin
