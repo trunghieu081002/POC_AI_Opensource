@@ -1,31 +1,45 @@
 suite: superset-assets
-summary: Native BI approval, independent chart/filter results, stable identities and scoped removal
-requires: [superset, postgres, superset-assets]
+summary: Native BI approval, independent chart/filter results, stable identities and
+  scoped removal
+requires:
+- superset
+- postgres
+- superset-assets
 setup:
-  - id: fixtures
-    script: setup/00-fixtures.sh
-    timeout: 120
+- id: fixtures
+  script: setup/00-fixtures.sh
+  timeout: 120
+  description: Create two namespaced warehouse fixtures and record metadata baseline
 checks:
-  - id: reject-unapproved
-    script: checks/10-approval.sh
-    negative: true
-    critical: true
-    timeout: 60
-  - id: chart-filter-independent-sql
-    script: checks/20-results.sh
-    critical: true
-    timeout: 180
-  - id: stable-redeploy
-    script: checks/30-redeploy.sh
-    timeout: 180
-  - id: reject-bad-expectation
-    script: checks/40-negative.sh
-    negative: true
-    timeout: 180
-  - id: update-scoped-undeploy
-    script: checks/50-scope.sh
-    timeout: 180
+- id: reject-unapproved
+  script: checks/10-approval.sh
+  negative: true
+  critical: true
+  timeout: 60
+  description: Reject deployment without content-bound approval before any mutation
+- id: chart-filter-independent-sql
+  script: checks/20-results.sh
+  critical: true
+  timeout: 180
+  description: Compare two saved charts and native filters with independent SQL and
+    literal expected
+- id: stable-redeploy
+  script: checks/30-redeploy.sh
+  timeout: 180
+  description: Repeat deployment without changing the exact native UUID and ID sets
+- id: reject-bad-expectation
+  script: checks/40-negative.sh
+  negative: true
+  timeout: 180
+  description: Reject wrong expected without altering approval and remove validation
+    clones
+- id: update-scoped-undeploy
+  script: checks/50-scope.sh
+  timeout: 180
+  description: Update content with stable IDs and remove only one project
 teardown:
-  - id: owned-fixtures-only
-    script: teardown/99-fixtures.sh
-    timeout: 120
+- id: owned-fixtures-only
+  script: teardown/99-fixtures.sh
+  timeout: 120
+  description: Verify native metadata baseline and remove only owned warehouse fixture
+    tables

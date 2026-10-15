@@ -212,3 +212,11 @@ def test_undeploy_one_project_keeps_the_other_project(project):
     assert not any(client.lookup(project['resources']).values())
     assert client.lookup(other['resources'])==before
     assets.check_results(client,other)
+
+
+def test_shipped_bi_suite_has_real_negative_and_scoped_cleanup_checks():
+    from dpagent.suites.loader import load
+    suite=load('superset-assets')
+    assert len(suite.checks)==5
+    assert {'reject-unapproved','reject-bad-expectation'} <= {c.id for c in suite.checks if c.negative}
+    assert suite.setup and suite.teardown
