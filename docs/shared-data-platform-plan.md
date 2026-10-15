@@ -67,3 +67,22 @@ outside shared artifacts; evidence must be checked for secrets before publishing
 | Native BI artifacts | Real native import, chart/filter vs literal expected and SQL; CLI suite 5/5; stable IDs; scoped update/undeploy | Browser rendering; HG integrated flow; second business pipeline/schema |
 | Operations | Pipeline matrix covers failures, promotion, deployment and cleanup | Explicit schedule/recovery/update evidence for composed BI projects |
 | Load | No representative throughput claim | Data-owner authorization, representative scale and agreed resource/time thresholds |
+
+## Completed correctness milestones (supersedes earlier planning gates)
+
+| Capability | Measured result | Remaining boundary |
+| --- | --- | --- |
+| Host / isolated stack | Oracle Linux Docker host; Ubuntu systemd disposable stack; 29 component checks | Native Oracle Linux stack installation not exercised |
+| HG data / approval / publish | #42 usage 3/3, bronze 34/34; composed HG exact silver/gold twice and byte checks | Synthetic source, future real business timezone/data |
+| Superset runtime | 4/4, denied writes, dbt recreate, reinstall/restart, rollback/recovery | Local managed PostgreSQL/service contract |
+| Native BI / dashboard | Generic pack; CLI validate/approve/deploy/update/undeploy with revisions; stable IDs; two browser charts/filters match expected | Admin-authenticated table/global-select cases; viewer RBAC/other plugins unproven |
+| Second project | Monthly sales in a different schema and business measure, same engine | Additional source/connector contracts only when required |
+| Operations | Real scheduled run; exact silver unique fault/no gold start; recovery; status/audit; scoped removal | Full snapshot rerun, not an arbitrary partial-resume claim |
+| Cleanup | Per-scenario/UUID receipts, journal and host ownership reconciliation; test container removed; baseline 11/11 | Optional combined SQL collector was empty and is not SQL evidence |
+| Load | Plan only | Permitted data, representative scale and time/resource criteria require owner input |
+
+See [complete run records](evidence/data-platform-projects/README.md) and
+[representative-load inputs](hg-representative-load-plan.md). No real/paid model
+call, production deployment or automatic PR merge was used. These results prove
+the pack extension process and two concrete projects, not every future stack,
+connector, chart plugin or production workload.

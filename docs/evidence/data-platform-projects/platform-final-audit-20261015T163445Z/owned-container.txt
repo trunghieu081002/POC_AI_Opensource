@@ -1,0 +1,1 @@
+bb99b5d6d584b7e1eea70e85af017ff32d942399230a17c1dcc6d17a9dd218a0 dpagent-m25-disposable {} /home/oracle/projects/dpagent-platform-run-706acc4e -> /opt/src/dpagent-src rw=false; /sys/fs/cgroup -> /sys/fs/cgroup rw=true; 

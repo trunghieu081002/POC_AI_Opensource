@@ -1,0 +1,109 @@
+{
+  "cleanup": "pass",
+  "fingerprint": "b6bacdb4f3566c284f1591d436482aca6f84422e3d4698972c45ae00360b083d",
+  "finished_at": "2026-10-15T16:24:05.900433+00:00",
+  "ids": {
+    "charts": {
+      "7206c8ba-2b37-5315-9020-395e4efb0a12": 32
+    },
+    "dashboards": {
+      "70e843bc-ee3d-58a9-85d1-6403a96b643e": 32
+    },
+    "databases": {
+      "dbc26a0b-27f8-50de-b806-4231a5aefd2f": 33
+    },
+    "datasets": {
+      "d09fed33-8b69-5dea-8ecb-4d70ec76c945": 32
+    }
+  },
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.250000000
+        }
+      ],
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        }
+      ],
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        }
+      ],
+      "filters": [
+        {
+          "col": "month",
+          "op": "IN",
+          "val": [
+            "2026-01"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        }
+      ]
+    }
+  ],
+  "project": "platform-cli-sales-v2",
+  "resources": {
+    "charts": [
+      "5824da31-4a21-5899-96ba-d2b4e18961aa"
+    ],
+    "dashboards": [
+      "e762f94c-cab1-5906-b8af-1d647b454890"
+    ],
+    "databases": [
+      "d10671f0-ff4b-5254-ae57-4503e4b6514a"
+    ],
+    "datasets": [
+      "786620dc-0caa-5b87-a659-ac32afcb13ee"
+    ]
+  },
+  "status": "pass",
+  "uuid_map": {
+    "5824da31-4a21-5899-96ba-d2b4e18961aa": "7206c8ba-2b37-5315-9020-395e4efb0a12",
+    "786620dc-0caa-5b87-a659-ac32afcb13ee": "d09fed33-8b69-5dea-8ecb-4d70ec76c945",
+    "d10671f0-ff4b-5254-ae57-4503e4b6514a": "dbc26a0b-27f8-50de-b806-4231a5aefd2f",
+    "e762f94c-cab1-5906-b8af-1d647b454890": "70e843bc-ee3d-58a9-85d1-6403a96b643e"
+  }
+}

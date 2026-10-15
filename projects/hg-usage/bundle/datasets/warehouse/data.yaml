@@ -1,0 +1,46 @@
+table_name: resources_useage_number
+schema: gold
+uuid: eefaac85-7a88-50b5-8ab3-8700732a3c1f
+database_uuid: aa4ade6a-fb9e-5110-852f-ee25c723489d
+version: 1.0.0
+filter_select_enabled: true
+columns:
+- column_name: resource_video_sk
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: video_id
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: hg_stock_id
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: published_date
+  type: TIMESTAMP
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: first_position
+  type: BIGINT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: position_group
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+metrics:
+- metric_name: rows
+  expression: COUNT(*)
+- metric_name: resource_video_pairs
+  expression: COUNT(DISTINCT resource_video_sk)
+- metric_name: stock_resources
+  expression: COUNT(DISTINCT hg_stock_id)
+- metric_name: videos
+  expression: COUNT(DISTINCT video_id)

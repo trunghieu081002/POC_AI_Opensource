@@ -1,0 +1,56 @@
+name: m25_monthly_sales
+summary: Minimal odoo_postgres sale_order -> landing -> raw (dbt) -> curated (procedure)
+  monthly revenue, built for M2.5's real fixture-validation acceptance matrix
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${M25_ODOO_HOST}
+    port: ${M25_ODOO_PORT:-5432}
+    database: ${M25_ODOO_NAME}
+    user: ${M25_ODOO_USER}
+    password: ${M25_ODOO_PASSWORD}
+  tables:
+  - sale_order
+warehouse:
+  host: ${M25_WH_HOST:-localhost}
+  port: ${M25_WH_PORT:-5432}
+  database: ${M25_WH_NAME:-warehouse}
+  user: ${M25_WH_USER}
+  password: ${M25_WH_PASSWORD}
+  schema: m25_monthly_sales
+stages:
+- name: landing
+  gates:
+  - type: row_count_bounds
+    table: sale_order
+    min: 1
+- name: raw
+  engine: dbt
+  depends_on: landing
+  models:
+  - stg_sale_order
+  gates:
+  - type: not_null
+    table: stg_sale_order
+    columns:
+    - id
+    - order_month
+    - amount_total
+  - type: unique
+    table: stg_sale_order
+    columns:
+    - id
+  quarantine:
+    reject_threshold_pct: 25
+- name: curated
+  engine: procedure
+  depends_on: raw
+  procedure: procedures/build_monthly_sales.sql
+  gates:
+  - type: not_null
+    table: fct_monthly_sales
+    columns:
+    - month
+    - revenue
+maturity: reviewed
+schedule: '* * * * *'

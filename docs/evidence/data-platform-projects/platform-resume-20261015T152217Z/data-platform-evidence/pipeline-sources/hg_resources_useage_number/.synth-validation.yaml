@@ -1,0 +1,630 @@
+generated_at: '2026-10-15T15:22:52+00:00'
+generator: dpagent pipeline validate
+model: ''
+content_hash: sha256:cbde01980698569f7ee095d226d9737a46613a964bf562ae5b3c5aa830d00641
+steps:
+  structure:
+    status: pass
+  load:
+    status: pass
+  dbt_compile:
+    status: pass
+    detail: own dbt project dwh_dbt/ parsed clean (4 model file(s), packages resolved,
+      every stage selector selects at least one model)
+    method: dbt project/Jinja parse only - structure, Jinja rendering, ref()/config
+      resolution; no live database, so it does NOT confirm the SQL itself is valid
+      Postgres (a typo like 'SELEC ...' still parses clean). Not dbt compile/run.
+      The SQL is only actually proven by steps 4-5 (dbt run against a real fixture
+      database).
+  procedures:
+    status: skipped
+    detail: no procedure-engine stage in this pipeline
+  dbt_dependencies:
+    status: skipped
+    detail: models live in the pipeline's own dbt project - ref()/source() resolve
+      only inside it, never against the shared dbt project, so the isolation this
+      check protects does not apply (the real dbt parse in the previous step covers
+      resolution)
+    checks_for: ref()/source() Jinja calls - not supported by this validation harness
+      (see check_dbt_dependencies's own docstring); models must read from a fully-schema-qualified
+      physical table instead
+  fixture:
+    clone_name: hg_resources_useage_number__validate__29c0fa66
+    pipeline_hash: sha256:cbde01980698569f7ee095d226d9737a46613a964bf562ae5b3c5aa830d00641
+    fixture_hash: sha256:bc3223e1f44fc4d5ece28258fa03709dd2d83e3001451695096398d8ceed868b
+    expected_hash: sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21
+    deploy_error: ''
+    run_ids:
+    - 16
+    - 17
+    run_status:
+      run_1: ok
+      run_2: ok
+    comparison:
+      run_1: pass
+      run_2: pass
+      idempotent: true
+    gates:
+      run_1:
+        landing:
+        - type: schema_contract
+          status: passed
+          detail: ''
+          rows_checked: null
+          rows_rejected: null
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 11
+          rows_rejected: null
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 18
+          rows_rejected: null
+        silver:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 7
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 7
+          rows_rejected: 0
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        gold:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+      run_2:
+        landing:
+        - type: schema_contract
+          status: passed
+          detail: ''
+          rows_checked: null
+          rows_rejected: null
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 11
+          rows_rejected: null
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 18
+          rows_rejected: null
+        silver:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 7
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 7
+          rows_rejected: 0
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        gold:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 13
+          rows_rejected: 0
+    dbt_tests:
+      run_1:
+      - kind: dbt.test.passed
+        stage: silver
+        status: passed
+        ran: 6
+        passed: 6
+        failed: 0
+        errored: 0
+        skipped: 0
+        required: 6
+        message: 'hg_resources_useage_number__validate__29c0fa66/silver: dbt test
+          passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6
+          required'
+        data:
+          stage: silver
+          status: passed
+          reason: ''
+          exit_code: 0
+          models:
+          - int_excluded_stock_codes
+          - dim_video
+          - fact_editing
+          ran: 6
+          passed: 6
+          failed: 0
+          errored: 0
+          warned: 0
+          skipped: 0
+          required:
+          - test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277
+          - test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5
+          - test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e
+          - test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35
+          - test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b
+          - test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862
+          missing: []
+          untested_models: []
+          tests:
+          - test: test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277
+            status: pass
+            failures: 0
+            name: not_null
+            column: dim_video_sk
+            models:
+            - dim_video
+            severity: error
+          - test: test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5
+            status: pass
+            failures: 0
+            name: not_null
+            column: fact_editing_sk
+            models:
+            - fact_editing
+            severity: error
+          - test: test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35
+            status: pass
+            failures: 0
+            name: unique
+            column: dim_video_sk
+            models:
+            - dim_video
+            severity: error
+          - test: test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e
+            status: pass
+            failures: 0
+            name: not_null
+            column: hg_stock_id
+            models:
+            - int_excluded_stock_codes
+            severity: error
+          - test: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b
+            status: pass
+            failures: 0
+            name: unique
+            column: fact_editing_sk
+            models:
+            - fact_editing
+            severity: error
+          - test: test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862
+            status: pass
+            failures: 0
+            name: unique
+            column: hg_stock_id
+            models:
+            - int_excluded_stock_codes
+            severity: error
+      - kind: dbt.test.passed
+        stage: gold
+        status: passed
+        ran: 4
+        passed: 4
+        failed: 0
+        errored: 0
+        skipped: 0
+        required: 4
+        message: 'hg_resources_useage_number__validate__29c0fa66/gold: dbt test passed
+          - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required'
+        data:
+          stage: gold
+          status: passed
+          reason: ''
+          exit_code: 0
+          models:
+          - resources_useage_number
+          ran: 4
+          passed: 4
+          failed: 0
+          errored: 0
+          warned: 0
+          skipped: 0
+          required:
+          - test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7
+          - test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba
+          - test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f
+          - test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257
+          missing: []
+          untested_models: []
+          tests:
+          - test: test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba
+            status: pass
+            failures: 0
+            name: not_null
+            column: position_group
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f
+            status: pass
+            failures: 0
+            name: not_null
+            column: resource_video_sk
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7
+            status: pass
+            failures: 0
+            name: accepted_values
+            column: position_group
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257
+            status: pass
+            failures: 0
+            name: unique
+            column: resource_video_sk
+            models:
+            - resources_useage_number
+            severity: error
+      run_2:
+      - kind: dbt.test.passed
+        stage: silver
+        status: passed
+        ran: 6
+        passed: 6
+        failed: 0
+        errored: 0
+        skipped: 0
+        required: 6
+        message: 'hg_resources_useage_number__validate__29c0fa66/silver: dbt test
+          passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6
+          required'
+        data:
+          stage: silver
+          status: passed
+          reason: ''
+          exit_code: 0
+          models:
+          - int_excluded_stock_codes
+          - dim_video
+          - fact_editing
+          ran: 6
+          passed: 6
+          failed: 0
+          errored: 0
+          warned: 0
+          skipped: 0
+          required:
+          - test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277
+          - test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5
+          - test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e
+          - test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35
+          - test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b
+          - test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862
+          missing: []
+          untested_models: []
+          tests:
+          - test: test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277
+            status: pass
+            failures: 0
+            name: not_null
+            column: dim_video_sk
+            models:
+            - dim_video
+            severity: error
+          - test: test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e
+            status: pass
+            failures: 0
+            name: not_null
+            column: hg_stock_id
+            models:
+            - int_excluded_stock_codes
+            severity: error
+          - test: test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5
+            status: pass
+            failures: 0
+            name: not_null
+            column: fact_editing_sk
+            models:
+            - fact_editing
+            severity: error
+          - test: test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35
+            status: pass
+            failures: 0
+            name: unique
+            column: dim_video_sk
+            models:
+            - dim_video
+            severity: error
+          - test: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b
+            status: pass
+            failures: 0
+            name: unique
+            column: fact_editing_sk
+            models:
+            - fact_editing
+            severity: error
+          - test: test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862
+            status: pass
+            failures: 0
+            name: unique
+            column: hg_stock_id
+            models:
+            - int_excluded_stock_codes
+            severity: error
+      - kind: dbt.test.passed
+        stage: gold
+        status: passed
+        ran: 4
+        passed: 4
+        failed: 0
+        errored: 0
+        skipped: 0
+        required: 4
+        message: 'hg_resources_useage_number__validate__29c0fa66/gold: dbt test passed
+          - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required'
+        data:
+          stage: gold
+          status: passed
+          reason: ''
+          exit_code: 0
+          models:
+          - resources_useage_number
+          ran: 4
+          passed: 4
+          failed: 0
+          errored: 0
+          warned: 0
+          skipped: 0
+          required:
+          - test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7
+          - test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba
+          - test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f
+          - test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257
+          missing: []
+          untested_models: []
+          tests:
+          - test: test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257
+            status: pass
+            failures: 0
+            name: unique
+            column: resource_video_sk
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba
+            status: pass
+            failures: 0
+            name: not_null
+            column: position_group
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f
+            status: pass
+            failures: 0
+            name: not_null
+            column: resource_video_sk
+            models:
+            - resources_useage_number
+            severity: error
+          - test: test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7
+            status: pass
+            failures: 0
+            name: accepted_values
+            column: position_group
+            models:
+            - resources_useage_number
+            severity: error
+    cleanup:
+      pipeline_artifacts: pass
+      pipeline_artifacts_detail: 'DAG removed; published files removed; secrets released:
+        DPAGENT_VALIDATE_29C0FA66_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_29C0FA66_BRONZE_BUCKET,
+        DPAGENT_VALIDATE_29C0FA66_BRONZE_ENDPOINT, DPAGENT_VALIDATE_29C0FA66_BRONZE_SECRET_KEY,
+        DPAGENT_VALIDATE_29C0FA66_SRC_DATABASE, DPAGENT_VALIDATE_29C0FA66_SRC_HOST,
+        DPAGENT_VALIDATE_29C0FA66_SRC_PASSWORD, DPAGENT_VALIDATE_29C0FA66_SRC_PORT,
+        DPAGENT_VALIDATE_29C0FA66_SRC_USER, DPAGENT_VALIDATE_29C0FA66_WH_DATABASE,
+        DPAGENT_VALIDATE_29C0FA66_WH_HOST, DPAGENT_VALIDATE_29C0FA66_WH_PASSWORD,
+        DPAGENT_VALIDATE_29C0FA66_WH_PORT, DPAGENT_VALIDATE_29C0FA66_WH_USER | verified
+        gone: DAG (file + Airflow registration + published files + dbt models + dlt
+        state), no clone secrets left in /opt/airflow/home/pipelines.env, no active
+        runs'
+      source_database: pass
+      source_role: pass
+      warehouse_database: pass
+      warehouse_role: pass
+      s3_objects: pass
+      overall: pass
+    unavailable_reason: ''
+    overall: pass
+    report_version: 2
+    validator:
+      dpagent: 0.4.0
+      report: 2
+      bronze_manifest_format: 1
+      postgres: PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      dbt: 1.8.10
+    inputs:
+      bronze_staging: true
+      dbt_project: true
+    bronze:
+      namespace: dpagent-validate/29c0fa66
+      batches:
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: resource
+        status: loaded
+        object_count: 1
+        total_rows: 10
+        loaded_rows: 10
+        manifest_sha256: 98c0f60d4a6e05d7726af680bc609b1c146e00da653f7cc395c08fd0b945b76c
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: resource_editings
+        status: loaded
+        object_count: 1
+        total_rows: 18
+        loaded_rows: 18
+        manifest_sha256: 04255cb45051a64046aa0a6cd01671e4951dd899a578c26a6ec0160cc201b0a7
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: channel
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: a698df5a6163a721140b877460f5e5328595620f11a11b074802813cbd18a520
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: channel_company
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: f762aaf023e0cdfb3214e8e65e1270635ab86b3b07eb2ce922ae00b875355542
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: channel_video_info
+        status: loaded
+        object_count: 1
+        total_rows: 11
+        loaded_rows: 11
+        manifest_sha256: 1624fc363fad7181ce50382d6e2311ff32504feee102dcfcf9781a36ba050cc4
+      - batch_id: a52d40ab-7911-4b6e-84a8-d674b29a9468
+        table_name: editings
+        status: loaded
+        object_count: 1
+        total_rows: 6
+        loaded_rows: 6
+        manifest_sha256: 461b66e033ab26aac9a77d2906adbd0db9d9f6564e46408de40c5781f7ce6d67
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: channel
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: 47e6f3dddbb45f64ed038b2c5af6bb525a3e8e46b58c53665c025b8b01cfb3f0
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: channel_company
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: 869bbbe3adc2f4809ad099930bd91df140d517a6c5380f745aae0a920303d0cf
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: channel_video_info
+        status: loaded
+        object_count: 1
+        total_rows: 11
+        loaded_rows: 11
+        manifest_sha256: 385561a625c133003fa0e8d88c00b3fb363e043c818a87eb057e93d78e2739b2
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: editings
+        status: loaded
+        object_count: 1
+        total_rows: 6
+        loaded_rows: 6
+        manifest_sha256: 31f4497b007028e56e1131afe2f0dea838668b1a8a056b5ea63162f34208df43
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: resource
+        status: loaded
+        object_count: 1
+        total_rows: 10
+        loaded_rows: 10
+        manifest_sha256: 584ae03e7762ead1e80897264db3109e35ab2899f1f9d15bcd7bd63ade1fd950
+      - batch_id: 1574e1a0-9938-4254-81fe-ba918c41ea9d
+        table_name: resource_editings
+        status: loaded
+        object_count: 1
+        total_rows: 18
+        loaded_rows: 18
+        manifest_sha256: ee6de4a4be048bb640fa68a6e3d2dc8ae7f3b53f6751862c6000a42fa62c9636
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: resource_editings
+        status: loaded
+        object_count: 1
+        total_rows: 18
+        loaded_rows: 18
+        manifest_sha256: 44ffa5f6671e6aabc834bfe1cbb564cc67bdcb5a743d7b385c3e93f1c073e43a
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: channel_company
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: 0f04dfc491ee40697523c6e3634914a98c732c5dc11049dcffb34d14d69aae15
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: channel
+        status: loaded
+        object_count: 1
+        total_rows: 5
+        loaded_rows: 5
+        manifest_sha256: f6510a1d2ed575a2d66efc4835b2c30dbc83d9b692649ec672cf042cf319de3f
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: channel_video_info
+        status: loaded
+        object_count: 1
+        total_rows: 11
+        loaded_rows: 11
+        manifest_sha256: ab201c501ea37d2fb93db6f46e4345914fddd324019d616817069220e454d4f3
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: editings
+        status: loaded
+        object_count: 1
+        total_rows: 6
+        loaded_rows: 6
+        manifest_sha256: 5674b9d84b1376cd0490c8a09739bc36a15402cf57afa1115577dc0dbcca16a0
+      - batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        table_name: resource
+        status: loaded
+        object_count: 1
+        total_rows: 10
+        loaded_rows: 10
+        manifest_sha256: 10f41a43473f640dfadd3f96c6b7a5f2709d84b544ee4be678fe65019f71b0a2
+      source_down_load:
+        ok: true
+        batch_id: fb35bc98-368d-4056-9339-d6f2a0c5ac34
+        source_dropped: true
+        source_unreachable: true
+        source_probe: 'psql: error: connection to server at "localhost" (::1), port
+          5432 failed: FATAL:  password authentication failed for user "dpagent_fixture_src_9574e1c8dc"
+
+          connection to server at "localhost" (::1), port 5432 failed: FATAL:  password
+          authentication failed for user "dpagent_fixture_src_9574e1c8dc"'
+        loaded: true
+        landing_matches_fixture: true
+        detail: 'channel: 5 row(s) matched exactly; channel_company: 5 row(s) matched
+          exactly; channel_video_info: 11 row(s) matched exactly; editings: 6 row(s)
+          matched exactly; resource: 10 row(s) matched exactly; resource_editings:
+          18 row(s) matched exactly'
+        error: ''
+      s3:
+        objects_found_at_teardown: 39
+        objects_remaining_after_purge: 0
+        error: ''
+    evidence_id: ev-70a21376c40afcc3
+assumptions: ''
+open_questions: []

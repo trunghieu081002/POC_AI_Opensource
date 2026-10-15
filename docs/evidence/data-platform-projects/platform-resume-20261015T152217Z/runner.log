@@ -1,0 +1,33 @@
+/opt/airflow/.venv/lib/python3.10/site-packages/airflow/utils/dot_renderer.py:29 UserWarning: Could not import graphviz. Rendering graph to the graphical format will not be possible.
+dag_id            | is_paused
+==================+==========
+m25_monthly_sales | True     
+                             
+project: disposable-data-platform
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  dlt                  4  requested  │
+│  5  postgres             5  requested  │
+│  6  seaweedfs            5  requested  │
+│  7  airflow              7  requested  │
+│  8  superset             6  requested  │
+│  9  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= seaweedfs — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+= superset-assets — already installed at v0.1.0 with identical params
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯

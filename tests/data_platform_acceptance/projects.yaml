@@ -1,0 +1,16 @@
+projects:
+  - pipeline: hg_resources_useage_number
+    bi: hg-usage
+    source_prefix: dpagent_fixture_platform_hg
+    fault_sql: >-
+      INSERT INTO resource_editings ("Id","EditingId","ResourcesId","StartTime","EndTime")
+      VALUES ('x3','e-1','r-2',11,21)
+    restore_sql: DELETE FROM resource_editings WHERE "Id"='x3' AND "StartTime"=11 AND "EndTime"=21
+    failing_stage: silver
+    unique_model: fact_editing_sk
+    failing_model: fact_editing
+    blocked_stage: gold
+  - pipeline: m25_monthly_sales
+    bi: monthly-sales
+    source_prefix: dpagent_fixture_platform_sales
+    schedule: '* * * * *'

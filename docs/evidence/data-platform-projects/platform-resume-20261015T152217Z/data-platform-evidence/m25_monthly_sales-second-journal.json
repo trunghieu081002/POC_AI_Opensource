@@ -1,0 +1,142 @@
+[
+  {
+    "id": 507,
+    "run_id": 24,
+    "ts": "2026-10-15T15:31:53+00:00",
+    "level": "info",
+    "kind": "extract.start",
+    "actor": "engine",
+    "message": "m25_monthly_sales via odoo_postgres",
+    "data_json": null
+  },
+  {
+    "id": 508,
+    "run_id": 24,
+    "ts": "2026-10-15T15:31:55+00:00",
+    "level": "info",
+    "kind": "extract.done",
+    "actor": "engine",
+    "message": "m25_monthly_sales extract complete: sale_order +3",
+    "data_json": null
+  },
+  {
+    "id": 509,
+    "run_id": 24,
+    "ts": "2026-10-15T15:31:56+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/landing row_count_bounds: ok",
+    "data_json": "{\"stage_run_id\": 56, \"gate_type\": \"row_count_bounds\"}"
+  },
+  {
+    "id": 510,
+    "run_id": 24,
+    "ts": "2026-10-15T15:31:56+00:00",
+    "level": "info",
+    "kind": "stage.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/landing gates passed",
+    "data_json": "{\"stage_run_id\": 56}"
+  },
+  {
+    "id": 511,
+    "run_id": 24,
+    "ts": "2026-10-15T15:31:58+00:00",
+    "level": "info",
+    "kind": "transform.start",
+    "actor": "engine",
+    "message": "m25_monthly_sales/raw via dbt",
+    "data_json": null
+  },
+  {
+    "id": 512,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:03+00:00",
+    "level": "info",
+    "kind": "transform.done",
+    "actor": "engine",
+    "message": "m25_monthly_sales/raw transform complete",
+    "data_json": null
+  },
+  {
+    "id": 513,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:05+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/raw not_null: ok",
+    "data_json": "{\"stage_run_id\": 57, \"gate_type\": \"not_null\"}"
+  },
+  {
+    "id": 514,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:06+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/raw unique: ok",
+    "data_json": "{\"stage_run_id\": 57, \"gate_type\": \"unique\"}"
+  },
+  {
+    "id": 515,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:06+00:00",
+    "level": "info",
+    "kind": "stage.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/raw gates passed",
+    "data_json": "{\"stage_run_id\": 57}"
+  },
+  {
+    "id": 516,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:08+00:00",
+    "level": "info",
+    "kind": "transform.start",
+    "actor": "engine",
+    "message": "m25_monthly_sales/curated via procedure",
+    "data_json": null
+  },
+  {
+    "id": 517,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:09+00:00",
+    "level": "info",
+    "kind": "transform.done",
+    "actor": "engine",
+    "message": "m25_monthly_sales/curated transform complete",
+    "data_json": null
+  },
+  {
+    "id": 518,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:10+00:00",
+    "level": "info",
+    "kind": "gate.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/curated not_null: ok",
+    "data_json": "{\"stage_run_id\": 58, \"gate_type\": \"not_null\"}"
+  },
+  {
+    "id": 519,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:10+00:00",
+    "level": "info",
+    "kind": "stage.passed",
+    "actor": "engine",
+    "message": "m25_monthly_sales/curated gates passed",
+    "data_json": "{\"stage_run_id\": 58}"
+  },
+  {
+    "id": 520,
+    "run_id": 24,
+    "ts": "2026-10-15T15:32:10+00:00",
+    "level": "info",
+    "kind": "pipeline.ok",
+    "actor": "engine",
+    "message": "DAG run 24 reached terminal state: ok",
+    "data_json": null
+  }
+]

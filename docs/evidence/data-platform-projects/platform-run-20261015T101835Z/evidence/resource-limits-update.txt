@@ -1,0 +1,2 @@
+dpagent-platform-acceptance-1792059515
+NanoCpus=8000000000 Memory=6442450944 MemorySwap=8589934592

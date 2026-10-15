@@ -1,0 +1,20 @@
+table_name: fct_monthly_sales
+schema: m25_monthly_sales
+uuid: 46e8e8fa-cd56-5490-be07-fb90837febbd
+database_uuid: ed18cb70-7b2d-52e4-9aa7-3525be65aa4e
+version: 1.0.0
+filter_select_enabled: true
+columns:
+- column_name: month
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: revenue
+  type: NUMERIC
+  groupby: true
+  filterable: true
+  is_dttm: false
+metrics:
+- metric_name: revenue
+  expression: SUM(revenue)

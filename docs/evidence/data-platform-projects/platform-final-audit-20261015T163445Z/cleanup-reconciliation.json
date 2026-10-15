@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "remaining_owned_runtime_resources": 0,
+  "source_database_cleanup_receipt": true,
+  "bronze_remaining_receipt": 0,
+  "hg_scoped_cleanup_receipt": true,
+  "monthly_scoped_cleanup_receipt": true,
+  "bi_owned_deployment_receipts_undeployed": 8,
+  "no_active_journal_runs": true,
+  "host_baseline_preserved": 11,
+  "optional_combined_sql_snapshot": "NOT CAPTURED: docker exec collector lacked -i; empty stdout retained",
+  "method": "actual scenario/CLI/UUID cleanup receipts reconciled with final journal and post-teardown host ownership audit; no SQL counts invented"
+}

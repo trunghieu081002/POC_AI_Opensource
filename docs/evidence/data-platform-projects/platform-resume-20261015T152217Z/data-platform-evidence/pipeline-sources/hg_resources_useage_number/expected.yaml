@@ -1,0 +1,76 @@
+# Calculated from fixture.yaml and the seed by tests/hg_resources_reference.py - an independent, naive Python
+# implementation of HG's models that never reads a pipeline's output; tests/test_hg_resources_useage_number.py
+# recomputes this file from it, and the rows below were also checked by hand:
+#   gold: 13 resource x video pairs of the 4 published videos that have resources.
+#     V1  (ED1)  HGFA0001 1 | HGFA0002 2 | HGFA0007 3         - HGFA000164B5... (seed) takes NO position
+#     V2/V7 (ED2) HGFA0002 1 | HGFA0001 1                     - V2 and V7 share a cut; r-1 is 2nd in e-2 but 1st in
+#                                                               e-6 (same ED2 code) -> the smaller, 1
+#     V8  (ED3)  HGFA0001 1 | 0002 2 | 0007 3 | 0009 4 | 0008 5 | 0010 6   - 0008/0009 tie on StartTime -> by Id
+#   left out: V3 (not published), V5 (no editing code), V6 (cut without resources), V4 (other company), blank id,
+#   V9 (channel link deleted), ResourceType 1, non-HGFA codes, the 5 787 seed codes.
+#   dim_video 7 rows (V1 keeps its newest copy; " V7 " keeps its spaces in the key, trimmed in video_id);
+#   fact_editing 13 rows (the exact duplicate of resource_editing x1 collapsed).
+#   published_date assumes the database session time zone is UTC (the PublishedAt values are +00).
+table: resources_useage_number
+schema: gold
+row_count: 13
+required_dbt_tests:
+- model: resources_useage_number
+  column: resource_video_sk
+  tests: [unique, not_null]
+  severity: error
+- model: fact_editing
+  column: fact_editing_sk
+  tests: [unique, not_null]
+  severity: error
+columns: {resource_video_sk: text, video_id: text, hg_stock_id: text, published_date: timestamp without time zone, first_position: bigint, position_group: text}
+rows:
+- {resource_video_sk: 5f028550f2e1e56dd0ad63d9b6931c16, video_id: V1, hg_stock_id: HGFA0001, published_date: '2026-01-10T08:00:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: 9a5bcbf8cd2beb8bc2a99b7ee0cd02d5, video_id: V1, hg_stock_id: HGFA0002, published_date: '2026-01-10T08:00:00', first_position: 2, position_group: 2-3}
+- {resource_video_sk: 4f2b3b5e61accc35d045414c4d01d074, video_id: V1, hg_stock_id: HGFA0007, published_date: '2026-01-10T08:00:00', first_position: 3, position_group: 2-3}
+- {resource_video_sk: bafefd53d296b2a26f74884e57b8cf46, video_id: V2, hg_stock_id: HGFA0001, published_date: '2026-02-01T09:30:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: 6007eaa24d9eab8cd45a10424ce0c766, video_id: V2, hg_stock_id: HGFA0002, published_date: '2026-02-01T09:30:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: 09d1cf9361762547faae9335d1640e13, video_id: V7, hg_stock_id: HGFA0001, published_date: '2026-03-10T08:00:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: 3aee756736bcace23be3ffdf76463777, video_id: V7, hg_stock_id: HGFA0002, published_date: '2026-03-10T08:00:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: 12e0bc0b93e1a34f51ccf8832c72dd0f, video_id: V8, hg_stock_id: HGFA0001, published_date: '2026-04-01T00:00:00', first_position: 1, position_group: '1'}
+- {resource_video_sk: cd841d9f3b1c7442191b6ea0c9a2963b, video_id: V8, hg_stock_id: HGFA0002, published_date: '2026-04-01T00:00:00', first_position: 2, position_group: 2-3}
+- {resource_video_sk: a29c1c02f7307eae094841121801a043, video_id: V8, hg_stock_id: HGFA0007, published_date: '2026-04-01T00:00:00', first_position: 3, position_group: 2-3}
+- {resource_video_sk: 0377e3f037d9363f43906f8d1baf01b8, video_id: V8, hg_stock_id: HGFA0009, published_date: '2026-04-01T00:00:00', first_position: 4, position_group: 4-5}
+- {resource_video_sk: 47f5c81895a6472eeeb2854c63c81df4, video_id: V8, hg_stock_id: HGFA0008, published_date: '2026-04-01T00:00:00', first_position: 5, position_group: 4-5}
+- {resource_video_sk: 78a3ffe7d37b14bc6cf82ac84d671120, video_id: V8, hg_stock_id: HGFA0010, published_date: '2026-04-01T00:00:00', first_position: 6, position_group: '>5'}
+also:
+- table: dim_video
+  schema: silver
+  row_count: 7
+  rows:
+  - {dim_video_sk: b4daca084ad9eabfc8de231929477ed6, video_id: V1, channel_id: UC_A, video_url: 'https://www.youtube.com/watch?v=V1', editing_code: ED1, published_date: '2026-01-10T08:00:00', video_name: Video
+      1 (bản mới nhất)}
+  - {dim_video_sk: ec765f1adc3b4253f2d3b131a4a8618f, video_id: V2, channel_id: UC_B, video_url: 'https://www.youtube.com/watch?v=V2', editing_code: ED2, published_date: '2026-02-01T09:30:00', video_name: Video
+      2}
+  - {dim_video_sk: d5b50b8cf96bcc8aba90f306f5e6189c, video_id: V3, channel_id: UC_A, video_url: 'https://www.youtube.com/watch?v=V3', editing_code: ED3, published_date: null, video_name: Video 3 chưa xuất
+      bản}
+  - {dim_video_sk: 8cff5423006469332e8ae5e3a8c8559c, video_id: V5, channel_id: UC_A, video_url: 'https://www.youtube.com/watch?v=V5', editing_code: null, published_date: '2026-03-01T08:00:00', video_name: Video
+      5 không có mã dựng}
+  - {dim_video_sk: db93f1c35b844334e2b266951618b4fe, video_id: V6, channel_id: UC_A, video_url: 'https://www.youtube.com/watch?v=V6', editing_code: ED4, published_date: '2026-03-05T08:00:00', video_name: Video
+      6 (dựng chưa có tài nguyên)}
+  - {dim_video_sk: 9ecd95314aa08e6b18b7a5657bc46d6f, video_id: V7, channel_id: UC_A, video_url: 'https://www.youtube.com/watch?v= V7 ', editing_code: ED2, published_date: '2026-03-10T08:00:00', video_name: Video
+      7 dùng chung bản dựng ED2}
+  - {dim_video_sk: ea7c1b92ccf2869f7f23c13385782d7c, video_id: V8, channel_id: UC_B, video_url: 'https://www.youtube.com/watch?v=V8', editing_code: ED3, published_date: '2026-04-01T00:00:00', video_name: Video
+      8 (6 tài nguyên)}
+- table: fact_editing
+  schema: silver
+  row_count: 13
+  rows:
+  - {fact_editing_sk: 6dbf9ac2da09ee1d3debf5a51873ec6d, editing_id: e-1, editing_code: ED1, hg_stock_id: HGFA0001, position: 1, duration: 10}
+  - {fact_editing_sk: 1414c9756505ddfb8ba0a3b6fc9d691f, editing_id: e-1, editing_code: ED1, hg_stock_id: HGFA0002, position: 2, duration: 10}
+  - {fact_editing_sk: bf947d200d7b021b18d38437f3bc1940, editing_id: e-1, editing_code: ED1, hg_stock_id: HGFA0007, position: 3, duration: 10}
+  - {fact_editing_sk: f4fe292eb01627a0219872d44a305ec5, editing_id: e-2, editing_code: ED2, hg_stock_id: HGFA0002, position: 1, duration: 5}
+  - {fact_editing_sk: 2436f23b98933a71439259c4bca8674b, editing_id: e-2, editing_code: ED2, hg_stock_id: HGFA0001, position: 2, duration: 2}
+  - {fact_editing_sk: d0c2225b640deec861a1208f37a77c25, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0001, position: 1, duration: 5}
+  - {fact_editing_sk: 2040a28d572e0889b2b34e9c66814f57, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0002, position: 2, duration: 5}
+  - {fact_editing_sk: 6d865d85813b1261953b3e79cdb04716, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0007, position: 3, duration: 5}
+  - {fact_editing_sk: 2cc054e40be10899f46d6c41257420c4, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0009, position: 4, duration: 6}
+  - {fact_editing_sk: d65a56bb8ecec55393dabf8734f6f5fa, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0008, position: 5, duration: 5}
+  - {fact_editing_sk: 137b8dad9acade63b507e67878d3b94b, editing_id: e-3, editing_code: ED3, hg_stock_id: HGFA0010, position: 6, duration: 5}
+  - {fact_editing_sk: 5ac34987813226c2b2fbf4e027ca93b5, editing_id: e-5, editing_code: ED5, hg_stock_id: HGFA0001, position: 1, duration: 5}
+  - {fact_editing_sk: 53502b874beebc31b83e1ac6e0cc817d, editing_id: e-6, editing_code: ED2, hg_stock_id: HGFA0001, position: 1, duration: 5}

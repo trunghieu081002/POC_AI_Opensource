@@ -1,0 +1,4 @@
+{
+  "ok": true,
+  "detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs"
+}

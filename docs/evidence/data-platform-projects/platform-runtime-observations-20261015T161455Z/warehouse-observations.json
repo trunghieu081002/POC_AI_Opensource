@@ -1,0 +1,8 @@
+{"seed_exclusions" : 5787, "gold_rows" : 13, "types" : [{"table_schema":"gold","table_name":"resources_useage_number","column_name":"published_date","data_type":"timestamp without time zone"}, 
+ {"table_schema":"silver","table_name":"dim_video","column_name":"published_date","data_type":"timestamp without time zone"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"YoutubeVideoId","data_type":"text"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"YoutubeChannelId","data_type":"text"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"Code","data_type":"text"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"PublishedAt","data_type":"timestamp with time zone"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"Title","data_type":"text"}, 
+ {"table_schema":"staging","table_name":"channel_video_info","column_name":"IsDeleted","data_type":"boolean"}]}

@@ -1,0 +1,20 @@
+# Literal independent expectations: HG expected fixture / hand-calculated monthly source rows.
+checks:
+- chart_uuid: 5560fb20-e00e-5e94-9acf-1a78f8b799d7
+  sql: SELECT month, SUM(revenue)::numeric(20,2) AS revenue FROM m25_monthly_sales.fct_monthly_sales
+    GROUP BY month
+  rows:
+  - &id001
+    month: 2026-01
+    revenue: 350.5
+  - month: 2026-02
+    revenue: 75.25
+  filters:
+  - dashboard_uuid: 187da096-ca28-54b7-91da-d85aaac8f174
+    native_filter_id: NATIVE_FILTER-dimension
+    values:
+    - 2026-01
+    sql: SELECT month, SUM(revenue)::numeric(20,2) AS revenue FROM m25_monthly_sales.fct_monthly_sales
+      WHERE month = '2026-01' GROUP BY month
+    rows:
+    - *id001

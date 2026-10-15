@@ -1,0 +1,83 @@
+# Hand-written input for `dpagent pipeline validate hg_resources_useage_number --fixture ... --expected ...`.
+# Each row exists for one rule of HG's models (the comment says which). Table and column names are the
+# staging names HG's dbt reads (HG's EL renames the raw "Channel" etc.; here the source already exposes them).
+# TARGET company = the default of dim_video's var target_company_id.
+tables:
+  - name: channel
+    columns: {Id: text, YoutubeChannelId: text, Title: text, IsDeleted: boolean}
+    rows:
+      - {Id: c1, YoutubeChannelId: UC_A,     Title: "Kênh A",       IsDeleted: false}
+      - {Id: c2, YoutubeChannelId: " UC_B ", Title: "Kênh B (id có khoảng trắng)", IsDeleted: false}   # trimmed by HG
+      - {Id: c3, YoutubeChannelId: UC_C,     Title: "Kênh của công ty khác", IsDeleted: false}           # other company
+      - {Id: c4, YoutubeChannelId: "",       Title: "Kênh không có mã YouTube", IsDeleted: false}        # blank id
+      - {Id: c5, YoutubeChannelId: UC_D,     Title: "Kênh đã gỡ khỏi công ty", IsDeleted: false}         # company link deleted
+  - name: channel_company
+    columns: {Id: text, ChannelId: text, CompanyId: text, IsDeleted: boolean}
+    rows:
+      - {Id: cc1, ChannelId: c1, CompanyId: "448025a0-0ff7-4ed0-a917-399a73decef2", IsDeleted: false}
+      - {Id: cc2, ChannelId: c2, CompanyId: "448025a0-0ff7-4ed0-a917-399a73decef2", IsDeleted: null}    # NULL = not deleted
+      - {Id: cc3, ChannelId: c3, CompanyId: "11111111-2222-3333-4444-555555555555", IsDeleted: false}
+      - {Id: cc4, ChannelId: c4, CompanyId: "448025a0-0ff7-4ed0-a917-399a73decef2", IsDeleted: false}
+      - {Id: cc5, ChannelId: c5, CompanyId: "448025a0-0ff7-4ed0-a917-399a73decef2", IsDeleted: true}
+  - name: channel_video_info
+    columns: {YoutubeVideoId: text, YoutubeChannelId: text, Code: text, PublishedAt: timestamp with time zone, Title: text, IsDeleted: boolean}
+    rows:
+      - {YoutubeVideoId: V1,     YoutubeChannelId: UC_A, Code: ED1,  PublishedAt: "2026-01-10 08:00:00+00", Title: "Video 1 (bản mới nhất)", IsDeleted: false}
+      - {YoutubeVideoId: V1,     YoutubeChannelId: UC_A, Code: EDX,  PublishedAt: "2026-01-05 08:00:00+00", Title: "Video 1 (bản cũ - bị loại)", IsDeleted: false}
+      - {YoutubeVideoId: V2,     YoutubeChannelId: UC_B, Code: ED2,  PublishedAt: "2026-02-01 09:30:00+00", Title: "Video 2", IsDeleted: false}
+      - {YoutubeVideoId: V3,     YoutubeChannelId: UC_A, Code: ED3,  PublishedAt: null,                     Title: "Video 3 chưa xuất bản", IsDeleted: false}
+      - {YoutubeVideoId: V4,     YoutubeChannelId: UC_C, Code: ED1,  PublishedAt: "2026-02-10 08:00:00+00", Title: "Video của công ty khác", IsDeleted: false}
+      - {YoutubeVideoId: "  ",   YoutubeChannelId: UC_A, Code: ED1,  PublishedAt: "2026-02-11 08:00:00+00", Title: "Video không có id", IsDeleted: false}
+      - {YoutubeVideoId: V5,     YoutubeChannelId: UC_A, Code: null, PublishedAt: "2026-03-01 08:00:00+00", Title: "Video 5 không có mã dựng", IsDeleted: false}
+      - {YoutubeVideoId: V6,     YoutubeChannelId: UC_A, Code: ED4,  PublishedAt: "2026-03-05 08:00:00+00", Title: "Video 6 (dựng chưa có tài nguyên)", IsDeleted: false}
+      - {YoutubeVideoId: " V7 ", YoutubeChannelId: UC_A, Code: ED2,  PublishedAt: "2026-03-10 08:00:00+00", Title: "Video 7 dùng chung bản dựng ED2", IsDeleted: false}
+      - {YoutubeVideoId: V8,     YoutubeChannelId: UC_B, Code: ED3,  PublishedAt: "2026-04-01 00:00:00+00", Title: "Video 8 (6 tài nguyên)", IsDeleted: false}
+      - {YoutubeVideoId: V9,     YoutubeChannelId: UC_D, Code: ED5,  PublishedAt: "2026-04-02 08:00:00+00", Title: "Video của kênh đã gỡ", IsDeleted: false}
+  - name: editings
+    columns: {Id: text, Title: text, IsDeleted: boolean, EditingFileId: text}
+    rows:
+      - {Id: e-1, Title: "Bản dựng 1", IsDeleted: false, EditingFileId: ED1}
+      - {Id: e-2, Title: "Bản dựng 2", IsDeleted: false, EditingFileId: ED2}
+      - {Id: e-3, Title: "Bản dựng 3", IsDeleted: false, EditingFileId: ED3}
+      - {Id: e-4, Title: "Bản dựng 4 (không có tài nguyên)", IsDeleted: false, EditingFileId: ED4}
+      - {Id: e-5, Title: "Bản dựng 5 (chưa video nào xuất bản)", IsDeleted: false, EditingFileId: ED5}
+      - {Id: e-6, Title: "Bản dựng khác cùng mã ED2", IsDeleted: false, EditingFileId: ED2}
+  - name: resource
+    columns: {Id: text, ResourceFileId: text, ResourceType: bigint, Title: text}
+    rows:
+      - {Id: r-1,  ResourceFileId: HGFA0001, ResourceType: 0, Title: "Tài nguyên 1"}
+      - {Id: r-2,  ResourceFileId: hgfa0002, ResourceType: 0, Title: "Tài nguyên 2 (viết thường)"}      # upper() by HG
+      - {Id: r-3,  ResourceFileId: HGFA0003, ResourceType: 1, Title: "ResourceType 1 - bị loại"}
+      - {Id: r-4,  ResourceFileId: XYZ0004,  ResourceType: 0, Title: "Không phải mã HGFA - bị loại"}
+      - {Id: r-5,  ResourceFileId: HGFA000164B5BE5F4AC291A1C282E61AF42E, ResourceType: 0, Title: "Nằm trong seed loại trừ"}
+      - {Id: r-6,  ResourceFileId: " hgfa001626104040460680aa201c205edee2 ", ResourceType: 0, Title: "Seed loại trừ (viết thường, có khoảng trắng)"}
+      - {Id: r-7,  ResourceFileId: HGFA0007, ResourceType: 0, Title: "Tài nguyên 7"}
+      - {Id: r-8,  ResourceFileId: HGFA0008, ResourceType: 0, Title: "Tài nguyên 8"}
+      - {Id: r-9,  ResourceFileId: HGFA0009, ResourceType: 0, Title: "Tài nguyên 9"}
+      - {Id: r-10, ResourceFileId: HGFA0010, ResourceType: 0, Title: "Tài nguyên 10"}
+  - name: resource_editings
+    columns: {Id: text, EditingId: text, ResourcesId: text, StartTime: double precision, EndTime: double precision}
+    rows:
+      # e-1 (ED1): r-1, [r-5 excluded: takes no position], r-2, r-7  -> positions 1, 2, 3
+      - {Id: x1,  EditingId: e-1, ResourcesId: r-1, StartTime: 0,  EndTime: 10}
+      - {Id: x1,  EditingId: e-1, ResourcesId: r-1, StartTime: 0,  EndTime: 10}        # exact duplicate row: collapsed by HG's DISTINCT
+      - {Id: x2,  EditingId: e-1, ResourcesId: r-5, StartTime: 5,  EndTime: 15}
+      - {Id: x3,  EditingId: e-1, ResourcesId: r-2, StartTime: 10, EndTime: 20}
+      - {Id: x4,  EditingId: e-1, ResourcesId: r-7, StartTime: 20, EndTime: 30}
+      # e-2 (ED2): r-2, [r-3 type 1, r-4 non-HGFA: no position], r-1  -> positions 1, 2
+      - {Id: x5,  EditingId: e-2, ResourcesId: r-2, StartTime: 0,  EndTime: 5}
+      - {Id: x6,  EditingId: e-2, ResourcesId: r-3, StartTime: 3,  EndTime: 6}
+      - {Id: x7,  EditingId: e-2, ResourcesId: r-1, StartTime: 7,  EndTime: 9}
+      - {Id: x8,  EditingId: e-2, ResourcesId: r-4, StartTime: 8,  EndTime: 9}
+      # e-3 (ED3): six kept resources; x13 / x14 tie on StartTime -> ordered by Id
+      - {Id: x9,  EditingId: e-3, ResourcesId: r-1,  StartTime: 0,  EndTime: 5}
+      - {Id: x10, EditingId: e-3, ResourcesId: r-2,  StartTime: 10, EndTime: 15}
+      - {Id: x11, EditingId: e-3, ResourcesId: r-7,  StartTime: 20, EndTime: 25}
+      - {Id: x14, EditingId: e-3, ResourcesId: r-8,  StartTime: 30, EndTime: 35}
+      - {Id: x13, EditingId: e-3, ResourcesId: r-9,  StartTime: 30, EndTime: 36}
+      - {Id: x12, EditingId: e-3, ResourcesId: r-10, StartTime: 40, EndTime: 45}
+      - {Id: x15, EditingId: e-3, ResourcesId: r-6,  StartTime: 50, EndTime: 55}      # seed-excluded
+      # e-5 (ED5): used only by a video of a deleted company link
+      - {Id: x16, EditingId: e-5, ResourcesId: r-1, StartTime: 0,  EndTime: 5}
+      # e-6 (ED2 again): r-1 is first here, third-ish in e-2 -> the pair (V2, r-1) takes the smaller position
+      - {Id: x20, EditingId: e-6, ResourcesId: r-1, StartTime: 0,  EndTime: 5}

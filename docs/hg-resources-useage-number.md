@@ -115,3 +115,14 @@ See [full evidence, failures and reproduction](evidence/hg-usage-company/README.
 Historical 1,269/25 and 1,281/25 unit evidence remains preserved. Documentation
 commits after the tested source do not alter its implementation. This acceptance
 does not cover Superset/dashboard or representative production load.
+
+## Composed BI follow-up
+
+The separate project-acceptance branch ran this unchanged HG data logic through
+packs to native Superset dataset/chart/dashboard and an actual browser filter.
+The four independent audit measures are 13 rows / 13 pairs / 6 stocks / 4 videos;
+selecting V1 gives 3/3/3/1. A different monthly-sales business project/schema uses
+the same engine. Scheduled run, source fault/no downstream start, recovery and
+scoped removal are recorded in [composed evidence](evidence/data-platform-projects/README.md).
+This remains synthetic correctness. [Representative HG load](hg-representative-load-plan.md)
+requires permitted data, actual scale and agreed limits before execution.

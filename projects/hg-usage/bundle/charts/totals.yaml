@@ -1,0 +1,28 @@
+slice_name: 'HG resource usage: independently checked audit measures'
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 100
+  viz_type: table
+  query_mode: aggregate
+  groupby: []
+  metrics:
+  - rows
+  - resource_video_pairs
+  - stock_resources
+  - videos
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": [], "metrics": ["rows", "resource_video_pairs", "stock_resources",
+  "videos"], "filters": [], "time_range": "No filter", "orderby": [], "row_limit":
+  1000, "extras": {"having": "", "where": ""}}], "form_data": {"datasource": "0__table",
+  "slice_id": 100, "viz_type": "table", "query_mode": "aggregate", "groupby": [],
+  "metrics": ["rows", "resource_video_pairs", "stock_resources", "videos"], "adhoc_filters":
+  [], "row_limit": 1000, "order_desc": false, "show_cell_bars": false}, "result_format":
+  "json", "result_type": "full"}'
+uuid: 3c34c6da-3bcc-5dfa-8532-4676ee7f334c
+dataset_uuid: eefaac85-7a88-50b5-8ab3-8700732a3c1f
+version: 1.0.0

@@ -1,0 +1,85 @@
+{
+  "cleanup": "pass",
+  "error": "ComparisonFailure",
+  "fingerprint": "f7a41230913051ef33356afdc904f2c411e772d06320c8c91de64498fe1285e1",
+  "finished_at": "2026-10-15T15:40:33.567553+00:00",
+  "ids": {
+    "charts": {
+      "1c90cacf-248b-5afa-9d93-fb8ab8ee6907": 17
+    },
+    "dashboards": {
+      "29f730e3-6475-5ed1-838b-43b162e49a23": 17
+    },
+    "databases": {
+      "37bee6be-48d0-50f0-99df-3176cb78e9c7": 18
+    },
+    "datasets": {
+      "0174f07a-095b-5e6f-bda4-7970236629bd": 17
+    }
+  },
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        },
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ],
+      "chart_uuid": "5cca69a0-6946-5db3-81d5-cb934e6a4350",
+      "expected": [
+        {
+          "n": 2,
+          "region": "north",
+          "total": 999
+        },
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        }
+      ],
+      "filters": [],
+      "matched": false,
+      "sql_rows": [
+        {
+          "n": 1,
+          "region": "south",
+          "total": 40
+        },
+        {
+          "n": 2,
+          "region": "north",
+          "total": 30
+        }
+      ]
+    }
+  ],
+  "project": "dpagent_selftest_29-1",
+  "resources": {
+    "charts": [
+      "5cca69a0-6946-5db3-81d5-cb934e6a4350"
+    ],
+    "dashboards": [
+      "e9f05c72-402c-5336-bdc2-04ff4709db18"
+    ],
+    "databases": [
+      "7d44277a-e857-5c60-930b-9ab8bf47a377"
+    ],
+    "datasets": [
+      "5e57f900-74e0-59cd-9a9e-e053e6ca946e"
+    ]
+  },
+  "status": "fail",
+  "uuid_map": {
+    "5cca69a0-6946-5db3-81d5-cb934e6a4350": "1c90cacf-248b-5afa-9d93-fb8ab8ee6907",
+    "5e57f900-74e0-59cd-9a9e-e053e6ca946e": "0174f07a-095b-5e6f-bda4-7970236629bd",
+    "7d44277a-e857-5c60-930b-9ab8bf47a377": "37bee6be-48d0-50f0-99df-3176cb78e9c7",
+    "e9f05c72-402c-5336-bdc2-04ff4709db18": "29f730e3-6475-5ed1-838b-43b162e49a23"
+  }
+}

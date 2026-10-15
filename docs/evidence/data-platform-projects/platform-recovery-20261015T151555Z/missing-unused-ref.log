@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/root/platform-recovery.py", line 13, in <module>
+    bronze.purge_namespace(p,prefix)
+  File "/opt/dpagent/src/dpagent/pipelines/bronze.py", line 184, in purge_namespace
+    return _call_worker(pipeline, "purge", "PURGE", {"BRONZE_NAMESPACE": namespace})
+  File "/opt/dpagent/src/dpagent/pipelines/bronze.py", line 158, in _call_worker
+    env = _storage_env(pipeline)
+  File "/opt/dpagent/src/dpagent/pipelines/bronze.py", line 153, in _storage_env
+    env = _base_env(pipeline)
+  File "/opt/dpagent/src/dpagent/pipelines/bronze.py", line 52, in _base_env
+    warehouse = resolve_refs(
+  File "/opt/dpagent/src/dpagent/engine/params.py", line 60, in resolve_refs
+    return {k: resolve_refs(v, path=f"{path}.{k}" if path else k)
+  File "/opt/dpagent/src/dpagent/engine/params.py", line 60, in <dictcomp>
+    return {k: resolve_refs(v, path=f"{path}.{k}" if path else k)
+  File "/opt/dpagent/src/dpagent/engine/params.py", line 58, in resolve_refs
+    return ENV_REF.sub(sub, value)
+  File "/opt/dpagent/src/dpagent/engine/params.py", line 54, in sub
+    raise ParamError(
+dpagent.engine.params.ParamError: hg_resources_useage_number.warehouse.user: ${HG_POC_WH_USER} is not set in the environment. Export it, or write ${HG_POC_WH_USER:-<fallback>}.

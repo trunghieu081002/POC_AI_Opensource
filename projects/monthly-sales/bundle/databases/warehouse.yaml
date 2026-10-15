@@ -1,0 +1,10 @@
+database_name: Warehouse
+sqlalchemy_uri: postgresql://
+uuid: ed18cb70-7b2d-52e4-9aa7-3525be65aa4e
+version: 1.0.0
+expose_in_sqllab: true
+allow_dml: false
+allow_ctas: false
+allow_cvas: false
+allow_file_upload: false
+extra: {}

@@ -1,0 +1,151 @@
+{
+  "status": "pass",
+  "projects": {
+    "hg-usage": {
+      "unfiltered": {
+        "expected": [
+          {
+            "rows": 13,
+            "resource_video_pairs": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "api_rows": [
+          {
+            "rows": 13,
+            "resource_video_pairs": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "rendered": {
+          "headers": [
+            "rows",
+            "resource_video_pairs",
+            "stock_resources",
+            "videos"
+          ],
+          "cells": [
+            [
+              "13",
+              "13",
+              "6",
+              "4"
+            ]
+          ]
+        },
+        "matched": true
+      },
+      "selected_values": [
+        "V1"
+      ],
+      "filtered": {
+        "expected": [
+          {
+            "rows": 3,
+            "resource_video_pairs": 3,
+            "stock_resources": 3,
+            "videos": 1
+          }
+        ],
+        "api_rows": [
+          {
+            "rows": 3,
+            "resource_video_pairs": 3,
+            "stock_resources": 3,
+            "videos": 1
+          }
+        ],
+        "rendered": {
+          "headers": [
+            "rows",
+            "resource_video_pairs",
+            "stock_resources",
+            "videos"
+          ],
+          "cells": [
+            [
+              "3",
+              "3",
+              "3",
+              "1"
+            ]
+          ]
+        },
+        "matched": true
+      }
+    },
+    "monthly-sales": {
+      "unfiltered": {
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": "350.5"
+          },
+          {
+            "month": "2026-02",
+            "revenue": "75.25"
+          }
+        ],
+        "api_rows": [
+          {
+            "month": "2026-01",
+            "revenue": "350.500000000"
+          },
+          {
+            "month": "2026-02",
+            "revenue": "75.250000000"
+          }
+        ],
+        "rendered": {
+          "headers": [
+            "month",
+            "revenue"
+          ],
+          "cells": [
+            [
+              "2026-01",
+              "350.5"
+            ],
+            [
+              "2026-02",
+              "75.25"
+            ]
+          ]
+        },
+        "matched": true
+      },
+      "selected_values": [
+        "2026-01"
+      ],
+      "filtered": {
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": "350.5"
+          }
+        ],
+        "api_rows": [
+          {
+            "month": "2026-01",
+            "revenue": "350.500000000"
+          }
+        ],
+        "rendered": {
+          "headers": [
+            "month",
+            "revenue"
+          ],
+          "cells": [
+            [
+              "2026-01",
+              "350.5"
+            ]
+          ]
+        },
+        "matched": true
+      }
+    }
+  }
+}

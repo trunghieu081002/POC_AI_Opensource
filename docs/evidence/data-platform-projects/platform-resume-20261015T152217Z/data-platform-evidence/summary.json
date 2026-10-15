@@ -1,0 +1,71 @@
+{
+  "status": "pass",
+  "projects": {
+    "hg_resources_useage_number": {
+      "first_run": {
+        "run_id": 18,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly"
+        }
+      },
+      "second_run": {
+        "run_id": 19,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly"
+        }
+      },
+      "published_files_checked": 14,
+      "failure": {
+        "run_id": 27,
+        "status": "failed"
+      },
+      "recovery": {
+        "run_id": 28,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly"
+        }
+      }
+    },
+    "m25_monthly_sales": {
+      "first_run": {
+        "run_id": 23,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "2 row(s) matched exactly"
+        }
+      },
+      "scheduled_runs": [
+        {
+          "run_id": "scheduled__2026-10-15T15:30:00+00:00",
+          "state": "success"
+        }
+      ],
+      "second_run": {
+        "run_id": 24,
+        "status": "ok",
+        "comparison": {
+          "ok": true,
+          "detail": "2 row(s) matched exactly"
+        }
+      },
+      "published_files_checked": 3
+    }
+  },
+  "cleanup": {
+    "bi": "pass",
+    "m25_monthly_sales": {
+      "ok": true,
+      "detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs"
+    },
+    "bronze_remaining": 0,
+    "source_databases_removed": true
+  },
+  "scoped_undeploy": "pass"
+}

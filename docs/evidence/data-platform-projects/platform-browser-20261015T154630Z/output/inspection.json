@@ -1,0 +1,28 @@
+{
+  "hg-usage": {
+    "body": "Dashboards\nCharts\nDatasets\nSQL\nSettings\nFilters and controls\nVideo_Id\n4 options\nApply filters\nClear all\nHG resource usage: independently checked audit measures\nDraft\nDPAgent Admin\n2 minutes ago\nEdit dashboard\nHG resource usage: independently checked audit measures\nrows\n\t\nresource_video_pairs\n\t\nstock_resources\n\t\nvideos\n13\t13\t6\t4",
+    "tables": [
+      "rowsresource_video_pairsstock_resourcesvideos",
+      "131364"
+    ],
+    "comboboxes": [
+      {
+        "tag": "<input type=\"search\" id=\"NATIVE_FILTER-dimension\" autocomplete=\"off\" class=\"ant-select-selection-search-input\" role=\"combobox\" aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-owns=\"NATIVE_FILTER-dimension_list\" aria-autocomplete=\"list\" aria-controls=\"NATIVE_FILTER-dimension_list\" aria-label=\"NATIVE_FILTER-dimension\" readonly=\"\" unselectable=\"on\" value=\"\" style=\"opacity: 0;\">",
+        "visible": true
+      }
+    ]
+  },
+  "monthly-sales": {
+    "body": "Dashboards\nCharts\nDatasets\nSQL\nSettings\nFilters and controls\nMonth\n2 options\nApply filters\nClear all\nMonthly sales: independent revenue by calendar month\nDraft\nDPAgent Admin\n2 minutes ago\nEdit dashboard\nMonthly sales: independent revenue by calendar month\nmonth\n\t\nrevenue\n2026-01\t350.5\n2026-02\t75.25",
+    "tables": [
+      "monthrevenue",
+      "2026-01350.52026-0275.25"
+    ],
+    "comboboxes": [
+      {
+        "tag": "<input type=\"search\" id=\"NATIVE_FILTER-dimension\" autocomplete=\"off\" class=\"ant-select-selection-search-input\" role=\"combobox\" aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-owns=\"NATIVE_FILTER-dimension_list\" aria-autocomplete=\"list\" aria-controls=\"NATIVE_FILTER-dimension_list\" aria-label=\"NATIVE_FILTER-dimension\" readonly=\"\" unselectable=\"on\" value=\"\" style=\"opacity: 0;\">",
+        "visible": true
+      }
+    ]
+  }
+}

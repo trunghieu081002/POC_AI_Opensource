@@ -1,0 +1,48 @@
+[
+  {
+    "name": "hg-usage",
+    "url": "/superset/dashboard/hg-usage-overview/",
+    "rows": [
+      {
+        "rows": 13,
+        "resource_video_pairs": 13,
+        "stock_resources": 6,
+        "videos": 4
+      }
+    ],
+    "filter_values": [
+      "V1"
+    ],
+    "filtered_rows": [
+      {
+        "rows": 3,
+        "resource_video_pairs": 3,
+        "stock_resources": 3,
+        "videos": 1
+      }
+    ]
+  },
+  {
+    "name": "monthly-sales",
+    "url": "/superset/dashboard/monthly-sales-overview/",
+    "rows": [
+      {
+        "month": "2026-01",
+        "revenue": 350.5
+      },
+      {
+        "month": "2026-02",
+        "revenue": 75.25
+      }
+    ],
+    "filter_values": [
+      "2026-01"
+    ],
+    "filtered_rows": [
+      {
+        "month": "2026-01",
+        "revenue": 350.5
+      }
+    ]
+  }
+]

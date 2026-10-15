@@ -1,0 +1,71 @@
+dashboard_title: 'HG resource usage: independently checked audit measures'
+slug: overview
+uuid: f24446f1-1291-5c28-81b7-9725c64836bd
+version: 1.0.0
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    id: ROOT_ID
+    type: ROOT
+    children:
+    - GRID_ID
+  GRID_ID:
+    id: GRID_ID
+    type: GRID
+    children:
+    - ROW-1
+    parents:
+    - ROOT_ID
+  ROW-1:
+    id: ROW-1
+    type: ROW
+    children:
+    - CHART-1
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-1:
+    id: CHART-1
+    type: CHART
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-1
+    meta:
+      chartId: 100
+      uuid: 3c34c6da-3bcc-5dfa-8532-4676ee7f334c
+      width: 12
+      height: 50
+      sliceName: 'HG resource usage: independently checked audit measures'
+metadata:
+  native_filter_configuration:
+  - id: NATIVE_FILTER-dimension
+    name: Video_Id
+    filterType: filter_select
+    targets:
+    - datasetUuid: eefaac85-7a88-50b5-8ab3-8700732a3c1f
+      column:
+        name: video_id
+    defaultDataMask:
+      extraFormData: {}
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    controlValues:
+      enableEmptyFilter: false
+      multiSelect: true
+      searchAllOptions: false
+      inverseSelection: false
+    type: NATIVE_FILTER
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  timed_refresh_immune_slices: []
+  expanded_slices: {}
+  cross_filters_enabled: false

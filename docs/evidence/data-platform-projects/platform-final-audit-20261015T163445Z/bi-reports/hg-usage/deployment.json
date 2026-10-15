@@ -1,0 +1,560 @@
+{
+  "approved_by": "disposable-integration-acceptance",
+  "binding": {
+    "environment": "dev",
+    "superset": "http://127.0.0.1:8088",
+    "warehouse": {
+      "database": "/warehouse",
+      "host": "localhost",
+      "port": 5432,
+      "scheme": "postgresql+psycopg2",
+      "user": "superset_reader"
+    }
+  },
+  "content": {
+    "charts/totals.yaml": {
+      "dataset_uuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f",
+      "params": {
+        "adhoc_filters": [],
+        "datasource": "0__table",
+        "groupby": [],
+        "metrics": [
+          "rows",
+          "resource_video_pairs",
+          "stock_resources",
+          "videos"
+        ],
+        "order_desc": false,
+        "query_mode": "aggregate",
+        "row_limit": 1000,
+        "show_cell_bars": false,
+        "slice_id": 100,
+        "viz_type": "table"
+      },
+      "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [], \"metrics\": [\"rows\", \"resource_video_pairs\", \"stock_resources\", \"videos\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [], \"metrics\": [\"rows\", \"resource_video_pairs\", \"stock_resources\", \"videos\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+      "slice_name": "HG resource usage: independently checked audit measures",
+      "uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+      "version": "1.0.0",
+      "viz_type": "table"
+    },
+    "dashboards/overview.yaml": {
+      "dashboard_title": "HG resource usage: independently checked audit measures",
+      "metadata": {
+        "color_scheme": "supersetColors",
+        "cross_filters_enabled": false,
+        "expanded_slices": {},
+        "native_filter_configuration": [
+          {
+            "cascadeParentIds": [],
+            "controlValues": {
+              "enableEmptyFilter": false,
+              "inverseSelection": false,
+              "multiSelect": true,
+              "searchAllOptions": false
+            },
+            "defaultDataMask": {
+              "extraFormData": {},
+              "filterState": {},
+              "ownState": {}
+            },
+            "filterType": "filter_select",
+            "id": "NATIVE_FILTER-dimension",
+            "name": "Video_Id",
+            "scope": {
+              "excluded": [],
+              "rootPath": [
+                "ROOT_ID"
+              ]
+            },
+            "targets": [
+              {
+                "column": {
+                  "name": "video_id"
+                },
+                "datasetUuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f"
+              }
+            ],
+            "type": "NATIVE_FILTER"
+          }
+        ],
+        "refresh_frequency": 0,
+        "timed_refresh_immune_slices": []
+      },
+      "position": {
+        "CHART-1": {
+          "children": [],
+          "id": "CHART-1",
+          "meta": {
+            "chartId": 100,
+            "height": 50,
+            "sliceName": "HG resource usage: independently checked audit measures",
+            "uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+            "width": 12
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID",
+            "ROW-1"
+          ],
+          "type": "CHART"
+        },
+        "DASHBOARD_VERSION_KEY": "v2",
+        "GRID_ID": {
+          "children": [
+            "ROW-1"
+          ],
+          "id": "GRID_ID",
+          "parents": [
+            "ROOT_ID"
+          ],
+          "type": "GRID"
+        },
+        "ROOT_ID": {
+          "children": [
+            "GRID_ID"
+          ],
+          "id": "ROOT_ID",
+          "type": "ROOT"
+        },
+        "ROW-1": {
+          "children": [
+            "CHART-1"
+          ],
+          "id": "ROW-1",
+          "meta": {
+            "background": "BACKGROUND_TRANSPARENT"
+          },
+          "parents": [
+            "ROOT_ID",
+            "GRID_ID"
+          ],
+          "type": "ROW"
+        }
+      },
+      "slug": "overview",
+      "uuid": "f24446f1-1291-5c28-81b7-9725c64836bd",
+      "version": "1.0.0"
+    },
+    "databases/warehouse.yaml": {
+      "allow_ctas": false,
+      "allow_cvas": false,
+      "allow_dml": false,
+      "allow_file_upload": false,
+      "database_name": "Warehouse",
+      "expose_in_sqllab": true,
+      "extra": {},
+      "sqlalchemy_uri": "postgresql://",
+      "uuid": "aa4ade6a-fb9e-5110-852f-ee25c723489d",
+      "version": "1.0.0"
+    },
+    "datasets/warehouse/data.yaml": {
+      "columns": [
+        {
+          "column_name": "resource_video_sk",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        },
+        {
+          "column_name": "video_id",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        },
+        {
+          "column_name": "hg_stock_id",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        },
+        {
+          "column_name": "published_date",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TIMESTAMP"
+        },
+        {
+          "column_name": "first_position",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "BIGINT"
+        },
+        {
+          "column_name": "position_group",
+          "filterable": true,
+          "groupby": true,
+          "is_dttm": false,
+          "type": "TEXT"
+        }
+      ],
+      "database_uuid": "aa4ade6a-fb9e-5110-852f-ee25c723489d",
+      "filter_select_enabled": true,
+      "metrics": [
+        {
+          "expression": "COUNT(*)",
+          "metric_name": "rows"
+        },
+        {
+          "expression": "COUNT(DISTINCT resource_video_sk)",
+          "metric_name": "resource_video_pairs"
+        },
+        {
+          "expression": "COUNT(DISTINCT hg_stock_id)",
+          "metric_name": "stock_resources"
+        },
+        {
+          "expression": "COUNT(DISTINCT video_id)",
+          "metric_name": "videos"
+        }
+      ],
+      "schema": "gold",
+      "table_name": "resources_useage_number",
+      "uuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f",
+      "version": "1.0.0"
+    },
+    "metadata.yaml": {
+      "timestamp": "2026-01-01T00:00:00+00:00",
+      "type": "assets",
+      "version": "1.0.0"
+    }
+  },
+  "expected": {
+    "checks": [
+      {
+        "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+        "filters": [
+          {
+            "dashboard_uuid": "f24446f1-1291-5c28-81b7-9725c64836bd",
+            "native_filter_id": "NATIVE_FILTER-dimension",
+            "rows": [
+              {
+                "resource_video_pairs": 3,
+                "rows": 3,
+                "stock_resources": 3,
+                "videos": 1
+              }
+            ],
+            "sql": "SELECT COUNT(*) AS rows, COUNT(DISTINCT resource_video_sk) AS resource_video_pairs, COUNT(DISTINCT hg_stock_id) AS stock_resources, COUNT(DISTINCT video_id) AS videos FROM gold.resources_useage_number WHERE video_id = 'V1'",
+            "values": [
+              "V1"
+            ]
+          }
+        ],
+        "rows": [
+          {
+            "resource_video_pairs": 13,
+            "rows": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "sql": "SELECT COUNT(*) AS rows, COUNT(DISTINCT resource_video_sk) AS resource_video_pairs, COUNT(DISTINCT hg_stock_id) AS stock_resources, COUNT(DISTINCT video_id) AS videos FROM gold.resources_useage_number"
+      }
+    ]
+  },
+  "fingerprint": "5fd104ca43f08685d4ad8f26c4382d3b0760b3bbfcb11393f79823915649d63c",
+  "ids": {
+    "charts": {
+      "3c34c6da-3bcc-5dfa-8532-4676ee7f334c": 20
+    },
+    "dashboards": {
+      "f24446f1-1291-5c28-81b7-9725c64836bd": 20
+    },
+    "databases": {
+      "aa4ade6a-fb9e-5110-852f-ee25c723489d": 21
+    },
+    "datasets": {
+      "eefaac85-7a88-50b5-8ab3-8700732a3c1f": 20
+    }
+  },
+  "name": "hg-usage",
+  "observations": [
+    {
+      "chart_rows": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ],
+      "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+      "expected": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ],
+      "filters": [],
+      "matched": true,
+      "sql_rows": [
+        {
+          "resource_video_pairs": 13,
+          "rows": 13,
+          "stock_resources": 6,
+          "videos": 4
+        }
+      ]
+    },
+    {
+      "chart_rows": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ],
+      "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+      "expected": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ],
+      "filters": [
+        {
+          "col": "video_id",
+          "op": "IN",
+          "val": [
+            "V1"
+          ]
+        }
+      ],
+      "matched": true,
+      "sql_rows": [
+        {
+          "resource_video_pairs": 3,
+          "rows": 3,
+          "stock_resources": 3,
+          "videos": 1
+        }
+      ]
+    }
+  ],
+  "resources": {
+    "charts": {
+      "3c34c6da-3bcc-5dfa-8532-4676ee7f334c": {
+        "dataset_uuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f",
+        "params": {
+          "adhoc_filters": [],
+          "datasource": "0__table",
+          "groupby": [],
+          "metrics": [
+            "rows",
+            "resource_video_pairs",
+            "stock_resources",
+            "videos"
+          ],
+          "order_desc": false,
+          "query_mode": "aggregate",
+          "row_limit": 1000,
+          "show_cell_bars": false,
+          "slice_id": 100,
+          "viz_type": "table"
+        },
+        "query_context": "{\"datasource\": {\"id\": 0, \"type\": \"table\"}, \"force\": true, \"queries\": [{\"columns\": [], \"metrics\": [\"rows\", \"resource_video_pairs\", \"stock_resources\", \"videos\"], \"filters\": [], \"time_range\": \"No filter\", \"orderby\": [], \"row_limit\": 1000, \"extras\": {\"having\": \"\", \"where\": \"\"}}], \"form_data\": {\"datasource\": \"0__table\", \"slice_id\": 100, \"viz_type\": \"table\", \"query_mode\": \"aggregate\", \"groupby\": [], \"metrics\": [\"rows\", \"resource_video_pairs\", \"stock_resources\", \"videos\"], \"adhoc_filters\": [], \"row_limit\": 1000, \"order_desc\": false, \"show_cell_bars\": false}, \"result_format\": \"json\", \"result_type\": \"full\"}",
+        "slice_name": "HG resource usage: independently checked audit measures",
+        "uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+        "version": "1.0.0",
+        "viz_type": "table"
+      }
+    },
+    "dashboards": {
+      "f24446f1-1291-5c28-81b7-9725c64836bd": {
+        "dashboard_title": "HG resource usage: independently checked audit measures",
+        "metadata": {
+          "color_scheme": "supersetColors",
+          "cross_filters_enabled": false,
+          "expanded_slices": {},
+          "native_filter_configuration": [
+            {
+              "cascadeParentIds": [],
+              "controlValues": {
+                "enableEmptyFilter": false,
+                "inverseSelection": false,
+                "multiSelect": true,
+                "searchAllOptions": false
+              },
+              "defaultDataMask": {
+                "extraFormData": {},
+                "filterState": {},
+                "ownState": {}
+              },
+              "filterType": "filter_select",
+              "id": "NATIVE_FILTER-dimension",
+              "name": "Video_Id",
+              "scope": {
+                "excluded": [],
+                "rootPath": [
+                  "ROOT_ID"
+                ]
+              },
+              "targets": [
+                {
+                  "column": {
+                    "name": "video_id"
+                  },
+                  "datasetUuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f"
+                }
+              ],
+              "type": "NATIVE_FILTER"
+            }
+          ],
+          "refresh_frequency": 0,
+          "timed_refresh_immune_slices": []
+        },
+        "position": {
+          "CHART-1": {
+            "children": [],
+            "id": "CHART-1",
+            "meta": {
+              "chartId": 100,
+              "height": 50,
+              "sliceName": "HG resource usage: independently checked audit measures",
+              "uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+              "width": 12
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID",
+              "ROW-1"
+            ],
+            "type": "CHART"
+          },
+          "DASHBOARD_VERSION_KEY": "v2",
+          "GRID_ID": {
+            "children": [
+              "ROW-1"
+            ],
+            "id": "GRID_ID",
+            "parents": [
+              "ROOT_ID"
+            ],
+            "type": "GRID"
+          },
+          "ROOT_ID": {
+            "children": [
+              "GRID_ID"
+            ],
+            "id": "ROOT_ID",
+            "type": "ROOT"
+          },
+          "ROW-1": {
+            "children": [
+              "CHART-1"
+            ],
+            "id": "ROW-1",
+            "meta": {
+              "background": "BACKGROUND_TRANSPARENT"
+            },
+            "parents": [
+              "ROOT_ID",
+              "GRID_ID"
+            ],
+            "type": "ROW"
+          }
+        },
+        "slug": "overview",
+        "uuid": "f24446f1-1291-5c28-81b7-9725c64836bd",
+        "version": "1.0.0"
+      }
+    },
+    "databases": {
+      "aa4ade6a-fb9e-5110-852f-ee25c723489d": {
+        "allow_ctas": false,
+        "allow_cvas": false,
+        "allow_dml": false,
+        "allow_file_upload": false,
+        "database_name": "Warehouse",
+        "expose_in_sqllab": true,
+        "extra": {},
+        "sqlalchemy_uri": "postgresql://",
+        "uuid": "aa4ade6a-fb9e-5110-852f-ee25c723489d",
+        "version": "1.0.0"
+      }
+    },
+    "datasets": {
+      "eefaac85-7a88-50b5-8ab3-8700732a3c1f": {
+        "columns": [
+          {
+            "column_name": "resource_video_sk",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          },
+          {
+            "column_name": "video_id",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          },
+          {
+            "column_name": "hg_stock_id",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          },
+          {
+            "column_name": "published_date",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TIMESTAMP"
+          },
+          {
+            "column_name": "first_position",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "BIGINT"
+          },
+          {
+            "column_name": "position_group",
+            "filterable": true,
+            "groupby": true,
+            "is_dttm": false,
+            "type": "TEXT"
+          }
+        ],
+        "database_uuid": "aa4ade6a-fb9e-5110-852f-ee25c723489d",
+        "filter_select_enabled": true,
+        "metrics": [
+          {
+            "expression": "COUNT(*)",
+            "metric_name": "rows"
+          },
+          {
+            "expression": "COUNT(DISTINCT resource_video_sk)",
+            "metric_name": "resource_video_pairs"
+          },
+          {
+            "expression": "COUNT(DISTINCT hg_stock_id)",
+            "metric_name": "stock_resources"
+          },
+          {
+            "expression": "COUNT(DISTINCT video_id)",
+            "metric_name": "videos"
+          }
+        ],
+        "schema": "gold",
+        "table_name": "resources_useage_number",
+        "uuid": "eefaac85-7a88-50b5-8ab3-8700732a3c1f",
+        "version": "1.0.0"
+      }
+    }
+  },
+  "status": "undeployed"
+}

@@ -1,0 +1,13 @@
+# Hand-calculated from fixture.yaml in this same directory, independently
+# of this pipeline's own SQL - docs/m25-acceptance.md shows the arithmetic:
+#   2026-01: 100.00 + 250.50 = 350.50 (sale_order id 1 + id 2)
+#   2026-02: 75.25               (sale_order id 3)
+# Revenue is written as a quoted string, not an unquoted number - the
+# documented convention (fixture.py's own _canon_value docstring) that
+# protects a monetary value from YAML's own lossy float parsing; it still
+# compares equal to Postgres's own numeric fct_monthly_sales.revenue column.
+table: fct_monthly_sales
+rows:
+  - {month: "2026-01", revenue: "350.50"}
+  - {month: "2026-02", revenue: "75.25"}
+row_count: 2

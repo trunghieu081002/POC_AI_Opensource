@@ -1,0 +1,170 @@
+{
+  "hg-usage": {
+    "ids": {
+      "databases": {
+        "aa4ade6a-fb9e-5110-852f-ee25c723489d": 4
+      },
+      "datasets": {
+        "eefaac85-7a88-50b5-8ab3-8700732a3c1f": 4
+      },
+      "charts": {
+        "3c34c6da-3bcc-5dfa-8532-4676ee7f334c": 4
+      },
+      "dashboards": {
+        "f24446f1-1291-5c28-81b7-9725c64836bd": 4
+      }
+    },
+    "comparisons": [
+      {
+        "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+        "filters": [],
+        "expected": [
+          {
+            "rows": 13,
+            "resource_video_pairs": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "chart_rows": [
+          {
+            "rows": 13,
+            "resource_video_pairs": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "sql_rows": [
+          {
+            "rows": 13,
+            "resource_video_pairs": 13,
+            "stock_resources": 6,
+            "videos": 4
+          }
+        ],
+        "matched": true
+      },
+      {
+        "chart_uuid": "3c34c6da-3bcc-5dfa-8532-4676ee7f334c",
+        "filters": [
+          {
+            "col": "video_id",
+            "op": "IN",
+            "val": [
+              "V1"
+            ]
+          }
+        ],
+        "expected": [
+          {
+            "rows": 3,
+            "resource_video_pairs": 3,
+            "stock_resources": 3,
+            "videos": 1
+          }
+        ],
+        "chart_rows": [
+          {
+            "rows": 3,
+            "resource_video_pairs": 3,
+            "stock_resources": 3,
+            "videos": 1
+          }
+        ],
+        "sql_rows": [
+          {
+            "rows": 3,
+            "resource_video_pairs": 3,
+            "stock_resources": 3,
+            "videos": 1
+          }
+        ],
+        "matched": true
+      }
+    ]
+  },
+  "monthly-sales": {
+    "ids": {
+      "databases": {
+        "ed18cb70-7b2d-52e4-9aa7-3525be65aa4e": 6
+      },
+      "datasets": {
+        "46e8e8fa-cd56-5490-be07-fb90837febbd": 6
+      },
+      "charts": {
+        "5560fb20-e00e-5e94-9acf-1a78f8b799d7": 6
+      },
+      "dashboards": {
+        "187da096-ca28-54b7-91da-d85aaac8f174": 6
+      }
+    },
+    "comparisons": [
+      {
+        "chart_uuid": "5560fb20-e00e-5e94-9acf-1a78f8b799d7",
+        "filters": [],
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "chart_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "sql_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          },
+          {
+            "month": "2026-02",
+            "revenue": 75.25
+          }
+        ],
+        "matched": true
+      },
+      {
+        "chart_uuid": "5560fb20-e00e-5e94-9acf-1a78f8b799d7",
+        "filters": [
+          {
+            "col": "month",
+            "op": "IN",
+            "val": [
+              "2026-01"
+            ]
+          }
+        ],
+        "expected": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "chart_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "sql_rows": [
+          {
+            "month": "2026-01",
+            "revenue": 350.5
+          }
+        ],
+        "matched": true
+      }
+    ]
+  }
+}
