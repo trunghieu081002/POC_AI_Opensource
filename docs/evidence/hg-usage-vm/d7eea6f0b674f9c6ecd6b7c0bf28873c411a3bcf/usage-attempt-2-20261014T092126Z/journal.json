@@ -1,0 +1,542 @@
+{
+  "3": {
+    "target": "hg_resources_useage_number__validate__c10d5fab",
+    "status": "ok",
+    "events": [
+      {
+        "id": 126,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:08+00:00",
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "stage": null
+      },
+      {
+        "id": 127,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:11+00:00",
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab: batch cc093586-263a-4fc3-a00b-2cb2762fad6d - 55 row(s) in 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 128,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:13+00:00",
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab: batch cc093586-263a-4fc3-a00b-2cb2762fad6d",
+        "stage": null
+      },
+      {
+        "id": 129,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:16+00:00",
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab: batch cc093586-263a-4fc3-a00b-2cb2762fad6d loaded - 55 row(s) from 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 130,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:20+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/landing schema_contract: ok",
+        "stage": null
+      },
+      {
+        "id": 131,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:20+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 132,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:20+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 133,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:20+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/landing gates passed",
+        "stage": null
+      },
+      {
+        "id": 134,
+        "run_id": 3,
+        "ts": "2026-10-14T09:24:23+00:00",
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver via dbt",
+        "stage": null
+      },
+      {
+        "id": 135,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:13+00:00",
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "stage": "silver"
+      },
+      {
+        "id": 136,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:13+00:00",
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver transform complete",
+        "stage": null
+      },
+      {
+        "id": 137,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:17+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 138,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:17+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver unique: ok",
+        "stage": null
+      },
+      {
+        "id": 139,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:18+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 140,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:18+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver unique: ok",
+        "stage": null
+      },
+      {
+        "id": 141,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:18+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/silver gates passed",
+        "stage": null
+      },
+      {
+        "id": 142,
+        "run_id": 3,
+        "ts": "2026-10-14T09:27:20+00:00",
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold via dbt",
+        "stage": null
+      },
+      {
+        "id": 143,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:19+00:00",
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "stage": "gold"
+      },
+      {
+        "id": 144,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:19+00:00",
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold transform complete",
+        "stage": null
+      },
+      {
+        "id": 145,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:23+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 146,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:23+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold unique: ok",
+        "stage": null
+      },
+      {
+        "id": 147,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:23+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__c10d5fab/gold gates passed",
+        "stage": null
+      },
+      {
+        "id": 148,
+        "run_id": 3,
+        "ts": "2026-10-14T09:28:24+00:00",
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 3 reached terminal state: ok",
+        "stage": null
+      }
+    ]
+  },
+  "4": {
+    "target": "hg_resources_useage_number__validate__95ebb52b",
+    "status": "failed",
+    "events": [
+      {
+        "id": 149,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:38+00:00",
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "stage": null
+      },
+      {
+        "id": 150,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:40+00:00",
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b: batch 752d5b9b-6a14-416a-b83d-d2a79c2cbe4f - 56 row(s) in 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 151,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:42+00:00",
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b: batch 752d5b9b-6a14-416a-b83d-d2a79c2cbe4f",
+        "stage": null
+      },
+      {
+        "id": 152,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:44+00:00",
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b: batch 752d5b9b-6a14-416a-b83d-d2a79c2cbe4f loaded - 56 row(s) from 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 153,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:48+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b/landing schema_contract: ok",
+        "stage": null
+      },
+      {
+        "id": 154,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:48+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 155,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:48+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 156,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:48+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b/landing gates passed",
+        "stage": null
+      },
+      {
+        "id": 157,
+        "run_id": 4,
+        "ts": "2026-10-14T09:30:51+00:00",
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__95ebb52b/silver via dbt",
+        "stage": null
+      },
+      {
+        "id": 158,
+        "run_id": 4,
+        "ts": "2026-10-14T09:32:12+00:00",
+        "kind": "dbt.test.failed",
+        "level": "error",
+        "message": "hg_resources_useage_number__validate__95ebb52b/silver: dbt test failed - ran 6 (5 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 6 required: a test failed or errored: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+        "stage": "silver"
+      },
+      {
+        "id": 159,
+        "run_id": 4,
+        "ts": "2026-10-14T09:32:12+00:00",
+        "kind": "transform.failed",
+        "level": "error",
+        "message": "dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+        "stage": null
+      },
+      {
+        "id": 160,
+        "run_id": 4,
+        "ts": "2026-10-14T09:32:16+00:00",
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 4 reached terminal state: failed",
+        "stage": null
+      }
+    ]
+  },
+  "5": {
+    "target": "hg_a2_usage__validate__b4864cd2",
+    "status": "ok",
+    "events": [
+      {
+        "id": 161,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:18+00:00",
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "stage": null
+      },
+      {
+        "id": 162,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:20+00:00",
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2: batch 1f0773cb-d9e7-46f3-aabe-16e88ef2a856 - 55 row(s) in 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 163,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:23+00:00",
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2: batch 1f0773cb-d9e7-46f3-aabe-16e88ef2a856",
+        "stage": null
+      },
+      {
+        "id": 164,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:25+00:00",
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2: batch 1f0773cb-d9e7-46f3-aabe-16e88ef2a856 loaded - 55 row(s) from 6 object(s)",
+        "stage": null
+      },
+      {
+        "id": 165,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:28+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/landing schema_contract: ok",
+        "stage": null
+      },
+      {
+        "id": 166,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:28+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 167,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:28+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/landing row_count_bounds: ok",
+        "stage": null
+      },
+      {
+        "id": 168,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:28+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/landing gates passed",
+        "stage": null
+      },
+      {
+        "id": 169,
+        "run_id": 5,
+        "ts": "2026-10-14T09:34:30+00:00",
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver via dbt",
+        "stage": null
+      },
+      {
+        "id": 170,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:01+00:00",
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "stage": "silver"
+      },
+      {
+        "id": 171,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:01+00:00",
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver transform complete",
+        "stage": null
+      },
+      {
+        "id": 172,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:04+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 173,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:04+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver unique: ok",
+        "stage": null
+      },
+      {
+        "id": 174,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:05+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 175,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:05+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver unique: ok",
+        "stage": null
+      },
+      {
+        "id": 176,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:05+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/silver gates passed",
+        "stage": null
+      },
+      {
+        "id": 177,
+        "run_id": 5,
+        "ts": "2026-10-14T09:36:07+00:00",
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold via dbt",
+        "stage": null
+      },
+      {
+        "id": 178,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:15+00:00",
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "stage": "gold"
+      },
+      {
+        "id": 179,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:15+00:00",
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold transform complete",
+        "stage": null
+      },
+      {
+        "id": 180,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:18+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold not_null: ok",
+        "stage": null
+      },
+      {
+        "id": 181,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:19+00:00",
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold unique: ok",
+        "stage": null
+      },
+      {
+        "id": 182,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:19+00:00",
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__b4864cd2/gold gates passed",
+        "stage": null
+      },
+      {
+        "id": 183,
+        "run_id": 5,
+        "ts": "2026-10-14T09:37:20+00:00",
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 5 reached terminal state: ok",
+        "stage": null
+      }
+    ]
+  }
+}

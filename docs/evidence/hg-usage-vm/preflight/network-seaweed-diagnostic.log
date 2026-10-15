@@ -1,0 +1,255 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 20.205.243.166:443...
+* Connected to github.com (20.205.243.166) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+*  CAfile: /etc/ssl/certs/ca-certificates.crt
+*  CApath: /etc/ssl/certs
+* TLSv1.0 (OUT), TLS header, Certificate Status (22):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+} [512 bytes data]
+* TLSv1.2 (IN), TLS header, Certificate Status (22):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* TLSv1.2 (IN), TLS header, Finished (20):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+{ [19 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+{ [2741 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+{ [79 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+{ [36 bytes data]
+* TLSv1.2 (OUT), TLS header, Finished (20):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+} [1 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+} [36 bytes data]
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256
+* ALPN, server accepted to use h2
+* Server certificate:
+*  subject: CN=github.com
+*  start date: Sep  1 00:00:00 2026 GMT
+*  expire date: Nov 29 23:59:59 2026 GMT
+*  subjectAltName: host "github.com" matched cert's "github.com"
+*  issuer: C=GB; O=Sectigo Limited; CN=Sectigo Public Server Authentication CA DV E36
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multiplexing
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* Using Stream ID: 1 (easy handle 0x556586cdba90)
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+> HEAD /seaweedfs/seaweedfs/releases/download/4.48/linux_amd64.tar.gz HTTP/2
+> Host: github.com
+> user-agent: curl/7.81.0
+> accept: */*
+> 
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [57 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [57 bytes data]
+* old SSL session ID is stale, removing
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0< HTTP/2 302 
+< date: Wed, 14 Oct 2026 04:42:10 GMT
+< content-type: text/html; charset=utf-8
+< location: https://release-assets.githubusercontent.com/github-production-release-asset/21827146/d1ff5396-863b-44b4-b396-8855d5a29145?[temporary-query-redacted]
+< vary: X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With, X-GitHub-Client-Version, Sec-Fetch-Site,Accept-Encoding, Accept, X-Requested-With
+< cache-control: no-cache
+< strict-transport-security: max-age=31536000; includeSubdomains; preload
+< x-frame-options: deny
+< x-content-type-options: nosniff
+< x-xss-protection: 0
+< referrer-policy: no-referrer-when-downgrade
+< content-security-policy: default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubusercontent.com copilot-proxy.githubusercontent.com proxy.individual.githubcopilot.com proxy.business.githubcopilot.com proxy.enterprise.githubcopilot.com *.actions.githubusercontent.com wss://*.actions.githubusercontent.com productionresultssa0.blob.core.windows.net productionresultssa1.blob.core.windows.net productionresultssa2.blob.core.windows.net productionresultssa3.blob.core.windows.net productionresultssa4.blob.core.windows.net productionresultssa5.blob.core.windows.net productionresultssa6.blob.core.windows.net productionresultssa7.blob.core.windows.net productionresultssa8.blob.core.windows.net productionresultssa9.blob.core.windows.net productionresultssa10.blob.core.windows.net productionresultssa11.blob.core.windows.net productionresultssa12.blob.core.windows.net productionresultssa13.blob.core.windows.net productionresultssa14.blob.core.windows.net productionresultssa15.blob.core.windows.net productionresultssa16.blob.core.windows.net productionresultssa17.blob.core.windows.net productionresultssa18.blob.core.windows.net productionresultssa19.blob.core.windows.net github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com insights.github.com wss://alive.github.com wss://alive-staging.github.com api.githubcopilot.com api.individual.githubcopilot.com api.business.githubcopilot.com api.enterprise.githubcopilot.com wss://production-copilot-host.webpubsub.azure.com api.github.com/cmc_internal/api/; font-src github.githubassets.com; form-action 'self' github.com gist.github.com copilot-workspace.githubnext.com objects-origin.githubusercontent.com; frame-ancestors 'none'; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com; img-src 'self' data: blob: github.githubassets.com media.githubusercontent.com camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com private-avatars.githubusercontent.com github-cloud.s3.amazonaws.com objects.githubusercontent.com release-assets.githubusercontent.com secured-user-images.githubusercontent.com user-images.githubusercontent.com private-user-images.githubusercontent.com opengraph.githubassets.com repository-images.githubusercontent.com marketplace-screenshots.githubusercontent.com copilotprodattachments.blob.core.windows.net/github-production-copilot-attachments/ github-production-user-asset-6210df.s3.amazonaws.com customer-stories-feed.github.com spotlights-feed.github.com explore-feed.github.com *.googleusercontent.com objects-origin.githubusercontent.com *.githubusercontent.com; manifest-src 'self'; media-src github.com user-images.githubusercontent.com secured-user-images.githubusercontent.com private-user-images.githubusercontent.com github-production-user-asset-6210df.s3.amazonaws.com gist.github.com github.githubassets.com; script-src github.githubassets.com; style-src 'unsafe-inline' github.githubassets.com; upgrade-insecure-requests; worker-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/
+HTTP/2 302 
+date: Wed, 14 Oct 2026 04:42:10 GMT
+content-type: text/html; charset=utf-8
+location: https://release-assets.githubusercontent.com/github-production-release-asset/21827146/d1ff5396-863b-44b4-b396-8855d5a29145?[temporary-query-redacted]
+vary: X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With, X-GitHub-Client-Version, Sec-Fetch-Site,Accept-Encoding, Accept, X-Requested-With
+cache-control: no-cache
+strict-transport-security: max-age=31536000; includeSubdomains; preload
+x-frame-options: deny
+x-content-type-options: nosniff
+x-xss-protection: 0
+referrer-policy: no-referrer-when-downgrade
+content-security-policy: default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubusercontent.com copilot-proxy.githubusercontent.com proxy.individual.githubcopilot.com proxy.business.githubcopilot.com proxy.enterprise.githubcopilot.com *.actions.githubusercontent.com wss://*.actions.githubusercontent.com productionresultssa0.blob.core.windows.net productionresultssa1.blob.core.windows.net productionresultssa2.blob.core.windows.net productionresultssa3.blob.core.windows.net productionresultssa4.blob.core.windows.net productionresultssa5.blob.core.windows.net productionresultssa6.blob.core.windows.net productionresultssa7.blob.core.windows.net productionresultssa8.blob.core.windows.net productionresultssa9.blob.core.windows.net productionresultssa10.blob.core.windows.net productionresultssa11.blob.core.windows.net productionresultssa12.blob.core.windows.net productionresultssa13.blob.core.windows.net productionresultssa14.blob.core.windows.net productionresultssa15.blob.core.windows.net productionresultssa16.blob.core.windows.net productionresultssa17.blob.core.windows.net productionresultssa18.blob.core.windows.net productionresultssa19.blob.core.windows.net github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com insights.github.com wss://alive.github.com wss://alive-staging.github.com api.githubcopilot.com api.individual.githubcopilot.com api.business.githubcopilot.com api.enterprise.githubcopilot.com wss://production-copilot-host.webpubsub.azure.com api.github.com/cmc_internal/api/; font-src github.githubassets.com; form-action 'self' github.com gist.github.com copilot-workspace.githubnext.com objects-origin.githubusercontent.com; frame-ancestors 'none'; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com; img-src 'self' data: blob: github.githubassets.com media.githubusercontent.com camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com private-avatars.githubusercontent.com github-cloud.s3.amazonaws.com objects.githubusercontent.com release-assets.githubusercontent.com secured-user-images.githubusercontent.com us< server: github.com
+< content-length: 0
+< x-github-request-id: E761:231276:9AC89B:E711F7:6ACF0821
+< x-github-edge-region: southeastasia
+< 
+
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
+* Connection #0 to host github.com left intact
+* Issue another request to this URL: 'https://release-assets.githubusercontent.com/github-production-release-asset/21827146/d1ff5396-863b-44b4-b396-8855d5a29145?[temporary-query-redacted]'
+*   Trying 185.199.108.133:443...
+* Connected to release-assets.githubusercontent.com (185.199.108.133) port 443 (#1)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+*  CAfile: /etc/ssl/certs/ca-certificates.crt
+*  CApath: /etc/ssl/certs
+* TLSv1.0 (OUT), TLS header, Certificate Status (22):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+} [512 bytes data]
+* TLSv1.2 (IN), TLS header, Certificate Status (22):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* TLSv1.2 (IN), TLS header, Finished (20):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+{ [19 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+{ [4153 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+{ [264 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+{ [36 bytes data]
+* TLSv1.2 (OUT), TLS header, Finished (20):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+} [1 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+} [36 bytes data]
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256
+* ALPN, server accepted to use h2
+* Server certificate:
+*  subject: CN=*.github.io
+*  start date: Sep 30 23:44:46 2026 GMT
+*  expire date: Dec 29 23:44:45 2026 GMT
+*  subjectAltName: host "release-assets.githubusercontent.com" matched cert's "*.githubusercontent.com"
+*  issuer: C=US; O=Let's Encrypt; CN=YR1
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multiplexing
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* Using Stream ID: 1 (easy handle 0x556586cdba90)
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+> HEAD /github-production-release-asset/21827146/d1ff5396-863b-44b4-b396-8855d5a29145?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-14T05%3A32%3A00Z&rscd=attachment%3B+filename%3Dlinux_amd64.tar.gz&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-14T04%3A31%3A33Z&ske=2026-10-14T05%3A32%3A00Z&sks=b&skv=2018-11-09&sig=DcyS9FwG6T57R7LRgkmSAq5T6Cp9nbeUODbUL4fVGz0%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MTk1NDczMCwibmJmIjoxNzkxOTUyOTMwLCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.5bsm2iU0_chr7ATbMMvwuB05seR30nFMCNY32JEdV0s&response-content-disposition=attachment%3B%20filename%3Dlinux_amd64.tar.gz&response-content-type=application%2Foctet-stream HTTP/2
+> Host: release-assets.githubusercontent.com
+> user-agent: curl/7.81.0
+> accept: */*
+> 
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [193 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+< HTTP/2 200 
+< last-modified: Mon, 28 Sep 2026 16:50:09 GMT
+< etag: "0x8DF1D808E6A5BE0"
+< server: Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+< x-ms-request-id: 15b1d63c-401e-0049-7e69-4fa3be000000
+< x-ms-version: 2018-11-09
+< x-ms-creation-time: Mon, 28 Sep 2026 16:50:09 GMT
+< x-ms-lease-status: unlocked
+< x-ms-lease-state: available
+< x-ms-blob-type: BlockBlob
+< x-ms-server-encrypted: true
+< x-ms-access-tier: Hot
+< x-ms-access-tier-inferred: true
+< via: 1.1 varnish, 1.1 varnish
+< accept-ranges: bytes
+< age: 3993
+< date: Wed, 14 Oct 2026 04:42:11 GMT
+< x-served-by: cache-iad-kiad7000195-IAD, cache-sin-wsap440053-SIN
+< x-cache: HIT, HIT
+< x-cache-hits: 981, 0
+< x-timer: S1791952932.798163,VS0,VE1
+< content-disposition: attachment; filename=linux_amd64.tar.gz
+< content-type: application/octet-stream
+< content-length: 46067365
+< 
+
+  0 43.9M    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+* Connection #1 to host release-assets.githubusercontent.com left intact
+er-images.githubusercontent.com private-user-images.githubusercontent.com opengraph.githubassets.com repository-images.githubusercontent.com marketplace-screenshots.githubusercontent.com copilotprodattachments.blob.core.windows.net/github-production-copilot-attachments/ github-production-user-asset-6210df.s3.amazonaws.com customer-stories-feed.github.com spotlights-feed.github.com explore-feed.github.com *.googleusercontent.com objects-origin.githubusercontent.com *.githubusercontent.com; manifest-src 'self'; media-src github.com user-images.githubusercontent.com secured-user-images.githubusercontent.com private-user-images.githubusercontent.com github-production-user-asset-6210df.s3.amazonaws.com gist.github.com github.githubassets.com; script-src github.githubassets.com; style-src 'unsafe-inline' github.githubassets.com; upgrade-insecure-requests; worker-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/
+server: github.com
+content-length: 0
+x-github-request-id: E761:231276:9AC89B:E711F7:6ACF0821
+x-github-edge-region: southeastasia
+
+HTTP/2 200 
+last-modified: Mon, 28 Sep 2026 16:50:09 GMT
+etag: "0x8DF1D808E6A5BE0"
+server: Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+x-ms-request-id: 15b1d63c-401e-0049-7e69-4fa3be000000
+x-ms-version: 2018-11-09
+x-ms-creation-time: Mon, 28 Sep 2026 16:50:09 GMT
+x-ms-lease-status: unlocked
+x-ms-lease-state: available
+x-ms-blob-type: BlockBlob
+x-ms-server-encrypted: true
+x-ms-access-tier: Hot
+x-ms-access-tier-inferred: true
+via: 1.1 varnish, 1.1 varnish
+accept-ranges: bytes
+age: 3993
+date: Wed, 14 Oct 2026 04:42:11 GMT
+x-served-by: cache-iad-kiad7000195-IAD, cache-sin-wsap440053-SIN
+x-cache: HIT, HIT
+x-cache-hits: 981, 0
+x-timer: S1791952932.798163,VS0,VE1
+content-disposition: attachment; filename=linux_amd64.tar.gz
+content-type: application/octet-stream
+content-length: 46067365
+

@@ -1,0 +1,275 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "05de6517-2cdf-4085-bb64-ae969a6f8cb8",
+        "loaded_rows": 5,
+        "manifest_sha256": "5f86ac90499e901f59ef542ff05b7d76208ed8fb50f92627172c711e51e8baf8",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "05de6517-2cdf-4085-bb64-ae969a6f8cb8",
+        "loaded_rows": 7,
+        "manifest_sha256": "ee16fbcb18d89bc082abcdb50cdb687a39aa1bd941e89f8b861d64d073f7ac59",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "a851d70d-37e7-4b2a-946b-b0a8babc132a",
+        "loaded_rows": 5,
+        "manifest_sha256": "5a164bcc178d1358cde916f8b240a03d446dc014d941203229c24eda6ae711bb",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "a851d70d-37e7-4b2a-946b-b0a8babc132a",
+        "loaded_rows": 7,
+        "manifest_sha256": "de716b1bdecd7afab217989b1236de10d9f98b37a42b88f36d0d44d5a2f3f17c",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "059965ae-16e4-4650-8ff5-f2b7bb6f1cbe",
+        "loaded_rows": 5,
+        "manifest_sha256": "31c2a8265a8b8c9e13e5b339e59d33d528dc02ed096203a1a1ab6a8377f6a74d",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "059965ae-16e4-4650-8ff5-f2b7bb6f1cbe",
+        "loaded_rows": 7,
+        "manifest_sha256": "0f94175aaebf1a3b922987bced9f0e75999a371069bf68a721503c9ca251b358",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      }
+    ],
+    "namespace": "dpagent-validate/7d338eb8",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 15,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "059965ae-16e4-4650-8ff5-f2b7bb6f1cbe",
+      "detail": "x_music_plan_detail_price: 7 row(s) matched exactly; res_partner: 5 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_351dfe9205\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_351dfe9205\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_7D338EB8_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_7D338EB8_BRONZE_BUCKET, DPAGENT_VALIDATE_7D338EB8_BRONZE_ENDPOINT, DPAGENT_VALIDATE_7D338EB8_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_7D338EB8_SRC_DATABASE, DPAGENT_VALIDATE_7D338EB8_SRC_HOST, DPAGENT_VALIDATE_7D338EB8_SRC_PASSWORD, DPAGENT_VALIDATE_7D338EB8_SRC_PORT, DPAGENT_VALIDATE_7D338EB8_SRC_USER, DPAGENT_VALIDATE_7D338EB8_WH_DATABASE, DPAGENT_VALIDATE_7D338EB8_WH_HOST, DPAGENT_VALIDATE_7D338EB8_WH_PASSWORD, DPAGENT_VALIDATE_7D338EB8_WH_PORT, DPAGENT_VALIDATE_7D338EB8_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_fact_artist_assignment__validate__7d338eb8",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "fact_artist_assignment"
+          ],
+          "passed": 0,
+          "ran": 0,
+          "reason": "no dbt tests are declared on ['fact_artist_assignment']",
+          "required": [],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "not_applicable",
+          "tests": [],
+          "untested_models": [
+            "fact_artist_assignment"
+          ],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.not_applicable",
+        "message": "hg_fact_artist_assignment__validate__7d338eb8/silver: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['fact_artist_assignment']",
+        "passed": 0,
+        "ran": 0,
+        "required": 0,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "not_applicable"
+      }
+    ],
+    "run_2": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "fact_artist_assignment"
+          ],
+          "passed": 0,
+          "ran": 0,
+          "reason": "no dbt tests are declared on ['fact_artist_assignment']",
+          "required": [],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "not_applicable",
+          "tests": [],
+          "untested_models": [
+            "fact_artist_assignment"
+          ],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.not_applicable",
+        "message": "hg_fact_artist_assignment__validate__7d338eb8/silver: dbt test not_applicable - ran 0 (0 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 0 required: no dbt tests are declared on ['fact_artist_assignment']",
+        "passed": 0,
+        "ran": 0,
+        "required": 0,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "not_applicable"
+      }
+    ]
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-ef925bce907be6ce",
+  "expected_hash": "sha256:1c2dc7327023871b4fd51a88515779454c3d461db1eb40c4950d5a7e1c7b9f6c",
+  "fixture_hash": "sha256:19ebb8e7c2e28036aaa1c55b534dbfd0b49365739504bcf393338fc5bea8cfb4",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:4bf63ad6f4ca122b87d28b37eba490fa7c96e48128a4fcef63969a3ed2b5233d",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run_1: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_artist_assignment']",
+      "run_2: stage 'silver': dbt test is 'not_applicable': no dbt tests are declared on ['fact_artist_assignment']"
+    ]
+  },
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    51,
+    52
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

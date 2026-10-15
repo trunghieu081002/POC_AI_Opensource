@@ -1,0 +1,85 @@
+diff --git a/tests/m25_acceptance/run_matrix.py b/tests/m25_acceptance/run_matrix.py
+index a77c873..98f2b12 100644
+--- a/tests/m25_acceptance/run_matrix.py
++++ b/tests/m25_acceptance/run_matrix.py
+@@ -1008,8 +1008,35 @@ def run_fact_no_tests(tmp_path: Path) -> dict:
+ USAGE_DIR = REPO_ROOT / "pipelines" / "hg_resources_useage_number"
+ 
+ 
++def _observe_usage(run, *, required):
++    import usage_observations
++    original = fixture.compare_all
++    observations = []
++
++    def compare(expected, warehouse, default_schema):
++        comparison = original(expected, warehouse, default_schema)
++        if comparison.ok:
++            observations.append(usage_observations.observe(warehouse, USAGE_DIR))
++        return comparison
++
++    with _patched(fixture, "compare_all", compare):
++        result = run()
++    result["usage_observations"] = observations
++    result["usage_observation_problems"] = usage_observations.problems(observations, USAGE_DIR, required)
++    run_ids = list(result.get("run_ids") or [])
++    real = ((result.get("a2") or {}).get("steps") or {}).get("real_run") or {}
++    if real.get("run_id"):
++        run_ids.append(real["run_id"])
++    result["journal"] = {str(run_id): [
++        {"id": e["id"], "run_id": e["run_id"], "ts": e["ts"], "kind": e["kind"],
++         "level": e["level"], "message": e["message"],
++         "stage": json.loads(e["data_json"] or "{}").get("stage")}
++        for e in state.events_for(int(run_id))] for run_id in run_ids}
++    return result
++
++
+ def run_usage_correct_twice(tmp_path: Path) -> dict:
+-    return _run_hg(tmp_path, source=USAGE_DIR)
++    return _observe_usage(lambda: _run_hg(tmp_path, source=USAGE_DIR), required=2)
+ 
+ 
+ def run_usage_conflicting_ids(tmp_path: Path) -> dict:
+@@ -1040,12 +1067,12 @@ def run_usage_conflicting_ids(tmp_path: Path) -> dict:
+ 
+ 
+ def run_usage_promote_deploy_run(tmp_path: Path) -> dict:
+-    return run_a2_promote_deploy_run(
++    return _observe_usage(lambda: run_a2_promote_deploy_run(
+         tmp_path, source=USAGE_DIR, name="hg_a2_usage",
+         hashed_edits={"model": "dwh_dbt/models/gold/resources_useage_number.sql",
+                       "tests": "dwh_dbt/models/gold/_gold_models.yml",
+                       "seed": "dwh_dbt/seeds/manual_excluded_stock_codes.csv",
+-                      "macro": "dwh_dbt/macros/generate_schema_name.sql"})
++                      "macro": "dwh_dbt/macros/generate_schema_name.sql"}), required=3)
+ 
+ 
+ def run_fact_promote_deploy_run(tmp_path: Path) -> dict:
+@@ -1418,6 +1445,9 @@ def _usage_correct(result: dict) -> tuple[bool, str]:
+     problems = []
+     need = lambda cond, msg: None if cond else problems.append(msg)     # noqa: E731
+     need(result.get("overall") == "pass", f"overall={result.get('overall')!r}")
++    import usage_observations
++    for problem in usage_observations.problems(result.get("usage_observations") or [], USAGE_DIR, 2):
++        problems.append(problem)
+     need(result.get("run_status") == {"run_1": "ok", "run_2": "ok"}, f"run_status={result.get('run_status')}")
+     need(result.get("comparison", {}).get("idempotent") is True, "not idempotent")
+     c = result.get("cleanup", {})
+@@ -1490,10 +1520,17 @@ def _usage_conflicting(result: dict) -> tuple[bool, str]:
+                             "conflicting source ids: silver's unique test failed, gold never ran, nothing promotable")
+ 
+ 
++def _usage_a2(result):
++    import usage_observations
++    ok, detail = _a2(result)
++    problems = usage_observations.problems(result.get("usage_observations") or [], USAGE_DIR, 3)
++    return ok and not problems, "; ".join(([detail] if not ok else []) + problems) or detail
++
++
+ EXPECTATIONS.update({
+     "usage-correct-twice": _usage_correct,
+     "usage-conflicting-ids": _usage_conflicting,
+-    "usage-promote-deploy-run": _a2,
++    "usage-promote-deploy-run": _usage_a2,
+ })
+ 
+ EXPECTATIONS.update({

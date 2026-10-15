@@ -1,0 +1,1 @@
+M25_RESULTS_DIR=<this-run>/evidence bash scripts/m25-acceptance-ci.sh --keep --reuse-container dpagent-m25-acceptance-12428 --profile bronze --scenarios usage-correct-twice,usage-conflicting-ids,usage-promote-deploy-run

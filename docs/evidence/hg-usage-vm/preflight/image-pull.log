@@ -1,0 +1,8 @@
+22.04: Pulling from library/ubuntu
+98c4455a9898: Pulling fs layer
+398a0d4d3425: Download complete
+98c4455a9898: Download complete
+98c4455a9898: Pull complete
+Digest: sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401
+Status: Downloaded newer image for ubuntu:22.04
+docker.io/library/ubuntu:22.04

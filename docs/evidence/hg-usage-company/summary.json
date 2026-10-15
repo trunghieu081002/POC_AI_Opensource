@@ -1,0 +1,26 @@
+{
+  "source_revision": "cefb458b8131e97b7b1df9649edc43a6926e5759",
+  "source_tree": "9cd1ce0f5ac86e2fe8b5eac763fe7426955ce3cf",
+  "usage": {
+    "matched": 3,
+    "requested": 3,
+    "exit_code": 3,
+    "evidence": "docs/evidence/hg-usage-company/cefb458b8131e97b7b1df9649edc43a6926e5759/usage-20261015T050948Z"
+  },
+  "bronze": {
+    "matched": 34,
+    "requested": 34,
+    "exit_code": 0,
+    "evidence": "docs/evidence/hg-usage-company/cefb458b8131e97b7b1df9649edc43a6926e5759/bronze-20261015T052344Z"
+  },
+  "unit": {
+    "passed": 1310,
+    "skipped": 25,
+    "exit_code": 0,
+    "evidence": "docs/evidence/hg-usage-company/cefb458b8131e97b7b1df9649edc43a6926e5759/unit-20261015T053750Z"
+  },
+  "leaks": 0,
+  "host_os": "Oracle Linux 8.10",
+  "test_host_os": "Ubuntu 22.04 systemd disposable Docker container",
+  "demo_scope": "No host database/service changed; only owned disposable containers used"
+}

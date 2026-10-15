@@ -1,0 +1,115 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6",
+        "loaded_rows": null,
+        "manifest_sha256": null,
+        "object_count": null,
+        "status": "failed",
+        "table_name": "no_such_table",
+        "total_rows": null
+      },
+      {
+        "batch_id": "e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6",
+        "loaded_rows": null,
+        "manifest_sha256": null,
+        "object_count": null,
+        "status": "failed",
+        "table_name": "res_partner",
+        "total_rows": null
+      },
+      {
+        "batch_id": "e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6",
+        "loaded_rows": null,
+        "manifest_sha256": null,
+        "object_count": null,
+        "status": "failed",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": null
+      }
+    ],
+    "namespace": "dpagent-validate/36e59740",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 4,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_36E59740_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_36E59740_BRONZE_BUCKET, DPAGENT_VALIDATE_36E59740_BRONZE_ENDPOINT, DPAGENT_VALIDATE_36E59740_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_36E59740_SRC_DATABASE, DPAGENT_VALIDATE_36E59740_SRC_HOST, DPAGENT_VALIDATE_36E59740_SRC_PASSWORD, DPAGENT_VALIDATE_36E59740_SRC_PORT, DPAGENT_VALIDATE_36E59740_SRC_USER, DPAGENT_VALIDATE_36E59740_WH_DATABASE, DPAGENT_VALIDATE_36E59740_WH_HOST, DPAGENT_VALIDATE_36E59740_WH_PASSWORD, DPAGENT_VALIDATE_36E59740_WH_PORT, DPAGENT_VALIDATE_36E59740_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_bronze_pair__validate__36e59740",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "dbt_tests": {
+    "run_1": [],
+    "run_2": []
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-c42e315e6e6d0d76",
+  "expected_hash": "sha256:4ea7769c5d6fafddba848c96c9ef316d974e47dcf31e56bce37cb93399887999",
+  "fixture_hash": "sha256:59c68189c508e4609779a1ec030cc6faf07b0a7f1237d1eb41a9e6b73ca0b613",
+  "gates": {
+    "run_1": {},
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": false
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:f30ecdb2131b30f0bc6b0d05fdc44ac3397173272aa90579b5776adb06125199",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
+      "bronze batch e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6 is 'failed', not 'loaded'",
+      "bronze batch e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6 is 'failed', not 'loaded'",
+      "bronze batch e6768cd5-3c05-4bf4-8e1e-4bdddc45d5d6 is 'failed', not 'loaded'",
+      "run_1: run 41 finished 'failed' in the journal",
+      "run_1: gated stage 'landing' has no gate verdict in the journal"
+    ]
+  },
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    41
+  ],
+  "run_status": {
+    "run_1": "failed",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

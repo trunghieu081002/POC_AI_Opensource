@@ -1,0 +1,4 @@
+http://archive.ubuntu.com/ubuntu/pool/main/l/llvm-toolchain-15/libllvm15_15.0.7-0ubuntu0.22.04.3_amd64.deb status=206 bytes=1048576 speed=118333 time=8.861160
+curl_exit=0
+https://archive.ubuntu.com/ubuntu/pool/main/l/llvm-toolchain-15/libllvm15_15.0.7-0ubuntu0.22.04.3_amd64.deb status=206 bytes=1048576 speed=159796 time=6.561932
+curl_exit=0

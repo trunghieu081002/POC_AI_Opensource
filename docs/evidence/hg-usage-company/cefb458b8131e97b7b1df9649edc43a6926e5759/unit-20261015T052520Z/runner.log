@@ -1,0 +1,616 @@
+debconf: delaying package configuration, since apt-utils is not installed
+........FFFFFFF......................................................... [  5%]
+......................................ss.s.s.s.s.sss.s.................. [ 10%]
+........................................................................ [ 16%]
+........................................................................ [ 21%]
+........................................................................ [ 26%]
+.......................s................................................ [ 32%]
+........................................................................ [ 37%]
+........................................................................ [ 43%]
+sss..................................................................... [ 48%]
+........................................................................ [ 53%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 80%]
+......................ssssss............................................ [ 86%]
+................sss.s.......F.......F.s................................. [ 91%]
+........................................................................ [ 97%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+__ test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone __
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_fresh_tarball_extract_ins0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone(tmp_path):
+        """The P0 regression, end to end: run exactly as if bootstrap.sh were
+        sitting inside a just-extracted tarball (DPAGENT_SOURCE_DIR pointing at
+        that directory, as scripts/setup.sh now sets it) - PREFIX must end up
+        holding *that* source, and no git clone of any URL - CHANGEME or
+        otherwise - may be attempted."""
+        source = _fake_extracted_tarball(tmp_path)
+        prefix = tmp_path / "prefix"
+    
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(prefix),
+        })
+    
+        assert "CHANGEME" not in result.stdout + result.stderr
+        assert "cloning" not in (result.stdout + result.stderr).lower()
+>       assert (prefix / "MARKER.txt").exists(), (
+            f"PREFIX does not hold the local source's own file - stdout/stderr:\n"
+            f"{result.stdout}\n{result.stderr}")
+E       AssertionError: PREFIX does not hold the local source's own file - stdout/stderr:
+E         
+E         [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+E         [31mXX[0m no systemd on this host. dpagent manages components as systemd units, so it
+E         needs a VM or a systemd-enabled container, not a plain docker image.
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-unit/pytest-0/test_fresh_tarball_extract_ins0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:145: AssertionError
+____ test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it _____
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_explicit_source_dir_wins_0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it(tmp_path):
+        """Auto-detection (bootstrap.sh's own parent has a pyproject.toml) must
+        not be the only way DPAGENT_SOURCE_DIR gets used - an operator naming a
+        directory explicitly, with bootstrap.sh copied somewhere else entirely
+        (its own single-file "scp scripts/bootstrap.sh" use case), must still
+        work."""
+        source = _fake_extracted_tarball(tmp_path, name="elsewhere")
+        prefix = tmp_path / "prefix"
+        isolated_cwd = tmp_path / "isolated"
+        isolated_cwd.mkdir()
+    
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(prefix),
+        }, cwd=isolated_cwd)
+    
+>       assert (prefix / "MARKER.txt").exists(), result.stdout + result.stderr
+E       AssertionError: [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+E         [31mXX[0m no systemd on this host. dpagent manages components as systemd units, so it
+E         needs a VM or a systemd-enabled container, not a plain docker image.
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-unit/pytest-0/test_explicit_source_dir_wins_0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:171: AssertionError
+_ test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo __
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_auto_detected_source_dir_0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo(tmp_path):
+        """An operator who set DPAGENT_TARBALL or DPAGENT_REPO on purpose must
+        not have it silently overridden just because bootstrap.sh happens to be
+        sitting next to a real checkout (this repo's own scripts/ directory)."""
+        result = _run_bootstrap(tmp_path, {
+            "DPAGENT_TARBALL": "https://example.invalid/does-not-exist.tar.gz",
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+        })
+        combined = result.stdout + result.stderr
+>       assert "example.invalid" in combined or "fetching the release tarball" in combined
+E       AssertionError: assert ('example.invalid' in '\x1b[36m::\x1b[0m detected Ubuntu 22.04.5 LTS (debian family)\n\x1b[31mXX\x1b[0m no systemd on this host. dpagent manages components as systemd units, so it\nneeds a VM or a systemd-enabled container, not a plain docker image.\n' or 'fetching the release tarball' in '\x1b[36m::\x1b[0m detected Ubuntu 22.04.5 LTS (debian family)\n\x1b[31mXX\x1b[0m no systemd on this host. dpagent manages components as systemd units, so it\nneeds a VM or a systemd-enabled container, not a plain docker image.\n')
+
+tests/test_bootstrap_fetch.py:185: AssertionError
+________ test_no_source_configured_fails_loudly_not_a_placeholder_clone ________
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_no_source_configured_fail0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_no_source_configured_fails_loudly_not_a_placeholder_clone(tmp_path):
+        """Bootstrap.sh copied alone (its own documented single-file use case)
+        into a directory with nothing else, no env vars set: must refuse
+        clearly, never fall back to a CHANGEME URL."""
+        isolated = tmp_path / "alone"
+        isolated.mkdir()
+        shutil.copy(BOOTSTRAP, isolated / "bootstrap.sh")
+    
+        result = subprocess.run(
+            [BASH, str(isolated / "bootstrap.sh")],
+            capture_output=True, text=True, timeout=30,
+            env={**os.environ, "PATH": f"{_fake_bin(tmp_path)}:{os.environ['PATH']}",
+                "DPAGENT_PYTHON": MODERN_PYTHON,
+                "DPAGENT_PREFIX": str(tmp_path / "prefix")})
+    
+        combined = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "CHANGEME" not in combined
+>       assert "no source to install from" in combined
+E       AssertionError: assert 'no source to install from' in '\x1b[36m::\x1b[0m detected Ubuntu 22.04.5 LTS (debian family)\n\x1b[31mXX\x1b[0m no systemd on this host. dpagent manages components as systemd units, so it\nneeds a VM or a systemd-enabled container, not a plain docker image.\n'
+
+tests/test_bootstrap_fetch.py:209: AssertionError
+______________ test_rerunning_with_the_same_source_is_idempotent _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_rerunning_with_the_same_s0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_rerunning_with_the_same_source_is_idempotent(tmp_path):
+        """Second bootstrap run must not error out differently or duplicate
+        anything - re-syncing identical source into an already-populated PREFIX
+        is a no-op beyond re-copying the same bytes."""
+        source = _fake_extracted_tarball(tmp_path)
+        prefix = tmp_path / "prefix"
+        env_extra = {"DPAGENT_SOURCE_DIR": str(source), "DPAGENT_PREFIX": str(prefix)}
+    
+        first = _run_bootstrap(tmp_path, env_extra)
+>       assert (prefix / "MARKER.txt").exists(), first.stdout + first.stderr
+E       AssertionError: [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+E         [31mXX[0m no systemd on this host. dpagent manages components as systemd units, so it
+E         needs a VM or a systemd-enabled container, not a plain docker image.
+E         
+E       assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-unit/pytest-0/test_rerunning_with_the_same_s0/prefix') / 'MARKER.txt').exists
+
+tests/test_bootstrap_fetch.py:223: AssertionError
+________________ test_with_llm_unset_installs_the_plain_package ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_with_llm_unset_installs_t0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_with_llm_unset_installs_the_plain_package(tmp_path):
+        source = _fake_extracted_tarball(tmp_path)
+        result = _run_bootstrap_to_extra_resolution(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+        })
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+E         [31mXX[0m no systemd on this host. dpagent manages components as systemd units, so it
+E         needs a VM or a systemd-enabled container, not a plain docker image.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/bash', '/unit/scripts/bootstrap.sh'], returncode=1, stdout='', stderr='\x1b[36m::\x1b...nt manages components as systemd units, so it\nneeds a VM or a systemd-enabled container, not a plain docker image.\n').returncode
+
+tests/test_bootstrap_fetch.py:243: AssertionError
+_____________________ test_with_llm_set_adds_the_llm_extra _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_with_llm_set_adds_the_llm0')
+
+    @requires_bash
+    @requires_modern_python
+    def test_with_llm_set_adds_the_llm_extra(tmp_path):
+        source = _fake_extracted_tarball(tmp_path)
+        result = _run_bootstrap_to_extra_resolution(tmp_path, {
+            "DPAGENT_SOURCE_DIR": str(source),
+            "DPAGENT_PREFIX": str(tmp_path / "prefix"),
+            "DPAGENT_WITH_LLM": "1",
+        })
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+E         [31mXX[0m no systemd on this host. dpagent manages components as systemd units, so it
+E         needs a VM or a systemd-enabled container, not a plain docker image.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/bash', '/unit/scripts/bootstrap.sh'], returncode=1, stdout='', stderr='\x1b[36m::\x1b...nt manages components as systemd units, so it\nneeds a VM or a systemd-enabled container, not a plain docker image.\n').returncode
+
+tests/test_bootstrap_fetch.py:256: AssertionError
+__________ test_check_procedures_real_skip_without_passwordless_sudo ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_check_procedures_real_ski0')
+
+    def test_check_procedures_real_skip_without_passwordless_sudo(tmp_path):
+        """Real behaviour on this host, not mocked: no passwordless sudo to the
+        postgres OS user for the current operator - skipped, not failed, and
+        says why. Same pre-existing limitation test_pipelines_runtime.py's own
+        throwaway_warehouse fixture already hits."""
+        pipeline = _pipeline(tmp_path / "pipelines", with_dbt=False)
+>       result = validate.check_procedures(pipeline)
+
+tests/test_pipelines_validate.py:253: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpagent/pipelines/validate.py:300: in check_procedures
+    with pg_throwaway.throwaway_database(prefix="dpagent_validate") as db:
+/usr/lib/python3.10/contextlib.py:135: in __enter__
+    return next(self.gen)
+src/dpagent/pipelines/pg_throwaway.py:153: in throwaway_database
+    created_role = _run_as_postgres(f"CREATE ROLE {role} LOGIN PASSWORD '{password}';")
+src/dpagent/pipelines/pg_throwaway.py:95: in _run_as_postgres
+    return subprocess.run(
+/usr/lib/python3.10/subprocess.py:503: in run
+    with Popen(*popenargs, **kwargs) as process:
+/usr/lib/python3.10/subprocess.py:971: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['sudo', '-n', '-u', 'postgres', 'psql', '-v',...>
+args = ['sudo', '-n', '-u', 'postgres', 'psql', '-v', ...], executable = b'sudo'
+preexec_fn = None, close_fds = True, pass_fds = (), cwd = None, env = None
+startupinfo = None, creationflags = 0, shell = False, p2cread = -1
+p2cwrite = -1, c2pread = 12, c2pwrite = 13, errread = 14, errwrite = 15
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _posixsubprocess.fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        gid, gids, uid, umask,
+                        preexec_fn)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                child_exec_never_called = (err_msg == "noexec")
+                if child_exec_never_called:
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+>               raise child_exception_type(errno_num, err_msg, err_filename)
+E               FileNotFoundError: [Errno 2] No such file or directory: 'sudo'
+
+/usr/lib/python3.10/subprocess.py:1863: FileNotFoundError
+___ test_validate_pipeline_hash_changes_when_a_referenced_procedure_changes ____
+
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_validate_pipeline_hash_ch0')
+
+    def test_validate_pipeline_hash_changes_when_a_referenced_procedure_changes(tmp_path):
+        root = tmp_path / "pipelines"
+        pipeline = _pipeline(root, with_dbt=False)
+>       report1 = validate.validate_pipeline(pipeline)
+
+tests/test_pipelines_validate.py:364: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpagent/pipelines/validate.py:456: in validate_pipeline
+    compiled = check_compiles(pipeline)
+src/dpagent/pipelines/validate.py:343: in check_compiles
+    return CompileReport(dbt=check_dbt_models(pipeline), procedures=check_procedures(pipeline),
+src/dpagent/pipelines/validate.py:300: in check_procedures
+    with pg_throwaway.throwaway_database(prefix="dpagent_validate") as db:
+/usr/lib/python3.10/contextlib.py:135: in __enter__
+    return next(self.gen)
+src/dpagent/pipelines/pg_throwaway.py:153: in throwaway_database
+    created_role = _run_as_postgres(f"CREATE ROLE {role} LOGIN PASSWORD '{password}';")
+src/dpagent/pipelines/pg_throwaway.py:95: in _run_as_postgres
+    return subprocess.run(
+/usr/lib/python3.10/subprocess.py:503: in run
+    with Popen(*popenargs, **kwargs) as process:
+/usr/lib/python3.10/subprocess.py:971: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['sudo', '-n', '-u', 'postgres', 'psql', '-v',...>
+args = ['sudo', '-n', '-u', 'postgres', 'psql', '-v', ...], executable = b'sudo'
+preexec_fn = None, close_fds = True, pass_fds = (), cwd = None, env = None
+startupinfo = None, creationflags = 0, shell = False, p2cread = -1
+p2cwrite = -1, c2pread = 12, c2pwrite = 13, errread = 14, errwrite = 15
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _posixsubprocess.fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        gid, gids, uid, umask,
+                        preexec_fn)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                child_exec_never_called = (err_msg == "noexec")
+                if child_exec_never_called:
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+>               raise child_exception_type(errno_num, err_msg, err_filename)
+E               FileNotFoundError: [Errno 2] No such file or directory: 'sudo'
+
+/usr/lib/python3.10/subprocess.py:1863: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_bootstrap_fetch.py::test_fresh_tarball_extract_installs_its_own_source_not_a_placeholder_clone
+FAILED tests/test_bootstrap_fetch.py::test_explicit_source_dir_wins_even_when_bootstrap_sh_is_not_inside_it
+FAILED tests/test_bootstrap_fetch.py::test_auto_detected_source_dir_does_not_override_an_explicit_tarball_or_repo
+FAILED tests/test_bootstrap_fetch.py::test_no_source_configured_fails_loudly_not_a_placeholder_clone
+FAILED tests/test_bootstrap_fetch.py::test_rerunning_with_the_same_source_is_idempotent
+FAILED tests/test_bootstrap_fetch.py::test_with_llm_unset_installs_the_plain_package
+FAILED tests/test_bootstrap_fetch.py::test_with_llm_set_adds_the_llm_extra - AssertionError: [36m::[0m detected Ubuntu 22.04.5 LTS (debian family)
+FAILED tests/test_pipelines_validate.py::test_check_procedures_real_skip_without_passwordless_sudo
+FAILED tests/test_pipelines_validate.py::test_validate_pipeline_hash_changes_when_a_referenced_procedure_changes
+9 failed, 1301 passed, 25 skipped in 363.98s (0:06:03)

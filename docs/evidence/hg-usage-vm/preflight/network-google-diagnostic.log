@@ -1,0 +1,116 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 142.251.152.119:443...
+* Connected to www.google.com (142.251.152.119) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+*  CAfile: /etc/ssl/certs/ca-certificates.crt
+*  CApath: /etc/ssl/certs
+* TLSv1.0 (OUT), TLS header, Certificate Status (22):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+} [512 bytes data]
+* TLSv1.2 (IN), TLS header, Certificate Status (22):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* TLSv1.2 (IN), TLS header, Finished (20):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+{ [15 bytes data]
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+{ [2477 bytes data]
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+{ [79 bytes data]
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+{ [52 bytes data]
+* TLSv1.2 (OUT), TLS header, Finished (20):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+} [1 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+} [52 bytes data]
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+* ALPN, server accepted to use h2
+* Server certificate:
+*  subject: CN=www.google.com
+*  start date: Sep 28 18:41:21 2026 GMT
+*  expire date: Dec 21 18:41:20 2026 GMT
+*  subjectAltName: host "www.google.com" matched cert's "www.google.com"
+*  issuer: C=US; O=Google Trust Services; CN=WE2
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multiplexing
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+* Using Stream ID: 1 (easy handle 0x55f6afe36a90)
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+> HEAD / HTTP/2
+> Host: www.google.com
+> user-agent: curl/7.81.0
+> accept: */*
+> 
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [282 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [282 bytes data]
+* old SSL session ID is stale, removing
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (IN), TLS header, Supplemental data (23):
+{ [5 bytes data]
+* TLSv1.2 (OUT), TLS header, Supplemental data (23):
+} [5 bytes data]
+< HTTP/2 200 
+< content-type: text/html; charset=ISO-8859-1
+< content-security-policy-report-only: object-src 'none';base-uri 'self';script-src 'nonce-Af2sUmDwcyZ2zkcBRyq4yA' 'strict-dynamic' 'report-sample' 'unsafe-eval' 'unsafe-inline' https: http:;report-uri https://csp.withgoogle.com/csp/gws/other-hp
+< accept-ch: Sec-CH-Prefers-Color-Scheme
+< p3p: CP="This is not a P3P policy! See g.co/p3phelp for more info."
+< date: Wed, 14 Oct 2026 04:42:13 GMT
+< server: gws
+< x-xss-protection: 0
+< x-frame-options: SAMEORIGIN
+< expires: Wed, 14 Oct 2026 04:42:13 GMT
+< cache-control: private
+[private response header redacted]
+[private response header redacted]
+[private response header redacted]
+< alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+< 
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+* Connection #0 to host www.google.com left intact
+HTTP/2 200 
+content-type: text/html; charset=ISO-8859-1
+content-security-policy-report-only: object-src 'none';base-uri 'self';script-src 'nonce-Af2sUmDwcyZ2zkcBRyq4yA' 'strict-dynamic' 'report-sample' 'unsafe-eval' 'unsafe-inline' https: http:;report-uri https://csp.withgoogle.com/csp/gws/other-hp
+accept-ch: Sec-CH-Prefers-Color-Scheme
+p3p: CP="This is not a P3P policy! See g.co/p3phelp for more info."
+date: Wed, 14 Oct 2026 04:42:13 GMT
+server: gws
+x-xss-protection: 0
+x-frame-options: SAMEORIGIN
+expires: Wed, 14 Oct 2026 04:42:13 GMT
+cache-control: private
+[private response header redacted]
+[private response header redacted]
+[private response header redacted]
+alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+

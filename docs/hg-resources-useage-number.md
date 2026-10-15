@@ -92,3 +92,26 @@ assertion follow-up and Linux company-host handoff are documented in
 * The seed is HG's operational list of 5 787 stock codes, committed as is.
 * Real HG source tables are named `Channel`, `Resource`, … and their EL renames them; connecting dpagent to the real
   source needs a view layer or a rename step that is not built here.
+
+## Final verification after #41 / PR #42
+
+Source `cefb458b8131e97b7b1df9649edc43a6926e5759` passed the company Linux-host
+verification: targeted usage **3/3** (exit 3 means a complete requested subset),
+full bronze **34/34** (exit 0), full unit **1,310 passed / 25 skipped** (exit 0),
+and **0 leaks** in both independent acceptance audits. The stack ran in the
+repository's Ubuntu 22.04 systemd disposable Docker container on Oracle Linux
+8.10. The runner was removed after recording journals and confirming existing
+container IDs remained present. No host demo service or database was changed.
+
+Evidence includes independent silver/gold comparisons, both idempotent runs,
+5,787-row seed/exclusions, CamelCase staging columns, timestamp types and the
+actual **Etc/UTC** dbt session. The conflicting journal has the silver unique
+failure and no gold transform.start; promote is denied without approval change.
+The valid case proves promote/deploy/run and exact owned-project publication.
+UTC wall-time expectations are explicit for this fixture; this does not settle
+the business timezone of future real data. HG SQL, seed and expected were kept.
+
+See [full evidence, failures and reproduction](evidence/hg-usage-company/README.md).
+Historical 1,269/25 and 1,281/25 unit evidence remains preserved. Documentation
+commits after the tested source do not alter its implementation. This acceptance
+does not cover Superset/dashboard or representative production load.

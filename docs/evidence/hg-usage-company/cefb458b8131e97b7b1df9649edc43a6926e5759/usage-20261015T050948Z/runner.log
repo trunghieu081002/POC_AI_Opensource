@@ -1,0 +1,29 @@
+[36m::[0m reusing disposable dpagent-m25-acceptance-171123; synchronizing committed source cefb458b8131e97b7b1df9649edc43a6926e5759 without bootstrap
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+ok    usage-correct-twice          overall=pass cleanup=pass - matched expectation
+ok    usage-conflicting-ids        overall=fail cleanup=pass - conflicting source ids: silver's unique test failed, gold never ran, nothing promotable
+ok    usage-promote-deploy-run     overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+
+3/3 requested scenarios matched their expectation (the 'bronze' profile is 34).
+31 scenario(s) of the 'bronze' profile were not requested this run: ['a2-promote-deploy-run', 'correct-twice', 'drop-failure', 'fact-correct-twice', 'fact-dbt-test-fails', 'fact-no-tests', 'fact-promote-deploy-run', 'gate-over-threshold', 'gate-under-threshold', 'hg-correct-twice', 'hg-purge-failure-detected', 'hg-selector-typo', 'hg-stray-object-purged', 'hg-symlink-refused', 'hg-timeout', 'hg-wrong-expected', 'late-deploy-failure', 'literal-connection', 'mixed-connection', 'pair-correct-twice', 'pair-load-fails-midway', 'pair-missing-table', 'pair-tampered-batch-manifest', 'pair-tampered-object', 'partial-deploy-failure', 'ref-connection', 'seed-failure', 'source-provisioning-failure', 'timeout', 'warehouse-provisioning-failure', 'wrong-expected']
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+[32mok[0m evidence written under /home/oracle/projects/dpagent-verification/docs/evidence/hg-usage-company/cefb458b8131e97b7b1df9649edc43a6926e5759/usage-20261015T050948Z/evidence
+[36m::[0m --keep: leaving dpagent-m25-acceptance-171123 for inspection

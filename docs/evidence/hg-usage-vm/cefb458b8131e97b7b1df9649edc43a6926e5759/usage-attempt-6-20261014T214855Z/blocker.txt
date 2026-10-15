@@ -1,0 +1,1 @@
+Host blocker: VM clock observed ~5h34m behind Windows with kernel CPU soft lockups/watchdog failures. Acceptance interrupted rather than extending deadlines or weakening checks. No production/demo service or global clock/DNS/power-plan change.

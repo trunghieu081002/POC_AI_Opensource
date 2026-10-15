@@ -1,0 +1,30 @@
+[36m::[0m reusing disposable dpagent-m25-acceptance-12428; synchronizing committed source d7eea6f0b674f9c6ecd6b7c0bf28873c411a3bcf without bootstrap
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+ERROR usage-correct-twice          driver itself raised: JSONDecodeError('Expecting value: line 1 column 1372 (char 1371)')
+ok    usage-conflicting-ids        overall=fail cleanup=pass - conflicting source ids: silver's unique test failed, gold never ran, nothing promotable
+ERROR usage-promote-deploy-run     driver itself raised: JSONDecodeError('Expecting value: line 1 column 1372 (char 1371)')
+
+1/3 requested scenarios matched their expectation (the 'bronze' profile is 34).
+2 scenario(s) raised instead of producing a result: ['usage-correct-twice', 'usage-promote-deploy-run']
+31 scenario(s) of the 'bronze' profile were not requested this run: ['a2-promote-deploy-run', 'correct-twice', 'drop-failure', 'fact-correct-twice', 'fact-dbt-test-fails', 'fact-no-tests', 'fact-promote-deploy-run', 'gate-over-threshold', 'gate-under-threshold', 'hg-correct-twice', 'hg-purge-failure-detected', 'hg-selector-typo', 'hg-stray-object-purged', 'hg-symlink-refused', 'hg-timeout', 'hg-wrong-expected', 'late-deploy-failure', 'literal-connection', 'mixed-connection', 'pair-correct-twice', 'pair-load-fails-midway', 'pair-missing-table', 'pair-tampered-batch-manifest', 'pair-tampered-object', 'partial-deploy-failure', 'ref-connection', 'seed-failure', 'source-provisioning-failure', 'timeout', 'warehouse-provisioning-failure', 'wrong-expected']
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+[32mok[0m evidence written under /home/m25/projects/hg-usage-acceptance/docs/evidence/hg-usage-vm/d7eea6f0b674f9c6ecd6b7c0bf28873c411a3bcf/usage-attempt-2-20261014T092126Z/evidence
+[36m::[0m --keep: leaving dpagent-m25-acceptance-12428 for inspection
