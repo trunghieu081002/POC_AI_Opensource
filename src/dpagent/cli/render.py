@@ -26,7 +26,7 @@ def fail(message: str, code: int = 1):
 def echo_output(text: str, style: str = "dim", limit: int = 40) -> None:
     lines = [l for l in params_mod.redact(text).splitlines() if l.strip()]
     for line in lines[-limit:]:
-        console.print(f"      [{style}]{line}[/{style}]")
+        console.print("      " + line, style=style, markup=False, highlight=False)
 
 
 def parse_set(pairs: tuple[str, ...], default_pack: str | None) -> dict[str, dict]:

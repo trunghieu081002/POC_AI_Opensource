@@ -119,14 +119,14 @@ def test_list_type_wraps_a_single_value_with_no_comma():
 def test_string_type_with_a_comma_is_not_split():
     """The regression this guards: postgres.listen_addresses is a `string` param
     whose own GUC syntax is itself a comma-joined value
-    ("localhost,192.168.1.54"). A `--set` that put this through the same
+    ("localhost,192.0.2.54"). A `--set` that put this through the same
     comma-split as a `list` param corrupted it into a Python list, which the
     string coercer then stringified with str() into the literal text
-    "['localhost', '192.168.1.54']" - written straight into postgresql.conf,
+    "['localhost', '192.0.2.54']" - written straight into postgresql.conf,
     which refused to start on the invalid syntax."""
     schema = dict(SCHEMA, listen_addresses={"type": "string", "default": "localhost"})
-    out = params.resolve(schema, {"listen_addresses": "localhost,192.168.1.54"}, pack="postgres")
-    assert out["listen_addresses"] == "localhost,192.168.1.54"
+    out = params.resolve(schema, {"listen_addresses": "localhost,192.0.2.54"}, pack="postgres")
+    assert out["listen_addresses"] == "localhost,192.0.2.54"
 
 
 def test_list_type_parses_a_json_array_string():

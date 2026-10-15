@@ -19,8 +19,8 @@ def test_comma_value_is_kept_as_a_raw_string():
     out = render.parse_set(("postgres.databases=warehouse,airflow_meta",), None)
     assert out == {"postgres": {"databases": "warehouse,airflow_meta"}}
 
-    out = render.parse_set(("postgres.listen_addresses=localhost,192.168.1.54",), None)
-    assert out == {"postgres": {"listen_addresses": "localhost,192.168.1.54"}}
+    out = render.parse_set(("postgres.listen_addresses=localhost,192.0.2.54",), None)
+    assert out == {"postgres": {"listen_addresses": "localhost,192.0.2.54"}}
 
 
 def test_default_pack_is_used_when_key_has_no_dot():
@@ -66,3 +66,23 @@ def test_preflight_failure_output_is_still_shown():
 
     assert "something is wrong" in capture.get()
     assert "preflight failed" in capture.get()
+
+
+def test_subprocess_markup_is_printed_literally():
+    output="Loaded configuration at [/opt/superset/superset_config.py]\n[red]literal tool output[/red] [/orphan]"
+    with render.console.capture() as captured:
+        render.echo_output(output)
+    text=captured.get()
+    assert "[/opt/superset/superset_config.py]" in text
+    assert "[red]literal tool output[/red] [/orphan]" in text
+
+
+def test_literal_subprocess_output_still_redacts_secrets(monkeypatch):
+    from dpagent.engine import params
+    secret="registered-unit-secret-value"
+    monkeypatch.setattr(params,"_SECRETS",{secret})
+    with render.console.capture() as captured:
+        render.echo_output("[red]"+secret+"[/red]",style="red")
+    text=captured.get()
+    assert secret not in text
+    assert "[red]"+params.MASK+"[/red]" in text

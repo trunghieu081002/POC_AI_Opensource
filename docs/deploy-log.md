@@ -1,4 +1,6 @@
-# Deployment log — 192.168.1.54
+> Private connection addresses are replaced with a TEST-NET documentation address. Historical commands below are not current SSH configuration.
+
+# Deployment log — 192.0.2.54
 
 A running record of what was decided, what was run, and what it changed on the
 target. Append to it; do not rewrite history.
@@ -13,7 +15,7 @@ target. Append to it; do not rewrite history.
 
 | | |
 |---|---|
-| Host | `192.168.1.54` (LAN) |
+| Host | `192.0.2.54` (LAN) |
 | User | `phule` |
 | Classification | **Production** — carries real traffic |
 | Reachability | TCP 22 open from the Windows workstation |
@@ -60,8 +62,8 @@ target. Append to it; do not rewrite history.
 ### 2026-09-10 — connectivity check (read-only)
 
 ```
-Test-NetConnection 192.168.1.54 -Port 22   -> open
-ssh -o BatchMode=yes phule@192.168.1.54    -> Permission denied (exit 255)
+Test-NetConnection 192.0.2.54 -Port 22   -> open
+ssh -o BatchMode=yes phule@192.0.2.54    -> Permission denied (exit 255)
 ```
 
 Diagnosis: no key available, and the agent's shell is non-interactive with stdin
@@ -385,7 +387,7 @@ asked to "just start executing" the Getting Started flow. It installed
 `python3.11`, `base`, and — **the earlier decision to skip the postgres
 pack was not seen and was overridden** — `postgres` 15 host-level on port
 5432, with the acceptance suite passing (6/6 checks). Identity as ol8-19
-(192.168.1.54, the same shared production host: Oracle DB, MySQL,
+(192.0.2.54, the same shared production host: Oracle DB, MySQL,
 Elasticsearch, LDAP, OpenMetadata, the `postgres:16-alpine` container on
 55432, disk 87% used) was only recognised **after** postgres was already
 installed and proven, by cross-referencing `hostname`/`ss -tlnp` against this
@@ -561,9 +563,9 @@ binds `0.0.0.0:8090`.
 **postgres: not straightforward, and it broke the running stack.**
 `listen_addresses` defaults to `localhost`; reaching it from the LAN needs
 the host's own IP added. First attempt:
-`--set postgres.listen_addresses=192.168.1.54` — this *replaced* the
+`--set postgres.listen_addresses=192.0.2.54` — this *replaced* the
 listen list rather than extending it. PostgreSQL bound only to
-`192.168.1.54:5432` and stopped listening on `127.0.0.1`/`::1` entirely,
+`192.0.2.54:5432` and stopped listening on `127.0.0.1`/`::1` entirely,
 which is exactly what airflow's `backend_host=localhost` and dbt's
 `profiles.yml` `host: localhost` both depend on. The acceptance suite's
 "wrong password refused" check caught it immediately (its control
@@ -571,7 +573,7 @@ connection over TCP loopback failed outright) — a good example of why that
 suite exists; `verify` alone (checks `something is listening on 5432`, not
 *where*) would have reported this install as fine.
 
-**Fix, take one:** `--set postgres.listen_addresses="localhost,192.168.1.54"`
+**Fix, take one:** `--set postgres.listen_addresses="localhost,192.0.2.54"`
 (PostgreSQL's own GUC natively accepts a comma-joined list in one string).
 This exposed a second, unrelated bug: **`dpagent install`'s `--set` flag
 silently corrupts any `string`-typed param whose value contains a comma.**
@@ -583,7 +585,7 @@ this split happens to produce the right value by accident; for a
 `string`-typed param whose *own* legitimate value contains a comma
 (`listen_addresses`), it produced a Python list, which `resolve()`'s
 `string` coercer then stringified with `str()` — `"['localhost',
-'192.168.1.54']"`, single-quotes-and-all, written straight into
+'192.0.2.54']"`, single-quotes-and-all, written straight into
 `postgresql.conf`. Postgres refused to start on invalid config syntax, and
 because the *previous* run had already gotten as far as writing that broken
 `conf.d/10-dpagent.conf` before failing, every re-run thereafter also failed
@@ -601,7 +603,7 @@ directions with `pytest` (`tests/test_params.py`, 12/12) and a direct
 `parse_set` → `resolve` round-trip for each type.
 
 **Verified after the fix:** postgres listens on `127.0.0.1:5432`,
-`[::1]:5432` *and* `192.168.1.54:5432`; firewalld has `5432/tcp` open;
+`[::1]:5432` *and* `192.0.2.54:5432`; firewalld has `5432/tcp` open;
 acceptance suite 6/6; airflow `/health` still reports `metadatabase:
 healthy`; `dbt debug` from the `airflow` user still succeeds. Nothing
 downstream broke.
