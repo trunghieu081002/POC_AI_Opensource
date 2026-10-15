@@ -1,0 +1,1 @@
+c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8 dpagent-m25-disposable {} /sys/fs/cgroup -> /sys/fs/cgroup rw=true; /home/oracle/projects/dpagent-final-regression-2 -> /opt/src/dpagent-src rw=false; 

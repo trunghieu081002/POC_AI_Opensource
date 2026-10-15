@@ -1,0 +1,1 @@
+M25_CGROUPNS=host bash scripts/m25-acceptance-ci.sh --keep --reuse-container <verified-owned-container> --profile bronze

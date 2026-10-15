@@ -1,0 +1,106 @@
+project: bi-stack
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  postgres           5  requested  │
+│  5  superset           6  requested  │
+╰──────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.0  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["public"], "warehouse_creator_roles": ["analytics_writer"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 8392ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 87373ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 54ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 149ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 18885ms
+  6/6 service · Enable the Superset systemd service
+      ok 227ms
+  verify ok
+      No broken requirements found.
+      Loaded your LOCAL configuration at [/opt/superset/superset_config.py]
+      Superset PostgreSQL engine discovery passed
+      2026-10-15 07:19:33,921⚠superset.initialization:We haven't found any 
+Content Security Policy (CSP) defined in the configurations. Please make sure to
+configure CSP using the TALISMAN_ENABLED and TALISMAN_CONFIG keys or any other 
+external software. Failing to configure CSP have serious security implications. 
+Check https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP for more 
+information. You can disable this warning using the 
+CONTENT_SECURITY_POLICY_WARNING key.
+      2026-10-15 07:19:34,625:INFO:alembic.runtime.migration:Context impl 
+PostgresqlImpl.
+      2026-10-15 07:19:34,626:INFO:alembic.runtime.migration:Will assume 
+transactional DDL.
+      2026-10-15 07:19:35,305:INFO:superset.app:Syncing configuration to 
+database...
+      2026-10-15 07:19:35,313:INFO:superset.app:Configuration sync to database 
+completed successfully
+      2026-10-15 07:19:36,069:INFO:superset.core.mcp.core_mcp_injection:fastmcp 
+is not installed, skipping MCP initialization. Install it with: pip install 
+'apache-superset[fastmcp]'
+      ok Superset healthy
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+846ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 
+1646ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 2015ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1517ms
+    PASS Restart preserves the same unique metadata connection and query result 
+9771ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 462ms
+  superset: 4 checks passed
+
+╭──────── acceptance ────────╮
+│  suite     result  checks  │
+│  superset  passed     4/4  │
+╰────────────────────────────╯
+Authenticated warehouse query matches independent expected n=2,total=30
+Authenticated warehouse query matches independent expected n=2,total=30
+SQL Lab and PostgreSQL independently refuse writes (SQLSTATE 42501)
+Authenticated warehouse query matches independent expected n=2,total=30
+Same metadata connection survived restart
+Reinstall preserved one admin, one lifecycle connection and the same metadata id
+recovery=pass metadata_identity=preserved warehouse_expected=2,30 readonly=pass

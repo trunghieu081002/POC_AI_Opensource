@@ -1,0 +1,63 @@
+name: superset
+version: 0.1.0
+summary: Apache Superset in its own virtualenv with PostgreSQL metadata and a read-only warehouse role
+maturity: draft
+provides: [superset, business-intelligence]
+requires: [base, python-modern, postgres]
+supports:
+  families: [debian, rhel]
+host_needs:
+  memory_mb: 2048
+  disk_mb: { /opt: 4096 }
+params:
+  version: {type: string, default: "6.1.0", enum: ["6.1.0"]}
+  install_dir: {type: string, default: "/opt/superset", enum: ["/opt/superset"]}
+  bind_host: {type: string, default: "127.0.0.1"}
+  webserver_port: {type: int, default: 8088}
+  backend_host: {type: string, default: "localhost"}
+  backend_port: {type: int, default: 5432}
+  backend_db: {type: string, default: "superset_meta"}
+  backend_user: {type: string, default: "superset_meta"}
+  backend_password: {type: string, required: true, secret: true}
+  secret_key: {type: string, required: true, secret: true}
+  admin_user: {type: string, default: "admin"}
+  admin_password: {type: string, required: true, secret: true}
+  admin_email: {type: string, default: "admin@example.com"}
+  warehouse_host: {type: string, default: "localhost", enum: ["localhost", "127.0.0.1", "::1"]}
+  warehouse_port: {type: int, default: 5432}
+  warehouse_db: {type: string, default: "warehouse"}
+  warehouse_role: {type: string, default: "superset_reader"}
+  warehouse_password: {type: string, required: true, secret: true}
+  warehouse_schemas: {type: list, required: true}
+  warehouse_creator_roles: {type: list, required: true}
+preflight: preflight.sh
+verify: verify.sh
+rollback: rollback.sh
+detect: detect.sh
+errors: errors.yaml
+steps:
+  - id: runtime
+    script: steps/10-runtime.sh
+    description: Create a dedicated OS user and virtualenv without replacing system Python
+    timeout: 600
+    guard: 'test -x /opt/superset/.venv/bin/python && test -f /opt/superset/.dpagent-owned'
+  - id: install
+    script: steps/20-install.sh
+    description: Install the pinned Superset application and PostgreSQL adapter
+    timeout: 1800
+  - id: config
+    script: steps/30-config.sh
+    description: Write the protected environment and Superset configuration
+    timeout: 60
+  - id: warehouse-reader
+    script: steps/40-reader.sh
+    description: Provision an owned reader with SELECT defaults for the real table creators
+    timeout: 120
+  - id: metadata
+    script: steps/50-metadata.sh
+    description: Migrate metadata and create one admin without loading example data
+    timeout: 600
+  - id: service
+    script: steps/60-service.sh
+    description: Enable the Superset systemd service
+    timeout: 180

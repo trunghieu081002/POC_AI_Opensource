@@ -1,0 +1,70 @@
+JOB UNIT                       TYPE    STATE
+339 postgresql.service         start   waiting
+385 airflow-scheduler.service  start   waiting
+384 postgresql@15-main.service restart running
+
+3 jobs listed.
+○ postgresql.service - PostgreSQL RDBMS
+     Loaded: loaded (/lib/systemd/system/postgresql.service; enabled; vendor preset: enabled)
+     Active: inactive (dead) since Thu 2026-10-15 07:48:02 UTC; 25min ago
+   Main PID: 7262 (code=exited, status=0/SUCCESS)
+
+Oct 15 07:44:35 c99586116ebf systemd[1]: Starting PostgreSQL RDBMS...
+Oct 15 07:44:35 c99586116ebf systemd[1]: Finished PostgreSQL RDBMS.
+Oct 15 07:48:02 c99586116ebf systemd[1]: postgresql.service: Deactivated successfully.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopped PostgreSQL RDBMS.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopping PostgreSQL RDBMS...
+
+● postgresql@15-main.service - PostgreSQL Cluster 15-main
+     Loaded: loaded (/lib/systemd/system/postgresql@.service; enabled-runtime; vendor preset: enabled)
+     Active: deactivating (stop-sigterm) since Thu 2026-10-15 07:48:02 UTC; 25min ago
+    Process: 9142 ExecStop=/usr/bin/pg_ctlcluster --skip-systemctl-redirect -m fast 15-main stop (code=exited, status=0/SUCCESS)
+   Main PID: 7244 (code=exited, status=0/SUCCESS)
+      Tasks: 0 (limit: 76610)
+     Memory: 44.9M
+     CGroup: /docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8/system.slice/system-postgresql.slice/postgresql@15-main.service
+
+Oct 15 07:44:33 c99586116ebf systemd[1]: Starting PostgreSQL Cluster 15-main...
+Oct 15 07:44:35 c99586116ebf systemd[1]: Started PostgreSQL Cluster 15-main.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopping PostgreSQL Cluster 15-main...
+Oct 15 07:44:33 c99586116ebf systemd[1]: Starting PostgreSQL Cluster 15-main...
+Oct 15 07:44:35 c99586116ebf systemd[1]: Started PostgreSQL Cluster 15-main.
+Oct 15 07:44:35 c99586116ebf systemd[1]: Starting PostgreSQL RDBMS...
+Oct 15 07:44:35 c99586116ebf systemd[1]: Finished PostgreSQL RDBMS.
+Oct 15 07:48:02 c99586116ebf systemd[1]: postgresql.service: Deactivated successfully.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopped PostgreSQL RDBMS.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopping PostgreSQL RDBMS...
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopping PostgreSQL Cluster 15-main...
+2026-10-15 07:44:33.521 UTC [7244] LOG:  redirecting log output to logging collector process
+2026-10-15 07:44:33.521 UTC [7244] HINT:  Future log output will appear in directory "log".
+    PID    PPID STAT WCHAN                    ELAPSED COMMAND
+      1       0 Ss   ep_poll                     2121 systemd
+     23       1 S<s  ep_poll                     2121 systemd-journal
+     43       1 Ss   ep_poll                     2120 systemd-resolve
+     45       1 Ss   ep_poll                     2120 dbus-daemon
+     47       1 Ss   ep_poll                     2120 systemd-logind
+   8126       1 Ss   do_select                   1595 airflow
+   8178    8126 S    do_select                   1593 gunicorn: maste
+   8310    8178 S    do_select                   1589 [ready] gunicor
+   8311    8178 S    do_select                   1589 [ready] gunicor
+   8312    8178 S    do_select                   1588 [ready] gunicor
+   8313    8178 S    do_select                   1588 [ready] gunicor
+   9141       1 S    do_poll.constprop.0         1528 systemctl
+  10656       1 Ssl  futex_wait_queue_me         1181 weed
+  11912       0 Ss   do_wait                        0 bash
+  11922   11912 R    -                              0 ps
+drwxrwsr-x. 2 postgres postgres 40 Oct 15 07:48 /var/run/postgresql
+ls: cannot access '/var/lib/postgresql/15/main/postmaster.pid': No such file or directory
+13:perf_event:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+12:cpu,cpuacct:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+11:misc:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+10:rdma:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+9:pids:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+8:net_cls,net_prio:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+7:freezer:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+6:cpuset:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+5:hugetlb:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+4:blkio:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+3:memory:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+2:devices:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8
+1:name=systemd:/docker/c99586116ebfcb1a25f62ebfa8293caf716227403112b129c365aff5ca87d6f8/init.scope

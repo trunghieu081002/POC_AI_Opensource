@@ -1,0 +1,1 @@
+Unprivileged disposable unit user; isolated journal; pytest full suite with dev,llm dependencies, no provider credentials/calls

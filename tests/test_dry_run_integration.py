@@ -34,6 +34,14 @@ requires_bash = pytest.mark.skipif(
 # override here — everything else comes from the pack's own schema defaults,
 # exactly like a real --dry-run with no --set flags.
 REQUIRED_OVERRIDES = {
+    "superset": {
+        "backend_password": "dryrun-metadata-password",
+        "admin_password": "dryrun-admin-password",
+        "warehouse_password": "dryrun-reader-password",
+        "secret_key": "dryrun-test-key-with-at-least-32-characters",
+        "warehouse_schemas": ["public"],
+        "warehouse_creator_roles": ["analytics_writer"],
+    },
     "airflow": {"backend_password": "dryrun-test-pw", "admin_password": "dryrun-test-pw"},
     "seaweedfs": {"access_key": "dryrunaccesskey", "secret_key": "dryrunsecretkey"},
 }

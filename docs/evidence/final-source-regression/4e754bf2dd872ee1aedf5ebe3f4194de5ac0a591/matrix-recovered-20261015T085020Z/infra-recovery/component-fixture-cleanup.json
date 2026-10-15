@@ -1,0 +1,7 @@
+{
+  "before": [
+    "dpagent_selftest_2"
+  ],
+  "dropped_only_failed_install_run_2_fixture": true,
+  "after": []
+}

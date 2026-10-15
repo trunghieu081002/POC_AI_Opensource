@@ -1,0 +1,25 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 323B done
+#1 DONE 0.3s
+
+#2 [internal] load metadata for docker.io/library/dpagent-m25-disposable:latest
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.7s
+
+#4 [1/2] FROM docker.io/library/dpagent-m25-disposable:latest
+#4 DONE 0.0s
+
+#5 [2/2] RUN apt-get update -qq && apt-get install -y -qq python3 python3-venv git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+#5 CACHED
+
+#6 exporting to image
+#6 exporting layers done
+#6 writing image sha256:ec25a8454d5546411e34ecc305dced9f92d371190fd97ee4842de32fb027dd3f 0.0s done
+#6 naming to docker.io/library/dpagent-unit-dev:ubuntu22 0.0s done
+#6 DONE 0.1s

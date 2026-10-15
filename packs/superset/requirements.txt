@@ -1,0 +1,13 @@
+# Application/driver pins plus ABI-sensitive pins from the 6.1.0 release requirements.
+# https://github.com/apache/superset/blob/6.1.0/requirements/base.txt
+apache-superset[postgres,gevent]==6.1.0
+apache-superset-core==0.1.0
+gunicorn==23.0.0
+numpy==1.26.4
+pandas==2.1.4
+pyarrow==16.1.0
+Flask==2.3.3
+Flask-AppBuilder==5.0.2
+marshmallow==3.26.2
+greenlet==3.1.1
+cachetools==6.2.1
