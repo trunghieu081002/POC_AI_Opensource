@@ -13,10 +13,13 @@ for item in config['projects']:
     if len(sys.argv)>2 and name!=sys.argv[2]:continue
     p=a.read_project(yaml.safe_load((ROOT/'projects'/name/'bi.yaml').read_text()),c.binding)
     action=sys.argv[1]
-    if action=='deploy':
+    if action in ('deploy','redeploy'):
+        before=c.lookup(p['resources']) if action=='redeploy' else None
         p['config']['approved_sha256']=p['fingerprint']
         ids=a.deploy(c,p,'disposable-integration-acceptance')
-        reports[name]={'ids':ids,'fingerprint':p['fingerprint']}
+        if before is not None and ids!=before:raise AssertionError('Redeploy changed native UUID/ID mapping')
+        _,comparisons=a.check_results(c,p)
+        reports[name]={'ids':ids,'fingerprint':p['fingerprint'],'stable_ids':before is None or before==ids,'comparisons':comparisons}
     elif action=='verify':
         ids,observations=a.check_results(c,p);reports[name]={'ids':ids,'comparisons':observations}
     elif action=='undeploy':
