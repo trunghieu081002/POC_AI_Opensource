@@ -1,0 +1,24 @@
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 184ms
+  checks
+    PASS A row written is the same row read back 470ms
+    PASS Committed data is still there after a service restart 6191ms
+    PASS A wrong password is refused (negative) 406ms
+    PASS Every database in the spec accepts a connection and a write 514ms
+    PASS The running server reports the port and limits that were asked for 
+261ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 33ms
+  teardown
+    PASS Remove everything the suite created 466ms
+  postgres: 6 checks passed
+
+╭──────── acceptance ────────╮
+│  suite     result  checks  │
+│  postgres  passed     6/6  │
+╰────────────────────────────╯

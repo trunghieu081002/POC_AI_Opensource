@@ -1,0 +1,82 @@
+........................................................................ [  5%]
+........................................ss.s.s.s.s.sss.sFs.............. [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 21%]
+........................................................................ [ 26%]
+...............................s........................................ [ 31%]
+........................................................................ [ 37%]
+........................................................................ [ 42%]
+........sss............................................................. [ 47%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 74%]
+........................................................................ [ 79%]
+..............................ssssss.................................... [ 85%]
+........................sss.s.................s......................... [ 90%]
+........................................................................ [ 95%]
+........................................................                 [100%]
+=================================== FAILURES ===================================
+__________ test_every_step_survives_dry_run_in_order[superset-ubuntu] __________
+
+pack_name = 'superset', fake_os = 'ubuntu'
+tmp_path = PosixPath('/tmp/pytest-of-unit/pytest-0/test_every_step_survives_dry_r14')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0f1ad76230>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+>       resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+
+tests/test_dry_run_integration.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+schema = {'version': {'type': 'string', 'default': '6.1.0', 'enum': ['6.1.0']}, 'install_dir': {'type': 'string', 'default': '/...t']}, 'bind_host': {'type': 'string', 'default': '127.0.0.1'}, 'webserver_port': {'type': 'int', 'default': 8088}, ...}
+supplied = {}, pack = 'superset'
+
+    def resolve(schema: dict[str, dict], supplied: dict | None, *,
+                pack: str) -> dict[str, Any]:
+        """Merge supplied params over pack defaults, coerce types, validate, and
+        register secrets. Returns the dict handed to the step scripts.
+        """
+        supplied = resolve_refs(dict(supplied or {}), path=f"{pack}.params")
+        schema = schema or {}
+    
+        unknown = set(supplied) - set(schema)
+        if unknown:
+            raise ParamError(
+                f"pack {pack!r} has no param(s) {sorted(unknown)}; "
+                f"it accepts {sorted(schema) or '(none)'}"
+            )
+    
+        out: dict[str, Any] = {}
+        for name, rule in schema.items():
+            rule = rule or {}
+            if name in supplied:
+                raw = supplied[name]
+            elif "default" in rule:
+                raw = rule["default"]
+            elif rule.get("required"):
+>               raise ParamError(f"pack {pack!r}: param {name!r} is required")
+E               dpagent.engine.params.ParamError: pack 'superset': param 'backend_password' is required
+
+src/dpagent/engine/params.py:126: ParamError
+=========================== short test summary info ============================
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[superset-ubuntu]
+1 failed, 1325 passed, 26 skipped in 267.06s (0:04:27)

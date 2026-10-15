@@ -1,0 +1,177 @@
+project: bi-stack
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  postgres           5  requested  │
+│  5  superset           6  requested  │
+╰──────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+      ok 5209ms
+  2/3 locale · Generate a UTF-8 locale
+      ok 15ms
+  3/3 time-sync · Enable clock synchronisation
+      ok 80ms
+  verify ok
+      ok python3 runs
+      ok curl runs
+      ok openssl runs
+      ok tar runs
+      ok ss lists sockets
+      ok fuser is present
+      ok pgrep is present
+      ok CA bundle is usable
+      ok locale en_US.UTF-8 available
+      ok clock is synchronised
+      ok base tooling verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ python-modern v1.0.0                                                         │
+│ Ensure a Python 3.8+ interpreter exists, without touching the system python3 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "3.11"}
+  preflight ok
+      :: already satisfied: /usr/bin/python3.10
+      ok preflight passed
+  1/1 install · Install a Python 3.8+ interpreter alongside the system one
+      ok 47ms
+  verify ok
+      ok python-modern verified: /usr/bin/python3.10 (3.10)
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ dbt v1.0.0                                                               │
+│ dbt-core in a dedicated virtualenv, configured against a Postgres target │
+╰──────────────────────────────────────────────────────────────────────────╯
+  params: {"adapter": "postgres", "dbt_version": "1.8.*", "install_dir": 
+"/opt/dbt", "project_dir": "/opt/dbt/project", "profile_name": "default", 
+"target": "dev", "host": "localhost", "port": 5432, "database": "warehouse", 
+"db_schema": "public", "db_user": "analytics_writer", "db_password": 
+"***REDACTED***", "threads": 4}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 3663ms
+  2/4 install · Install dbt-core and the postgres adapter into the venv
+      ok 4016ms
+  3/4 project · Seed a minimal dbt project and profiles.yml if none exists
+      ok 53ms
+  4/4 wrapper · Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+      ok 16ms
+  verify ok
+      ok dbt binary present at /opt/dbt/.venv/bin/dbt
+      ok /usr/local/bin/dbt wrapper present
+      :: reported version:   - installed: 1.8.10
+      ok version matches the requested 1.8.*
+      ok dbt verified (liveness only - run 'dbt debug' to check the database 
+connection)
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 100, "databases": ["warehouse", "superset_meta"], "users": 
+[{"name": "analytics_writer", "password": "***REDACTED***", "databases": 
+["warehouse"]}, {"name": "superset_meta", "password": "***REDACTED***", 
+"databases": ["superset_meta"]}], "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      !! port 5432 already serves a running PostgreSQL — the install will adopt 
+it
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      ok 9392ms
+  2/5 install · Install the PostgreSQL server packages
+      ok 2196ms
+  3/5 initdb · Initialise the data directory and start the service
+      ok 295ms
+  4/5 config · Apply port, listen_addresses and connection settings
+      ok 2621ms
+  5/5 databases · Create the requested databases, roles and grants
+      ok 408ms
+  verify ok
+      ok service postgresql is active
+      ok something is listening on 5432
+      ok pg_isready on port 5432
+      ok server answers queries: 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      ok database warehouse exists
+      ok database superset_meta exists
+      ok postgres 15 verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.0  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["public"], "warehouse_creator_roles": ["analytics_writer"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 7009ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 4533ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 51ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 134ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 19324ms
+  6/6 service · Enable the Superset systemd service
+      ok 2465ms
+  verify ok
+      No broken requirements found.
+Traceback (most recent call last):
+  File "/usr/local/bin/dpagent", line 6, in <module>
+    sys.exit(main())
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/click/core.py", line 1631, in __call__
+    return self.main(*args, **kwargs)
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/click/core.py", line 1552, in main
+    rv = self.invoke(ctx)
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/click/core.py", line 2032, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/click/core.py", line 1415, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/click/core.py", line 910, in invoke
+    return callback(*args, **kwargs)
+  File "/opt/dpagent/src/dpagent/cli/install.py", line 211, in spec_cmd
+    _do_install(names, params_by_name, fake_os, dry_run, force, yes, allow_draft,
+  File "/opt/dpagent/src/dpagent/cli/install.py", line 81, in _do_install
+    outcome = engine.install(resolution)
+  File "/opt/dpagent/src/dpagent/engine/runner.py", line 340, in install
+    outcome = self.install_pack(pack, supplied)
+  File "/opt/dpagent/src/dpagent/engine/runner.py", line 315, in install_pack
+    self.reporter.verify(pack, result)
+  File "/opt/dpagent/src/dpagent/cli/render.py", line 129, in verify
+    echo_output(result.output, style="dim" if result.ok else "red")
+  File "/opt/dpagent/src/dpagent/cli/render.py", line 29, in echo_output
+    console.print(f"      [{style}]{line}[/{style}]")
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/rich/console.py", line 1705, in print
+    renderables = self._collect_renderables(
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/rich/console.py", line 1560, in _collect_renderables
+    self.render_str(
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/rich/console.py", line 1442, in render_str
+    rich_text = render_markup(
+  File "/opt/dpagent/.venv/lib/python3.10/site-packages/rich/markup.py", line 167, in render
+    raise MarkupError(
+rich.errors.MarkupError: closing tag '[/opt/superset/superset_config.py]' at position 46 doesn't match any open tag

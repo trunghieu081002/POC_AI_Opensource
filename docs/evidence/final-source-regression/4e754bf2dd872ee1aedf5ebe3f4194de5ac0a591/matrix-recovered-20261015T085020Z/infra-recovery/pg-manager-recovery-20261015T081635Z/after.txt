@@ -1,0 +1,18 @@
+JOB UNIT                       TYPE  STATE
+385 airflow-scheduler.service  start waiting
+339 postgresql.service         start waiting
+384 postgresql@15-main.service start running
+
+3 jobs listed.
+ActiveState=inactive
+SubState=dead
+
+ActiveState=activating
+SubState=start
+/var/run/postgresql:5432 - accepting connections
+Oct 15 07:44:33 c99586116ebf systemd[1]: Starting PostgreSQL Cluster 15-main...
+Oct 15 07:44:35 c99586116ebf systemd[1]: Started PostgreSQL Cluster 15-main.
+Oct 15 07:48:02 c99586116ebf systemd[1]: Stopping PostgreSQL Cluster 15-main...
+Oct 15 08:16:35 c99586116ebf systemd[1]: postgresql@15-main.service: Deactivated successfully.
+Oct 15 08:16:35 c99586116ebf systemd[1]: Stopped PostgreSQL Cluster 15-main.
+Oct 15 08:16:35 c99586116ebf systemd[1]: Starting PostgreSQL Cluster 15-main...

@@ -1,0 +1,7 @@
+{
+  "runtime_secret_scan": "complete",
+  "private_endpoint_scan": "complete",
+  "credential_uri_scan": "complete",
+  "redacted_files": [],
+  "originals": "retained in private host evidence directories"
+}

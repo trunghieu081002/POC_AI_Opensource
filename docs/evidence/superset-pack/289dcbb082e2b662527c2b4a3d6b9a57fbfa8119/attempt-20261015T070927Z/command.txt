@@ -1,0 +1,1 @@
+bash scripts/superset-acceptance-ci.sh --keep --reuse-container <verified-owned-container>

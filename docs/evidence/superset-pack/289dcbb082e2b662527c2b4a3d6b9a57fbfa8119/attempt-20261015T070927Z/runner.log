@@ -1,0 +1,497 @@
+project: bi-stack
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  postgres           5  requested  │
+│  5  superset           6  requested  │
+╰──────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+      ok 5256ms
+  2/3 locale · Generate a UTF-8 locale
+      ok 11ms
+  3/3 time-sync · Enable clock synchronisation
+      ok 82ms
+  verify ok
+      ok python3 runs
+      ok curl runs
+      ok openssl runs
+      ok tar runs
+      ok ss lists sockets
+      ok fuser is present
+      ok pgrep is present
+      ok CA bundle is usable
+      ok locale en_US.UTF-8 available
+      ok clock is synchronised
+      ok base tooling verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ python-modern v1.0.0                                                         │
+│ Ensure a Python 3.8+ interpreter exists, without touching the system python3 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "3.11"}
+  preflight ok
+      :: already satisfied: /usr/bin/python3.10
+      ok preflight passed
+  1/1 install · Install a Python 3.8+ interpreter alongside the system one
+      ok 54ms
+  verify ok
+      ok python-modern verified: /usr/bin/python3.10 (3.10)
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ dbt v1.0.0                                                               │
+│ dbt-core in a dedicated virtualenv, configured against a Postgres target │
+╰──────────────────────────────────────────────────────────────────────────╯
+  params: {"adapter": "postgres", "dbt_version": "1.8.*", "install_dir": 
+"/opt/dbt", "project_dir": "/opt/dbt/project", "profile_name": "default", 
+"target": "dev", "host": "localhost", "port": 5432, "database": "warehouse", 
+"db_schema": "public", "db_user": "analytics_writer", "db_password": 
+"***REDACTED***", "threads": 4}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 3527ms
+  2/4 install · Install dbt-core and the postgres adapter into the venv
+      ok 4583ms
+  3/4 project · Seed a minimal dbt project and profiles.yml if none exists
+      ok 54ms
+  4/4 wrapper · Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+      ok 18ms
+  verify ok
+      ok dbt binary present at /opt/dbt/.venv/bin/dbt
+      ok /usr/local/bin/dbt wrapper present
+      :: reported version:   - installed: 1.8.10
+      ok version matches the requested 1.8.*
+      ok dbt verified (liveness only - run 'dbt debug' to check the database 
+connection)
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 100, "databases": ["warehouse", "superset_meta"], "users": 
+[{"name": "analytics_writer", "password": "***REDACTED***", "databases": 
+["warehouse"]}, {"name": "superset_meta", "password": "***REDACTED***", 
+"databases": ["superset_meta"]}], "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      !! port 5432 already serves a running PostgreSQL — the install will adopt 
+it
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      ok 9687ms
+  2/5 install · Install the PostgreSQL server packages
+      ok 1966ms
+  3/5 initdb · Initialise the data directory and start the service
+      ok 272ms
+  4/5 config · Apply port, listen_addresses and connection settings
+      ok 2508ms
+  5/5 databases · Create the requested databases, roles and grants
+      ok 343ms
+  verify ok
+      ok service postgresql is active
+      ok something is listening on 5432
+      ok pg_isready on port 5432
+      ok server answers queries: 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      ok database warehouse exists
+      ok database superset_meta exists
+      ok postgres 15 verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.0  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["public"], "warehouse_creator_roles": ["analytics_writer"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 7823ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 3083ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 45ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 123ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 19082ms
+  6/6 service · Enable the Superset systemd service
+      ok 2679ms
+  verify ok
+      No broken requirements found.
+      Loaded your LOCAL configuration at [/opt/superset/superset_config.py]
+      Superset PostgreSQL engine discovery passed
+      2026-10-15 07:10:51,806⚠superset.initialization:We haven't found any 
+Content Security Policy (CSP) defined in the configurations. Please make sure to
+configure CSP using the TALISMAN_ENABLED and TALISMAN_CONFIG keys or any other 
+external software. Failing to configure CSP have serious security implications. 
+Check https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP for more 
+information. You can disable this warning using the 
+CONTENT_SECURITY_POLICY_WARNING key.
+      2026-10-15 07:10:53,305:INFO:alembic.runtime.migration:Context impl 
+PostgresqlImpl.
+      2026-10-15 07:10:53,305:INFO:alembic.runtime.migration:Will assume 
+transactional DDL.
+      2026-10-15 07:10:53,857:INFO:superset.app:Syncing configuration to 
+database...
+      2026-10-15 07:10:53,865:INFO:superset.app:Configuration sync to database 
+completed successfully
+      2026-10-15 07:10:54,639:INFO:superset.core.mcp.core_mcp_injection:fastmcp 
+is not installed, skipping MCP initialization. Install it with: pip install 
+'apache-superset[fastmcp]'
+      ok Superset healthy
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+874ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 855ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 722ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+2765ms
+    PASS Restart preserves the same unique metadata connection and query result 
+9680ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 644ms
+  superset: 4 checks passed
+
+╭──────── acceptance ────────╮
+│  suite     result  checks  │
+│  superset  passed     4/4  │
+╰────────────────────────────╯
+07:11:18  Running with dbt=1.8.10
+07:11:18  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions
+07:11:18  Registered adapter: postgres=1.8.2
+07:11:18  Unable to do partial parsing because saved manifest not found. Starting full parse.
+07:11:19  Found 1 model, 433 macros
+07:11:19  
+07:11:20  Concurrency: 4 threads (target='dev')
+07:11:20  
+07:11:20  1 of 1 START sql table model public.dpagent_selftest_1792048168 ................ [RUN]
+07:11:20  1 of 1 OK created sql table model public.dpagent_selftest_1792048168 ........... [SELECT 2 in 0.17s]
+07:11:20  
+07:11:20  Finished running 1 table model in 0 hours 0 minutes and 0.34 seconds (0.34s).
+07:11:20  
+07:11:20  Completed successfully
+07:11:20  
+07:11:20  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
+Namespaced warehouse table and authenticated connection created
+Authenticated warehouse query matches independent expected n=2,total=30
+Authenticated warehouse query matches independent expected n=2,total=30
+SQL Lab and PostgreSQL independently refuse writes (SQLSTATE 42501)
+Authenticated warehouse query matches independent expected n=2,total=30
+Authenticated warehouse query matches independent expected n=2,total=30
+SQL Lab and PostgreSQL independently refuse writes (SQLSTATE 42501)
+Real dbt full-refresh changed table OID 18335 -> 18340 ; authenticated SELECT/write denial hold
+project: bi-stack
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  postgres           5  requested  │
+│  5  superset           6  requested  │
+╰──────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+      ok 7095ms
+  2/3 locale · Generate a UTF-8 locale
+      ok 9ms
+  3/3 time-sync · Enable clock synchronisation
+      ok 85ms
+  verify ok
+      ok python3 runs
+      ok curl runs
+      ok openssl runs
+      ok tar runs
+      ok ss lists sockets
+      ok fuser is present
+      ok pgrep is present
+      ok CA bundle is usable
+      ok locale en_US.UTF-8 available
+      ok clock is synchronised
+      ok base tooling verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ python-modern v1.0.0                                                         │
+│ Ensure a Python 3.8+ interpreter exists, without touching the system python3 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "3.11"}
+  preflight ok
+      :: already satisfied: /usr/bin/python3.10
+      ok preflight passed
+  1/1 install · Install a Python 3.8+ interpreter alongside the system one
+      ok 58ms
+  verify ok
+      ok python-modern verified: /usr/bin/python3.10 (3.10)
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ dbt v1.0.0                                                               │
+│ dbt-core in a dedicated virtualenv, configured against a Postgres target │
+╰──────────────────────────────────────────────────────────────────────────╯
+  params: {"adapter": "postgres", "dbt_version": "1.8.*", "install_dir": 
+"/opt/dbt", "project_dir": "/opt/dbt/project", "profile_name": "default", 
+"target": "dev", "host": "localhost", "port": 5432, "database": "warehouse", 
+"db_schema": "public", "db_user": "analytics_writer", "db_password": 
+"***REDACTED***", "threads": 4}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 2819ms
+  2/4 install · Install dbt-core and the postgres adapter into the venv
+      ok 5244ms
+  3/4 project · Seed a minimal dbt project and profiles.yml if none exists
+      ok 79ms
+  4/4 wrapper · Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+      ok 21ms
+  verify ok
+      ok dbt binary present at /opt/dbt/.venv/bin/dbt
+      ok /usr/local/bin/dbt wrapper present
+      :: reported version:   - installed: 1.8.10
+      ok version matches the requested 1.8.*
+      ok dbt verified (liveness only - run 'dbt debug' to check the database 
+connection)
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 100, "databases": ["warehouse", "superset_meta"], "users": 
+[{"name": "analytics_writer", "password": "***REDACTED***", "databases": 
+["warehouse"]}, {"name": "superset_meta", "password": "***REDACTED***", 
+"databases": ["superset_meta"]}], "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      !! port 5432 already serves a running PostgreSQL — the install will adopt 
+it
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      ok 10728ms
+  2/5 install · Install the PostgreSQL server packages
+      ok 2207ms
+  3/5 initdb · Initialise the data directory and start the service
+      ok 291ms
+  4/5 config · Apply port, listen_addresses and connection settings
+      ok 3036ms
+  5/5 databases · Create the requested databases, roles and grants
+      ok 236ms
+  verify ok
+      ok service postgresql is active
+      ok something is listening on 5432
+      ok pg_isready on port 5432
+      ok server answers queries: 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      ok database warehouse exists
+      ok database superset_meta exists
+      ok postgres 15 verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.0  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["public"], "warehouse_creator_roles": ["analytics_writer"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 7337ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 3196ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 45ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 164ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 20258ms
+  6/6 service · Enable the Superset systemd service
+      ok 2453ms
+  verify ok
+      No broken requirements found.
+      Loaded your LOCAL configuration at [/opt/superset/superset_config.py]
+      Superset PostgreSQL engine discovery passed
+      2026-10-15 07:12:52,133⚠superset.initialization:We haven't found any 
+Content Security Policy (CSP) defined in the configurations. Please make sure to
+configure CSP using the TALISMAN_ENABLED and TALISMAN_CONFIG keys or any other 
+external software. Failing to configure CSP have serious security implications. 
+Check https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP for more 
+information. You can disable this warning using the 
+CONTENT_SECURITY_POLICY_WARNING key.
+      2026-10-15 07:12:52,900:INFO:alembic.runtime.migration:Context impl 
+PostgresqlImpl.
+      2026-10-15 07:12:52,901:INFO:alembic.runtime.migration:Will assume 
+transactional DDL.
+      2026-10-15 07:12:53,468:INFO:superset.app:Syncing configuration to 
+database...
+      2026-10-15 07:12:53,477:INFO:superset.app:Configuration sync to database 
+completed successfully
+      2026-10-15 07:12:54,449:INFO:superset.core.mcp.core_mcp_injection:fastmcp 
+is not installed, skipping MCP initialization. Install it with: pip install 
+'apache-superset[fastmcp]'
+      ok Superset healthy
+
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 635ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 19ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 36ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 87ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 8ms
+  base: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ dbt                                                                          │
+│ Prove dbt actually connects to Postgres, transforms data, and catches bad    │
+│ data                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Write a good and a deliberately-broken throwaway dbt model 30ms
+  checks
+    PASS dbt can actually connect to the configured Postgres target 3632ms
+    PASS dbt run builds a model whose output matches the source data 6490ms
+    PASS A dbt test fails when the underlying data violates it (negative) 7771ms
+    PASS A dbtread member other than whoever ran dbt first can still write to 
+the project 305ms
+  teardown
+    PASS Remove the throwaway models and the tables they built 312ms
+  dbt: 4 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 759ms
+  checks
+    PASS A row written is the same row read back 1448ms
+    PASS Committed data is still there after a service restart 10755ms
+    PASS A wrong password is refused (negative) 932ms
+    PASS Every database in the spec accepts a connection and a write 339ms
+    PASS The running server reports the port and limits that were asked for 
+300ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 42ms
+  teardown
+    PASS Remove everything the suite created 1326ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 5170ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 25ms
+  python-modern: 2 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+791ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 689ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 1975ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1565ms
+    PASS Restart preserves the same unique metadata connection and query result 
+10440ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 654ms
+  superset: 4 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  postgres       passed     6/6  │
+│  python-modern  passed     2/2  │
+│  superset       passed     4/4  │
+╰─────────────────────────────────╯
+╭──────────────────────────────────╮
+│ installed and proven working     │
+│ install run 6 · acceptance run 7 │
+╰──────────────────────────────────╯
+Authenticated warehouse query matches independent expected n=2,total=30
+Authenticated warehouse query matches independent expected n=2,total=30
+SQL Lab and PostgreSQL independently refuse writes (SQLSTATE 42501)
+Authenticated warehouse query matches independent expected n=2,total=30
+Same metadata connection survived restart
+Reinstall preserved one admin, one lifecycle connection and the same metadata id
+╭───────────────────────────────────────────────╮
+│ superset will be removed, including its data. │
+│ /opt/dpagent/packs/superset/rollback.sh       │
+╰───────────────────────────────────────────────╯
+      Removed owned service/runtime; metadata, warehouse, reader grants and 
+ownership receipts retained
+      $ python3 /opt/dpagent/packs/superset/manage.py rollback
+      Removed /etc/systemd/system/multi-user.target.wants/superset.service.
+rolled back
+Rollback removed owned runtime and retained metadata and warehouse rows
+Owned lifecycle fixtures retained for container teardown; no database decommission during rollback

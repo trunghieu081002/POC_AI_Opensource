@@ -1,0 +1,3 @@
+?? docs/evidence/final-source-regression/eb8e3b1f1b0936a8f1803042dac6ff308b6a40d5/run-20261015T072110Z/pid.txt
+?? docs/evidence/final-source-regression/eb8e3b1f1b0936a8f1803042dac6ff308b6a40d5/run-20261015T072110Z/provenance.txt
+?? docs/evidence/final-source-regression/eb8e3b1f1b0936a8f1803042dac6ff308b6a40d5/run-20261015T072110Z/working-tree-before.txt

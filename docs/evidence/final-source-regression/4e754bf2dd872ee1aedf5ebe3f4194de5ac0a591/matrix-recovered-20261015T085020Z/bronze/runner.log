@@ -1,0 +1,59 @@
+[36m::[0m reusing disposable dpagent-m25-acceptance-781222; synchronizing committed source 4e754bf2dd872ee1aedf5ebe3f4194de5ac0a591 without bootstrap
+[32mok[0m postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+[36m::[0m running the acceptance matrix driver
+ok    ref-connection               overall=pass cleanup=pass - matched expectation
+ok    literal-connection           overall=pass cleanup=pass - matched expectation
+ok    mixed-connection             overall=pass cleanup=pass - matched expectation
+ok    correct-twice                overall=pass cleanup=pass - matched expectation
+ok    wrong-expected               overall=fail cleanup=pass - matched expectation
+ok    gate-under-threshold         overall=pass cleanup=pass - matched expectation
+ok    gate-over-threshold          overall=fail cleanup=pass - matched expectation
+ok    timeout                      overall=fail cleanup=fail - matched expectation
+ok    seed-failure                 overall=fail cleanup=pass - matched expectation
+ok    partial-deploy-failure       overall=fail cleanup=pass - matched expectation
+ok    late-deploy-failure          overall=fail cleanup=pass - matched expectation
+ok    source-provisioning-failure  overall=unavailable cleanup=not_attempted - matched expectation
+ok    warehouse-provisioning-failure overall=unavailable cleanup=pass - matched expectation
+ok    drop-failure                 overall=fail cleanup=fail - matched expectation
+ok    hg-correct-twice             overall=pass cleanup=pass - matched expectation
+ok    hg-wrong-expected            overall=fail cleanup=pass - matched expectation; promote refused: run 2 status is 'not_run', not 'ok'; run 1 comparison against expected is 'fail', not 'pass'; run 2 comparison against expected is 'not_run'
+ok    hg-selector-typo             overall=fail cleanup=pass - matched expectation; promote refused: step 3 dbt: fail - stage 'gold': selector 'mart_artist_summry' selects 0 models (dbt would exit 0 with 'Nothing to do' and the stage would l
+ok    hg-symlink-refused           overall=refused cleanup=not_attempted - matched expectation
+ok    hg-timeout                   overall=fail cleanup=fail - matched expectation; promote refused: run 1 timed out (worker not confirmed stopped); run 2 status is 'not_run', not 'ok'; run 1 comparison against expected is 'not_run', not 'pa
+ok    hg-stray-object-purged       overall=pass cleanup=pass - matched expectation
+ok    hg-purge-failure-detected    overall=fail cleanup=fail - a purge that lied was caught by the independent re-list; promote refused: validation overall is 'fail'; cleanup overall is 'fail', not 'pass'; cleanup s3_objects is 'fail: 6 object(s) still under dpagent-validate/a
+ok    a2-promote-deploy-run        overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+ok    pair-correct-twice           overall=pass cleanup=pass - matched expectation
+ok    pair-missing-table           overall=fail cleanup=pass - one missing table failed the whole batch; nothing promotable
+ok    pair-tampered-object         overall=fail cleanup=pass - LOAD refused (sha256); previous landing intact in both tables
+ok    pair-tampered-batch-manifest overall=fail cleanup=pass - LOAD refused (batch); previous landing intact in both tables
+ok    pair-load-fails-midway       overall=pass cleanup=pass - LOAD failed on table 2 after table 1 was replaced: both rolled back, batch still extracted; retry loaded both
+ok    fact-correct-twice           overall=pass cleanup=pass - matched expectation
+ok    fact-dbt-test-fails          overall=fail cleanup=pass - dbt run succeeded, dbt test failed -> stage failed, nothing promotable
+ok    fact-no-tests                overall=pass cleanup=pass - no declared tests: recorded not_applicable (not passed); promote refused
+ok    usage-correct-twice          overall=pass cleanup=pass - matched expectation
+ok    usage-conflicting-ids        overall=fail cleanup=pass - conflicting source ids: silver's unique test failed, gold never ran, nothing promotable
+ok    usage-promote-deploy-run     overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+ok    fact-promote-deploy-run      overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+
+34/34 requested scenarios matched their expectation (the 'bronze' profile is 34).
+== databases named dpagent_fixture_*
+(none)
+== roles named dpagent_fixture_*
+(none)
+== published validation clones
+(none)
+== shared dbt project clone models
+(none)
+== Airflow DAGs of clones
+(none)
+== clone secrets in pipelines.env
+(none)
+== S3 objects under dpagent-validate/
+(none)
+== S3 objects under a2-promote/
+(none)
+
+leaks=0
+[32mok[0m evidence written under /home/oracle/projects/dpagent-final-regression-2/docs/evidence/final-source-regression/4e754bf2dd872ee1aedf5ebe3f4194de5ac0a591/matrix-recovered-20261015T085020Z/bronze/evidence
+[36m::[0m --keep: leaving dpagent-m25-acceptance-781222 for inspection

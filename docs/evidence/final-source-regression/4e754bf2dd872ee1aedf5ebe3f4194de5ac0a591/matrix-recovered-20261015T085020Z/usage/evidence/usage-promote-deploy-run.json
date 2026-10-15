@@ -1,0 +1,1973 @@
+{
+  "a2": {
+    "problems": [],
+    "steps": {
+      "edits_invalidate": {
+        "expected": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "fixture": {
+          "approval_still_valid": true,
+          "approval_unchanged": true,
+          "deploy_refused": false,
+          "promote_accepted": false,
+          "reason": ""
+        },
+        "macro": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T09:00:32+00:00 by 'm25-matrix') - re-"
+        },
+        "model": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T09:00:32+00:00 by 'm25-matrix') - re-"
+        },
+        "seed": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T09:00:32+00:00 by 'm25-matrix') - re-"
+        },
+        "tests": {
+          "approval_still_valid": false,
+          "approval_unchanged": true,
+          "deploy_refused": true,
+          "promote_accepted": false,
+          "reason": "hg_a2_usage's manifest/procedures/models changed since it was approved (2026-10-15T09:00:32+00:00 by 'm25-matrix') - re-"
+        }
+      },
+      "promote": {
+        "accepted": true,
+        "evidence_id": "ev-97c7362e31103b47",
+        "is_approved": true,
+        "maturity": "reviewed",
+        "verification": "verified"
+      },
+      "promote_before_validation": {
+        "accepted": false,
+        "approval_unchanged": true,
+        "reasons": [
+          "no sealed evidence for 'hg_a2_usage' in this host's journal - run `dpagent pipeline validate hg_a2_usage --fixture ... --expected ...` here first (a report file alone is not evidence)"
+        ]
+      },
+      "real_run": {
+        "cleanup_detail": "verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+        "cleanup_ok": true,
+        "comparison": {
+          "detail": "gold.resources_useage_number: 13 row(s) matched exactly; silver.dim_video: 7 row(s) matched exactly; silver.fact_editing: 13 row(s) matched exactly",
+          "ok": true
+        },
+        "databases_dropped": true,
+        "dbt_tests": [
+          {
+            "kind": "dbt.test.passed",
+            "message": "hg_a2_usage/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required"
+          },
+          {
+            "kind": "dbt.test.passed",
+            "message": "hg_a2_usage/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required"
+          }
+        ],
+        "deployed": true,
+        "error": "",
+        "gates_passed": true,
+        "published_files_checked": 14,
+        "published_files_differ": [],
+        "run_id": 9,
+        "run_status": "ok",
+        "s3_remaining": 0
+      },
+      "restored_is_valid_again": true,
+      "validate": {
+        "cleanup": "pass",
+        "evidence_id": "ev-97c7362e31103b47",
+        "overall": "pass"
+      }
+    }
+  },
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 5,
+        "manifest_sha256": "329da1fc1227b02f4a2b8f242a1e2d5b579dab18ff5d69d5647a078176d4e44a",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 5,
+        "manifest_sha256": "4e5a634532b2d810e3600cf61d91a09e2fb88dbc0ecb148b4b94fb9f26154a5f",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_company",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 11,
+        "manifest_sha256": "f38d2187acfb9f4744d2b3914ae150fec1550ca2a57281d3ae01c5025fcf31c1",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_video_info",
+        "total_rows": 11
+      },
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 6,
+        "manifest_sha256": "f7a6956c73f4abd2925b69a9fcc0749722edc717d010753b5c7c7ab1302c9356",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "editings",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 10,
+        "manifest_sha256": "636a8f14066ba1c67f468269f8fcec9f7b8aca5bf817f05e0cd491189b24ed79",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource",
+        "total_rows": 10
+      },
+      {
+        "batch_id": "5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "loaded_rows": 18,
+        "manifest_sha256": "d2dc77b353b9bc4d673fca064cb154923a030c090cf12d3039024b12e69eb00b",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource_editings",
+        "total_rows": 18
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 5,
+        "manifest_sha256": "00528e2b4d1b46f56471d513e9c9d167cdd603176c6130eaa9fbd53c7f4429d4",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 5,
+        "manifest_sha256": "766893ff15321c7b036290cd502c4761623a5558754f1a2ba0167a2259bf5b26",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_company",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 11,
+        "manifest_sha256": "e4883c66364c6d45e7c8da7955ae0d73caf1470945cab7cac612c3db55887d1c",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_video_info",
+        "total_rows": 11
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 6,
+        "manifest_sha256": "d7ef40c4fa223c83e80df77b3bdbb6bb4c8489441d369db57537565655b831de",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "editings",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 10,
+        "manifest_sha256": "b880159c3ec15efb6496570a1c69a401991aa143922b007c7c1f39e8da1c1f63",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource",
+        "total_rows": 10
+      },
+      {
+        "batch_id": "bebd5907-21f2-4346-9026-2eb52d42c261",
+        "loaded_rows": 18,
+        "manifest_sha256": "10ae431853e4e12fae7982ecb887ab83b6be3b31eb5c00048b862ed8315992ec",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource_editings",
+        "total_rows": 18
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 5,
+        "manifest_sha256": "1ef52afa5434a38f3a235f7648217c3cfd3fd079710aaa5b853dcfaa1477d229",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 5,
+        "manifest_sha256": "d7becccf3ca8b3852ac3c6d4ff903817b6f772c7a91088004f52bcdc77b509dd",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_company",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 11,
+        "manifest_sha256": "ac927ad694f843b95859a9eb0634d718dde9e576b8769fff608a87fcea76b172",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_video_info",
+        "total_rows": 11
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 6,
+        "manifest_sha256": "ad504b3e20071083b4e753eefdcbd98a91010f1d6e5b7edbf8591504eceb9ad0",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "editings",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 10,
+        "manifest_sha256": "cd64fb5ef7b3dd6bae902e1c3491c3270f5768e34aab209d771d3feceec98bc8",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource",
+        "total_rows": 10
+      },
+      {
+        "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+        "loaded_rows": 18,
+        "manifest_sha256": "b51b331b5e32e31ed62871d9a8dd1cafca98a5f0512e82b06b685c4cfc9bdb1a",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource_editings",
+        "total_rows": 18
+      }
+    ],
+    "namespace": "dpagent-validate/20a8d1a8",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 39,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "8b77faff-4cfd-4719-813e-60648da1b229",
+      "detail": "channel: 5 row(s) matched exactly; channel_company: 5 row(s) matched exactly; channel_video_info: 11 row(s) matched exactly; editings: 6 row(s) matched exactly; resource: 10 row(s) matched exactly; resource_editings: 18 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_6783feb9b2\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_6783feb9b2\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_20A8D1A8_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_20A8D1A8_BRONZE_BUCKET, DPAGENT_VALIDATE_20A8D1A8_BRONZE_ENDPOINT, DPAGENT_VALIDATE_20A8D1A8_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_20A8D1A8_SRC_DATABASE, DPAGENT_VALIDATE_20A8D1A8_SRC_HOST, DPAGENT_VALIDATE_20A8D1A8_SRC_PASSWORD, DPAGENT_VALIDATE_20A8D1A8_SRC_PORT, DPAGENT_VALIDATE_20A8D1A8_SRC_USER, DPAGENT_VALIDATE_20A8D1A8_WH_DATABASE, DPAGENT_VALIDATE_20A8D1A8_WH_HOST, DPAGENT_VALIDATE_20A8D1A8_WH_PASSWORD, DPAGENT_VALIDATE_20A8D1A8_WH_PORT, DPAGENT_VALIDATE_20A8D1A8_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "real_run": {
+      "artifacts": true,
+      "databases_dropped": true,
+      "s3_remaining": 0
+    },
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_a2_usage__validate__20a8d1a8",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "int_excluded_stock_codes",
+            "dim_video",
+            "fact_editing"
+          ],
+          "passed": 6,
+          "ran": 6,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277",
+            "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5",
+            "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e",
+            "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35",
+            "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b",
+            "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "passed": 6,
+        "ran": 6,
+        "required": 6,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      },
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "resources_useage_number"
+          ],
+          "passed": 4,
+          "ran": 4,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7",
+            "test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba",
+            "test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f",
+            "test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257"
+          ],
+          "skipped": 0,
+          "stage": "gold",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "position_group",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba"
+            },
+            {
+              "column": "resource_video_sk",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f"
+            },
+            {
+              "column": "position_group",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "accepted_values",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7"
+            },
+            {
+              "column": "resource_video_sk",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "passed": 4,
+        "ran": 4,
+        "required": 4,
+        "skipped": 0,
+        "stage": "gold",
+        "status": "passed"
+      }
+    ],
+    "run_2": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "int_excluded_stock_codes",
+            "dim_video",
+            "fact_editing"
+          ],
+          "passed": 6,
+          "ran": 6,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277",
+            "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5",
+            "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e",
+            "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35",
+            "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b",
+            "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "passed": 6,
+        "ran": 6,
+        "required": 6,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "passed"
+      },
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 0,
+          "failed": 0,
+          "missing": [],
+          "models": [
+            "resources_useage_number"
+          ],
+          "passed": 4,
+          "ran": 4,
+          "reason": "",
+          "required": [
+            "test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7",
+            "test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba",
+            "test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f",
+            "test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257"
+          ],
+          "skipped": 0,
+          "stage": "gold",
+          "status": "passed",
+          "tests": [
+            {
+              "column": "resource_video_sk",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_resources_useage_number_resource_video_sk.dd413a455f"
+            },
+            {
+              "column": "position_group",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_resources_useage_number_position_group.2a1e1183ba"
+            },
+            {
+              "column": "resource_video_sk",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_resources_useage_number_resource_video_sk.d761cc3257"
+            },
+            {
+              "column": "position_group",
+              "failures": 0,
+              "models": [
+                "resources_useage_number"
+              ],
+              "name": "accepted_values",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.accepted_values_resources_useage_number_position_group__1__2_3__4_5___5.f96db4bef7"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 0,
+        "kind": "dbt.test.passed",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "passed": 4,
+        "ran": 4,
+        "required": 4,
+        "skipped": 0,
+        "stage": "gold",
+        "status": "passed"
+      }
+    ]
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-97c7362e31103b47",
+  "expected_hash": "sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21",
+  "fixture_hash": "sha256:bc3223e1f44fc4d5ece28258fa03709dd2d83e3001451695096398d8ceed868b",
+  "gates": {
+    "run_1": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 11,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 18,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    },
+    "run_2": {
+      "gold": [
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ],
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 11,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 18,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ],
+      "silver": [
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "not_null"
+        },
+        {
+          "detail": "",
+          "rows_checked": 13,
+          "rows_rejected": 0,
+          "status": "passed",
+          "type": "unique"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "journal": {
+    "7": [
+      {
+        "id": 197,
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:21+00:00"
+      },
+      {
+        "id": 198,
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch 5469660d-3ffa-431a-a9c1-b3e35e47843e - 55 row(s) in 6 object(s)",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:22+00:00"
+      },
+      {
+        "id": 199,
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch 5469660d-3ffa-431a-a9c1-b3e35e47843e",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:23+00:00"
+      },
+      {
+        "id": 200,
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch 5469660d-3ffa-431a-a9c1-b3e35e47843e loaded - 55 row(s) from 6 object(s)",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:24+00:00"
+      },
+      {
+        "id": 201,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing schema_contract: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:26+00:00"
+      },
+      {
+        "id": 202,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing row_count_bounds: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:26+00:00"
+      },
+      {
+        "id": 203,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing row_count_bounds: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:26+00:00"
+      },
+      {
+        "id": 204,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing gates passed",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:26+00:00"
+      },
+      {
+        "id": 205,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver via dbt",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:57:28+00:00"
+      },
+      {
+        "id": 206,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "run_id": 7,
+        "stage": "silver",
+        "ts": "2026-10-15T08:58:08+00:00"
+      },
+      {
+        "id": 207,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver transform complete",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:08+00:00"
+      },
+      {
+        "id": 208,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver not_null: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:09+00:00"
+      },
+      {
+        "id": 209,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver unique: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:09+00:00"
+      },
+      {
+        "id": 210,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver not_null: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:09+00:00"
+      },
+      {
+        "id": 211,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver unique: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:10+00:00"
+      },
+      {
+        "id": 212,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver gates passed",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:10+00:00"
+      },
+      {
+        "id": 213,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold via dbt",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:10+00:00"
+      },
+      {
+        "id": 214,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "run_id": 7,
+        "stage": "gold",
+        "ts": "2026-10-15T08:58:42+00:00"
+      },
+      {
+        "id": 215,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold transform complete",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:42+00:00"
+      },
+      {
+        "id": 216,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold not_null: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:43+00:00"
+      },
+      {
+        "id": 217,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold unique: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:43+00:00"
+      },
+      {
+        "id": 218,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold gates passed",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:43+00:00"
+      },
+      {
+        "id": 219,
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 7 reached terminal state: ok",
+        "run_id": 7,
+        "stage": null,
+        "ts": "2026-10-15T08:58:43+00:00"
+      }
+    ],
+    "8": [
+      {
+        "id": 220,
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:51+00:00"
+      },
+      {
+        "id": 221,
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch bebd5907-21f2-4346-9026-2eb52d42c261 - 55 row(s) in 6 object(s)",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:52+00:00"
+      },
+      {
+        "id": 222,
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch bebd5907-21f2-4346-9026-2eb52d42c261",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:54+00:00"
+      },
+      {
+        "id": 223,
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8: batch bebd5907-21f2-4346-9026-2eb52d42c261 loaded - 55 row(s) from 6 object(s)",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:55+00:00"
+      },
+      {
+        "id": 224,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing schema_contract: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:57+00:00"
+      },
+      {
+        "id": 225,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing row_count_bounds: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:57+00:00"
+      },
+      {
+        "id": 226,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing row_count_bounds: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:57+00:00"
+      },
+      {
+        "id": 227,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/landing gates passed",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:57+00:00"
+      },
+      {
+        "id": 228,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver via dbt",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:58:58+00:00"
+      },
+      {
+        "id": 229,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "run_id": 8,
+        "stage": "silver",
+        "ts": "2026-10-15T08:59:37+00:00"
+      },
+      {
+        "id": 230,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver transform complete",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:38+00:00"
+      },
+      {
+        "id": 231,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver not_null: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:39+00:00"
+      },
+      {
+        "id": 232,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver unique: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:40+00:00"
+      },
+      {
+        "id": 233,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver not_null: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:40+00:00"
+      },
+      {
+        "id": 234,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver unique: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:40+00:00"
+      },
+      {
+        "id": 235,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/silver gates passed",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:40+00:00"
+      },
+      {
+        "id": 236,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold via dbt",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T08:59:40+00:00"
+      },
+      {
+        "id": 237,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "run_id": 8,
+        "stage": "gold",
+        "ts": "2026-10-15T09:00:11+00:00"
+      },
+      {
+        "id": 238,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold transform complete",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T09:00:11+00:00"
+      },
+      {
+        "id": 239,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold not_null: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T09:00:12+00:00"
+      },
+      {
+        "id": 240,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold unique: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T09:00:13+00:00"
+      },
+      {
+        "id": 241,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage__validate__20a8d1a8/gold gates passed",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T09:00:13+00:00"
+      },
+      {
+        "id": 242,
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 8 reached terminal state: ok",
+        "run_id": 8,
+        "stage": null,
+        "ts": "2026-10-15T09:00:13+00:00"
+      }
+    ],
+    "9": [
+      {
+        "id": 247,
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_a2_usage: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:48+00:00"
+      },
+      {
+        "id": 248,
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_a2_usage: batch af09c97f-ec70-44bb-897a-f509325c767f - 55 row(s) in 6 object(s)",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:49+00:00"
+      },
+      {
+        "id": 249,
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_a2_usage: batch af09c97f-ec70-44bb-897a-f509325c767f",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:52+00:00"
+      },
+      {
+        "id": 250,
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_a2_usage: batch af09c97f-ec70-44bb-897a-f509325c767f loaded - 55 row(s) from 6 object(s)",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:53+00:00"
+      },
+      {
+        "id": 251,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/landing schema_contract: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:55+00:00"
+      },
+      {
+        "id": 252,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/landing row_count_bounds: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:55+00:00"
+      },
+      {
+        "id": 253,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/landing row_count_bounds: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:55+00:00"
+      },
+      {
+        "id": 254,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage/landing gates passed",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:55+00:00"
+      },
+      {
+        "id": 255,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage/silver via dbt",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:00:56+00:00"
+      },
+      {
+        "id": 256,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver: dbt test passed - ran 6 (6 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 6 required",
+        "run_id": 9,
+        "stage": "silver",
+        "ts": "2026-10-15T09:01:36+00:00"
+      },
+      {
+        "id": 257,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage/silver transform complete",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:36+00:00"
+      },
+      {
+        "id": 258,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver not_null: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:38+00:00"
+      },
+      {
+        "id": 259,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver unique: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:38+00:00"
+      },
+      {
+        "id": 260,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver not_null: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:38+00:00"
+      },
+      {
+        "id": 261,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver unique: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:38+00:00"
+      },
+      {
+        "id": 262,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage/silver gates passed",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:38+00:00"
+      },
+      {
+        "id": 263,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_a2_usage/gold via dbt",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:01:41+00:00"
+      },
+      {
+        "id": 264,
+        "kind": "dbt.test.passed",
+        "level": "info",
+        "message": "hg_a2_usage/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "run_id": 9,
+        "stage": "gold",
+        "ts": "2026-10-15T09:02:12+00:00"
+      },
+      {
+        "id": 265,
+        "kind": "transform.done",
+        "level": "info",
+        "message": "hg_a2_usage/gold transform complete",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:02:12+00:00"
+      },
+      {
+        "id": 266,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/gold not_null: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:02:13+00:00"
+      },
+      {
+        "id": 267,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_a2_usage/gold unique: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:02:13+00:00"
+      },
+      {
+        "id": 268,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_a2_usage/gold gates passed",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:02:13+00:00"
+      },
+      {
+        "id": 269,
+        "kind": "pipeline.ok",
+        "level": "info",
+        "message": "DAG run 9 reached terminal state: ok",
+        "run_id": 9,
+        "stage": null,
+        "ts": "2026-10-15T09:02:15+00:00"
+      }
+    ]
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:f659803a6a5f35fa8afff7b71ae55f6b7912242e1cf5cf537d617c9194e0b552",
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    7,
+    8
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "usage_observation_problems": [],
+  "usage_observations": [
+    {
+      "database": "dpagent_fixture_wh_8132f5d624",
+      "excluded_rows": 5787,
+      "gold_rows": [
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 4,
+          "hg_stock_id": "HGFA0009",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 5,
+          "hg_stock_id": "HGFA0008",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 6,
+          "hg_stock_id": "HGFA0010",
+          "position_group": ">5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+          "video_id": "V8"
+        }
+      ],
+      "landing_columns": {
+        "channel": {
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text",
+          "YoutubeChannelId": "text"
+        },
+        "channel_company": {
+          "ChannelId": "text",
+          "CompanyId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean"
+        },
+        "channel_video_info": {
+          "Code": "text",
+          "IsDeleted": "boolean",
+          "PublishedAt": "timestamp with time zone",
+          "Title": "text",
+          "YoutubeChannelId": "text",
+          "YoutubeVideoId": "text"
+        },
+        "editings": {
+          "EditingFileId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text"
+        },
+        "resource": {
+          "Id": "text",
+          "ResourceFileId": "text",
+          "ResourceType": "bigint",
+          "Title": "text"
+        },
+        "resource_editings": {
+          "EditingId": "text",
+          "EndTime": "double precision",
+          "Id": "text",
+          "ResourcesId": "text",
+          "StartTime": "double precision"
+        }
+      },
+      "seed_rows": 5787,
+      "timestamp_types": {
+        "gold.resources_useage_number.published_date": "timestamp without time zone",
+        "silver.dim_video.published_date": "timestamp without time zone",
+        "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+      },
+      "timezone": "Etc/UTC",
+      "user": "dpagent_fixture_wh_8132f5d624",
+      "utc_cast_probe": "2024-01-01 00:00:00"
+    },
+    {
+      "database": "dpagent_fixture_wh_8132f5d624",
+      "excluded_rows": 5787,
+      "gold_rows": [
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 4,
+          "hg_stock_id": "HGFA0009",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 5,
+          "hg_stock_id": "HGFA0008",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 6,
+          "hg_stock_id": "HGFA0010",
+          "position_group": ">5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+          "video_id": "V8"
+        }
+      ],
+      "landing_columns": {
+        "channel": {
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text",
+          "YoutubeChannelId": "text"
+        },
+        "channel_company": {
+          "ChannelId": "text",
+          "CompanyId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean"
+        },
+        "channel_video_info": {
+          "Code": "text",
+          "IsDeleted": "boolean",
+          "PublishedAt": "timestamp with time zone",
+          "Title": "text",
+          "YoutubeChannelId": "text",
+          "YoutubeVideoId": "text"
+        },
+        "editings": {
+          "EditingFileId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text"
+        },
+        "resource": {
+          "Id": "text",
+          "ResourceFileId": "text",
+          "ResourceType": "bigint",
+          "Title": "text"
+        },
+        "resource_editings": {
+          "EditingId": "text",
+          "EndTime": "double precision",
+          "Id": "text",
+          "ResourcesId": "text",
+          "StartTime": "double precision"
+        }
+      },
+      "seed_rows": 5787,
+      "timestamp_types": {
+        "gold.resources_useage_number.published_date": "timestamp without time zone",
+        "silver.dim_video.published_date": "timestamp without time zone",
+        "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+      },
+      "timezone": "Etc/UTC",
+      "user": "dpagent_fixture_wh_8132f5d624",
+      "utc_cast_probe": "2024-01-01 00:00:00"
+    },
+    {
+      "database": "dpagent_fixture_a2wh_288ded520f",
+      "excluded_rows": 5787,
+      "gold_rows": [
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "5f028550f2e1e56dd0ad63d9b6931c16",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "9a5bcbf8cd2beb8bc2a99b7ee0cd02d5",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-01-10T08:00:00",
+          "resource_video_sk": "4f2b3b5e61accc35d045414c4d01d074",
+          "video_id": "V1"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "bafefd53d296b2a26f74884e57b8cf46",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-02-01T09:30:00",
+          "resource_video_sk": "6007eaa24d9eab8cd45a10424ce0c766",
+          "video_id": "V2"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "09d1cf9361762547faae9335d1640e13",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "1",
+          "published_date": "2026-03-10T08:00:00",
+          "resource_video_sk": "3aee756736bcace23be3ffdf76463777",
+          "video_id": "V7"
+        },
+        {
+          "first_position": 1,
+          "hg_stock_id": "HGFA0001",
+          "position_group": "1",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "12e0bc0b93e1a34f51ccf8832c72dd0f",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 2,
+          "hg_stock_id": "HGFA0002",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "cd841d9f3b1c7442191b6ea0c9a2963b",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 3,
+          "hg_stock_id": "HGFA0007",
+          "position_group": "2-3",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "a29c1c02f7307eae094841121801a043",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 4,
+          "hg_stock_id": "HGFA0009",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "0377e3f037d9363f43906f8d1baf01b8",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 5,
+          "hg_stock_id": "HGFA0008",
+          "position_group": "4-5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "47f5c81895a6472eeeb2854c63c81df4",
+          "video_id": "V8"
+        },
+        {
+          "first_position": 6,
+          "hg_stock_id": "HGFA0010",
+          "position_group": ">5",
+          "published_date": "2026-04-01T00:00:00",
+          "resource_video_sk": "78a3ffe7d37b14bc6cf82ac84d671120",
+          "video_id": "V8"
+        }
+      ],
+      "landing_columns": {
+        "channel": {
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text",
+          "YoutubeChannelId": "text"
+        },
+        "channel_company": {
+          "ChannelId": "text",
+          "CompanyId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean"
+        },
+        "channel_video_info": {
+          "Code": "text",
+          "IsDeleted": "boolean",
+          "PublishedAt": "timestamp with time zone",
+          "Title": "text",
+          "YoutubeChannelId": "text",
+          "YoutubeVideoId": "text"
+        },
+        "editings": {
+          "EditingFileId": "text",
+          "Id": "text",
+          "IsDeleted": "boolean",
+          "Title": "text"
+        },
+        "resource": {
+          "Id": "text",
+          "ResourceFileId": "text",
+          "ResourceType": "bigint",
+          "Title": "text"
+        },
+        "resource_editings": {
+          "EditingId": "text",
+          "EndTime": "double precision",
+          "Id": "text",
+          "ResourcesId": "text",
+          "StartTime": "double precision"
+        }
+      },
+      "seed_rows": 5787,
+      "timestamp_types": {
+        "gold.resources_useage_number.published_date": "timestamp without time zone",
+        "silver.dim_video.published_date": "timestamp without time zone",
+        "staging.channel_video_info.PublishedAt": "timestamp with time zone"
+      },
+      "timezone": "Etc/UTC",
+      "user": "dpagent_fixture_a2wh_288ded520f",
+      "utc_cast_probe": "2024-01-01 00:00:00"
+    }
+  ],
+  "validation_overall": "pass",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

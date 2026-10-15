@@ -1,0 +1,1 @@
+Recover the final successful lifecycle namespace after rollback: spec --no-test; test superset; lifecycle after-reinstall. No bootstrap and no repeat of already passed lifecycle phases.

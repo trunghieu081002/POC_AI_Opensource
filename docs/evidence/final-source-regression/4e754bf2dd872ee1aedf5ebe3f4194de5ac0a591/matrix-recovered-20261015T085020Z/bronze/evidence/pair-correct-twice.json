@@ -1,0 +1,188 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "0f970636-3ff9-4f24-b64c-4e551c52168c",
+        "loaded_rows": 5,
+        "manifest_sha256": "d8f3c093b12f3c2d72dff7abb473cea21e1f57a097a40ec96878e8a5864ddf42",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "0f970636-3ff9-4f24-b64c-4e551c52168c",
+        "loaded_rows": 7,
+        "manifest_sha256": "866399bc7be99209ca0a00f4406383fcf687215b00a6769e7c8e6ccc1b2b0642",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "0319a6d7-8f7c-49ed-b673-a09a5681ea3c",
+        "loaded_rows": 5,
+        "manifest_sha256": "19795c686a979597121f3049553510c74628df30f4a8118101bcac7b3341503a",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "0319a6d7-8f7c-49ed-b673-a09a5681ea3c",
+        "loaded_rows": 7,
+        "manifest_sha256": "1e74ec2aba179c7f1533a8155f4364a9d4cb1524db3db5b3888aeb5f96695e50",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      },
+      {
+        "batch_id": "d7ef6ab6-552d-4891-954b-da22e2da9423",
+        "loaded_rows": 5,
+        "manifest_sha256": "1b97e857d65811496cc026d7564012daaab267c00dbfef9689dbb0f66e533ff8",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "res_partner",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "d7ef6ab6-552d-4891-954b-da22e2da9423",
+        "loaded_rows": 7,
+        "manifest_sha256": "a2263d11f4e446d32e3b37acf2fd391fce9b6be68df8e7bb21c71bab816b502a",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "x_music_plan_detail_price",
+        "total_rows": 7
+      }
+    ],
+    "namespace": "dpagent-validate/94c4d4c4",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 15,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": {
+      "batch_id": "d7ef6ab6-552d-4891-954b-da22e2da9423",
+      "detail": "res_partner: 5 row(s) matched exactly; x_music_plan_detail_price: 7 row(s) matched exactly",
+      "error": "",
+      "landing_matches_fixture": true,
+      "loaded": true,
+      "ok": true,
+      "source_dropped": true,
+      "source_probe": "psql: error: connection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_8a94570db1\"\nconnection to server at \"localhost\" (::1), port 5432 failed: FATAL:  password authentication failed for user \"dpagent_fixture_src_8a94570db1\"",
+      "source_unreachable": true
+    }
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_94C4D4C4_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_94C4D4C4_BRONZE_BUCKET, DPAGENT_VALIDATE_94C4D4C4_BRONZE_ENDPOINT, DPAGENT_VALIDATE_94C4D4C4_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_94C4D4C4_SRC_DATABASE, DPAGENT_VALIDATE_94C4D4C4_SRC_HOST, DPAGENT_VALIDATE_94C4D4C4_SRC_PASSWORD, DPAGENT_VALIDATE_94C4D4C4_SRC_PORT, DPAGENT_VALIDATE_94C4D4C4_SRC_USER, DPAGENT_VALIDATE_94C4D4C4_WH_DATABASE, DPAGENT_VALIDATE_94C4D4C4_WH_HOST, DPAGENT_VALIDATE_94C4D4C4_WH_PASSWORD, DPAGENT_VALIDATE_94C4D4C4_WH_PORT, DPAGENT_VALIDATE_94C4D4C4_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_bronze_pair__validate__94c4d4c4",
+  "comparison": {
+    "idempotent": true,
+    "run_1": "pass",
+    "run_2": "pass"
+  },
+  "dbt_tests": {
+    "run_1": [],
+    "run_2": []
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-d0323d7de1e827d3",
+  "expected_hash": "sha256:4ea7769c5d6fafddba848c96c9ef316d974e47dcf31e56bce37cb93399887999",
+  "fixture_hash": "sha256:59c68189c508e4609779a1ec030cc6faf07b0a7f1237d1eb41a9e6b73ca0b613",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 5,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ]
+    },
+    "run_2": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 5,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 7,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": false
+  },
+  "overall": "pass",
+  "pipeline_hash": "sha256:429a7b077767728143e0e52f7ddc3c54b3953216498a46d68555caf309c58131",
+  "promote": {
+    "accepted": true,
+    "evidence_id": "ev-d0323d7de1e827d3",
+    "is_approved": true,
+    "maturity": "reviewed",
+    "verification": "verified"
+  },
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    37,
+    38
+  ],
+  "run_status": {
+    "run_1": "ok",
+    "run_2": "ok"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}
