@@ -34,6 +34,7 @@ requires_bash = pytest.mark.skipif(
 # override here — everything else comes from the pack's own schema defaults,
 # exactly like a real --dry-run with no --set flags.
 REQUIRED_OVERRIDES = {
+    "superset-assets": {"projects": [{"name":"dryrun","bundle_dir":"projects/dryrun/bundle","expected_file":"projects/dryrun/expected.yaml"}]},
     "superset": {
         "backend_password": "dryrun-metadata-password",
         "admin_password": "dryrun-admin-password",

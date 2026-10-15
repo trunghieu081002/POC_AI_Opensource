@@ -1,0 +1,14 @@
+- id: bi-approval-mismatch
+  match:
+    output: "BI approval does not match"
+  cause: The artifact, independent expected or environment binding changed after approval.
+  autofix: []
+  ask_user: Validate and review the new fingerprint before supplying approved_sha256.
+  retry: false
+- id: bi-ownership-collision
+  match:
+    output: "Refusing unowned Superset"
+  cause: A UUID or unique metadata name belongs to another project.
+  autofix: []
+  ask_user: Assign project-owned UUIDs and names; existing assets are never adopted automatically.
+  retry: false
