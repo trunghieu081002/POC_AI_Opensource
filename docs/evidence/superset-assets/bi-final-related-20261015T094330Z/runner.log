@@ -1,0 +1,64 @@
+...................................F...........Fs.......                 [100%]
+=================================== FAILURES ===================================
+__________________ test_every_shipped_check_has_a_description __________________
+
+    def test_every_shipped_check_has_a_description():
+        for name in loader.available():
+            suite = loader.load(name)
+            for check in suite.checks:
+>               assert check.description, f"{name}/{check.id} has no description"
+E               AssertionError: superset-assets/reject-unapproved has no description
+E               assert ''
+E                +  where '' = Check(id='reject-unapproved', script='checks/10-approval.sh', description='', timeout=60, critical=True, negative=True).description
+
+tests/test_suites.py:115: AssertionError
+____________ test_every_step_survives_dry_run_in_order[postgres-ol] ____________
+
+pack_name = 'postgres', fake_os = 'ol'
+tmp_path = PosixPath('/tmp/pytest-of-oracle/pytest-455/test_every_step_survives_dry_r9')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f5603da9dd0>
+
+    @requires_bash
+    @pytest.mark.parametrize("pack_name,fake_os", _cases())
+    def test_every_step_survives_dry_run_in_order(pack_name, fake_os, tmp_path, monkeypatch):
+        if (pack_name, fake_os) in KNOWN_UNCONDITIONAL_FAILURES:
+            pytest.skip(f"{pack_name} on {fake_os} fails by design, not by dry-run bug — see comment above")
+    
+        marker = FAMILY_MARKER_BINARY.get(fake_os)
+        if marker and not shutil.which(marker):
+            pytest.skip(f"this host has no {marker} — cannot meaningfully fake {fake_os} here")
+    
+        # run_script() writes a command-log jsonl under executor.LOG_DIR, which
+        # defaults to /var/log/dpagent — not writable by whatever unprivileged
+        # user runs pytest. Redirect it so this test needs no root.
+        monkeypatch.setattr(executor, "LOG_DIR", tmp_path)
+    
+        pack = packs.load(pack_name)
+        os_info = os_detect.resolve(fake_os)
+        resolved = params_mod.resolve(pack.param_schema, REQUIRED_OVERRIDES.get(pack_name, {}),
+                                      pack=pack_name)
+        env = executor.build_env(
+            os_info.as_env(), resolved, dry_run=True,
+            extra={"DP_PACK": pack_name, "DP_PACK_ROOT": str(pack.root)},
+        )
+    
+        for step in pack.steps:
+            result = executor.run_script(pack.path(step.script), env, "test-dryrun",
+                                         timeout=60, cwd=pack.root)
+>           assert result.rc == 0, (
+                f"{pack_name}/{step.id} ({fake_os}) failed under --dry-run "
+                f"(rc={result.rc}):\n{result.output}"
+            )
+E           AssertionError: postgres/repo (ol) failed under --dry-run (rc=124):
+E             !! not root - the real run will need: sudo -E dpagent ...
+E             :: adding PGDG for EL8 x86_64
+E             DRY $ dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+E             
+E             [dpagent] timed out after 60s
+E           assert 124 == 0
+E            +  where 124 = Result(rc=124, stdout='', stderr='!! not root - the real run will need: sudo -E dpagent ...\n:: adding PGDG for EL8 x8...s=60023, timed_out=True, log_path='/tmp/pytest-of-oracle/pytest-455/test_every_step_survives_dry_r9/test-dryrun.jsonl').rc
+
+tests/test_dry_run_integration.py:113: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_suites.py::test_every_shipped_check_has_a_description - Ass...
+FAILED tests/test_dry_run_integration.py::test_every_step_survives_dry_run_in_order[postgres-ol]

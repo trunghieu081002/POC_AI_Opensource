@@ -1,0 +1,6 @@
+skipping suite superset-assets: superset-assets not installed
+╭─────────────────────────────────────────────────────────────────╮
+│ no acceptance suite covers what is installed                    │
+│ An install with no suite is unproven, whatever verify said.     │
+│ Write one under /opt/dpagent-bi-probe/suites/<name>/suite.yaml. │
+╰─────────────────────────────────────────────────────────────────╯
