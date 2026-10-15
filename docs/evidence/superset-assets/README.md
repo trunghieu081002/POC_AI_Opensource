@@ -34,3 +34,21 @@ schema. This does not prove the HG pipeline-to-dashboard path, a second business
 pipeline/schema, browser dashboard rendering, or representative HG load. Runtime
 rollback/recovery is evidenced separately by the Superset pack. No production
 service, existing company container, real LLM or paid model was used.
+
+## Final JSON/CLI checks
+
+Full unit at composed source `96ac9127` found three genuine stdlib JSON fallback
+failures (1358 passed, 27 skipped); `use_decimal` was not a stdlib argument.
+All five reads now use `parse_float=Decimal`, supported by both libraries. A
+forced-stdlib run passed all 26 artifact tests. Real retained two-project
+redeploy on `4fe8a5a5` preserved IDs and independent comparisons; full unit on
+that source passed **1361/27**, and the final real artifact suite passed **5/5**.
+
+An additional actual CLI update first correctly failed stale-fingerprint verify
+when its external file changed but its validation parameters were reused. The
+successful config adds `projects[].revision`: v1 -> v2 invalidates the existing
+parameter checkpoint. The same CLI then proved fresh validate, approved deploy,
+identical redeploy, title update with stable IDs and idempotent scoped undeploy,
+with exact metadata baseline restored and leaks 0. No engine/assertion/expected
+was weakened; revision is an existing list-parameter input, not a security hash.
+Full composed, browser and final cleanup evidence is in dependent project PR #46.
