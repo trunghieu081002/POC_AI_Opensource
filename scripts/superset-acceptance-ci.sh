@@ -107,5 +107,9 @@ fi
 dpagent spec /opt/dpagent/tests/superset_acceptance/stack.yaml --yes --allow-draft --force
 /opt/superset/.venv/bin/python /opt/dpagent/tests/superset_acceptance/lifecycle.py after-reinstall
 /opt/superset/.venv/bin/python /opt/dpagent/tests/superset_acceptance/lifecycle.py rollback
-echo 'install=pass authenticated_query=pass api_and_db_write_denial=pass dbt_recreate=pass reinstall=pass restart=pass rollback=pass' > /root/superset-acceptance/lifecycle.txt
+# Restore from the same environment secrets: metadata encryption must survive rollback.
+dpagent spec /opt/dpagent/tests/superset_acceptance/stack.yaml --yes --allow-draft --no-test
+dpagent test superset
+/opt/superset/.venv/bin/python /opt/dpagent/tests/superset_acceptance/lifecycle.py after-reinstall
+echo 'install=pass authenticated_query=pass api_and_db_write_denial=pass dbt_recreate=pass reinstall=pass restart=pass rollback=pass recovery=pass' > /root/superset-acceptance/lifecycle.txt
 HOST
