@@ -1,0 +1,36 @@
+# A generic, isolated BI stack. Supply all secrets through the environment.
+# The postgres pack creates metadata and warehouse roles; Superset creates its
+# separately owned SELECT-only role. Never give that reader to postgres.users.
+project: bi-stack
+components:
+  - base: {}
+  - python-modern:
+      version: "3.11"
+  - postgres:
+      version: "15"
+      databases: [warehouse, superset_meta]
+      users:
+        - name: analytics_writer
+          password: "${WAREHOUSE_WRITER_PASSWORD}"
+          databases: [warehouse]
+        - name: superset_meta
+          password: "${SUPERSET_METADATA_PASSWORD}"
+          databases: [superset_meta]
+  - superset:
+      version: "6.1.0"
+      backend_db: superset_meta
+      backend_user: superset_meta
+      backend_password: "${SUPERSET_METADATA_PASSWORD}"
+      secret_key: "${SUPERSET_SECRET_KEY}"
+      admin_password: "${SUPERSET_ADMIN_PASSWORD}"
+      warehouse_db: warehouse
+      warehouse_role: superset_reader
+      warehouse_password: "${SUPERSET_WAREHOUSE_PASSWORD}"
+      warehouse_schemas: [public]
+      warehouse_creator_roles: [analytics_writer]
+  - dbt:
+      dbt_version: "1.8.*"
+      db_user: analytics_writer
+      db_password: "${WAREHOUSE_WRITER_PASSWORD}"
+      database: warehouse
+      db_schema: public

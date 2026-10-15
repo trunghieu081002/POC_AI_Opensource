@@ -1,0 +1,10 @@
+import os
+
+SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
+SQLALCHEMY_DATABASE_URI = os.environ["SUPERSET_METADATA_URI"]
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+WTF_CSRF_ENABLED = True
+TALISMAN_ENABLED = False  # loopback HTTP; external access requires an HTTPS proxy
+ENABLE_PROXY_FIX = False
+AUTH_RATE_LIMITED = True
+AUTH_RATE_LIMIT = "20 per minute"

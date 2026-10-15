@@ -1,0 +1,14 @@
+- id: superset-database-auth
+  match:
+    output: "password authentication failed"
+  cause: Configured database credentials do not match the PostgreSQL role.
+  autofix: []
+  ask_user: Confirm the environment secret and the role configured by the postgres spec.
+  retry: false
+- id: superset-reader-collision
+  match:
+    output: "reader role exists without this pack ownership marker"
+  cause: The requested reader belongs to another installation.
+  autofix: []
+  ask_user: Choose a separate warehouse_role; existing roles are never adopted automatically.
+  retry: false

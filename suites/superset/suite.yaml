@@ -1,0 +1,32 @@
+suite: superset
+summary: Authenticate, query a warehouse, refuse writes and retain metadata across a restart
+requires: [superset, postgres]
+setup:
+  - id: create-owned-fixtures
+    script: setup/00-fixtures.sh
+    description: Create namespaced warehouse rows and one namespaced API connection
+    timeout: 120
+checks:
+  - id: authenticated-query
+    script: checks/10-query.sh
+    description: An authenticated SQL Lab query matches independent fixture totals
+    critical: true
+    timeout: 60
+  - id: refuses-writes
+    script: checks/20-readonly.sh
+    description: SQL Lab and PostgreSQL refuse warehouse writes
+    negative: true
+    timeout: 60
+  - id: reader-survives-recreate
+    script: checks/30-recreate.sh
+    description: SELECT remains permitted after the real creator recreates the table
+    timeout: 60
+  - id: metadata-survives-restart
+    script: checks/40-restart.sh
+    description: Restart preserves the same unique metadata connection and query result
+    timeout: 180
+teardown:
+  - id: remove-owned-fixtures
+    script: teardown/99-fixtures.sh
+    description: Remove only this namespace's connection and warehouse table
+    timeout: 120
