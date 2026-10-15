@@ -19,8 +19,8 @@ def test_comma_value_is_kept_as_a_raw_string():
     out = render.parse_set(("postgres.databases=warehouse,airflow_meta",), None)
     assert out == {"postgres": {"databases": "warehouse,airflow_meta"}}
 
-    out = render.parse_set(("postgres.listen_addresses=localhost,192.168.1.54",), None)
-    assert out == {"postgres": {"listen_addresses": "localhost,192.168.1.54"}}
+    out = render.parse_set(("postgres.listen_addresses=localhost,192.0.2.54",), None)
+    assert out == {"postgres": {"listen_addresses": "localhost,192.0.2.54"}}
 
 
 def test_default_pack_is_used_when_key_has_no_dot():
