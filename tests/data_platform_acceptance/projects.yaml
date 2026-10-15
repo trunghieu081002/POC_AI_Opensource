@@ -8,6 +8,7 @@ projects:
     restore_sql: DELETE FROM resource_editings WHERE "Id"='x3' AND "StartTime"=11 AND "EndTime"=21
     failing_stage: silver
     unique_model: fact_editing_sk
+    failing_model: fact_editing
     blocked_stage: gold
   - pipeline: m25_monthly_sales
     bi: monthly-sales
