@@ -41,6 +41,11 @@ def run(p,expected,warehouse,label,want='ok'):
         if not cmp.ok:raise AssertionError('Independent warehouse expected mismatch')
     return result
 
+def undeploy_checked(p):
+    undone=deploy.undeploy(p);ok,detail=fixture._verify_cleanup_complete(p,undone,deploy)
+    if not ok:raise AssertionError('Scoped pipeline cleanup failed: '+detail)
+    return {'ok':ok,'detail':detail}
+
 def assert_failure_journal(events,run_id,pipeline,item):
     if not events or any(e['run_id']!=run_id for e in events):raise AssertionError('Missing or mismatched failure journal')
     stage=item['failing_stage'];blocked=item['blocked_stage']
@@ -112,7 +117,7 @@ def main():
                 recovered=bi('verify')
                 if {n:v['ids'] for n,v in recovered.items()}!={n:v['ids'] for n,v in initial.items()}:raise AssertionError('BI identities changed after dbt recreate')
         # Scoped removal must preserve the other project's running service/query.
-        first=pipelines[0][1];bi('undeploy',CONFIG[0]['bi']);deploy.undeploy(first);deployed.remove(first)
+        first=pipelines[0][1];bi('undeploy',CONFIG[0]['bi']);REPORT['cleanup'][first.name]=undeploy_checked(first);deployed.remove(first)
         bi('verify',CONFIG[1]['bi'])
         REPORT['scoped_undeploy']='pass';REPORT['status']='pass'
       finally:
