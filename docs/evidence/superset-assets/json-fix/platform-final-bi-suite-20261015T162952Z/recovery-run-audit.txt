@@ -1,0 +1,62 @@
+                                     run 28                                     
+ time            actor   kind                  message                          
+ 15:33:25+00:00  engine  bronze.extract.start  hg_resources_useage_number:      
+                                               channel, channel_company,        
+                                               channel_video_info, editings,    
+                                               resource, resource_editings ->   
+                                               bronze (one snapshot)            
+ 15:33:25+00:00  engine  bronze.extract.done   hg_resources_useage_number:      
+                                               batch                            
+                                               b829bdb8-6c79-4e4f-a96b-f73afab… 
+                                               - 55 row(s) in 6 object(s)       
+ 15:33:27+00:00  engine  bronze.load.start     hg_resources_useage_number:      
+                                               batch                            
+                                               b829bdb8-6c79-4e4f-a96b-f73afab… 
+ 15:33:28+00:00  engine  bronze.load.done      hg_resources_useage_number:      
+                                               batch                            
+                                               b829bdb8-6c79-4e4f-a96b-f73afab… 
+                                               loaded - 55 row(s) from 6        
+                                               object(s)                        
+ 15:33:30+00:00  engine  gate.passed           hg_resources_useage_number/land… 
+                                               schema_contract: ok              
+ 15:33:30+00:00  engine  gate.passed           hg_resources_useage_number/land… 
+                                               row_count_bounds: ok             
+ 15:33:30+00:00  engine  gate.passed           hg_resources_useage_number/land… 
+                                               row_count_bounds: ok             
+ 15:33:31+00:00  engine  stage.passed          hg_resources_useage_number/land… 
+                                               gates passed                     
+ 15:33:32+00:00  engine  transform.start       hg_resources_useage_number/silv… 
+                                               via dbt                          
+ 15:34:15+00:00  engine  dbt.test.passed       hg_resources_useage_number/silv… 
+                                               dbt test passed - ran 6 (6       
+                                               passed, 0 failed, 0 errored, 0   
+                                               warned, 0 skipped) of 6 required 
+ 15:34:15+00:00  engine  transform.done        hg_resources_useage_number/silv… 
+                                               transform complete               
+ 15:34:17+00:00  engine  gate.passed           hg_resources_useage_number/silv… 
+                                               not_null: ok                     
+ 15:34:17+00:00  engine  gate.passed           hg_resources_useage_number/silv… 
+                                               unique: ok                       
+ 15:34:17+00:00  engine  gate.passed           hg_resources_useage_number/silv… 
+                                               not_null: ok                     
+ 15:34:18+00:00  engine  gate.passed           hg_resources_useage_number/silv… 
+                                               unique: ok                       
+ 15:34:18+00:00  engine  stage.passed          hg_resources_useage_number/silv… 
+                                               gates passed                     
+ 15:34:19+00:00  engine  transform.start       hg_resources_useage_number/gold  
+                                               via dbt                          
+ 15:34:51+00:00  engine  dbt.test.passed       hg_resources_useage_number/gold: 
+                                               dbt test passed - ran 4 (4       
+                                               passed, 0 failed, 0 errored, 0   
+                                               warned, 0 skipped) of 4 required 
+ 15:34:51+00:00  engine  transform.done        hg_resources_useage_number/gold  
+                                               transform complete               
+ 15:34:53+00:00  engine  gate.passed           hg_resources_useage_number/gold  
+                                               not_null: ok                     
+ 15:34:53+00:00  engine  gate.passed           hg_resources_useage_number/gold  
+                                               unique: ok                       
+ 15:34:53+00:00  engine  stage.passed          hg_resources_useage_number/gold  
+                                               gates passed                     
+ 15:34:54+00:00  engine  pipeline.ok           DAG run 28 reached terminal      
+                                               state: ok                        
+full command log: /var/log/dpagent/run-28.jsonl

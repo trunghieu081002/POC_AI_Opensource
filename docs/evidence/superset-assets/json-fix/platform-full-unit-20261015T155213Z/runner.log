@@ -1,0 +1,289 @@
+........................................................................ [  5%]
+............................................ss.s.s.s.s.sss.s.s.s........ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+.........................................s.............................. [ 31%]
+........................................................................ [ 36%]
+........................................................................ [ 41%]
+..................sss................................................... [ 46%]
+........................................................................ [ 51%]
+........................................................................ [ 57%]
+........................................................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 72%]
+........................................................................ [ 77%]
+........................................ssssss.......................... [ 82%]
+..................................sss.s.................s............... [ 88%]
+........................................................................ [ 93%]
+....................F..FF............................................... [ 98%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+_______ test_redeploy_keeps_uuid_ids_and_foreign_uuid_cannot_be_adopted ________
+
+project = {'name': 'retail', 'content': {'charts/totals.yaml': {'slice_name': 'Independent fixture totals', 'viz_type': 'table',...m("amount")::integer AS total FROM "public"."orders_gold" WHERE "region" = \'north\' GROUP BY "region"', ...}]}]}, ...}
+
+    def test_redeploy_keeps_uuid_ids_and_foreign_uuid_cannot_be_adopted(project):
+        client=FakeClient(project['binding']);project['config']['approved_sha256']=project['fingerprint']
+        first=assets.deploy(client,project,'operator')
+>       assert assets.deploy(client,project,'operator')==first
+
+tests/test_superset_assets.py:162: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packs/superset-assets/assets.py:394: in deploy
+    path = deployment_path(project); previous = json.loads(path.read_text(),use_decimal=True) if path.exists() else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = '{\n  "approved_by": "operator",\n  "binding": {\n    "environment": "unit"\n  },\n  "content": {\n    "charts/totals...."a29b9660-3092-5f23-966b-68b9b5d6bbbe",\n        "version": "1.0.0"\n      }\n    }\n  },\n  "status": "deployed"\n}\n'
+cls = <class 'json.decoder.JSONDecoder'>, object_hook = None, parse_float = None
+parse_int = None, parse_constant = None, object_pairs_hook = None
+kw = {'use_decimal': True}
+
+    def loads(s, *, cls=None, object_hook=None, parse_float=None,
+            parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+        containing a JSON document) to a Python object.
+    
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+    
+        ``object_pairs_hook`` is an optional function that will be called with the
+        result of any object literal decoded with an ordered list of pairs.  The
+        return value of ``object_pairs_hook`` will be used instead of the ``dict``.
+        This feature can be used to implement custom decoders.  If ``object_hook``
+        is also defined, the ``object_pairs_hook`` takes priority.
+    
+        ``parse_float``, if specified, will be called with the string
+        of every JSON float to be decoded. By default this is equivalent to
+        float(num_str). This can be used to use another datatype or parser
+        for JSON floats (e.g. decimal.Decimal).
+    
+        ``parse_int``, if specified, will be called with the string
+        of every JSON int to be decoded. By default this is equivalent to
+        int(num_str). This can be used to use another datatype or parser
+        for JSON integers (e.g. float).
+    
+        ``parse_constant``, if specified, will be called with one of the
+        following strings: -Infinity, Infinity, NaN.
+        This can be used to raise an exception if invalid JSON numbers
+        are encountered.
+    
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
+        if isinstance(s, str):
+            if s.startswith('\ufeff'):
+                raise JSONDecodeError("Unexpected UTF-8 BOM (decode using utf-8-sig)",
+                                      s, 0)
+        else:
+            if not isinstance(s, (bytes, bytearray)):
+                raise TypeError(f'the JSON object must be str, bytes or bytearray, '
+                                f'not {s.__class__.__name__}')
+            s = s.decode(detect_encoding(s), 'surrogatepass')
+    
+        if (cls is None and object_hook is None and
+                parse_int is None and parse_float is None and
+                parse_constant is None and object_pairs_hook is None and not kw):
+            return _default_decoder.decode(s)
+        if cls is None:
+            cls = JSONDecoder
+        if object_hook is not None:
+            kw['object_hook'] = object_hook
+        if object_pairs_hook is not None:
+            kw['object_pairs_hook'] = object_pairs_hook
+        if parse_float is not None:
+            kw['parse_float'] = parse_float
+        if parse_int is not None:
+            kw['parse_int'] = parse_int
+        if parse_constant is not None:
+            kw['parse_constant'] = parse_constant
+>       return cls(**kw).decode(s)
+E       TypeError: JSONDecoder.__init__() got an unexpected keyword argument 'use_decimal'
+
+/usr/lib/python3.10/json/__init__.py:359: TypeError
+________ test_failed_live_update_restores_previous_owned_configuration _________
+
+project = {'name': 'retail', 'content': {'charts/totals.yaml': {'slice_name': 'Independent fixture totals', 'viz_type': 'table',...m("amount")::integer AS total FROM "public"."orders_gold" WHERE "region" = \'north\' GROUP BY "region"', ...}]}]}, ...}
+
+    def test_failed_live_update_restores_previous_owned_configuration(project):
+        client=FakeClient(project['binding']);project['config']['approved_sha256']=project['fingerprint']
+        before=assets.deploy(client,project,'operator')
+        receipt=assets.deployment_path(project).read_bytes()
+        updated=copy.deepcopy(project)
+        updated['content']['charts/totals.yaml']['slice_name']='Changed title'
+        updated['fingerprint']='f'*64;updated['config']['approved_sha256']=updated['fingerprint']
+        client.fail_live=True
+>       with pytest.raises(RuntimeError,match='injected live'):assets.deploy(client,updated,'operator')
+
+tests/test_superset_assets.py:195: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packs/superset-assets/assets.py:394: in deploy
+    path = deployment_path(project); previous = json.loads(path.read_text(),use_decimal=True) if path.exists() else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = '{\n  "approved_by": "operator",\n  "binding": {\n    "environment": "unit"\n  },\n  "content": {\n    "charts/totals...."a29b9660-3092-5f23-966b-68b9b5d6bbbe",\n        "version": "1.0.0"\n      }\n    }\n  },\n  "status": "deployed"\n}\n'
+cls = <class 'json.decoder.JSONDecoder'>, object_hook = None, parse_float = None
+parse_int = None, parse_constant = None, object_pairs_hook = None
+kw = {'use_decimal': True}
+
+    def loads(s, *, cls=None, object_hook=None, parse_float=None,
+            parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+        containing a JSON document) to a Python object.
+    
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+    
+        ``object_pairs_hook`` is an optional function that will be called with the
+        result of any object literal decoded with an ordered list of pairs.  The
+        return value of ``object_pairs_hook`` will be used instead of the ``dict``.
+        This feature can be used to implement custom decoders.  If ``object_hook``
+        is also defined, the ``object_pairs_hook`` takes priority.
+    
+        ``parse_float``, if specified, will be called with the string
+        of every JSON float to be decoded. By default this is equivalent to
+        float(num_str). This can be used to use another datatype or parser
+        for JSON floats (e.g. decimal.Decimal).
+    
+        ``parse_int``, if specified, will be called with the string
+        of every JSON int to be decoded. By default this is equivalent to
+        int(num_str). This can be used to use another datatype or parser
+        for JSON integers (e.g. float).
+    
+        ``parse_constant``, if specified, will be called with one of the
+        following strings: -Infinity, Infinity, NaN.
+        This can be used to raise an exception if invalid JSON numbers
+        are encountered.
+    
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
+        if isinstance(s, str):
+            if s.startswith('\ufeff'):
+                raise JSONDecodeError("Unexpected UTF-8 BOM (decode using utf-8-sig)",
+                                      s, 0)
+        else:
+            if not isinstance(s, (bytes, bytearray)):
+                raise TypeError(f'the JSON object must be str, bytes or bytearray, '
+                                f'not {s.__class__.__name__}')
+            s = s.decode(detect_encoding(s), 'surrogatepass')
+    
+        if (cls is None and object_hook is None and
+                parse_int is None and parse_float is None and
+                parse_constant is None and object_pairs_hook is None and not kw):
+            return _default_decoder.decode(s)
+        if cls is None:
+            cls = JSONDecoder
+        if object_hook is not None:
+            kw['object_hook'] = object_hook
+        if object_pairs_hook is not None:
+            kw['object_pairs_hook'] = object_pairs_hook
+        if parse_float is not None:
+            kw['parse_float'] = parse_float
+        if parse_int is not None:
+            kw['parse_int'] = parse_int
+        if parse_constant is not None:
+            kw['parse_constant'] = parse_constant
+>       return cls(**kw).decode(s)
+E       TypeError: JSONDecoder.__init__() got an unexpected keyword argument 'use_decimal'
+
+/usr/lib/python3.10/json/__init__.py:359: TypeError
+______________ test_undeploy_one_project_keeps_the_other_project _______________
+
+project = {'name': 'retail', 'content': {'charts/totals.yaml': {'slice_name': 'Independent fixture totals', 'viz_type': 'table',...m("amount")::integer AS total FROM "public"."orders_gold" WHERE "region" = \'north\' GROUP BY "region"', ...}]}]}, ...}
+
+    def test_undeploy_one_project_keeps_the_other_project(project):
+        directory=assets.ROOT/'projects'/'other'
+        fixture.create(directory,'other','public','other_gold')
+        config={'name':'other','bundle_dir':'projects/other/bundle','expected_file':'projects/other/expected.yaml'}
+        other=assets.read_project(config,project['binding'])
+        client=FakeClient(project['binding'])
+        for item in (project,other):
+            item['config']['approved_sha256']=item['fingerprint'];assets.deploy(client,item,'operator')
+        before=client.lookup(other['resources'])
+>       assets.undeploy(client,project['name'])
+
+tests/test_superset_assets.py:211: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packs/superset-assets/assets.py:435: in undeploy
+    record = json.loads(path.read_text(),use_decimal=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = '{\n  "approved_by": "operator",\n  "binding": {\n    "environment": "unit"\n  },\n  "content": {\n    "charts/totals...."a29b9660-3092-5f23-966b-68b9b5d6bbbe",\n        "version": "1.0.0"\n      }\n    }\n  },\n  "status": "deployed"\n}\n'
+cls = <class 'json.decoder.JSONDecoder'>, object_hook = None, parse_float = None
+parse_int = None, parse_constant = None, object_pairs_hook = None
+kw = {'use_decimal': True}
+
+    def loads(s, *, cls=None, object_hook=None, parse_float=None,
+            parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+        containing a JSON document) to a Python object.
+    
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+    
+        ``object_pairs_hook`` is an optional function that will be called with the
+        result of any object literal decoded with an ordered list of pairs.  The
+        return value of ``object_pairs_hook`` will be used instead of the ``dict``.
+        This feature can be used to implement custom decoders.  If ``object_hook``
+        is also defined, the ``object_pairs_hook`` takes priority.
+    
+        ``parse_float``, if specified, will be called with the string
+        of every JSON float to be decoded. By default this is equivalent to
+        float(num_str). This can be used to use another datatype or parser
+        for JSON floats (e.g. decimal.Decimal).
+    
+        ``parse_int``, if specified, will be called with the string
+        of every JSON int to be decoded. By default this is equivalent to
+        int(num_str). This can be used to use another datatype or parser
+        for JSON integers (e.g. float).
+    
+        ``parse_constant``, if specified, will be called with one of the
+        following strings: -Infinity, Infinity, NaN.
+        This can be used to raise an exception if invalid JSON numbers
+        are encountered.
+    
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
+        if isinstance(s, str):
+            if s.startswith('\ufeff'):
+                raise JSONDecodeError("Unexpected UTF-8 BOM (decode using utf-8-sig)",
+                                      s, 0)
+        else:
+            if not isinstance(s, (bytes, bytearray)):
+                raise TypeError(f'the JSON object must be str, bytes or bytearray, '
+                                f'not {s.__class__.__name__}')
+            s = s.decode(detect_encoding(s), 'surrogatepass')
+    
+        if (cls is None and object_hook is None and
+                parse_int is None and parse_float is None and
+                parse_constant is None and object_pairs_hook is None and not kw):
+            return _default_decoder.decode(s)
+        if cls is None:
+            cls = JSONDecoder
+        if object_hook is not None:
+            kw['object_hook'] = object_hook
+        if object_pairs_hook is not None:
+            kw['object_pairs_hook'] = object_pairs_hook
+        if parse_float is not None:
+            kw['parse_float'] = parse_float
+        if parse_int is not None:
+            kw['parse_int'] = parse_int
+        if parse_constant is not None:
+            kw['parse_constant'] = parse_constant
+>       return cls(**kw).decode(s)
+E       TypeError: JSONDecoder.__init__() got an unexpected keyword argument 'use_decimal'
+
+/usr/lib/python3.10/json/__init__.py:359: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_superset_assets.py::test_redeploy_keeps_uuid_ids_and_foreign_uuid_cannot_be_adopted
+FAILED tests/test_superset_assets.py::test_failed_live_update_restores_previous_owned_configuration
+FAILED tests/test_superset_assets.py::test_undeploy_one_project_keeps_the_other_project
+3 failed, 1358 passed, 27 skipped in 294.76s (0:04:54)

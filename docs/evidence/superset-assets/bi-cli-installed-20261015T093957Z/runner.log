@@ -1,0 +1,59 @@
+project: bi-stack
+╭─── plan · ubuntu 22.04 (debian/apt) ───╮
+│  #  pack             steps  why        │
+│  1  base                 3  requested  │
+│  2  python-modern        1  requested  │
+│  3  dbt                  4  requested  │
+│  4  postgres             5  requested  │
+│  5  superset             6  requested  │
+│  6  superset-assets      1  requested  │
+╰────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "projects": [{"name": "bi-probe", "bundle_dir": 
+"projects/bi-probe/bundle", "expected_file": 
+"projects/bi-probe/expected.yaml"}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 1771ms
+  verify ok
+      bi-probe verified validate
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset-assets                                                              │
+│ Native BI approval, independent chart/filter results, stable identities and  │
+│ scoped removal                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS fixtures 628ms
+  checks
+    PASS reject-unapproved (negative) 784ms
+    PASS chart-filter-independent-sql 8872ms
+    PASS stable-redeploy 7236ms
+    PASS reject-bad-expectation (negative) 4257ms
+    PASS update-scoped-undeploy 4336ms
+  teardown
+    PASS owned-fixtures-only 905ms
+  superset-assets: 5 checks passed
+
+╭─────────── acceptance ────────────╮
+│  suite            result  checks  │
+│  superset-assets  passed     5/5  │
+╰───────────────────────────────────╯

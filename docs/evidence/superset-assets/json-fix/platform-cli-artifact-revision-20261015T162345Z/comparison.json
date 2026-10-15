@@ -1,0 +1,89 @@
+{
+  "status": "pass",
+  "initial_ids": {
+    "databases": {
+      "d10671f0-ff4b-5254-ae57-4503e4b6514a": 31
+    },
+    "datasets": {
+      "786620dc-0caa-5b87-a659-ac32afcb13ee": 30
+    },
+    "charts": {
+      "5824da31-4a21-5899-96ba-d2b4e18961aa": 30
+    },
+    "dashboards": {
+      "e762f94c-cab1-5906-b8af-1d647b454890": 30
+    }
+  },
+  "stable_ids": true,
+  "fresh_validation": true,
+  "comparisons": [
+    {
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "filters": [],
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ],
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.250000000
+        }
+      ],
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        },
+        {
+          "month": "2026-02",
+          "revenue": 75.25
+        }
+      ],
+      "matched": true
+    },
+    {
+      "chart_uuid": "5824da31-4a21-5899-96ba-d2b4e18961aa",
+      "filters": [
+        {
+          "col": "month",
+          "op": "IN",
+          "val": [
+            "2026-01"
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "month": "2026-01",
+          "revenue": 350.5
+        }
+      ],
+      "chart_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.500000000
+        }
+      ],
+      "sql_rows": [
+        {
+          "month": "2026-01",
+          "revenue": 350.50
+        }
+      ],
+      "matched": true
+    }
+  ],
+  "metadata_baseline_restored": true,
+  "leaks": 0
+}
