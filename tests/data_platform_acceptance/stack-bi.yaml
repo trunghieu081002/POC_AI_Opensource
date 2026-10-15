@@ -84,3 +84,13 @@ components:
     - m25_monthly_sales
     warehouse_creator_roles:
     - dbt_user
+- superset-assets:
+    mode: validate
+    environment: dev
+    projects:
+    - name: hg-usage
+      bundle_dir: projects/hg-usage/bundle
+      expected_file: projects/hg-usage/expected.yaml
+    - name: monthly-sales
+      bundle_dir: projects/monthly-sales/bundle
+      expected_file: projects/monthly-sales/expected.yaml
