@@ -21,9 +21,19 @@ components:
       mode: validate
       projects:
         - name: reporting
+          revision: reviewed-content-v1
           bundle_dir: projects/reporting/bundle
           expected_file: projects/reporting/expected.yaml
 ```
+
+Each project configuration carries an opaque `revision` label (a Git revision
+or explicit artifact version). Change it whenever bundle/expected files change,
+including another validation before approval. The existing installer hashes the
+entire `projects` parameter list; external file bytes alone do not invalidate an
+old install checkpoint. A fresh revision triggers a new validation without forcing
+runtime dependencies to reinstall. Always use the new report's full fingerprint
+for approval. The revision label never replaces the artifact/expected byte hash.
+A stale fingerprint is refused; the failed CLI attempt is retained in evidence.
 
 An expected file declares chart UUID, independent SQL and literal expected rows;
 optional native filter checks declare dashboard UUID, native filter ID, values,
