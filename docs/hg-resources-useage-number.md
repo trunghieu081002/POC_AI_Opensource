@@ -69,9 +69,9 @@ Python implementation of HG's models (`tests/hg_resources_reference.py`, which r
 seed); the fixture exercises every rule above; the verbatim files are unchanged; every model of every dbt stage
 has a test; the whole project, seed included, is under the approval hash.
 
-**Not done yet:** the three matrix scenarios (`usage-correct-twice`, `usage-conflicting-ids`,
-`usage-promote-deploy-run`) have **not** been run on a disposable host. A first attempt was stopped while the host
-was still installing. Until they pass this report is *unit-tested only*, not *really verified*.
+**Verified on disposable Linux:** all three usage scenarios passed on source
+`cefb458b8131e97b7b1df9649edc43a6926e5759`. Full bronze, full unit, actual
+timezone and cleanup evidence are recorded in the final verification section below.
 
 | Scenario | What it must show |
 |---|---|
@@ -85,10 +85,10 @@ Follow-up verification: the original full unit run at merge commit
 `b1a5b6e8aa98ad4b7c57b23e3a8d02c33595f721` passed 1 269 tests with 25 skips;
 its evidence is retained in `docs/evidence/hg-usage-verification/`. The journal
 assertion follow-up and Linux company-host handoff are documented in
-`docs/evidence/hg-usage-journal-fix/HANDOFF.md`. Real-host acceptance remains pending.
+`docs/evidence/hg-usage-journal-fix/HANDOFF.md`. Company-host acceptance is recorded below; earlier failed attempts remain preserved.
 
-* One report, full snapshot. `published_date` assumes the database session time zone is UTC (the fixture's
-  `PublishedAt` values are `+00`).
+* One report, full snapshot. The fixture has `PublishedAt` values at `+00`; its actual dbt
+  session was observed as `Etc/UTC`. Future real data requires an explicit business timezone decision.
 * The seed is HG's operational list of 5 787 stock codes, committed as is.
 * Real HG source tables are named `Channel`, `Resource`, … and their EL renames them; connecting dpagent to the real
   source needs a view layer or a rename step that is not built here.
