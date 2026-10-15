@@ -1,0 +1,86 @@
+project: disposable-data-platform
+components:
+- base:
+    locale: en_US.UTF-8
+- python-modern:
+    version: '3.11'
+- postgres:
+    version: '15'
+    port: 5432
+    listen_addresses: localhost
+    max_connections: 200
+    databases:
+    - warehouse
+    - airflow_meta
+    - dlt_selftest
+    - superset_meta
+    users:
+    - name: dbt_user
+      password: ${DBT_DB_PASSWORD}
+      databases:
+      - warehouse
+    - name: airflow
+      password: ${AIRFLOW_DB_PASSWORD}
+      databases:
+      - airflow_meta
+    - name: dlt_user
+      password: ${DLT_DB_PASSWORD}
+      databases:
+      - dlt_selftest
+    - name: superset_meta
+      password: ${SUPERSET_METADATA_PASSWORD}
+      databases:
+      - superset_meta
+- dbt:
+    adapter: postgres
+    dbt_version: 1.8.*
+    host: localhost
+    port: 5432
+    database: warehouse
+    db_schema: public
+    db_user: dbt_user
+    db_password: ${DBT_DB_PASSWORD}
+    threads: 4
+- airflow:
+    version: 2.9.3
+    executor: LocalExecutor
+    webserver_port: 8090
+    load_examples: false
+    backend_host: localhost
+    backend_port: 5432
+    backend_db: airflow_meta
+    backend_user: airflow
+    backend_password: ${AIRFLOW_DB_PASSWORD}
+    admin_user: admin
+    admin_password: ${AIRFLOW_ADMIN_PASSWORD}
+    admin_email: admin@example.com
+- dlt:
+    dlt_version: 1.*
+    host: localhost
+    port: 5432
+    database: dlt_selftest
+    db_user: dlt_user
+    db_password: ${DLT_DB_PASSWORD}
+- seaweedfs:
+    version: '4.48'
+    s3_port: 8333
+    bind_address: 127.0.0.1
+    access_key: ${BRONZE_S3_ACCESS_KEY}
+    secret_key: ${BRONZE_S3_SECRET_KEY}
+    buckets:
+    - hg-bronze
+- superset:
+    version: 6.1.0
+    backend_db: superset_meta
+    backend_user: superset_meta
+    backend_password: ${SUPERSET_METADATA_PASSWORD}
+    secret_key: ${SUPERSET_SECRET_KEY}
+    admin_password: ${SUPERSET_ADMIN_PASSWORD}
+    warehouse_db: warehouse
+    warehouse_role: superset_reader
+    warehouse_password: ${SUPERSET_WAREHOUSE_PASSWORD}
+    warehouse_schemas:
+    - gold
+    - m25_monthly_sales
+    warehouse_creator_roles:
+    - dbt_user
