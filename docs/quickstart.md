@@ -48,6 +48,12 @@ plays the operator above, and checks each milestone independently (`tests/quicks
 values): first run, a refused deployment with an unreviewed fingerprint, deploy, update with stable
 identities, rerun without duplicates, status, scoped undeploy. Results: `docs/evidence/quickstart/`.
 
+| Run | Source | Result |
+|---|---|---|
+| `6ff1049/20261018T132215Z` | first version | **failed** at `bi-validate`: `bi.yaml` names only Superset, so the resolver pulled `postgres` in as a dependency with its *default* params and re-ran its config step against the running server (`max_connections` 200 → 100). Fixed in `3eb2b08`: an installed pack pulled in only as a dependency is kept as configured |
+| `3eb2b08/20261018T134430Z` | the fix | **failed** in `install`, before any quickstart step: `systemctl restart postgresql` > 300 s with the shared host at load ≈ 25 (infrastructure) |
+| `11468cf/20261018T150927Z` | `3eb2b08` + evidence only | **PASS**, 13 steps rc=0: first run = expected (2 months: 2 orders/200.50, 2 orders/100.00), landing 6 rows once; a deploy with an unreviewed fingerprint refused (rc=3) and nothing in Superset; deploy → chart data = expected, each asset exactly once; v2 update → new fingerprint, title changed, IDs unchanged (dashboard/chart/dataset/db 11/11/11/12); rerun → same rows, no duplicates; status/audit; undeploy → no project UUID in Superset, DAG/dbt models/`QS_*` secrets gone, source tree kept, Superset still up; secret scan clean; container removed |
+
 ## Limits
 
 * Ubuntu 22.04 systemd container on one host; native RHEL/Oracle Linux is a separate acceptance.

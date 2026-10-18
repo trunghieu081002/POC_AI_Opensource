@@ -13,7 +13,7 @@ are **not** one automated flow; this table says which step an operator can do wi
 | Validate | `dpagent pipeline lint`, `pipeline validate NAME [--fixture F --expected E]` | matrix 34/34 | csv/file connectors cannot be fixture-validated (refused by design), so they cannot reach evidence-bound approval |
 | Approve | `dpagent pipeline promote NAME --fixture F --expected E` (A2: sealed evidence, content hash) | matrix promote scenarios | The composed acceptance (#46) approves with `approval.promote()` in Python, not this CLI |
 | Deploy / run / schedule | `pipeline deploy`, `pipeline run [--wait]`, `schedule:` in the manifest | matrix + #46 scheduled run | #46 deploys with `deploy.deploy()` under environment overrides and polls the journal itself |
-| Demo / source data | — | — | No command loads a demo source; a real project points at its real source, a quickstart has to create one |
+| Demo / source data | `dpagent pipeline fixture-sql FIXTURE \| psql` (demo only) | quickstart PASS `11468cf` | a real project points at its real source |
 | Dashboard | `dpagent spec` with the `superset-assets` component, `mode: validate → deploy → undeploy`; approval = `approved_by` + the printed `fingerprint` | assets suite 5/5 (#45), CLI revision v1→v2 (#46) | **Dashboards are hand-authored native Superset YAML** (`projects/<name>/bundle`, stable UUIDs); no generator. #46's verify/redeploy use `tests/data_platform_acceptance/bi_phase.py`, which approves itself |
 | Status / audit | `pipeline status`, `pipeline audit [RUN]`, `dpagent audit`, `status` | matrix, #46 | BI status = `dpagent test superset-assets` / report JSON in `/var/lib/dpagent-bi-assets/<project>/` |
 | Recovery | fix data, `pipeline run` (full snapshot) | #46 fault → recovery | No partial resume (by design: full snapshot) |
@@ -42,8 +42,10 @@ that stays `maturity: draft` until `dpagent promote` — the catalog never claim
 
 ## Gaps closed next (in this order)
 
-1. **Quickstart through product commands only** (`docs/quickstart.md`): a small non-HG project from a clean
-   checkout: doctor/spec → validate → promote → deploy/run → dashboard → update/rerun → status/audit →
-   undeploy, with no test helper approving anything.
+1. **Quickstart through product commands only** — **done** (`docs/quickstart.md`, PASS on `11468cf`): a
+   small non-HG project from a `git archive` of the commit: doctor/spec → validate → promote → deploy/run →
+   dashboard → update/rerun → status/audit → undeploy, with no test helper approving anything. Two
+   links were added: `dpagent pipeline fixture-sql` (demo source data) and dependency-only packs are no longer
+   reconfigured with defaults (found by the run).
 2. **Viewer RBAC**: a real non-admin account; API and browser checks.
 3. **Native Oracle Linux** in a clean VM (or clearly labelled container scope).
