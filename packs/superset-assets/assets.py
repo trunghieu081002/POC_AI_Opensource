@@ -12,6 +12,7 @@ except ImportError:  # Static dry-run also works before the Superset venv exists
 import os
 import re
 import shlex
+import subprocess
 import sys
 import uuid
 import zipfile
@@ -150,10 +151,61 @@ def read_project(config: dict, binding: dict) -> dict:
             if not isinstance(filtered.get("rows"), list) or not isinstance(filtered.get("sql"), str):
                 raise ValueError("Every filter check needs independent SQL and rows")
             canonical(filtered["rows"])
-    fingerprint = hashlib.sha256(json.dumps({"project": name, "files": hashes,
-        "expected": hashlib.sha256(raw_expected).hexdigest(), "binding": binding}, sort_keys=True).encode()).hexdigest()
+    viewers = read_viewers(config)
+    identity = {"project": name, "files": hashes,
+        "expected": hashlib.sha256(raw_expected).hexdigest(), "binding": binding}
+    if viewers:
+        # who may view is part of what is approved: changing it needs a fresh approval
+        identity["viewers"] = sorted(v["username"] for v in viewers)
+    fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return {"name": name, "content": content, "resources": resources, "expected": expected,
             "fingerprint": fingerprint, "binding": binding, "config": config}
+
+
+def read_viewers(config: dict) -> list:
+    """`projects[].viewers: [{username, password_env}]` - real non-admin accounts for this project only.
+    The password is read from the named environment variable at deploy time; it is never a parameter, never
+    in the receipt and never in the fingerprint."""
+    viewers = config.get("viewers") or []
+    if not isinstance(viewers, list) or len(viewers) > 50: raise ValueError("viewers must be a list")
+    seen = set()
+    for v in viewers:
+        if not isinstance(v, dict) or set(v) != {"username", "password_env"}: raise ValueError("Each viewer needs username and password_env only")
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]{2,62}", str(v["username"])) or v["username"] in seen: raise ValueError("Invalid or duplicate viewer username")
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]{1,62}", str(v["password_env"])): raise ValueError("password_env must name an environment variable")
+        seen.add(v["username"])
+    return viewers
+
+
+def viewer_role(name): return "dpagent-viewer-" + name
+
+
+def run_viewers(payload):
+    """viewers.py inside the Superset application, as the `superset` user, with its protected environment.
+    Passwords travel on stdin only."""
+    command = ["runuser", "-u", "superset", "--", "/opt/superset/.venv/bin/python", "/opt/superset/env_exec.py",
+               "/opt/superset/superset.env", "/opt/superset/.venv/bin/python", str(Path(__file__).with_name("viewers.py"))]
+    proc = subprocess.run(command, input=json.dumps(payload).encode(), capture_output=True, cwd="/", timeout=300)
+    if proc.returncode != 0:
+        detail = proc.stderr.decode(errors="replace").strip().splitlines()[-1:] or ["no output"]
+        raise RuntimeError("Viewer reconciliation failed: " + detail[0][:300])
+    return json.loads(proc.stdout.decode().strip().splitlines()[-1])
+
+
+def ensure_viewers(project, ids, previous):
+    viewers = read_viewers(project["config"])
+    owned = ((previous or {}).get("viewers") or {}).get("users", [])
+    if not viewers and not owned: return None
+    if not viewers:
+        return run_viewers({"action": "remove", "role": viewer_role(project["name"]), "owned_users": owned}) and None
+    users = []
+    for v in viewers:
+        password = os.environ.get(v["password_env"], "")
+        if len(password) < 12: raise ValueError("Viewer password from " + v["password_env"] + " must have at least 12 characters")
+        users.append({"username": v["username"], "password": password})
+    result = run_viewers({"action": "ensure", "role": viewer_role(project["name"]), "owned_users": owned, "users": users,
+                          "dataset_uuids": sorted(project["resources"]["datasets"])})
+    return {"role": result["role"], "users": result["users"], "permissions": result["permissions"]}
 
 
 def rewrite(value, mapping):
@@ -408,6 +460,7 @@ def deploy(client, project, approved_by):
     try:
         client.import_bundle(data)
         ids, observations = check_results(client, project)
+        viewers = ensure_viewers(project, ids, previous)
     except Exception as exc:
         attempt={"status":"fail","fingerprint":project["fingerprint"],"error":type(exc).__name__,"observations":getattr(exc,"observations",[])}
         try:
@@ -425,7 +478,7 @@ def deploy(client, project, approved_by):
         finally: write_state(path.parent/("deployment-attempt-"+uuid.uuid4().hex+".json"),attempt)
         raise
     if previous: write_state(path.parent/"history"/(previous["fingerprint"]+".json"),previous)
-    write_state(path, {"name": project["name"], "fingerprint": project["fingerprint"], "binding": project["binding"], "approved_by": approved_by, "ids": ids, "content": project["content"], "resources": project["resources"], "expected": project["expected"], "observations": observations, "status": "deployed"})
+    write_state(path, {"name": project["name"], "fingerprint": project["fingerprint"], "binding": project["binding"], "approved_by": approved_by, "ids": ids, "content": project["content"], "resources": project["resources"], "expected": project["expected"], "observations": observations, "status": "deployed", "viewers": viewers})
     return ids
 
 
@@ -435,6 +488,8 @@ def undeploy(client, name):
     record = json.loads(path.read_text(),parse_float=Decimal)
     if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
     if record["status"] == "undeployed": return
+    if record.get("viewers"):
+        run_viewers({"action": "remove", "role": record["viewers"]["role"], "owned_users": record["viewers"]["users"]})
     client.cleanup(record["resources"], receipt=record["ids"])
     record["status"] = "undeployed"; write_state(path, record)
 

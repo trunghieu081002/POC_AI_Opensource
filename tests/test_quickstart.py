@@ -105,6 +105,76 @@ def test_specs_hold_no_secret_values_only_environment_references():
         for key in re.findall(r"(?:password|secret_key)\s*:\s*(.+)", doc):
             assert key.strip().strip('"').startswith("${"), (name, key)
     env = (Q / "dev.env.example").read_text()
-    assert all(v in ("change-me", "change-me-to-at-least-32-random-characters") for k, v in
+    assert all(v in ("change-me", "change-me-viewer", "change-me-to-at-least-32-random-characters") for k, v in
                (line.split("=", 1) for line in env.splitlines() if "=" in line and not line.startswith("#"))
                if "PASSWORD" in k or "SECRET" in k)
+
+
+def _assets():
+    spec = importlib.util.spec_from_file_location("assets", ROOT / "packs/superset-assets/assets.py")
+    a = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(a)
+    return a
+
+
+def _project(a, name, **extra):
+    import os
+    cwd = os.getcwd()
+    os.chdir(ROOT)
+    try:
+        return a.read_project({"name": name, "revision": "v1", "bundle_dir": f"projects/{name}/bundle",
+                               "expected_file": f"projects/{name}/expected.yaml", **extra}, {"environment": "dev"})
+    finally:
+        os.chdir(cwd)
+
+
+def test_viewers_are_part_of_the_approved_fingerprint_but_passwords_are_not():
+    a = _assets()
+    plain = _project(a, "quickstart-sales")
+    one = _project(a, "quickstart-sales", viewers=[{"username": "qs.sales.viewer", "password_env": "A_PASSWORD"}])
+    other_env = _project(a, "quickstart-sales", viewers=[{"username": "qs.sales.viewer", "password_env": "B_PASSWORD"}])
+    two = _project(a, "quickstart-sales", viewers=[{"username": "qs.sales.viewer", "password_env": "A_PASSWORD"},
+                                                    {"username": "qs.extra", "password_env": "A_PASSWORD"}])
+    assert plain["fingerprint"] != one["fingerprint"] != two["fingerprint"]
+    assert one["fingerprint"] == other_env["fingerprint"]          # where the password comes from is not access
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("viewers", [
+    [{"username": "qs.viewer", "password": "inline-secret"}],                  # a password in config
+    [{"username": "qs.viewer", "password_env": "lowercase"}],
+    [{"username": "Admin", "password_env": "X_PASSWORD"}],
+    [{"username": "qs.viewer", "password_env": "X_PASSWORD"}, {"username": "qs.viewer", "password_env": "X_PASSWORD"}],
+    "qs.viewer",
+])
+def test_a_malformed_viewer_config_is_refused(viewers):
+    with pytest.raises(ValueError):
+        _assets().read_viewers({"viewers": viewers})
+
+
+def test_the_two_projects_own_disjoint_uuids_and_different_data():
+    a = _assets()
+    sales, ops = _project(a, "quickstart-sales"), _project(a, "quickstart-ops")
+    keys = lambda p: {k for v in p["resources"].values() for k in v}   # noqa: E731
+    assert not keys(sales) & keys(ops)
+    ds = lambda p: next(iter(p["resources"]["datasets"].values()))["table_name"]   # noqa: E731
+    assert (ds(sales), ds(ops)) == ("fct_monthly_revenue", "stg_orders")
+
+
+def test_ops_expected_is_the_fixture_counted_by_normalised_status():
+    rows = yaml.safe_load((P / "fixture.yaml").read_text())["tables"][0]["rows"]
+    from collections import Counter
+    want = Counter(r["status"].strip().lower() for r in rows)
+    check = yaml.safe_load((ROOT / "projects/quickstart-ops/expected.yaml").read_text())["checks"][0]
+    assert {r["status"]: r["orders"] for r in check["rows"]} == dict(want)
+    assert check["filters"][0]["rows"] == [{"status": "done", "orders": want["done"]}]
+
+
+def test_the_bi_spec_names_a_viewer_per_project_by_environment_variable_only():
+    doc = yaml.safe_load((Q / "bi.yaml").read_text())
+    projects = next(c["superset-assets"] for c in doc["components"] if "superset-assets" in c)["projects"]
+    assert {p["name"]: [v["username"] for v in p["viewers"]] for p in projects} == {
+        "quickstart-sales": ["qs.sales.viewer"], "quickstart-ops": ["qs.ops.viewer"]}
+    assert all(set(v) == {"username", "password_env"} for p in projects for v in p["viewers"])

@@ -9,7 +9,8 @@
 #   approve      promote on that sealed evidence (needs QS_APPROVED_BY: a person)
 #   deploy       deploy for real, run once and wait
 #   bi-validate  install Superset, validate the dashboard on throwaway clones, print its fingerprint
-#   bi-deploy    deploy the dashboard (needs QS_BI_APPROVED_BY and QS_BI_APPROVED_SHA256 = the fingerprint)
+#   bi-deploy    deploy both dashboards and their viewer accounts (needs QS_BI_APPROVED_BY and the reviewed
+#                fingerprints QS_BI_APPROVED_SHA256 / QS_OPS_BI_APPROVED_SHA256)
 #   rerun        run the pipeline again (full snapshot: no duplicates)
 #   status       pipeline status, the last run's audit, installed/proven packs, the BI deployment check
 #   undeploy     remove the dashboard (project-scoped), then the pipeline
@@ -51,11 +52,14 @@ case "${1:-}" in
   bi-validate)
     need SUPERSET_METADATA_PASSWORD SUPERSET_SECRET_KEY SUPERSET_ADMIN_PASSWORD SUPERSET_WAREHOUSE_PASSWORD QS_WH_USER
     QS_BI_MODE=validate dpagent spec "$Q/bi.yaml" --yes --allow-draft
-    echo "review /var/lib/dpagent-bi-assets/quickstart-sales/validation.json, then approve its fingerprint:"
-    python3 -c 'import json; r=json.load(open("/var/lib/dpagent-bi-assets/quickstart-sales/validation.json")); print("status="+r["status"], "fingerprint="+r["fingerprint"])'
+    for project in quickstart-sales quickstart-ops; do
+      echo "review /var/lib/dpagent-bi-assets/$project/validation.json, then approve its fingerprint:"
+      python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(sys.argv[2], "status="+r["status"], "fingerprint="+r["fingerprint"])' \
+        "/var/lib/dpagent-bi-assets/$project/validation.json" "$project"
+    done
     ;;
   bi-deploy)
-    need QS_BI_APPROVED_BY QS_BI_APPROVED_SHA256
+    need QS_BI_APPROVED_BY QS_BI_APPROVED_SHA256 QS_OPS_BI_APPROVED_SHA256 QS_SALES_VIEWER_PASSWORD QS_OPS_VIEWER_PASSWORD
     # --no-test: the runtime and assets suites already ran at bi-validate; the deployment itself is checked
     # by the pack (it revalidates before touching live assets) and by `verify` below.
     QS_BI_MODE=deploy dpagent spec "$Q/bi.yaml" --yes --allow-draft --no-test

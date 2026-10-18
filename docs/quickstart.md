@@ -37,6 +37,10 @@ bash $W undeploy      # BI mode undeploy (this project's assets only), dpagent p
 `bi-deploy` with it. Identities (UUIDs, IDs) stay the same; the old fingerprint is refused.
 **Update the pipeline:** edit, `validate`, `approve` again, `deploy` — any edit invalidates the approval.
 
+**Viewers:** `bi.yaml` deploys two BI projects, `quickstart-sales` and `quickstart-ops` (orders by status), each with
+its own viewer account (`qs.sales.viewer`, `qs.ops.viewer`; passwords from `QS_*_VIEWER_PASSWORD`). A viewer can
+read its project's dashboard and filter it, cannot change anything, and cannot see the other project.
+
 The BI step runs after the first pipeline run on purpose: the Superset pack grants its read-only role on
 schemas that already exist, following the configured table creator for tables created later.
 
@@ -58,7 +62,8 @@ identities, rerun without duplicates, status, scoped undeploy. Results: `docs/ev
 
 * Ubuntu 22.04 systemd container on one host; native RHEL/Oracle Linux is a separate acceptance.
 * The demo source is created from the fixture (`fixture-sql`); a real project points at its real source.
-* Superset checks use the admin account; a viewer role is a separate acceptance.
+* Viewer access is checked through the API and a real browser for table charts and a select filter; other
+  chart types, row-level security and SSO/LDAP are not covered.
 * Undeploy keeps warehouse data and the Superset/Airflow runtimes; when dpagent runs from `/opt/dpagent`
   the source tree is also the published tree and is kept.
 * Full snapshot only; recovery = fix the source, run again.

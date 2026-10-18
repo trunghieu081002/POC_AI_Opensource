@@ -1,0 +1,25 @@
+slice_name: 'Quickstart operations: orders by status'
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 100
+  viz_type: table
+  query_mode: aggregate
+  groupby:
+  - status
+  metrics:
+  - orders
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": ["status"], "metrics": ["orders"], "filters": [], "time_range": "No
+  filter", "orderby": [], "row_limit": 1000, "extras": {"having": "", "where": ""}}],
+  "form_data": {"datasource": "0__table", "slice_id": 100, "viz_type": "table", "query_mode":
+  "aggregate", "groupby": ["status"], "metrics": ["orders"], "adhoc_filters": [],
+  "row_limit": 1000, "order_desc": false, "show_cell_bars": false}, "result_format":
+  "json", "result_type": "full"}'
+uuid: 19ad462c-b544-5246-b4ff-255f81069fd6
+dataset_uuid: 41576b64-580a-5fa3-92e5-63ead1615663
+version: 1.0.0

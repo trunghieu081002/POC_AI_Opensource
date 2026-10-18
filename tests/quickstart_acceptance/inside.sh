@@ -1,32 +1,35 @@
 #!/usr/bin/env bash
 # Runs INSIDE the disposable host, from the clean source copy at /opt/dpagent (scripts/quickstart-acceptance-ci.sh).
 # Plays the operator of docs/quickstart.md: fills an environment file, runs examples/quickstart/walkthrough.sh
-# step by step (product commands only), and reads values a person would read (the BI fingerprint). After each
-# milestone an independent check (tests/quickstart_acceptance/check.py) compares with hand-calculated values.
+# step by step (product commands only), and reads values a person would read (the BI fingerprints). After each
+# milestone an independent check (tests/quickstart_acceptance/check*.py) compares with hand-calculated values.
+#   inside.sh first    install .. BI deploy with viewer accounts, viewer API checks
+#   inside.sh second   (after the host's viewer browser check) update, rerun, status, undeploy
 set -euo pipefail
+PHASE="${1:?first|second}"
 cd /opt/dpagent
 OUT=/root/quickstart-evidence
 mkdir -p "$OUT"
 W=examples/quickstart/walkthrough.sh
 PY=/opt/dpagent/.venv/bin/python
+SPY=/opt/superset/.venv/bin/python
 
 # --- the operator's environment file (random secrets; never written to evidence)
-umask 077
 ENV=/root/quickstart-dev.env
-sed -e "s/^QS_SRC_PASSWORD=.*/QS_SRC_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^QS_WH_PASSWORD=.*/QS_WH_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^AIRFLOW_DB_PASSWORD=.*/AIRFLOW_DB_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^AIRFLOW_ADMIN_PASSWORD=.*/AIRFLOW_ADMIN_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^DLT_DB_PASSWORD=.*/DLT_DB_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^SUPERSET_METADATA_PASSWORD=.*/SUPERSET_METADATA_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=$(openssl rand -hex 32)/" \
-    -e "s/^SUPERSET_ADMIN_PASSWORD=.*/SUPERSET_ADMIN_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^SUPERSET_WAREHOUSE_PASSWORD=.*/SUPERSET_WAREHOUSE_PASSWORD=$(openssl rand -hex 16)/" \
-    -e "s/^QS_APPROVED_BY=.*/QS_APPROVED_BY=quickstart.reviewer/" \
-    examples/quickstart/dev.env.example > "$ENV"
+if [ ! -f "$ENV" ]; then
+  umask 077
+  cp examples/quickstart/dev.env.example "$ENV"
+  for key in QS_SRC_PASSWORD QS_WH_PASSWORD AIRFLOW_DB_PASSWORD AIRFLOW_ADMIN_PASSWORD DLT_DB_PASSWORD \
+             SUPERSET_METADATA_PASSWORD SUPERSET_ADMIN_PASSWORD SUPERSET_WAREHOUSE_PASSWORD \
+             QS_SALES_VIEWER_PASSWORD QS_OPS_VIEWER_PASSWORD; do
+    sed -i "s/^${key}=.*/${key}=$(openssl rand -hex 16)/" "$ENV"
+  done
+  sed -i -e "s/^SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=$(openssl rand -hex 32)/" \
+         -e "s/^QS_APPROVED_BY=.*/QS_APPROVED_BY=quickstart.reviewer/" "$ENV"
+  umask 022
+fi
 grep -q change-me "$ENV" && { echo "unfilled value in the environment file" >&2; exit 2; }
 set -a; . "$ENV"; set +a
-umask 022
 scan_secrets() {   # never keep evidence that contains a secret value from the environment file (any exit)
   local rc=$?
   while IFS='=' read -r key value; do
@@ -36,7 +39,7 @@ scan_secrets() {   # never keep evidence that contains a secret value from the e
       echo "secret $key found in evidence - evidence removed" >&2; rm -rf "$OUT"; exit 99
     fi
   done < "$ENV"
-  echo "secret scan: no environment-file secret value in evidence" >> "$OUT/steps.log"
+  echo "secret scan ($PHASE): no environment-file secret value in evidence" >> "$OUT/steps.log"
   exit "$rc"
 }
 trap scan_secrets EXIT
@@ -48,65 +51,92 @@ step() {   # step <label> <command...>: run, keep its full log and exit code, st
   echo "$label rc=$rc" | tee -a "$OUT/steps.log"
   [ "$rc" -eq 0 ] || { tail -40 "$OUT/$label.log"; exit "$rc"; }
 }
-check() {  # check <label> <args...>   (Superset's venv: it has requests and PyYAML)
-  local label="$1"; shift
-  /opt/superset/.venv/bin/python tests/quickstart_acceptance/check.py "$@" > "$OUT/check-$label.json" 2>&1 \
+check() {  # check <label> <script> <args...>   (Superset's venv: it has requests and PyYAML)
+  local label="$1" script="$2"; shift 2
+  "$SPY" "tests/quickstart_acceptance/$script" "$@" > "$OUT/check-$label.json" 2>&1 \
     || { echo "CHECK FAILED: $label"; cat "$OUT/check-$label.json"; exit 1; }
   echo "check $label ok" | tee -a "$OUT/steps.log"
 }
-fingerprint() { python3 -c 'import json; print(json.load(open("/var/lib/dpagent-bi-assets/quickstart-sales/validation.json"))["fingerprint"])'; }
+fingerprint() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["fingerprint"])' \
+                  "/var/lib/dpagent-bi-assets/$1/validation.json"; }
+SALES_TITLE="Quickstart sales: completed orders and revenue by month"
+SALES_TITLE_V2="Quickstart sales (v2): completed orders and revenue by month"
+export QS_BI_APPROVED_BY=quickstart.reviewer
 
-step 01-install     bash "$W" install
-step 02-source      bash "$W" source
-step 03-validate    bash "$W" validate
-step 04-approve     bash "$W" approve
-step 05-deploy      bash "$W" deploy
-"$PY" tests/quickstart_acceptance/check.py warehouse > "$OUT/check-after-first-run.json" || { cat "$OUT/check-after-first-run.json"; exit 1; }
-echo "check after-first-run ok" | tee -a "$OUT/steps.log"
+if [ "$PHASE" = first ]; then
+  step 01-install     bash "$W" install
+  step 02-source      bash "$W" source
+  step 03-validate    bash "$W" validate
+  step 04-approve     bash "$W" approve
+  step 05-deploy      bash "$W" deploy
+  "$PY" tests/quickstart_acceptance/check.py warehouse > "$OUT/check-after-first-run.json" \
+    || { cat "$OUT/check-after-first-run.json"; exit 1; }
+  echo "check after-first-run ok" | tee -a "$OUT/steps.log"
 
-step 06-bi-validate bash "$W" bi-validate
-FP1="$(fingerprint)"; echo "$FP1" > "$OUT/fingerprint-v1.txt"
+  step 06-bi-validate bash "$W" bi-validate
+  fingerprint quickstart-sales > "$OUT/fingerprint-sales-v1.txt"
+  fingerprint quickstart-ops > "$OUT/fingerprint-ops-v1.txt"
 
-# negative: a fingerprint nobody reviewed must not deploy anything
-set +e
-QS_BI_APPROVED_BY=quickstart.reviewer QS_BI_APPROVED_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
-  bash "$W" bi-deploy > "$OUT/07-bi-deploy-wrong-fingerprint.log" 2>&1
-rc=$?; set -e
-echo "07-bi-deploy-wrong-fingerprint rc=$rc (must be non-zero)" | tee -a "$OUT/steps.log"
-[ "$rc" -ne 0 ] || { echo "a wrong fingerprint deployed" >&2; exit 1; }
-check after-refused-deploy bi-absent
+  # negative: fingerprints nobody reviewed must not deploy anything (or create any viewer)
+  set +e
+  QS_BI_APPROVED_SHA256=$(printf '0%.0s' $(seq 64)) QS_OPS_BI_APPROVED_SHA256=$(printf '1%.0s' $(seq 64)) \
+    bash "$W" bi-deploy > "$OUT/07-bi-deploy-wrong-fingerprint.log" 2>&1
+  rc=$?; set -e
+  echo "07-bi-deploy-wrong-fingerprint rc=$rc (must be non-zero)" | tee -a "$OUT/steps.log"
+  [ "$rc" -ne 0 ] || { echo "a wrong fingerprint deployed" >&2; exit 1; }
+  check after-refused-deploy-sales check.py bi-absent quickstart-sales
+  check after-refused-deploy-ops check.py bi-absent quickstart-ops
+  n=$(runuser -u postgres -- psql -X -At -d superset_meta -c "SELECT count(*) FROM ab_user WHERE username LIKE 'qs.%'")
+  [ "$n" = 0 ] || { echo "viewer accounts exist after a refused deploy" >&2; exit 1; }
 
-QS_BI_APPROVED_BY=quickstart.reviewer QS_BI_APPROVED_SHA256="$FP1" step 08-bi-deploy bash "$W" bi-deploy
-check after-bi-deploy bi "Quickstart sales: completed orders and revenue by month"
-cp "$OUT/check-after-bi-deploy.json" "$OUT/ids-v1.json"
+  QS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-sales-v1.txt")" QS_OPS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-ops-v1.txt")" \
+    step 08-bi-deploy bash "$W" bi-deploy
+  check after-bi-deploy check.py bi "$SALES_TITLE"
+  cp "$OUT/check-after-bi-deploy.json" "$OUT/ids-v1.json"
 
+  # viewer RBAC through the API, as each viewer (never admin)
+  check viewer-sales-api check_viewer.py qs.sales.viewer QS_SALES_VIEWER_PASSWORD quickstart-sales quickstart-ops
+  check viewer-ops-api   check_viewer.py qs.ops.viewer   QS_OPS_VIEWER_PASSWORD   quickstart-ops   quickstart-sales
+  # the viewers' write attempts changed nothing
+  check after-viewer-attempts check.py bi "$SALES_TITLE"
+  echo "PHASE first PASS" | tee -a "$OUT/steps.log"
+  exit 0
+fi
+
+# ---------------------------------------------------------------- second phase
 # update: a reviewed content change -> new revision -> validate -> new fingerprint -> deploy, same identities
-sed -i 's/^dashboard_title: .*/dashboard_title: '"'"'Quickstart sales (v2): completed orders and revenue by month'"'"'/' \
-  projects/quickstart-sales/bundle/dashboards/overview.yaml
+sed -i "s/^dashboard_title: .*/dashboard_title: '$SALES_TITLE_V2'/" projects/quickstart-sales/bundle/dashboards/overview.yaml
 export QS_BI_REVISION=v2
 step 09-bi-validate-v2 bash "$W" bi-validate
-FP2="$(fingerprint)"; echo "$FP2" > "$OUT/fingerprint-v2.txt"
-[ "$FP2" != "$FP1" ] || { echo "the content change did not change the fingerprint" >&2; exit 1; }
-QS_BI_APPROVED_BY=quickstart.reviewer QS_BI_APPROVED_SHA256="$FP2" step 10-bi-deploy-v2 bash "$W" bi-deploy
-check after-update bi "Quickstart sales (v2): completed orders and revenue by month"
+fingerprint quickstart-sales > "$OUT/fingerprint-sales-v2.txt"
+fingerprint quickstart-ops > "$OUT/fingerprint-ops-v2.txt"
+cmp -s "$OUT/fingerprint-sales-v1.txt" "$OUT/fingerprint-sales-v2.txt" && { echo "content change kept the fingerprint" >&2; exit 1; }
+cmp -s "$OUT/fingerprint-ops-v1.txt" "$OUT/fingerprint-ops-v2.txt" || { echo "an unchanged project changed fingerprint" >&2; exit 1; }
+QS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-sales-v2.txt")" QS_OPS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-ops-v2.txt")" \
+  step 10-bi-deploy-v2 bash "$W" bi-deploy
+check after-update check.py bi "$SALES_TITLE_V2"
 python3 - "$OUT/ids-v1.json" "$OUT/check-after-update.json" <<'PY' | tee -a "$OUT/steps.log"
 import json, sys
 a, b = (json.load(open(p))["ids"] for p in sys.argv[1:])
 assert a == b, f"identities changed on update: {a} -> {b}"
 print("check identities-stable-on-update ok", a)
 PY
+check viewer-sales-api-after-update check_viewer.py qs.sales.viewer QS_SALES_VIEWER_PASSWORD quickstart-sales quickstart-ops
 
 step 11-rerun       bash "$W" rerun
 "$PY" tests/quickstart_acceptance/check.py warehouse > "$OUT/check-after-rerun.json" || { cat "$OUT/check-after-rerun.json"; exit 1; }
 echo "check after-rerun (no duplicates) ok" | tee -a "$OUT/steps.log"
-check after-rerun-bi bi "Quickstart sales (v2): completed orders and revenue by month"
+check after-rerun-bi check.py bi "$SALES_TITLE_V2"
 
 step 12-status      bash "$W" status
 grep -q quickstart_sales "$OUT/12-status.log"
 
 step 13-undeploy    bash "$W" undeploy
-check after-undeploy bi-absent
-# scoped: the pipeline is gone from Airflow and the published tree; the Superset runtime still answers
+check after-undeploy-sales check.py bi-absent quickstart-sales
+check after-undeploy-ops check.py bi-absent quickstart-ops
+v=$(runuser -u postgres -- psql -X -At -d superset_meta -c \
+  "SELECT (SELECT count(*) FROM ab_user WHERE username LIKE 'qs.%') + (SELECT count(*) FROM ab_role WHERE name LIKE 'dpagent-viewer-%')")
+[ "$v" = 0 ] || { echo "viewer accounts/roles remain after undeploy ($v)" >&2; exit 1; }
 if su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -q quickstart_sales; then
   echo "DAG still present after undeploy" >&2; exit 1; fi
 # (the source tree is NOT removed when dpagent runs from /opt/dpagent: published == source there, by design)
@@ -115,5 +145,5 @@ MODELS="$("$PY" -c 'from dpagent.pipelines import deploy; print(deploy._dbt_proj
 if grep -q '^QS_' /opt/airflow/home/pipelines.env 2>/dev/null; then echo "pipeline secrets not released" >&2; exit 1; fi
 [ -d pipelines/quickstart_sales ] || { echo "undeploy removed the operator's source tree" >&2; exit 1; }
 curl -fsS --noproxy '*' -o /dev/null http://127.0.0.1:8088/health
-echo "check scoped-undeploy ok (DAG, dbt models, secrets and BI assets gone; source kept; Superset runtime up)" | tee -a "$OUT/steps.log"
+echo "check scoped-undeploy ok (DAG, dbt models, secrets, BI assets and viewer accounts gone; source kept; Superset up)" | tee -a "$OUT/steps.log"
 echo PASS | tee -a "$OUT/steps.log"
