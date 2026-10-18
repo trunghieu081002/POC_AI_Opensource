@@ -1,0 +1,11 @@
+# Hand-calculated from fixture.yaml, never from the pipeline's output:
+#   2026-01: orders 1 + 2 ("done" and " DONE " normalise to done) = 2;  120.00 + 80.50 = 200.50
+#            order 3 is cancelled -> not revenue
+#   2026-02: orders 4 + 5 = 2;  40.25 + 59.75 = 100.00
+#   2026-03: only a draft -> no row
+table: fct_monthly_revenue
+row_count: 2
+columns: {month: text, orders: bigint, revenue: numeric}
+rows:
+  - {month: "2026-01", orders: 2, revenue: "200.50"}
+  - {month: "2026-02", orders: 2, revenue: "100.00"}

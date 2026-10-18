@@ -1,0 +1,26 @@
+slice_name: 'Quickstart sales: completed orders and revenue by month'
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 100
+  viz_type: table
+  query_mode: aggregate
+  groupby:
+  - month
+  metrics:
+  - orders
+  - revenue
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": ["month"], "metrics": ["orders", "revenue"], "filters": [], "time_range":
+  "No filter", "orderby": [], "row_limit": 1000, "extras": {"having": "", "where":
+  ""}}], "form_data": {"datasource": "0__table", "slice_id": 100, "viz_type": "table",
+  "query_mode": "aggregate", "groupby": ["month"], "metrics": ["orders", "revenue"],
+  "adhoc_filters": [], "row_limit": 1000, "order_desc": false, "show_cell_bars": false},
+  "result_format": "json", "result_type": "full"}'
+uuid: d499d4da-5459-548e-8cd7-192d248c445a
+dataset_uuid: 3642e01b-2cc8-5ea9-a57d-e6cf3e263132
+version: 1.0.0

@@ -1,0 +1,12 @@
+# Hand-written validation input (and the quickstart's demo source data). Each row is here for one rule:
+# two completed orders in January, a cancelled one (not revenue), a padded upper-case status, a draft.
+tables:
+  - name: orders
+    columns: {id: bigint, order_date: date, status: text, amount: numeric, customer: text}
+    rows:
+      - {id: 1, order_date: "2026-01-03", status: "done",       amount: "120.00", customer: "An"}
+      - {id: 2, order_date: "2026-01-15", status: " DONE ",     amount: "80.50",  customer: "Bình"}
+      - {id: 3, order_date: "2026-01-20", status: "cancelled",  amount: "999.00", customer: "An"}
+      - {id: 4, order_date: "2026-02-01", status: "done",       amount: "40.25",  customer: "Chi"}
+      - {id: 5, order_date: "2026-02-14", status: "done",       amount: "59.75",  customer: "An"}
+      - {id: 6, order_date: "2026-03-02", status: "draft",      amount: "10.00",  customer: "Dũng"}

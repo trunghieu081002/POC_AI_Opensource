@@ -200,6 +200,21 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
                  f"deploy refuses it until then.")
 
 
+@pipeline_group.command("fixture-sql")
+@click.argument("fixture_path", metavar="FIXTURE", type=click.Path(exists=True, dir_okay=False))
+def fixture_sql_cmd(fixture_path):
+    """Print the SQL that creates and fills a fixture's tables - to load a demo source by hand
+    (docs/quickstart.md), e.g. `dpagent pipeline fixture-sql F | psql "$SOURCE_URI"`.
+
+    The same statements `validate --fixture` seeds into its throwaway source. Runs nothing and
+    connects to nothing; a real project points at its real source instead."""
+    fixture = fixture_mod.load_fixture(Path(fixture_path))
+    click.echo("BEGIN;")
+    for _, statement in fixture_mod.seed_statements(fixture):
+        click.echo(statement)
+    click.echo("COMMIT;")
+
+
 @pipeline_group.command("validate")
 @click.argument("name")
 @click.option("--fixture", "fixture_path", type=click.Path(exists=True, dir_okay=False),

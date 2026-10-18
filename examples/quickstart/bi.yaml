@@ -1,0 +1,30 @@
+# Quickstart BI (docs/quickstart.md). Applied AFTER the pipeline's first run: the Superset reader is granted
+# on schemas that already exist. One file for every BI step; the step is chosen by the environment:
+#   QS_BI_MODE=validate                     -> imports throwaway clones, compares, prints `fingerprint=...`
+#   QS_BI_MODE=deploy + QS_BI_APPROVED_BY + QS_BI_APPROVED_SHA256 (the reviewed fingerprint) -> live assets
+#   QS_BI_MODE=undeploy                     -> removes only this project's receipt-owned assets
+# Change QS_BI_REVISION whenever the bundle or its expected file changes (docs: packs/superset-assets).
+project: quickstart-bi
+components:
+  - superset:
+      version: "6.1.0"
+      backend_db: superset_meta
+      backend_user: superset_meta
+      backend_password: "${SUPERSET_METADATA_PASSWORD}"
+      secret_key: "${SUPERSET_SECRET_KEY}"
+      admin_password: "${SUPERSET_ADMIN_PASSWORD}"
+      warehouse_db: warehouse
+      warehouse_role: superset_reader
+      warehouse_password: "${SUPERSET_WAREHOUSE_PASSWORD}"
+      warehouse_schemas: [quickstart_sales]
+      warehouse_creator_roles: ["${QS_WH_USER}"]
+  - superset-assets:
+      environment: "${QS_ENVIRONMENT:-dev}"
+      mode: "${QS_BI_MODE:-validate}"
+      approved_by: "${QS_BI_APPROVED_BY:-}"
+      projects:
+        - name: quickstart-sales
+          revision: "${QS_BI_REVISION:-v1}"
+          bundle_dir: projects/quickstart-sales/bundle
+          expected_file: projects/quickstart-sales/expected.yaml
+          approved_sha256: "${QS_BI_APPROVED_SHA256:-}"

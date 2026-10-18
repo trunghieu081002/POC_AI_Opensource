@@ -1,0 +1,71 @@
+dashboard_title: 'Quickstart sales: completed orders and revenue by month'
+slug: overview
+uuid: 71b1389c-7d6e-5622-bc93-87d3b1e0470f
+version: 1.0.0
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    id: ROOT_ID
+    type: ROOT
+    children:
+    - GRID_ID
+  GRID_ID:
+    id: GRID_ID
+    type: GRID
+    children:
+    - ROW-1
+    parents:
+    - ROOT_ID
+  ROW-1:
+    id: ROW-1
+    type: ROW
+    children:
+    - CHART-1
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-1:
+    id: CHART-1
+    type: CHART
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-1
+    meta:
+      chartId: 100
+      uuid: d499d4da-5459-548e-8cd7-192d248c445a
+      width: 12
+      height: 50
+      sliceName: 'Quickstart sales: completed orders and revenue by month'
+metadata:
+  native_filter_configuration:
+  - id: NATIVE_FILTER-dimension
+    name: Month
+    filterType: filter_select
+    targets:
+    - datasetUuid: 3642e01b-2cc8-5ea9-a57d-e6cf3e263132
+      column:
+        name: month
+    defaultDataMask:
+      extraFormData: {}
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    controlValues:
+      enableEmptyFilter: false
+      multiSelect: true
+      searchAllOptions: false
+      inverseSelection: false
+    type: NATIVE_FILTER
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  timed_refresh_immune_slices: []
+  expanded_slices: {}
+  cross_filters_enabled: false
