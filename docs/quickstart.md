@@ -60,7 +60,8 @@ identities, rerun without duplicates, status, scoped undeploy. Results: `docs/ev
 
 ## Limits
 
-* Ubuntu 22.04 systemd container on one host; native RHEL/Oracle Linux is a separate acceptance.
+* Verified in disposable systemd containers: Ubuntu 22.04 and Oracle Linux 8.10 (`--os ol8`, PASS on `c006792`;
+  system Python unchanged). Not a native VM: SELinux enforcing and firewalld were not exercised.
 * The demo source is created from the fixture (`fixture-sql`); a real project points at its real source.
 * Viewer access is checked through the API and a real browser for table charts and a select filter, as the
   accounts `viewers:` creates; other chart types, row-level security, SSO/LDAP, a viewer of several projects and
