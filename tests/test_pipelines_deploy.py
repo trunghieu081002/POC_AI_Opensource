@@ -1295,3 +1295,42 @@ def test_undeploy_never_deletes_the_source_tree_it_shares_with_the_published_dir
     result = deploy.undeploy(p)
     assert (shared / "demo" / "pipeline.yaml").is_file(), "operator's source must survive"
     assert result.published_files_removed is False
+
+
+def test_the_group_writable_journal_directory_does_not_make_the_seal_key_readable(tmp_path):
+    """`chmod -R g+rwX` on the journal directory (so the airflow user can write the SQLite journal) used to
+    turn evidence.key into 0660, after which evidence.py refused it and every later validate/promote failed."""
+    import os
+    import stat
+    import subprocess
+    from dpagent.pipelines import deploy, evidence
+
+    (tmp_path / "dpagent.db").write_bytes(b"journal")
+    key = tmp_path / deploy.SEAL_KEY_NAME
+    key.write_bytes(os.urandom(32))
+    key.chmod(0o600)
+    subprocess.run(["chmod", "-R", "g+rwX", str(tmp_path)], check=True)       # what deploy does to the directory
+    assert stat.S_IMODE(key.stat().st_mode) == 0o660                         # the bug
+    assert stat.S_IMODE((tmp_path / "dpagent.db").stat().st_mode) & 0o060 == 0o060   # the journal stays shared
+
+    assert deploy.protect_seal_key(tmp_path) is True
+    assert stat.S_IMODE(key.stat().st_mode) == 0o600
+    assert stat.S_IMODE((tmp_path / "dpagent.db").stat().st_mode) & 0o060 == 0o060   # not touched
+    assert deploy.protect_seal_key(tmp_path) is False                        # idempotent
+    # and the consumer accepts it again
+    import pytest
+    from dpagent.engine import state
+    orig = state.DB_PATH
+    state.DB_PATH = tmp_path / "dpagent.db"
+    try:
+        assert evidence._load_key(create=False) == key.read_bytes()
+        key.chmod(0o660)
+        with pytest.raises(PermissionError, match="readable by group/other"):
+            evidence._load_key(create=False)                                 # the safety check itself is intact
+    finally:
+        state.DB_PATH = orig
+
+
+def test_protect_seal_key_is_a_no_op_without_a_key(tmp_path):
+    from dpagent.pipelines import deploy
+    assert deploy.protect_seal_key(tmp_path) is False

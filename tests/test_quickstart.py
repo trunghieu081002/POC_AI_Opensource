@@ -190,3 +190,12 @@ def test_the_runner_can_target_an_oracle_linux_8_container_and_says_what_that_do
     docker = (ROOT / "scripts/m25-disposable-host-ol8.Dockerfile").read_text()
     assert docker.startswith("# An Oracle Linux 8.10 userland") and "FROM oraclelinux:8" in docker
     assert "CONTAINER" in docker and "NOT a native EL8 install" in docker
+
+
+def test_fixture_sql_replace_makes_the_demo_load_repeatable_without_changing_the_default():
+    plain = CliRunner().invoke(cli, ["pipeline", "fixture-sql", str(P / "fixture.yaml")]).output
+    replaced = CliRunner().invoke(cli, ["pipeline", "fixture-sql", str(P / "fixture.yaml"), "--replace"]).output
+    assert "DROP" not in plain
+    assert replaced.splitlines()[:2] == ["BEGIN;", 'DROP TABLE IF EXISTS "orders";']
+    assert replaced.replace('DROP TABLE IF EXISTS "orders";\n', "") == plain
+    assert "--replace" in (Q / "walkthrough.sh").read_text()

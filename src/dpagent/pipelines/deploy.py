@@ -599,6 +599,30 @@ def _run_root_command(cmd: list[str], *, what: str) -> None:
         raise DeployError(f"{what} failed:\n{proc.stderr.strip() or proc.stdout.strip()}")
 
 
+SEAL_KEY_NAME = "evidence.key"
+
+
+def protect_seal_key(journal_dir: Path) -> bool:
+    """The evidence seal key (evidence.py) lives in the journal directory, and the recursive group-writable
+    chmod above is for the SQLite journal the airflow user must write - not for the key, which only root's CLI
+    uses and which evidence.py refuses to trust once group/other can read it. Without this, the first deploy made
+    the key 0660 and every later `validate`/`promote` failed ("readable by group/other") - found when the
+    quickstart's pipeline-update flow ran a second validation after a deploy. Runs every time, so a host that
+    already has a relaxed key is repaired by its next deploy. True if it changed anything."""
+    key = Path(journal_dir) / SEAL_KEY_NAME
+    if not key.exists():
+        return False
+    st = key.stat()
+    changed = False
+    if stat.S_IMODE(st.st_mode) != 0o600:
+        key.chmod(0o600)
+        changed = True
+    if hasattr(os, "geteuid") and os.geteuid() == 0 and st.st_gid != 0:
+        os.chown(key, st.st_uid, 0)
+        changed = True
+    return changed
+
+
 def ensure_airflow_can_run_pipelines() -> list[str]:
     """Makes true, idempotently, the three host preconditions a real
     Airflow run needs that were done by hand at least once getting `dpagent
@@ -649,6 +673,8 @@ def ensure_airflow_can_run_pipelines() -> list[str]:
         _run_root_command(["chmod", "-R", "g+rwX", str(journal_dir)],
                           what="making dpagent's own journal directory group-writable")
         done.append(f"{journal_dir} is now group-writable by {_SHARED_GROUP!r}")
+    if protect_seal_key(journal_dir):
+        done.append(f"{journal_dir / SEAL_KEY_NAME} kept private to root (0600)")
 
     # 2. A narrow ACL so the `airflow` OS user can traverse to wherever this
     # checkout actually lives - the first ancestor directory not already

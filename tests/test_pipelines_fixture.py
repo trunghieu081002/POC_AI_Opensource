@@ -506,7 +506,7 @@ def _mock_preflight_subprocess(monkeypatch, *, sudo_ok=True, pg_ready_ok=True,
     def fake_run(cmd, **kwargs):
         if cmd[:4] == ["sudo", "-n", "-u", "postgres"] and cmd[4:5] == ["true"]:
             return _sp.CompletedProcess(cmd, 0 if sudo_ok else 1, stdout="", stderr="")
-        if cmd[:4] == ["sudo", "-n", "-u", "postgres"] and cmd[4:5] == ["pg_isready"]:
+        if cmd[:4] == ["sudo", "-n", "-u", "postgres"] and cmd[4:5] == ["psql"]:
             return _sp.CompletedProcess(cmd, 0 if pg_ready_ok else 1, stdout="",
                                         stderr="" if pg_ready_ok else "no response")
         if cmd[:2] == ["systemctl", "is-active"]:

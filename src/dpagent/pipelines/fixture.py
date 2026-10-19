@@ -1131,7 +1131,12 @@ def preflight_fixture_host(pipeline: Pipeline) -> PreflightResult:
             "is required, twice over - once for a throwaway source, once for a "
             "throwaway warehouse)")
     else:
-        pg_ready, detail = _run_preflight_check(["sudo", "-n", "-u", "postgres", "pg_isready"])
+        # `psql`, not `pg_isready`: the PGDG packages on Red Hat family hosts put pg_isready only under
+        # /usr/pgsql-<ver>/bin (outside sudo's secure_path) while psql, like everything else this module
+        # calls, is on the PATH through the `alternatives` symlink (found on Oracle Linux 8). A real query
+        # also proves more than "the port answers".
+        pg_ready, detail = _run_preflight_check(["sudo", "-n", "-u", "postgres", "psql", "-X", "-At",
+                                                 "-d", "postgres", "-c", "SELECT 1"])
         if pg_ready is None:
             reasons.append(detail)
         elif pg_ready.returncode != 0:

@@ -112,7 +112,9 @@ def _load_key(*, create: bool) -> bytes | None:
         if mode & 0o077:
             raise PermissionError(
                 f"{path} is readable by group/other (mode {oct(mode)}); refusing to trust or "
-                f"use a seal key that others could read")
+                f"use a seal key that others could read. If an older `dpagent pipeline deploy` loosened it "
+                f"(it made the whole journal directory group-writable), restore it once: "
+                f"chmod 600 {path} && chown root:root {path}")
         return path.read_bytes()
     if not create:
         return None

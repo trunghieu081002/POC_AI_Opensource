@@ -750,7 +750,12 @@ def _run_extract(pipeline: loader.Pipeline, pipeline_name: str, run_id: int | No
         src = resolve_refs(pipeline.source.connection,
                            path=f"{pipeline_name}.source.connection")
         _register_secrets(src)
-        env["SRC_URL"] = _connection_url(src)
+        # The driver is named explicitly: a bare `postgresql://` means "the SQLAlchemy default driver", which
+        # SQLAlchemy 2.1 changed from psycopg2 to psycopg (v3) - not installed here. The dlt venv resolves a
+        # new SQLAlchemy on Python >= 3.11 (found on Oracle Linux 8, where python-modern provides 3.11, while
+        # the Ubuntu 22.04 hosts on Python 3.10 never saw it). DEST_URL stays plain: dlt's postgres
+        # destination parses it itself and uses psycopg2.
+        env["SRC_URL"] = _connection_url(src, scheme="postgresql+psycopg2")
     elif pipeline.source.connector == "sql_server":
         # pymssql (packs/dlt/steps/20-install.sh), not pyodbc: a pure/
         # prebuilt-wheel driver dlt's own sql_database source can use
