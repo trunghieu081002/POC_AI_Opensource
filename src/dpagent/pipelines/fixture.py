@@ -576,26 +576,29 @@ def seed_source(fixture: Fixture, db: ThrowawayDB) -> None:
     (`pg_throwaway`) and applying. Every statement's `returncode` is
     checked - a silently-failed seed is worse than no seed at all (see
     `FixtureSeedError`'s own docstring)."""
+    for label, statement in seed_statements(fixture):
+        proc = _psql(db, "-c", statement)
+        if proc.returncode != 0:
+            raise FixtureSeedError(f"{label} failed: {(proc.stderr or proc.stdout).strip()}")
+
+
+def seed_statements(fixture: Fixture) -> list[tuple[str, str]]:
+    """(label, SQL) for every CREATE TABLE and INSERT a fixture seeds - the one place that turns a
+    fixture into SQL, used by `seed_source` (throwaway validation source) and by
+    `dpagent pipeline fixture-sql` (a quickstart's demo source), so the two cannot drift."""
+    out: list[tuple[str, str]] = []
     for table in fixture.tables:
         col_defs = ", ".join(f"{_quote_ident(col)} {type_}"
                              for col, type_ in table.columns.items())
-        create_sql = f"CREATE TABLE {_quote_ident(table.name)} ({col_defs});"
-        proc = _psql(db, "-c", create_sql)
-        if proc.returncode != 0:
-            raise FixtureSeedError(
-                f"CREATE TABLE {table.name} failed: "
-                f"{(proc.stderr or proc.stdout).strip()}")
+        out.append((f"CREATE TABLE {table.name}",
+                    f"CREATE TABLE {_quote_ident(table.name)} ({col_defs});"))
         for row in table.rows:
             cols = list(row.keys())
             col_list = ", ".join(_quote_ident(c) for c in cols)
             values = ", ".join(_quote_literal(row[c]) for c in cols)
-            insert_sql = (f"INSERT INTO {_quote_ident(table.name)} ({col_list}) "
-                          f"VALUES ({values});")
-            proc = _psql(db, "-c", insert_sql)
-            if proc.returncode != 0:
-                raise FixtureSeedError(
-                    f"INSERT INTO {table.name} failed: "
-                    f"{(proc.stderr or proc.stdout).strip()}")
+            out.append((f"INSERT INTO {table.name}",
+                        f"INSERT INTO {_quote_ident(table.name)} ({col_list}) VALUES ({values});"))
+    return out
 
 
 def _psql(db: ThrowawayDB, *args: str, timeout: int = 30) -> subprocess.CompletedProcess:

@@ -228,7 +228,21 @@ class Engine:
 
     # ------------------------------------------------------------ packs
 
-    def install_pack(self, pack: packs.Pack, supplied: dict) -> PackOutcome:
+    def install_pack(self, pack: packs.Pack, supplied: dict, *,
+                     dependency_only: bool = False) -> PackOutcome:
+        existing = state.get_install(pack.name) if dependency_only else None
+        if existing and existing["status"] == "installed":
+            # Pulled in only because a requested pack `requires:` it, so `supplied` holds no
+            # operator intent - only the pack's defaults. Reconfiguring an installed, configured pack
+            # with those defaults is destructive (found for real: a BI-only spec re-ran the postgres
+            # pack's config step with max_connections back to the default and no databases, against
+            # the running server). Name the pack in the spec to change its configuration.
+            self.reporter.pack_skipped(
+                pack, f"already installed at v{existing['pack_version']} - a dependency is not "
+                      f"reconfigured with default params (name it in the spec to change it)")
+            state.event("pack.noop", f"{pack.name} already installed; kept as configured",
+                        run_id=self.run_id, data={"pack": pack.name, "dependency_only": True})
+            return PackOutcome(pack.name, SKIPPED, reason="already installed (dependency)")
         try:
             resolved = params_mod.resolve(pack.param_schema, supplied, pack=pack.name)
         except params_mod.ParamError as exc:
@@ -336,8 +350,9 @@ class Engine:
     def install(self, resolution) -> RunOutcome:
         run = RunOutcome(self.run_id, OK)
         for pack in resolution.order:
-            supplied = resolution.requests[pack.name].params
-            outcome = self.install_pack(pack, supplied)
+            request = resolution.requests[pack.name]
+            outcome = self.install_pack(pack, request.params,
+                                        dependency_only=not request.requested)
             run.packs.append(outcome)
             if outcome.status not in (OK, SKIPPED):
                 run.status = outcome.status

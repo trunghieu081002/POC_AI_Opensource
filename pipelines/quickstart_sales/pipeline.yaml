@@ -1,0 +1,55 @@
+# The quickstart project (docs/quickstart.md): small, not HG, and taken through product commands only -
+# doctor/spec -> validate -> promote -> deploy/run -> dashboard -> update/rerun -> status/audit -> undeploy.
+# Every connection value is a ${VAR} from the environment file of the target environment
+# (examples/quickstart/dev.env.example); nothing environment-specific is in this file.
+name: quickstart_sales
+summary: orders -> landing -> raw (dbt) -> curated (dbt) - monthly revenue and order count of completed orders
+
+source:
+  connector: odoo_postgres          # any PostgreSQL source; the connector name is historical
+  connection:
+    host: "${QS_SRC_HOST:-localhost}"
+    port: "${QS_SRC_PORT:-5432}"
+    database: "${QS_SRC_NAME}"
+    user: "${QS_SRC_USER}"
+    password: "${QS_SRC_PASSWORD}"
+  tables: [orders]
+
+warehouse:
+  host: "${QS_WH_HOST:-localhost}"
+  port: "${QS_WH_PORT:-5432}"
+  database: "${QS_WH_NAME:-warehouse}"
+  user: "${QS_WH_USER}"
+  password: "${QS_WH_PASSWORD}"
+  schema: quickstart_sales
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: orders
+        min: 1
+
+  - name: raw
+    engine: dbt
+    depends_on: landing
+    models: [stg_orders]
+    gates:
+      - type: not_null
+        table: stg_orders
+        columns: [id, order_month, status, amount]
+      - type: unique
+        table: stg_orders
+        columns: [id]
+
+  - name: curated
+    engine: dbt
+    depends_on: raw
+    models: [fct_monthly_revenue]
+    gates:
+      - type: not_null
+        table: fct_monthly_revenue
+        columns: [month, orders, revenue]
+      - type: unique
+        table: fct_monthly_revenue
+        columns: [month]

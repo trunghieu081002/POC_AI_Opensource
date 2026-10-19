@@ -1,0 +1,51 @@
+# Quickstart data stack (docs/quickstart.md): PostgreSQL + dbt + Airflow + dlt, plus the demo source
+# database `qs_source`. Every secret and environment value comes from the environment file
+# (dev.env.example); this file is the same for every environment.
+project: quickstart
+components:
+  - base:
+      locale: en_US.UTF-8
+  - python-modern:
+      version: "3.11"
+  - postgres:
+      version: "15"
+      port: 5432
+      listen_addresses: localhost
+      max_connections: 200
+      databases: [warehouse, airflow_meta, dlt_selftest, superset_meta, "${QS_SRC_NAME}"]
+      users:
+        - {name: "${QS_WH_USER}", password: "${QS_WH_PASSWORD}", databases: [warehouse]}
+        - {name: airflow, password: "${AIRFLOW_DB_PASSWORD}", databases: [airflow_meta]}
+        - {name: dlt_user, password: "${DLT_DB_PASSWORD}", databases: [dlt_selftest]}
+        - {name: superset_meta, password: "${SUPERSET_METADATA_PASSWORD}", databases: [superset_meta]}
+        - {name: "${QS_SRC_USER}", password: "${QS_SRC_PASSWORD}", databases: ["${QS_SRC_NAME}"]}
+  - dbt:
+      adapter: postgres
+      dbt_version: "1.8.*"
+      host: localhost
+      port: 5432
+      database: warehouse
+      db_schema: public
+      db_user: "${QS_WH_USER}"
+      db_password: "${QS_WH_PASSWORD}"
+      threads: 4
+  - airflow:
+      version: "2.9.3"
+      executor: LocalExecutor
+      webserver_port: 8090
+      load_examples: false
+      backend_host: localhost
+      backend_port: 5432
+      backend_db: airflow_meta
+      backend_user: airflow
+      backend_password: "${AIRFLOW_DB_PASSWORD}"
+      admin_user: admin
+      admin_password: "${AIRFLOW_ADMIN_PASSWORD}"
+      admin_email: admin@example.com
+  - dlt:
+      dlt_version: "1.*"
+      host: localhost
+      port: 5432
+      database: dlt_selftest
+      db_user: dlt_user
+      db_password: "${DLT_DB_PASSWORD}"

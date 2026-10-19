@@ -1,0 +1,14 @@
+== 01-install: bash examples/quickstart/walkthrough.sh install
+01-install rc=0
+== 02-source: bash examples/quickstart/walkthrough.sh source
+02-source rc=0
+== 03-validate: bash examples/quickstart/walkthrough.sh validate
+03-validate rc=0
+== 04-approve: bash examples/quickstart/walkthrough.sh approve
+04-approve rc=0
+== 05-deploy: bash examples/quickstart/walkthrough.sh deploy
+05-deploy rc=0
+check after-first-run ok
+== 06-bi-validate: bash examples/quickstart/walkthrough.sh bi-validate
+06-bi-validate rc=3
+secret scan: no environment-file secret value in evidence

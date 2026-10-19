@@ -1,0 +1,53 @@
+== 01-install: bash examples/quickstart/walkthrough.sh install
+01-install rc=0
+== 02-source: bash examples/quickstart/walkthrough.sh source
+02-source rc=0
+== 03-validate: bash examples/quickstart/walkthrough.sh validate
+03-validate rc=0
+== 04-approve: bash examples/quickstart/walkthrough.sh approve
+04-approve rc=0
+== 05-deploy: bash examples/quickstart/walkthrough.sh deploy
+05-deploy rc=0
+check after-first-run ok
+== 06-bi-validate: bash examples/quickstart/walkthrough.sh bi-validate
+06-bi-validate rc=3
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 100, "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      !! port 5432 already serves a running PostgreSQL — the install will adopt 
+it
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      skip — guard says already applied
+  2/5 install · Install the PostgreSQL server packages
+      skip — guard says already applied
+  3/5 initdb · Initialise the data directory and start the service
+      skip — guard says already applied
+  4/5 config · Apply port, listen_addresses and connection settings
+  postgres: Step timed out. If the host is just slow, raise `timeout:` for this 
+step in the pack manifest and re-run — completed steps are skipped.
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ halted on postgres                                                           │
+│ Step timed out. If the host is just slow, raise `timeout:` for this step in  │
+│ the pack manifest and re-run — completed steps are skipped.                  │
+│                                                                              │
+│                                                                              │
+│ re-run to resume — completed steps are skipped                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,0 +1,192 @@
+project: quickstart-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.0  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["quickstart_sales"], "warehouse_creator_roles": ["dbt_user"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 18859ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 147250ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 76ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 159ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 39249ms
+  6/6 service · Enable the Superset systemd service
+      ok 212ms
+  verify ok
+      No broken requirements found.
+      Loaded your LOCAL configuration at [/opt/superset/superset_config.py]
+      Superset PostgreSQL engine discovery passed
+      2026-10-18 15:33:03,954⚠superset.initialization:We haven't found any 
+Content Security Policy (CSP) defined in the configurations. Please make sure to
+configure CSP using the TALISMAN_ENABLED and TALISMAN_CONFIG keys or any other 
+external software. Failing to configure CSP have serious security implications. 
+Check https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP for more 
+information. You can disable this warning using the 
+CONTENT_SECURITY_POLICY_WARNING key.
+      2026-10-18 15:33:04,652:INFO:alembic.runtime.migration:Context impl 
+PostgresqlImpl.
+      2026-10-18 15:33:04,653:INFO:alembic.runtime.migration:Will assume 
+transactional DDL.
+      2026-10-18 15:33:05,268:INFO:superset.app:Syncing configuration to 
+database...
+      2026-10-18 15:33:05,283:INFO:superset.app:Configuration sync to database 
+completed successfully
+      2026-10-18 15:33:06,444:INFO:superset.core.mcp.core_mcp_injection:fastmcp 
+is not installed, skipping MCP initialization. Install it with: pip install 
+'apache-superset[fastmcp]'
+      ok Superset healthy
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "projects": [{"name": "quickstart-sales", "revision": "v1", 
+"bundle_dir": "projects/quickstart-sales/bundle", "expected_file": 
+"projects/quickstart-sales/expected.yaml", "approved_sha256": ""}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 4688ms
+  verify ok
+      quickstart-sales verified validate
+
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 572ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 17ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 33ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 99ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 31ms
+  base: 4 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 332ms
+  checks
+    PASS A row written is the same row read back 491ms
+    PASS Committed data is still there after a service restart 4295ms
+    PASS A wrong password is refused (negative) 894ms
+    PASS Every database in the spec accepts a connection and a write 1467ms
+    PASS The running server reports the port and limits that were asked for 
+357ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 33ms
+  teardown
+    PASS Remove everything the suite created 678ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 6610ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 42ms
+  python-modern: 2 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+827ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 658ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 1026ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1464ms
+    PASS Restart preserves the same unique metadata connection and query result 
+8894ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 1140ms
+  superset: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset-assets                                                              │
+│ Native BI approval, independent chart/filter results, stable identities and  │
+│ scoped removal                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create two namespaced warehouse fixtures and record metadata baseline 
+2036ms
+  checks
+    PASS Reject deployment without content-bound approval before any mutation 
+(negative) 659ms
+    PASS Compare two saved charts and native filters with independent SQL and 
+literal expected 9472ms
+    PASS Repeat deployment without changing the exact native UUID and ID sets 
+7489ms
+    PASS Reject wrong expected without altering approval and remove validation 
+clones (negative) 1685ms
+    PASS Update content with stable IDs and remove only one project 3393ms
+  teardown
+    PASS Verify native metadata baseline and remove only owned warehouse fixture
+tables 705ms
+  superset-assets: 5 checks passed
+
+╭─────────── acceptance ────────────╮
+│  suite            result  checks  │
+│  base             passed     4/4  │
+│  postgres         passed     6/6  │
+│  python-modern    passed     2/2  │
+│  superset         passed     4/4  │
+│  superset-assets  passed     5/5  │
+╰───────────────────────────────────╯
+╭──────────────────────────────────╮
+│ installed and proven working     │
+│ install run 6 · acceptance run 7 │
+╰──────────────────────────────────╯
+review /var/lib/dpagent-bi-assets/quickstart-sales/validation.json, then approve its fingerprint:
+status=pass fingerprint=eb5c472a862e0719f7db1ce9e9f01fd129005bb9d1e2b9075ab8d529962dbac9

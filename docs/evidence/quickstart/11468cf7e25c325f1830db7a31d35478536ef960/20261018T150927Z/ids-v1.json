@@ -1,0 +1,1 @@
+{"ids": {"dashboards": [11], "slices": [11], "tables": [11], "dbs": [12]}, "exactly_once": true, "chart_rows": [{"month": "2026-01", "orders": 2, "revenue": "200.50"}, {"month": "2026-02", "orders": 2, "revenue": "100.00"}], "dashboard_title": "Quickstart sales: completed orders and revenue by month", "data_ok": true, "ok": true}

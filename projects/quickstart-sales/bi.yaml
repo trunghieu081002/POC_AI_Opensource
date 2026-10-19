@@ -1,0 +1,4 @@
+name: quickstart-sales
+revision: v1
+bundle_dir: projects/quickstart-sales/bundle
+expected_file: projects/quickstart-sales/expected.yaml
