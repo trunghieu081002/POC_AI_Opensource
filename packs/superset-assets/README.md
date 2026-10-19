@@ -79,9 +79,17 @@ Each gets exactly one role, `dpagent-viewer-<project>`: Superset's Gamma permiss
 permission removed, plus `datasource_access` on the project's own datasets - it can open the project's dashboard
 and charts and apply its filters; it cannot change an asset, has no SQL Lab and sees no other project. The password
 is read at deploy time from the named environment variable: it is never a parameter, a receipt field or part of the
-fingerprint. The usernames ARE part of the fingerprint, so granting or removing access needs a fresh approval. An
-existing user not created by this project is refused, never adopted; undeploy removes the project's viewers and
-role. Accounts are created inside the Superset application (`viewers.py`), like the runtime's administrator.
+fingerprint. The usernames ARE part of the fingerprint, so granting or removing access needs a fresh approval.
+Accounts are created inside the Superset application (`viewers.py`), like the runtime's administrator.
+
+Ownership comes only from the previous deployment receipt. Before any asset is imported (and again inside the
+change), deploy, redeploy and undeploy refuse - changing nothing - if:
+* a role named `dpagent-viewer-<project>` exists that no receipt of this project records;
+* a user with a configured viewer name exists that this project did not create (never adopted);
+* the project's role has a member the receipt does not record (foreign membership);
+* a viewer the project created was granted another role (it is neither stripped nor deleted).
+The user/role change itself is one database transaction: an error rolls all of it back, and the deploy restores
+the previous assets. Undeploy removes the project's viewers and role only when the checks pass.
 
 Native format/API references are pinned to the tested Superset tag:
 - https://github.com/apache/superset/blob/6.1.0/superset/importexport/api.py
