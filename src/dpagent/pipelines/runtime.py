@@ -12,6 +12,7 @@ import io
 import json
 import os
 import subprocess
+import shutil
 import tempfile
 from pathlib import Path
 from urllib.parse import quote
@@ -437,9 +438,10 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
         if pipeline.dbt_project is not None:
             proc = _run_own_dbt_project(pipeline, target, run_id=run_id)
         else:
-            with _dbt_profiles_dir(pipeline) as profiles_dir:
+            with _dbt_profiles_dir(pipeline) as profiles_dir, \
+                    _own_view_of_shared_project(pipeline) as project_dir:
                 proc = _run([_dbt_bin(), "run", "--select", *target.models,
-                            "--project-dir", _dbt_project_dir(),
+                            "--project-dir", str(project_dir),
                             "--profiles-dir", profiles_dir],
                            pipeline=pipeline, kind="transform", what=f"dbt run for {stage!r}")
         if proc.returncode != 0:
@@ -459,6 +461,43 @@ def run_transform(*, pipeline_name: str, stage: str, run_id: int | None = None) 
                         run_id=run_id, level="error")
             raise GateFailed(f"CALL {proc_name}() failed for {stage!r}:\n{detail}")
     state.event("transform.done", f"{pipeline_name}/{stage} transform complete", run_id=run_id)
+
+
+# What a shared-project stage run sees of the dbt pack's project, besides its own models/<pipeline>/.
+_SHARED_PROJECT_KEEP = ("dbt_project.yml", "packages.yml", "package-lock.yml", "dependencies.yml", "macros",
+                        "seeds", "snapshots", "analyses", "tests")
+
+
+@contextlib.contextmanager
+def _own_view_of_shared_project(pipeline: loader.Pipeline):
+    """A private temp copy of the dbt pack's shared project holding ONLY this pipeline's own published models
+    (models/<pipeline name>/), plus the project's configuration and macros (and its installed packages, linked).
+
+    dbt parses every enabled model of a project before it selects anything, and refuses two models that
+    materialise to the same database.schema.alias. A validation clone pins its renamed models' alias back to the
+    original table names in the original schema - so with the real pipeline deployed, `validate` of that same
+    pipeline (the edit -> validate -> promote -> deploy update flow) failed with "dbt found two resources with
+    the database representation ..." (found on Oracle Linux 8; not OS-specific). Shared-project models may not
+    ref() another pipeline's models (validate.check_dbt_dependencies), so nothing outside the pipeline's own
+    directory is needed to run it - and one pipeline's broken model can no longer break another's run. dbt's
+    target/ and logs/ are written in the copy, not in the shared directory."""
+    shared = Path(_dbt_project_dir())
+    own = shared / "models" / pipeline.name
+    if not own.is_dir():
+        raise GateFailed(f"no published dbt models for {pipeline.name!r} under {own} - deploy the pipeline first")
+    with tempfile.TemporaryDirectory(prefix="dpagent_dbt_shared_") as tmp:
+        work = Path(tmp) / "project"
+        work.mkdir()
+        for name in _SHARED_PROJECT_KEEP:
+            src = shared / name
+            if src.is_dir():
+                shutil.copytree(src, work / name, symlinks=False)
+            elif src.is_file():
+                shutil.copyfile(src, work / name)
+        if (shared / "dbt_packages").is_dir():
+            (work / "dbt_packages").symlink_to(shared / "dbt_packages", target_is_directory=True)
+        shutil.copytree(own, work / "models" / pipeline.name)
+        yield work
 
 
 def _run_own_dbt_project(pipeline: loader.Pipeline, target: loader.Stage, *,
