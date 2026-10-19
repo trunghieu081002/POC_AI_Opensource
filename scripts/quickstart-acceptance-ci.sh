@@ -58,7 +58,7 @@ RUNDIR=$(mktemp -d); chmod 700 "$RUNDIR"
 docker exec "$NAME" bash -c 'set -a; . /root/quickstart-dev.env; set +a
   printf "{\"username\": \"qs.sales.viewer\", \"password\": \"%s\"}" "$QS_SALES_VIEWER_PASSWORD"' > "$RUNDIR/viewer-auth.json"
 chmod 600 "$RUNDIR/viewer-auth.json"
-docker exec "$NAME" /opt/superset/.venv/bin/python - > "$RUNDIR/viewer-targets.json" <<'PY'
+docker exec -i "$NAME" /opt/superset/.venv/bin/python - > "$RUNDIR/viewer-targets.json" <<'PY'
 import json, subprocess, yaml
 from pathlib import Path
 def dash_id(project):
@@ -78,6 +78,7 @@ docker run --rm --network "container:$NAME" -v "$RUNDIR:/run:ro" -v "$OUT/browse
   dpagent-quickstart-browser python /viewer_browser.py > "$OUT/browser/run.log" 2>&1
 BROWSER_RC=$?
 set -e
+[ -s "$RUNDIR/viewer-targets.json" ] || { echo "viewer-targets.json is empty - harness error, not a product result" >&2; exit 97; }
 if grep -rqF -- "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["password"])' "$RUNDIR/viewer-auth.json")" "$OUT/browser"; then
   rm -rf "$RUNDIR" "$OUT/browser"; echo "viewer password found in browser evidence - removed" >&2; exit 99
 fi
