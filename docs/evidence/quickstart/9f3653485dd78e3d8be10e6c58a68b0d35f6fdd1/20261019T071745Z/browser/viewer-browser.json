@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "user": "qs.sales.viewer",
+  "own_unfiltered": {
+    "rendered": [
+      {
+        "month": "2026-01",
+        "orders": "2",
+        "revenue": "200.5"
+      },
+      {
+        "month": "2026-02",
+        "orders": "2",
+        "revenue": "100"
+      }
+    ],
+    "headers": [
+      "month",
+      "orders",
+      "revenue"
+    ],
+    "api_rows": [
+      {
+        "month": "2026-01",
+        "orders": 2,
+        "revenue": "200.50"
+      },
+      {
+        "month": "2026-02",
+        "orders": 2,
+        "revenue": "100.00"
+      }
+    ]
+  },
+  "edit_controls": 0,
+  "own_filtered": {
+    "rendered": [
+      {
+        "month": "2026-01",
+        "orders": "2",
+        "revenue": "200.5"
+      }
+    ],
+    "headers": [
+      "month",
+      "orders",
+      "revenue"
+    ],
+    "api_rows": [
+      {
+        "month": "2026-01",
+        "orders": 2,
+        "revenue": "200.50"
+      }
+    ]
+  },
+  "other": {
+    "final_url": "/superset/dashboard/14/",
+    "table_rows": 0,
+    "chart_data_statuses": [],
+    "chart_data_ok": 0
+  }
+}

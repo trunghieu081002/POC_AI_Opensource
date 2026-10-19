@@ -1,0 +1,1 @@
+{"ok": true, "rows": [{"month": "2026-01", "orders": 2, "revenue": 200.5}, {"month": "2026-02", "orders": 2, "revenue": 100.0}], "expected": [{"month": "2026-01", "orders": 2, "revenue": "200.50"}, {"month": "2026-02", "orders": 2, "revenue": "100.00"}], "landing_rows": 6, "landing_distinct_ids": 6, "source_rows": 6}
