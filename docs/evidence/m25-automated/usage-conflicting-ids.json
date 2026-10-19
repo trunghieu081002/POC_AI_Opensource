@@ -1,0 +1,389 @@
+{
+  "bronze": {
+    "batches": [
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 5,
+        "manifest_sha256": "f7f9d9a8035bbb4bff48bbdf95c592f9131f55b4eff2bcbd4815e3abc119e08d",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 5,
+        "manifest_sha256": "ddfa8537b69b1ec85d33e2065c506ce3aed86b4ec4e7c57232524ac698b18b9a",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_company",
+        "total_rows": 5
+      },
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 11,
+        "manifest_sha256": "597faeae76dfaa11657bc1d2520b10fa165c95123b90f1e78f96cfabfbc3e563",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "channel_video_info",
+        "total_rows": 11
+      },
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 6,
+        "manifest_sha256": "05da35b9f5ada54f2afea5ddcc623af8d6b64d4ba12a32294835459d5ef59575",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "editings",
+        "total_rows": 6
+      },
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 10,
+        "manifest_sha256": "2cb4a6ce3344a23feebb9d5d8a4e91087c13d6ecfc5146135be3520b20aed6e8",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource",
+        "total_rows": 10
+      },
+      {
+        "batch_id": "396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "loaded_rows": 19,
+        "manifest_sha256": "2216691571388b3d017814cb25c38409f0a15bb9b26bdfc6ff4a976f5241ce2b",
+        "object_count": 1,
+        "status": "loaded",
+        "table_name": "resource_editings",
+        "total_rows": 19
+      }
+    ],
+    "namespace": "dpagent-validate/242faf32",
+    "s3": {
+      "error": "",
+      "objects_found_at_teardown": 13,
+      "objects_remaining_after_purge": 0
+    },
+    "source_down_load": null
+  },
+  "cleanup": {
+    "overall": "pass",
+    "pipeline_artifacts": "pass",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_242FAF32_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_242FAF32_BRONZE_BUCKET, DPAGENT_VALIDATE_242FAF32_BRONZE_ENDPOINT, DPAGENT_VALIDATE_242FAF32_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_242FAF32_SRC_DATABASE, DPAGENT_VALIDATE_242FAF32_SRC_HOST, DPAGENT_VALIDATE_242FAF32_SRC_PASSWORD, DPAGENT_VALIDATE_242FAF32_SRC_PORT, DPAGENT_VALIDATE_242FAF32_SRC_USER, DPAGENT_VALIDATE_242FAF32_WH_DATABASE, DPAGENT_VALIDATE_242FAF32_WH_HOST, DPAGENT_VALIDATE_242FAF32_WH_PASSWORD, DPAGENT_VALIDATE_242FAF32_WH_PORT, DPAGENT_VALIDATE_242FAF32_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "s3_objects": "pass",
+    "source_database": "pass",
+    "source_role": "pass",
+    "warehouse_database": "pass",
+    "warehouse_role": "pass"
+  },
+  "clone_name": "hg_resources_useage_number__validate__242faf32",
+  "comparison": {
+    "idempotent": false,
+    "run_1": "not_run",
+    "run_2": "not_run"
+  },
+  "dbt_tests": {
+    "run_1": [
+      {
+        "data": {
+          "errored": 0,
+          "exit_code": 1,
+          "failed": 1,
+          "missing": [],
+          "models": [
+            "int_excluded_stock_codes",
+            "dim_video",
+            "fact_editing"
+          ],
+          "passed": 5,
+          "ran": 6,
+          "reason": "a test failed or errored",
+          "required": [
+            "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277",
+            "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5",
+            "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e",
+            "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35",
+            "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b",
+            "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+          ],
+          "skipped": 0,
+          "stage": "silver",
+          "status": "failed",
+          "tests": [
+            {
+              "column": "fact_editing_sk",
+              "failures": 0,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_fact_editing_fact_editing_sk.4ad76073e5"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_video_dim_video_sk.5f31c93f35"
+            },
+            {
+              "column": "dim_video_sk",
+              "failures": 0,
+              "models": [
+                "dim_video"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_video_dim_video_sk.ae90ece277"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_int_excluded_stock_codes_hg_stock_id.df06fae82e"
+            },
+            {
+              "column": "fact_editing_sk",
+              "failures": 1,
+              "models": [
+                "fact_editing"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "fail",
+              "test": "test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b"
+            },
+            {
+              "column": "hg_stock_id",
+              "failures": 0,
+              "models": [
+                "int_excluded_stock_codes"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_int_excluded_stock_codes_hg_stock_id.3473119862"
+            }
+          ],
+          "untested_models": [],
+          "warned": 0
+        },
+        "errored": 0,
+        "failed": 1,
+        "kind": "dbt.test.failed",
+        "message": "hg_resources_useage_number__validate__242faf32/silver: dbt test failed - ran 6 (5 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 6 required: a test failed or errored: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+        "passed": 5,
+        "ran": 6,
+        "required": 6,
+        "skipped": 0,
+        "stage": "silver",
+        "status": "failed"
+      }
+    ],
+    "run_2": []
+  },
+  "deploy_error": "",
+  "evidence_id": "ev-6bbaff30a01543f0",
+  "expected_hash": "sha256:b469ea7940ab4b9de6970b22ee9e0402cf2c7d1d623f90b8b04274db6b9f7e21",
+  "fixture_hash": "sha256:e3be769a1d36b5d27060f1daff760d5bde95d5de3fac59464474070bdcac0b3d",
+  "gates": {
+    "run_1": {
+      "landing": [
+        {
+          "detail": "",
+          "rows_checked": null,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "schema_contract"
+        },
+        {
+          "detail": "",
+          "rows_checked": 11,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        },
+        {
+          "detail": "",
+          "rows_checked": 19,
+          "rows_rejected": null,
+          "status": "passed",
+          "type": "row_count_bounds"
+        }
+      ]
+    },
+    "run_2": {}
+  },
+  "inputs": {
+    "bronze_staging": true,
+    "dbt_project": true
+  },
+  "journal": {
+    "46": [
+      {
+        "id": 761,
+        "kind": "bronze.extract.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32: channel, channel_company, channel_video_info, editings, resource, resource_editings -> bronze (one snapshot)",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:37+00:00"
+      },
+      {
+        "id": 762,
+        "kind": "bronze.extract.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32: batch 396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2 - 56 row(s) in 6 object(s)",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:37+00:00"
+      },
+      {
+        "id": 763,
+        "kind": "bronze.load.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32: batch 396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:39+00:00"
+      },
+      {
+        "id": 764,
+        "kind": "bronze.load.done",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32: batch 396c2ac6-d670-4fe1-a9a7-5e488c2b5fd2 loaded - 56 row(s) from 6 object(s)",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:41+00:00"
+      },
+      {
+        "id": 765,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32/landing schema_contract: ok",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:42+00:00"
+      },
+      {
+        "id": 766,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32/landing row_count_bounds: ok",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:42+00:00"
+      },
+      {
+        "id": 767,
+        "kind": "gate.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32/landing row_count_bounds: ok",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:42+00:00"
+      },
+      {
+        "id": 768,
+        "kind": "stage.passed",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32/landing gates passed",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:43+00:00"
+      },
+      {
+        "id": 769,
+        "kind": "transform.start",
+        "level": "info",
+        "message": "hg_resources_useage_number__validate__242faf32/silver via dbt",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:36:44+00:00"
+      },
+      {
+        "id": 770,
+        "kind": "dbt.test.failed",
+        "level": "error",
+        "message": "hg_resources_useage_number__validate__242faf32/silver: dbt test failed - ran 6 (5 passed, 1 failed, 0 errored, 0 warned, 0 skipped) of 6 required: a test failed or errored: test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+        "run_id": 46,
+        "stage": "silver",
+        "ts": "2026-10-19T08:37:23+00:00"
+      },
+      {
+        "id": 771,
+        "kind": "transform.failed",
+        "level": "error",
+        "message": "dbt run failed for 'silver': [dbt test] dbt test failed for 'silver': test.dwh_hgmedia.unique_fact_editing_fact_editing_sk.f82b3d8d4b fail (1 failing row(s))",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:37:23+00:00"
+      },
+      {
+        "id": 772,
+        "kind": "pipeline.failed",
+        "level": "error",
+        "message": "DAG run 46 reached terminal state: failed",
+        "run_id": 46,
+        "stage": null,
+        "ts": "2026-10-19T08:37:26+00:00"
+      }
+    ]
+  },
+  "overall": "fail",
+  "pipeline_hash": "sha256:630e24f2f8965bdc4f58fa79ce24ca83935789f32f9eaa9d8ebadd442ffd6946",
+  "promote": {
+    "accepted": false,
+    "approval_unchanged": true,
+    "reasons": [
+      "run 1 status is 'failed', not 'ok'",
+      "run 2 status is 'not_run', not 'ok'",
+      "run 1 comparison against expected is 'not_run', not 'pass'",
+      "run 2 comparison against expected is 'not_run', not 'pass'",
+      "the two runs were not idempotent",
+      "validation overall is 'fail'",
+      "expected exactly 2 run ids, the evidence has 1",
+      "bronze pipeline but no source-removed proof in the evidence",
+      "expected at least 3 bronze batches (2 runs + the source-down LOAD), got 1",
+      "run_1: run 46 finished 'failed' in the journal",
+      "run_1: stage 'silver': dbt test is 'failed': a test failed or errored",
+      "run_1: no dbt test record for stage 'gold' in the journal",
+      "run_1: required a `unique` test on resources_useage_number.resource_video_sk: dbt ran none",
+      "run_1: required a `not_null` test on resources_useage_number.resource_video_sk: dbt ran none",
+      "run_1: required a `unique` test on fact_editing.fact_editing_sk did not pass",
+      "run_1: gated stage 'silver' has no gate verdict in the journal",
+      "run_1: gated stage 'gold' has no gate verdict in the journal"
+    ]
+  },
+  "recovered_after_scenario": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "report_version": 2,
+  "run_ids": [
+    46
+  ],
+  "run_status": {
+    "run_1": "failed",
+    "run_2": "not_run"
+  },
+  "unavailable_reason": "",
+  "validator": {
+    "bronze_manifest_format": 1,
+    "dbt": "1.8.10",
+    "dpagent": "0.4.0",
+    "postgres": "PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)",
+    "report": 2
+  }
+}

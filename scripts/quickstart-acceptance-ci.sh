@@ -67,7 +67,8 @@ if [ "$OS" = ol8 ]; then
     echo "container firewalld: $(docker exec "$NAME" sh -c 'systemctl is-active firewalld 2>&1 || true')   (no firewall is exercised)"
     echo "docker host getenforce: $(getenforce 2>&1 || true)"
     echo "docker host firewalld: $(systemctl is-active firewalld 2>&1 || true)"
-    echo "system python before: $(docker exec "$NAME" sh -c 'command -v python3 >/dev/null && python3 --version || echo none')"
+    echo "bare image python3 (before the OS packages python3/python3.11 are installed): $(docker exec "$NAME" sh -c 'command -v python3 >/dev/null && python3 --version || echo none')"
+    echo "system python baseline = after those OS packages, before DPAgent (system-python-before.txt); compared at the end"
   } > "$OUT/os-scope.txt"
   docker exec "$NAME" bash -lc '
     set -euo pipefail
