@@ -19,7 +19,7 @@ are **not** one automated flow; this table says which step an operator can do wi
 | Recovery | fix data, `pipeline run` (full snapshot) | #46 fault → recovery | No partial resume (by design: full snapshot) |
 | Update | edit files → validate → promote → deploy; BI: new `revision` → validate → new fingerprint → deploy | #46 CLI v1→v2 | — |
 | Undeploy | `pipeline undeploy`; `superset-assets mode: undeploy`; `dpagent rollback <pack>` | matrix, #45, #46 | — |
-| Viewer access | — | — | Superset runtime creates **only an Admin**; every browser/API check so far used admin |
+| Viewer access | `superset-assets` `projects[].viewers` (username + password env var) | quickstart viewer RBAC PASS `ea2076d` | other chart types, RLS, SSO/LDAP |
 | Native OS | packs declare `debian`, `rhel` | Ubuntu 22.04 systemd containers only | Oracle Linux / RHEL install never exercised |
 
 ## What a new project has to add (no engine change)
@@ -47,5 +47,5 @@ that stays `maturity: draft` until `dpagent promote` — the catalog never claim
    dashboard → update/rerun → status/audit → undeploy, with no test helper approving anything. Two
    links were added: `dpagent pipeline fixture-sql` (demo source data) and dependency-only packs are no longer
    reconfigured with defaults (found by the run).
-2. **Viewer RBAC**: a real non-admin account; API and browser checks.
+2. **Viewer RBAC** — **done** (PASS on `ea2076d`): per-project read-only viewers; API and real-browser checks as the viewer; writes refused with 403; the other project 404.
 3. **Native Oracle Linux** in a clean VM (or clearly labelled container scope).
