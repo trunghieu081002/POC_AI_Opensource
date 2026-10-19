@@ -59,6 +59,29 @@ check() {  # check <label> <script> <args...>   (Superset's venv: it has request
 }
 fingerprint() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["fingerprint"])' \
                   "/var/lib/dpagent-bi-assets/$1/validation.json"; }
+meta() { runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d superset_meta -c "$1"; }
+superset_state() {   # users (roles, password hash digest, active), roles (permission count), asset change times, receipts
+  meta "SELECT x FROM (
+      SELECT 'user '||u.username||' active='||u.active||' pw='||md5(coalesce(u.password,''))||' roles='||
+             coalesce((SELECT string_agg(r.name, ',' ORDER BY r.name) FROM ab_user_role ur JOIN ab_role r ON r.id=ur.role_id
+                       WHERE ur.user_id=u.id),'') AS x FROM ab_user u
+      UNION ALL SELECT 'role '||r.name||' perms='||(SELECT count(*) FROM ab_permission_view_role pr WHERE pr.role_id=r.id) FROM ab_role r
+      UNION ALL SELECT 'dashboard '||uuid||' '||changed_on FROM dashboards
+      UNION ALL SELECT 'chart '||uuid||' '||changed_on FROM slices
+      UNION ALL SELECT 'dataset '||uuid||' '||changed_on FROM tables) s ORDER BY x"
+  for f in /var/lib/dpagent-bi-assets/*/deployment.json; do [ -f "$f" ] && sha256sum "$f"; done; true
+}
+refused_unchanged() {   # refused_unchanged <label> <command...>: must fail and leave Superset + receipts byte-identical
+  local label="$1"; shift
+  superset_state > "$OUT/$label-state-before.txt"
+  set +e; COLUMNS=400 "$@" > "$OUT/$label.log" 2>&1; local rc=$?; set -e   # wide: the reason stays on one line
+  superset_state > "$OUT/$label-state-after.txt"
+  echo "$label rc=$rc (must be non-zero)" | tee -a "$OUT/steps.log"
+  [ "$rc" -ne 0 ] || { echo "$label: was not refused" >&2; exit 1; }
+  cmp -s "$OUT/$label-state-before.txt" "$OUT/$label-state-after.txt" \
+    || { diff "$OUT/$label-state-before.txt" "$OUT/$label-state-after.txt" | head -20; echo "$label: state changed" >&2; exit 1; }
+  echo "check $label-state-unchanged ok" | tee -a "$OUT/steps.log"
+}
 SALES_TITLE="Quickstart sales: completed orders and revenue by month"
 SALES_TITLE_V2="Quickstart sales (v2): completed orders and revenue by month"
 export QS_BI_APPROVED_BY=quickstart.reviewer
@@ -89,8 +112,16 @@ if [ "$PHASE" = first ]; then
   n=$(runuser -u postgres -- psql -X -At -d superset_meta -c "SELECT count(*) FROM ab_user WHERE username LIKE 'qs.%'")
   [ "$n" = 0 ] || { echo "viewer accounts exist after a refused deploy" >&2; exit 1; }
 
-  QS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-sales-v1.txt")" QS_OPS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-ops-v1.txt")" \
-    step 08-bi-deploy bash "$W" bi-deploy
+  export QS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-sales-v1.txt")" QS_OPS_BI_APPROVED_SHA256="$(cat "$OUT/fingerprint-ops-v1.txt")"
+  # negative: a role with the project's name that no receipt records (someone else's) is refused before any import
+  meta "INSERT INTO ab_role (id, name) VALUES (nextval('ab_role_id_seq'), 'dpagent-viewer-quickstart-sales')" >/dev/null
+  refused_unchanged 07b-bi-deploy-squatted-role bash "$W" bi-deploy
+  grep -q "Viewer role not owned by this project" "$OUT/07b-bi-deploy-squatted-role.log" || { echo "refused for another reason" >&2; exit 1; }
+  check after-squatted-role-sales check.py bi-absent quickstart-sales
+  check after-squatted-role-ops check.py bi-absent quickstart-ops
+  meta "DELETE FROM ab_role WHERE name = 'dpagent-viewer-quickstart-sales'" >/dev/null
+
+  step 08-bi-deploy bash "$W" bi-deploy
   check after-bi-deploy check.py bi "$SALES_TITLE"
   cp "$OUT/check-after-bi-deploy.json" "$OUT/ids-v1.json"
 
@@ -99,6 +130,24 @@ if [ "$PHASE" = first ]; then
   check viewer-ops-api   check_viewer.py qs.ops.viewer   QS_OPS_VIEWER_PASSWORD   quickstart-ops   quickstart-sales
   # the viewers' write attempts changed nothing
   check after-viewer-attempts check.py bi "$SALES_TITLE"
+
+  # negative: someone else adds a member to a project's viewer role -> redeploy refused, nothing changed
+  meta "INSERT INTO ab_user (id, first_name, last_name, username, email, active, created_on, changed_on)
+        VALUES (nextval('ab_user_id_seq'), 'Foreign', 'Member', 'foreign.member', 'foreign.member@example.invalid', true, now(), now());
+        INSERT INTO ab_user_role (id, user_id, role_id) SELECT nextval('ab_user_role_id_seq'), u.id, r.id FROM ab_user u, ab_role r
+        WHERE u.username = 'foreign.member' AND r.name = 'dpagent-viewer-quickstart-ops'" >/dev/null
+  refused_unchanged 08b-bi-redeploy-foreign-member bash "$W" bi-deploy
+  grep -q "Viewer role has foreign members" "$OUT/08b-bi-redeploy-foreign-member.log" || { echo "refused for another reason" >&2; exit 1; }
+  # ... and an owned viewer that someone granted another role is neither stripped nor deleted
+  meta "DELETE FROM ab_user_role WHERE user_id = (SELECT id FROM ab_user WHERE username = 'foreign.member');
+        DELETE FROM ab_user WHERE username = 'foreign.member';
+        INSERT INTO ab_user_role (id, user_id, role_id) SELECT nextval('ab_user_role_id_seq'), u.id, r.id FROM ab_user u, ab_role r
+        WHERE u.username = 'qs.ops.viewer' AND r.name = 'Alpha'" >/dev/null
+  refused_unchanged 08c-bi-redeploy-viewer-extra-role bash "$W" bi-deploy
+  grep -q "Viewer account holds another role" "$OUT/08c-bi-redeploy-viewer-extra-role.log" || { echo "refused for another reason" >&2; exit 1; }
+  meta "DELETE FROM ab_user_role WHERE user_id = (SELECT id FROM ab_user WHERE username = 'qs.ops.viewer')
+        AND role_id = (SELECT id FROM ab_role WHERE name = 'Alpha')" >/dev/null
+  check after-refusals check.py bi "$SALES_TITLE"
   echo "PHASE first PASS" | tee -a "$OUT/steps.log"
   exit 0
 fi

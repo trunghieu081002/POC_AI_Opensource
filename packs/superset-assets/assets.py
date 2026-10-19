@@ -192,19 +192,32 @@ def run_viewers(payload):
     return json.loads(proc.stdout.decode().strip().splitlines()[-1])
 
 
-def ensure_viewers(project, ids, previous):
+def viewer_plan(project, previous):
+    """What viewers.py should do for this deployment, or None. Ownership comes only from the previous receipt:
+    `owned_role` is true only if it recorded this project's role."""
     viewers = read_viewers(project["config"])
-    owned = ((previous or {}).get("viewers") or {}).get("users", [])
+    receipt = (previous or {}).get("viewers") or {}
+    owned, role = receipt.get("users", []), viewer_role(project["name"])
+    base = {"role": role, "owned_role": receipt.get("role") == role, "owned_users": owned}
     if not viewers and not owned: return None
-    if not viewers:
-        return run_viewers({"action": "remove", "role": viewer_role(project["name"]), "owned_users": owned}) and None
+    if not viewers: return dict(base, action="remove")
     users = []
     for v in viewers:
         password = os.environ.get(v["password_env"], "")
         if len(password) < 12: raise ValueError("Viewer password from " + v["password_env"] + " must have at least 12 characters")
         users.append({"username": v["username"], "password": password})
-    result = run_viewers({"action": "ensure", "role": viewer_role(project["name"]), "owned_users": owned, "users": users,
-                          "dataset_uuids": sorted(project["resources"]["datasets"])})
+    return dict(base, action="ensure", users=users, dataset_uuids=sorted(project["resources"]["datasets"]))
+
+
+def check_viewers(plan):
+    """Refuse before anything is imported: same ownership checks as the change itself, no passwords sent."""
+    if plan: run_viewers(dict(plan, action="check", users=[{"username": u["username"]} for u in plan.get("users", [])]))
+
+
+def ensure_viewers(plan):
+    if not plan: return None
+    result = run_viewers(plan)
+    if plan["action"] == "remove": return None
     return {"role": result["role"], "users": result["users"], "permissions": result["permissions"]}
 
 
@@ -455,12 +468,14 @@ def deploy(client, project, approved_by):
             if not previous or previous["ids"].get(kind, {}).get(key) != identifier:
                 raise RuntimeError("Refusing unowned Superset UUID")
     client.assert_names_owned(project, previous)
+    plan = viewer_plan(project, previous)
+    check_viewers(plan)
     validate(client, project)
     data, _ = bundle(project, client.env["SUPERSET_WAREHOUSE_URI"])
     try:
         client.import_bundle(data)
         ids, observations = check_results(client, project)
-        viewers = ensure_viewers(project, ids, previous)
+        viewers = ensure_viewers(plan)
     except Exception as exc:
         attempt={"status":"fail","fingerprint":project["fingerprint"],"error":type(exc).__name__,"observations":getattr(exc,"observations",[])}
         try:
@@ -489,7 +504,8 @@ def undeploy(client, name):
     if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
     if record["status"] == "undeployed": return
     if record.get("viewers"):
-        run_viewers({"action": "remove", "role": record["viewers"]["role"], "owned_users": record["viewers"]["users"]})
+        run_viewers({"action": "remove", "role": record["viewers"]["role"], "owned_role": True,
+                     "owned_users": record["viewers"]["users"]})
     client.cleanup(record["resources"], receipt=record["ids"])
     record["status"] = "undeployed"; write_state(path, record)
 
