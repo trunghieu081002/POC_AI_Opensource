@@ -1,0 +1,15 @@
+ok image dpagent-m25-disposable ready
+ok container dpagent-m25-acceptance-2186971 up, systemd running
+ok python 3.10 (python3)
+ok dpagent installed
+(dpagent synth), and proposing a catalog entry for a failure nothing matched:
+ok postgres+dlt+dbt+airflow (profile: bronze) installed and verified running
+ok    a2-promote-deploy-run        overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+ok    fact-promote-deploy-run      overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+ok    usage-promote-deploy-run     overall=pass cleanup=pass - validate -> promote -> real deploy/run -> edits invalidate, all as required
+ok    late-deploy-failure          overall=fail cleanup=pass - matched expectation
+ok    partial-deploy-failure       overall=fail cleanup=pass - matched expectation
+ok    correct-twice                overall=pass cleanup=pass - matched expectation
+6/6 requested scenarios matched their expectation (the 'bronze' profile is 34).
+leaks=0
+ok evidence written under /tmp/claude-1000/-home-oracle-POC-AI-Opensource/434d0bd7-ef42-4061-b348-d2517bc3aaa3/scratchpad/wt49/docs/evidence/m25-automated

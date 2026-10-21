@@ -1,0 +1,7 @@
+triggered — dpagent run 18
+waiting up to 1800s for run 18 to finish...
+  quickstart_sales · run 18 ok · started 2026-10-21T13:38:01+00:00  
+ stage    status  rows  gates             started                   
+ landing  passed     6  row_count_bounds  2026-10-21T13:38:12+00:00 
+ raw      passed     -  not_null, unique  2026-10-21T13:38:25+00:00 
+ curated  passed     -  not_null, unique  2026-10-21T13:38:34+00:00 
