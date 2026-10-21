@@ -1,0 +1,21 @@
+checks:
+- chart_uuid: 19ad462c-b544-5246-b4ff-255f81069fd6
+  sql: SELECT status, COUNT(*)::bigint AS orders FROM quickstart_sales.stg_orders
+    GROUP BY status
+  rows:
+  - status: done
+    orders: 4
+  - status: cancelled
+    orders: 1
+  - status: draft
+    orders: 1
+  filters:
+  - dashboard_uuid: 4f2b6e97-1555-55f6-8287-b1f86e4f9403
+    native_filter_id: NATIVE_FILTER-status
+    values:
+    - done
+    sql: SELECT status, COUNT(*)::bigint AS orders FROM quickstart_sales.stg_orders
+      WHERE status = 'done' GROUP BY status
+    rows:
+    - status: done
+      orders: 4

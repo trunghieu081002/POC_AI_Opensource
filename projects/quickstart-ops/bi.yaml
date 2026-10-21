@@ -1,0 +1,4 @@
+name: quickstart-ops
+revision: v1
+bundle_dir: projects/quickstart-ops/bundle
+expected_file: projects/quickstart-ops/expected.yaml

@@ -12,6 +12,7 @@ except ImportError:  # Static dry-run also works before the Superset venv exists
 import os
 import re
 import shlex
+import subprocess
 import sys
 import uuid
 import zipfile
@@ -150,10 +151,74 @@ def read_project(config: dict, binding: dict) -> dict:
             if not isinstance(filtered.get("rows"), list) or not isinstance(filtered.get("sql"), str):
                 raise ValueError("Every filter check needs independent SQL and rows")
             canonical(filtered["rows"])
-    fingerprint = hashlib.sha256(json.dumps({"project": name, "files": hashes,
-        "expected": hashlib.sha256(raw_expected).hexdigest(), "binding": binding}, sort_keys=True).encode()).hexdigest()
+    viewers = read_viewers(config)
+    identity = {"project": name, "files": hashes,
+        "expected": hashlib.sha256(raw_expected).hexdigest(), "binding": binding}
+    if viewers:
+        # who may view is part of what is approved: changing it needs a fresh approval
+        identity["viewers"] = sorted(v["username"] for v in viewers)
+    fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return {"name": name, "content": content, "resources": resources, "expected": expected,
             "fingerprint": fingerprint, "binding": binding, "config": config}
+
+
+def read_viewers(config: dict) -> list:
+    """`projects[].viewers: [{username, password_env}]` - real non-admin accounts for this project only.
+    The password is read from the named environment variable at deploy time; it is never a parameter, never
+    in the receipt and never in the fingerprint."""
+    viewers = config.get("viewers") or []
+    if not isinstance(viewers, list) or len(viewers) > 50: raise ValueError("viewers must be a list")
+    seen = set()
+    for v in viewers:
+        if not isinstance(v, dict) or set(v) != {"username", "password_env"}: raise ValueError("Each viewer needs username and password_env only")
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]{2,62}", str(v["username"])) or v["username"] in seen: raise ValueError("Invalid or duplicate viewer username")
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]{1,62}", str(v["password_env"])): raise ValueError("password_env must name an environment variable")
+        seen.add(v["username"])
+    return viewers
+
+
+def viewer_role(name): return "dpagent-viewer-" + name
+
+
+def run_viewers(payload):
+    """viewers.py inside the Superset application, as the `superset` user, with its protected environment.
+    Passwords travel on stdin only."""
+    command = ["runuser", "-u", "superset", "--", "/opt/superset/.venv/bin/python", "/opt/superset/env_exec.py",
+               "/opt/superset/superset.env", "/opt/superset/.venv/bin/python", str(Path(__file__).with_name("viewers.py"))]
+    proc = subprocess.run(command, input=json.dumps(payload).encode(), capture_output=True, cwd="/", timeout=300)
+    if proc.returncode != 0:
+        detail = proc.stderr.decode(errors="replace").strip().splitlines()[-1:] or ["no output"]
+        raise RuntimeError("Viewer reconciliation failed: " + detail[0][:300])
+    return json.loads(proc.stdout.decode().strip().splitlines()[-1])
+
+
+def viewer_plan(project, previous):
+    """What viewers.py should do for this deployment, or None. Ownership comes only from the previous receipt:
+    `owned_role` is true only if it recorded this project's role."""
+    viewers = read_viewers(project["config"])
+    receipt = (previous or {}).get("viewers") or {}
+    owned, role = receipt.get("users", []), viewer_role(project["name"])
+    base = {"role": role, "owned_role": receipt.get("role") == role, "owned_users": owned}
+    if not viewers and not owned: return None
+    if not viewers: return dict(base, action="remove")
+    users = []
+    for v in viewers:
+        password = os.environ.get(v["password_env"], "")
+        if len(password) < 12: raise ValueError("Viewer password from " + v["password_env"] + " must have at least 12 characters")
+        users.append({"username": v["username"], "password": password})
+    return dict(base, action="ensure", users=users, dataset_uuids=sorted(project["resources"]["datasets"]))
+
+
+def check_viewers(plan):
+    """Refuse before anything is imported: same ownership checks as the change itself, no passwords sent."""
+    if plan: run_viewers(dict(plan, action="check", users=[{"username": u["username"]} for u in plan.get("users", [])]))
+
+
+def ensure_viewers(plan):
+    if not plan: return None
+    result = run_viewers(plan)
+    if plan["action"] == "remove": return None
+    return {"role": result["role"], "users": result["users"], "permissions": result["permissions"]}
 
 
 def rewrite(value, mapping):
@@ -388,7 +453,9 @@ def validate(client, project):
 def deployment_path(project): return STATE / project["name"] / "deployment.json"
 
 
-def deploy(client, project, approved_by):
+def deploy_checks(client, project, approved_by):
+    """Every refusal a deploy can make before it changes anything: approval, receipt, UUID and name ownership,
+    viewer ownership. Returns (previous receipt or None, viewer plan)."""
     if not approved_by or project["config"].get("approved_sha256") != project["fingerprint"]:
         raise RuntimeError("BI approval does not match artifact, expected and environment binding")
     path = deployment_path(project); previous = json.loads(path.read_text(),parse_float=Decimal) if path.exists() else None
@@ -403,11 +470,20 @@ def deploy(client, project, approved_by):
             if not previous or previous["ids"].get(kind, {}).get(key) != identifier:
                 raise RuntimeError("Refusing unowned Superset UUID")
     client.assert_names_owned(project, previous)
+    plan = viewer_plan(project, previous)
+    check_viewers(plan)
+    return previous, plan
+
+
+def deploy(client, project, approved_by):
+    previous, plan = deploy_checks(client, project, approved_by)
+    path = deployment_path(project)
     validate(client, project)
     data, _ = bundle(project, client.env["SUPERSET_WAREHOUSE_URI"])
     try:
         client.import_bundle(data)
         ids, observations = check_results(client, project)
+        viewers = ensure_viewers(plan)
     except Exception as exc:
         attempt={"status":"fail","fingerprint":project["fingerprint"],"error":type(exc).__name__,"observations":getattr(exc,"observations",[])}
         try:
@@ -425,18 +501,47 @@ def deploy(client, project, approved_by):
         finally: write_state(path.parent/("deployment-attempt-"+uuid.uuid4().hex+".json"),attempt)
         raise
     if previous: write_state(path.parent/"history"/(previous["fingerprint"]+".json"),previous)
-    write_state(path, {"name": project["name"], "fingerprint": project["fingerprint"], "binding": project["binding"], "approved_by": approved_by, "ids": ids, "content": project["content"], "resources": project["resources"], "expected": project["expected"], "observations": observations, "status": "deployed"})
+    write_state(path, {"name": project["name"], "fingerprint": project["fingerprint"], "binding": project["binding"], "approved_by": approved_by, "ids": ids, "content": project["content"], "resources": project["resources"], "expected": project["expected"], "observations": observations, "status": "deployed", "viewers": viewers})
     return ids
+
+
+def undeploy_record(client, name):
+    """The receipt to undeploy, or None if there is nothing to do; refuses a receipt for another target."""
+    path = STATE / name / "deployment.json"
+    if not path.exists(): return None
+    record = json.loads(path.read_text(),parse_float=Decimal)
+    if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
+    return None if record["status"] == "undeployed" else record
+
+
+def undeploy_viewers_plan(record):
+    return {"action": "remove", "role": record["viewers"]["role"], "owned_role": True,
+            "owned_users": record["viewers"]["users"]} if record.get("viewers") else None
 
 
 def undeploy(client, name):
     path = STATE / name / "deployment.json"
-    if not path.exists(): return
-    record = json.loads(path.read_text(),parse_float=Decimal)
-    if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
-    if record["status"] == "undeployed": return
+    record = undeploy_record(client, name)
+    if record is None: return
+    plan = undeploy_viewers_plan(record)
+    if plan: run_viewers(plan)
     client.cleanup(record["resources"], receipt=record["ids"])
     record["status"] = "undeployed"; write_state(path, record)
+
+
+def deploy_all(client, projects, approved_by):
+    """Every project's refusals are checked before ANY project is deployed: one refused project leaves the others
+    as they were, not half of the spec applied."""
+    for project in projects: deploy_checks(client, project, approved_by)
+    for project in projects: deploy(client, project, approved_by)
+
+
+def undeploy_all(client, names):
+    """Same for undeploy: every receipt and viewer removal is checked before any project is removed."""
+    for name in names:
+        record = undeploy_record(client, name)
+        check_viewers(record and undeploy_viewers_plan(record))
+    for name in names: undeploy(client, name)
 
 
 def environment():
@@ -475,11 +580,12 @@ def main(action):
                 if record["binding"] != client.binding or record["status"] != "undeployed" or any(client.lookup(record["resources"]).values()):
                     raise RuntimeError("BI undeploy is incomplete")
     elif action == "rollback" or mode == "undeploy":
-        for name in names: undeploy(client, name)
+        undeploy_all(client, names)
     elif action == "apply":
+        if mode == "deploy":
+            deploy_all(client, projects, os.environ.get("DP_PARAM_APPROVED_BY", ""))
         for project in projects:
             if mode == "validate": validate(client, project)
-            else: deploy(client, project, os.environ.get("DP_PARAM_APPROVED_BY", ""))
             print(project["name"], "mode=" + mode, "fingerprint=" + project["fingerprint"])
     elif action == "verify":
         for project in projects:

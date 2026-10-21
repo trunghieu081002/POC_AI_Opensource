@@ -48,4 +48,42 @@ docker exec "$NAME" bash -lc '
   apt-get update -qq && apt-get install -y -qq sudo ca-certificates curl openssl python3 python3-venv python3-pip >/dev/null
   DPAGENT_SOURCE_DIR=/opt/src/clean bash /opt/src/clean/scripts/bootstrap.sh
 ' > "$OUT/bootstrap.log" 2>&1
-docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh' 2>&1 | tee "$OUT/run.log"
+docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh first' 2>&1 | tee "$OUT/run-first.log"
+
+# Viewer RBAC in a real browser, logged in as the sales viewer: a Playwright container sharing the host's network
+# namespace (Superset binds loopback). The password goes through a 0600 file that is removed right after.
+docker build -q -t dpagent-quickstart-browser -f "$ROOT/tests/data_platform_acceptance/browser.Dockerfile" \
+  "$ROOT/tests/data_platform_acceptance" > "$OUT/browser-image.txt"
+RUNDIR=$(mktemp -d); chmod 700 "$RUNDIR"
+docker exec "$NAME" bash -c 'set -a; . /root/quickstart-dev.env; set +a
+  printf "{\"username\": \"qs.sales.viewer\", \"password\": \"%s\"}" "$QS_SALES_VIEWER_PASSWORD"' > "$RUNDIR/viewer-auth.json"
+chmod 600 "$RUNDIR/viewer-auth.json"
+docker exec -i "$NAME" /opt/superset/.venv/bin/python - > "$RUNDIR/viewer-targets.json" <<'PY'
+import json, subprocess, yaml
+from pathlib import Path
+def dash_id(project):
+    key = yaml.safe_load(Path(f"/opt/dpagent/projects/{project}/bundle/dashboards/overview.yaml").read_text())["uuid"]
+    return subprocess.check_output(["runuser", "-u", "postgres", "--", "psql", "-X", "-At", "-d", "superset_meta",
+                                    "-c", f"SELECT id FROM dashboards WHERE uuid = '{key}'"], cwd="/", text=True).strip()
+check = yaml.safe_load(Path("/opt/dpagent/projects/quickstart-sales/expected.yaml").read_text())["checks"][0]
+f = check["filters"][0]
+print(json.dumps({"own": {"url": f"/superset/dashboard/{dash_id('quickstart-sales')}/", "rows": check["rows"],
+                          "filter_values": [str(v) for v in f["values"]], "filtered_rows": f["rows"]},
+                  "other": {"url": f"/superset/dashboard/{dash_id('quickstart-ops')}/"}}, default=str))
+PY
+mkdir -p "$OUT/browser"
+set +e
+docker run --rm --network "container:$NAME" -v "$RUNDIR:/run:ro" -v "$OUT/browser:/output" \
+  -v "$ROOT/tests/quickstart_acceptance/viewer_browser.py:/viewer_browser.py:ro" \
+  dpagent-quickstart-browser python /viewer_browser.py > "$OUT/browser/run.log" 2>&1
+BROWSER_RC=$?
+set -e
+[ -s "$RUNDIR/viewer-targets.json" ] || { echo "viewer-targets.json is empty - harness error, not a product result" >&2; exit 97; }
+if grep -rqF -- "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["password"])' "$RUNDIR/viewer-auth.json")" "$OUT/browser"; then
+  rm -rf "$RUNDIR" "$OUT/browser"; echo "viewer password found in browser evidence - removed" >&2; exit 99
+fi
+rm -rf "$RUNDIR"
+echo "viewer browser rc=$BROWSER_RC" | tee -a "$OUT/browser/run.log"
+[ "$BROWSER_RC" -eq 0 ] || { tail -30 "$OUT/browser/run.log"; exit 1; }
+
+docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh second' 2>&1 | tee "$OUT/run-second.log"

@@ -12,3 +12,31 @@
   autofix: []
   ask_user: Assign project-owned UUIDs and names; existing assets are never adopted automatically.
   retry: false
+- id: bi-viewer-role-unowned
+  match:
+    output: "no deployment receipt of this project records it"
+  cause: A Superset role named dpagent-viewer-<project> exists, but no deployment of this project created it.
+  autofix: []
+  ask_user: "Viewer role not owned by this project: rename or remove that role in Superset; it is never adopted."
+  retry: false
+- id: bi-viewer-foreign-member
+  match:
+    output: "has members this project does not own"
+  cause: Someone added users that this project did not create to the project's viewer role.
+  autofix: []
+  ask_user: "Viewer role has foreign members: move them to their own role; DPAgent does not change or delete a role others use."
+  retry: false
+- id: bi-viewer-extra-role
+  match:
+    output: "also holds roles this project does not own"
+  cause: A viewer account created by this project was granted another role in Superset.
+  autofix: []
+  ask_user: "Viewer account holds another role: remove that role from it; DPAgent neither strips nor deletes it."
+  retry: false
+- id: bi-viewer-user-exists
+  match:
+    output: "Refusing to adopt existing Superset user"
+  cause: A Superset user with a configured viewer name exists, but this project did not create it.
+  autofix: []
+  ask_user: "Viewer name already taken in Superset: choose another username; existing users are never adopted."
+  retry: false

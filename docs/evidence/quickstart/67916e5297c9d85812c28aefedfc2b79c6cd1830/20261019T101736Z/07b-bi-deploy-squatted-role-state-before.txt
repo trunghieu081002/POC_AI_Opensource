@@ -1,0 +1,9 @@
+role Admin perms=226
+role Alpha perms=117
+role Gamma perms=95
+role Public perms=0
+role dpagent-viewer-quickstart-sales perms=0
+role sql_lab perms=30
+user admin active=true pw=caa1bdb73b945bb22f4cea68d2812d37 roles=Admin
+fb3aa95c7d8d70fbefe5087d2652ee9811944d7338c1e127e524382583e9feac  /var/lib/dpagent-bi-assets/dpagent_selftest_7-1/deployment.json
+a50763fb25c0ac021fc35ab8dfc355c89f1210f54948388c18db17baadbaa2a4  /var/lib/dpagent-bi-assets/dpagent_selftest_7-2/deployment.json

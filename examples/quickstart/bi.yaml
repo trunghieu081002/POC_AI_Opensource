@@ -1,7 +1,8 @@
 # Quickstart BI (docs/quickstart.md). Applied AFTER the pipeline's first run: the Superset reader is granted
 # on schemas that already exist. One file for every BI step; the step is chosen by the environment:
 #   QS_BI_MODE=validate                     -> imports throwaway clones, compares, prints `fingerprint=...`
-#   QS_BI_MODE=deploy + QS_BI_APPROVED_BY + QS_BI_APPROVED_SHA256 (the reviewed fingerprint) -> live assets
+#   QS_BI_MODE=deploy + QS_BI_APPROVED_BY + QS_BI_APPROVED_SHA256 / QS_OPS_BI_APPROVED_SHA256 (the reviewed
+#   fingerprints of the two projects) -> live assets and each project's viewer account
 #   QS_BI_MODE=undeploy                     -> removes only this project's receipt-owned assets
 # Change QS_BI_REVISION whenever the bundle or its expected file changes (docs: packs/superset-assets).
 project: quickstart-bi
@@ -28,3 +29,13 @@ components:
           bundle_dir: projects/quickstart-sales/bundle
           expected_file: projects/quickstart-sales/expected.yaml
           approved_sha256: "${QS_BI_APPROVED_SHA256:-}"
+          # real non-admin accounts that may only view this project; passwords come from the environment
+          viewers:
+            - {username: qs.sales.viewer, password_env: QS_SALES_VIEWER_PASSWORD}
+        - name: quickstart-ops
+          revision: "${QS_OPS_BI_REVISION:-v1}"
+          bundle_dir: projects/quickstart-ops/bundle
+          expected_file: projects/quickstart-ops/expected.yaml
+          approved_sha256: "${QS_OPS_BI_APPROVED_SHA256:-}"
+          viewers:
+            - {username: qs.ops.viewer, password_env: QS_OPS_VIEWER_PASSWORD}

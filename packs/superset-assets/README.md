@@ -72,6 +72,25 @@ It uses namespaced synthetic warehouse tables created by the configured creator.
 It does not prove a second production project, the HG pipeline-to-dashboard path,
 frontend filter interaction or representative load. Those are separate gates.
 
+## Project viewers
+
+`projects[].viewers: [{username, password_env}]` creates real non-admin Superset accounts for that project only.
+Each gets exactly one role, `dpagent-viewer-<project>`: Superset's Gamma permission set with every write
+permission removed, plus `datasource_access` on the project's own datasets - it can open the project's dashboard
+and charts and apply its filters; it cannot change an asset, has no SQL Lab and sees no other project. The password
+is read at deploy time from the named environment variable: it is never a parameter, a receipt field or part of the
+fingerprint. The usernames ARE part of the fingerprint, so granting or removing access needs a fresh approval.
+Accounts are created inside the Superset application (`viewers.py`), like the runtime's administrator.
+
+Ownership comes only from the previous deployment receipt. Before any asset is imported (and again inside the
+change), deploy, redeploy and undeploy refuse - changing nothing - if:
+* a role named `dpagent-viewer-<project>` exists that no receipt of this project records;
+* a user with a configured viewer name exists that this project did not create (never adopted);
+* the project's role has a member the receipt does not record (foreign membership);
+* a viewer the project created was granted another role (it is neither stripped nor deleted).
+The user/role change itself is one database transaction: an error rolls all of it back, and the deploy restores
+the previous assets. Undeploy removes the project's viewers and role only when the checks pass.
+
 Native format/API references are pinned to the tested Superset tag:
 - https://github.com/apache/superset/blob/6.1.0/superset/importexport/api.py
 - https://github.com/apache/superset/blob/6.1.0/superset/commands/importers/v1/assets.py

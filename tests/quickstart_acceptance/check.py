@@ -5,7 +5,7 @@ pipelines/quickstart_sales/expected.yaml. Prints one JSON object; exit 1 if a ch
 
   check.py warehouse            fct_monthly_revenue == expected; landing holds each source row once
   check.py bi [TITLE]           dashboard/chart/dataset exist once by UUID; chart data == expected
-  check.py bi-absent            none of the project's UUIDs remain in Superset metadata
+  check.py bi-absent [PROJECT]  none of the project's UUIDs remain in Superset metadata
 """
 from __future__ import annotations
 
@@ -21,9 +21,13 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = yaml.safe_load((ROOT / "pipelines/quickstart_sales/expected.yaml").read_text())
 FIXTURE = yaml.safe_load((ROOT / "pipelines/quickstart_sales/fixture.yaml").read_text())
-BUNDLE = ROOT / "projects/quickstart-sales/bundle"
-UUIDS = {kind: yaml.safe_load(next((BUNDLE / sub).rglob("*.yaml")).read_text())["uuid"]
-         for kind, sub in (("dashboards", "dashboards"), ("slices", "charts"), ("tables", "datasets"), ("dbs", "databases"))}
+
+
+def uuids(project: str = "quickstart-sales") -> dict:
+    bundle = ROOT / "projects" / project / "bundle"
+    return {kind: yaml.safe_load(next((bundle / sub).rglob("*.yaml")).read_text())["uuid"]
+            for kind, sub in (("dashboards", "dashboards"), ("slices", "charts"), ("tables", "datasets"),
+                              ("dbs", "databases"))}
 
 
 def psql(database: str, sql: str) -> str:
@@ -46,9 +50,9 @@ def warehouse() -> dict:
             "landing_distinct_ids": distinct, "source_rows": source_rows}
 
 
-def metadata_ids() -> dict:
+def metadata_ids(project: str = "quickstart-sales") -> dict:
     out = {}
-    for table, key in UUIDS.items():
+    for table, key in uuids(project).items():
         rows = psql("superset_meta", f"SELECT id FROM {table} WHERE uuid = '{key}'")
         out[table] = [int(x) for x in rows.split()] if rows else []
     return out
@@ -82,13 +86,14 @@ def bi(title: str | None = None) -> dict:
     return result
 
 
-def bi_absent() -> dict:
-    ids = metadata_ids()
-    return {"ok": not any(ids.values()), "ids": ids}
+def bi_absent(project: str = "quickstart-sales") -> dict:
+    ids = metadata_ids(project)
+    return {"ok": not any(ids.values()), "ids": ids, "project": project}
 
 
 if __name__ == "__main__":
     what = sys.argv[1]
-    out = {"warehouse": warehouse, "bi-absent": bi_absent}.get(what, lambda: bi(*sys.argv[2:3]))()
+    out = {"warehouse": warehouse, "bi-absent": lambda: bi_absent(*sys.argv[2:3])}.get(
+        what, lambda: bi(*sys.argv[2:3]))()
     print(json.dumps(out, default=str, ensure_ascii=False))
     sys.exit(0 if out["ok"] else 1)

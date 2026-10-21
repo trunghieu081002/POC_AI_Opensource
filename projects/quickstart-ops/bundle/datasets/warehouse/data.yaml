@@ -1,0 +1,20 @@
+table_name: stg_orders
+schema: quickstart_sales
+uuid: 41576b64-580a-5fa3-92e5-63ead1615663
+database_uuid: 539af5f2-4ba8-5bfd-bc09-03e05bfb7f1c
+version: 1.0.0
+filter_select_enabled: true
+columns:
+- column_name: status
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: id
+  type: BIGINT
+  groupby: false
+  filterable: true
+  is_dttm: false
+metrics:
+- metric_name: orders
+  expression: COUNT(*)
