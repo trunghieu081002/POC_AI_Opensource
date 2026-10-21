@@ -1,0 +1,14 @@
+ok image dpagent-m25-disposable ready
+ok container dpagent-m25-acceptance-1868634 up, systemd running
+ok python 3.10 (python3)
+ok dpagent installed
+(dpagent synth), and proposing a catalog entry for a failure nothing matched:
+ok postgres+dlt+dbt+airflow (profile: core) installed and verified running
+ERROR a2-promote-deploy-run        driver itself raised: RuntimeError('/opt/seaweedfs/credentials.env not found - the bronze profile needs the seaweedfs pack installed (examples/layer2-bronze-stack.yaml)')
+ok    late-deploy-failure          overall=fail cleanup=pass - matched expectation
+ok    partial-deploy-failure       overall=fail cleanup=pass - matched expectation
+ok    correct-twice                overall=pass cleanup=pass - matched expectation
+3/4 requested scenarios matched their expectation (the 'core' profile is 14).
+1 scenario(s) raised instead of producing a result: ['a2-promote-deploy-run']
+leaks=0
+ok evidence written under /tmp/claude-1000/-home-oracle-POC-AI-Opensource/434d0bd7-ef42-4061-b348-d2517bc3aaa3/scratchpad/wt49/docs/evidence/m25-automated
