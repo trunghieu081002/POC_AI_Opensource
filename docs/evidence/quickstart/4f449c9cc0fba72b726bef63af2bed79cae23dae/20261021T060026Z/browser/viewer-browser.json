@@ -1,0 +1,15 @@
+{
+  "status": "fail",
+  "user": "qs.sales.viewer",
+  "login": {
+    "url": "/login/?next=%2Fsuperset%2Fwelcome%2F",
+    "posts": [
+      {
+        "url": "/login/",
+        "status": 302
+      }
+    ],
+    "messages": []
+  },
+  "error": "Traceback (most recent call last):\n  File \"/viewer_browser.py\", line 69, in <module>\n    page.wait_for_url(lambda url: \"/login\" not in url, timeout=60000)\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/sync_api/_generated.py\", line 10057, in wait_for_url\n    self._sync(\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/_impl/_sync_base.py\", line 115, in _sync\n    return task.result()\n           ^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/_impl/_page.py\", line 590, in wait_for_url\n    return await self._main_frame.wait_for_url(**locals_to_params(locals()))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/_impl/_frame.py\", line 289, in wait_for_url\n    async with self.expect_navigation(\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/_impl/_event_context_manager.py\", line 33, in __aexit__\n    await self._future\n  File \"/usr/local/lib/python3.12/dist-packages/playwright/_impl/_frame.py\", line 265, in continuation\n    event = await waiter.result()\n            ^^^^^^^^^^^^^^^^^^^^^\nplaywright._impl._errors.TimeoutError: Timeout 60000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"<function ImplToApiMapping.wrap_handler.<locals>.wrapper_func at 0x7fb2c04b42c0>\" until 'load'\n============================================================\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/viewer_browser.py\", line 75, in <module>\n    raise AssertionError(\"viewer login failed\")\nAssertionError: viewer login failed\n"
+}

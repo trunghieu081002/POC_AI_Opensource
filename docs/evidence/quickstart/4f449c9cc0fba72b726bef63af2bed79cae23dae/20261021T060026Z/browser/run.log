@@ -1,0 +1,31 @@
+Traceback (most recent call last):
+  File "/viewer_browser.py", line 69, in <module>
+    page.wait_for_url(lambda url: "/login" not in url, timeout=60000)
+  File "/usr/local/lib/python3.12/dist-packages/playwright/sync_api/_generated.py", line 10057, in wait_for_url
+    self._sync(
+  File "/usr/local/lib/python3.12/dist-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/playwright/_impl/_page.py", line 590, in wait_for_url
+    return await self._main_frame.wait_for_url(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/playwright/_impl/_frame.py", line 289, in wait_for_url
+    async with self.expect_navigation(
+  File "/usr/local/lib/python3.12/dist-packages/playwright/_impl/_event_context_manager.py", line 33, in __aexit__
+    await self._future
+  File "/usr/local/lib/python3.12/dist-packages/playwright/_impl/_frame.py", line 265, in continuation
+    event = await waiter.result()
+            ^^^^^^^^^^^^^^^^^^^^^
+playwright._impl._errors.TimeoutError: Timeout 60000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "<function ImplToApiMapping.wrap_handler.<locals>.wrapper_func at 0x7fb2c04b42c0>" until 'load'
+============================================================
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/viewer_browser.py", line 75, in <module>
+    raise AssertionError("viewer login failed")
+AssertionError: viewer login failed
+
+viewer browser rc=1
