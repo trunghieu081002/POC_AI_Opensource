@@ -131,19 +131,21 @@ if [ "$PHASE" = first ]; then
   # the viewers' write attempts changed nothing
   check after-viewer-attempts check.py bi "$SALES_TITLE"
 
-  # negative: someone else adds a member to a project's viewer role -> redeploy refused, nothing changed
+  # negative: someone else adds a member to a project's viewer role -> redeploy refused, nothing changed.
+  # (A spec with identical params is not re-applied at all - the engine skips it - so each refusal check below
+  #  changes the ops revision label: the pack really runs and must refuse, for BOTH projects, before any change.)
   meta "INSERT INTO ab_user (id, first_name, last_name, username, email, active, created_on, changed_on)
         VALUES (nextval('ab_user_id_seq'), 'Foreign', 'Member', 'foreign.member', 'foreign.member@example.invalid', true, now(), now());
         INSERT INTO ab_user_role (id, user_id, role_id) SELECT nextval('ab_user_role_id_seq'), u.id, r.id FROM ab_user u, ab_role r
         WHERE u.username = 'foreign.member' AND r.name = 'dpagent-viewer-quickstart-ops'" >/dev/null
-  refused_unchanged 08b-bi-redeploy-foreign-member bash "$W" bi-deploy
+  refused_unchanged 08b-bi-redeploy-foreign-member env QS_OPS_BI_REVISION=v1-08b bash "$W" bi-deploy
   grep -q "Viewer role has foreign members" "$OUT/08b-bi-redeploy-foreign-member.log" || { echo "refused for another reason" >&2; exit 1; }
   # ... and an owned viewer that someone granted another role is neither stripped nor deleted
   meta "DELETE FROM ab_user_role WHERE user_id = (SELECT id FROM ab_user WHERE username = 'foreign.member');
         DELETE FROM ab_user WHERE username = 'foreign.member';
         INSERT INTO ab_user_role (id, user_id, role_id) SELECT nextval('ab_user_role_id_seq'), u.id, r.id FROM ab_user u, ab_role r
         WHERE u.username = 'qs.ops.viewer' AND r.name = 'Alpha'" >/dev/null
-  refused_unchanged 08c-bi-redeploy-viewer-extra-role bash "$W" bi-deploy
+  refused_unchanged 08c-bi-redeploy-viewer-extra-role env QS_OPS_BI_REVISION=v1-08c bash "$W" bi-deploy
   grep -q "Viewer account holds another role" "$OUT/08c-bi-redeploy-viewer-extra-role.log" || { echo "refused for another reason" >&2; exit 1; }
   meta "DELETE FROM ab_user_role WHERE user_id = (SELECT id FROM ab_user WHERE username = 'qs.ops.viewer')
         AND role_id = (SELECT id FROM ab_role WHERE name = 'Alpha')" >/dev/null

@@ -453,7 +453,9 @@ def validate(client, project):
 def deployment_path(project): return STATE / project["name"] / "deployment.json"
 
 
-def deploy(client, project, approved_by):
+def deploy_checks(client, project, approved_by):
+    """Every refusal a deploy can make before it changes anything: approval, receipt, UUID and name ownership,
+    viewer ownership. Returns (previous receipt or None, viewer plan)."""
     if not approved_by or project["config"].get("approved_sha256") != project["fingerprint"]:
         raise RuntimeError("BI approval does not match artifact, expected and environment binding")
     path = deployment_path(project); previous = json.loads(path.read_text(),parse_float=Decimal) if path.exists() else None
@@ -470,6 +472,12 @@ def deploy(client, project, approved_by):
     client.assert_names_owned(project, previous)
     plan = viewer_plan(project, previous)
     check_viewers(plan)
+    return previous, plan
+
+
+def deploy(client, project, approved_by):
+    previous, plan = deploy_checks(client, project, approved_by)
+    path = deployment_path(project)
     validate(client, project)
     data, _ = bundle(project, client.env["SUPERSET_WAREHOUSE_URI"])
     try:
@@ -497,17 +505,43 @@ def deploy(client, project, approved_by):
     return ids
 
 
-def undeploy(client, name):
+def undeploy_record(client, name):
+    """The receipt to undeploy, or None if there is nothing to do; refuses a receipt for another target."""
     path = STATE / name / "deployment.json"
-    if not path.exists(): return
+    if not path.exists(): return None
     record = json.loads(path.read_text(),parse_float=Decimal)
     if record["binding"] != client.binding: raise RuntimeError("BI undeploy target differs from the ownership receipt")
-    if record["status"] == "undeployed": return
-    if record.get("viewers"):
-        run_viewers({"action": "remove", "role": record["viewers"]["role"], "owned_role": True,
-                     "owned_users": record["viewers"]["users"]})
+    return None if record["status"] == "undeployed" else record
+
+
+def undeploy_viewers_plan(record):
+    return {"action": "remove", "role": record["viewers"]["role"], "owned_role": True,
+            "owned_users": record["viewers"]["users"]} if record.get("viewers") else None
+
+
+def undeploy(client, name):
+    path = STATE / name / "deployment.json"
+    record = undeploy_record(client, name)
+    if record is None: return
+    plan = undeploy_viewers_plan(record)
+    if plan: run_viewers(plan)
     client.cleanup(record["resources"], receipt=record["ids"])
     record["status"] = "undeployed"; write_state(path, record)
+
+
+def deploy_all(client, projects, approved_by):
+    """Every project's refusals are checked before ANY project is deployed: one refused project leaves the others
+    as they were, not half of the spec applied."""
+    for project in projects: deploy_checks(client, project, approved_by)
+    for project in projects: deploy(client, project, approved_by)
+
+
+def undeploy_all(client, names):
+    """Same for undeploy: every receipt and viewer removal is checked before any project is removed."""
+    for name in names:
+        record = undeploy_record(client, name)
+        check_viewers(record and undeploy_viewers_plan(record))
+    for name in names: undeploy(client, name)
 
 
 def environment():
@@ -546,11 +580,12 @@ def main(action):
                 if record["binding"] != client.binding or record["status"] != "undeployed" or any(client.lookup(record["resources"]).values()):
                     raise RuntimeError("BI undeploy is incomplete")
     elif action == "rollback" or mode == "undeploy":
-        for name in names: undeploy(client, name)
+        undeploy_all(client, names)
     elif action == "apply":
+        if mode == "deploy":
+            deploy_all(client, projects, os.environ.get("DP_PARAM_APPROVED_BY", ""))
         for project in projects:
             if mode == "validate": validate(client, project)
-            else: deploy(client, project, os.environ.get("DP_PARAM_APPROVED_BY", ""))
             print(project["name"], "mode=" + mode, "fingerprint=" + project["fingerprint"])
     elif action == "verify":
         for project in projects:
