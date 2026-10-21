@@ -1,0 +1,5 @@
+{
+  "status": "fail",
+  "user": "qs.sales.viewer",
+  "error": "Traceback (most recent call last):\n  File \"/viewer_browser.py\", line 65, in <module>\n    raise AssertionError(\"viewer login failed\")\nAssertionError: viewer login failed\n"
+}

@@ -202,7 +202,10 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
 
 @pipeline_group.command("fixture-sql")
 @click.argument("fixture_path", metavar="FIXTURE", type=click.Path(exists=True, dir_okay=False))
-def fixture_sql_cmd(fixture_path):
+@click.option("--replace", is_flag=True,
+              help="Drop each table first (DROP TABLE IF EXISTS), so loading the demo source again replaces it "
+                   "instead of failing with 'relation already exists'. Only for a demo source you own.")
+def fixture_sql_cmd(fixture_path, replace):
     """Print the SQL that creates and fills a fixture's tables - to load a demo source by hand
     (docs/quickstart.md), e.g. `dpagent pipeline fixture-sql F | psql "$SOURCE_URI"`.
 
@@ -210,6 +213,9 @@ def fixture_sql_cmd(fixture_path):
     connects to nothing; a real project points at its real source instead."""
     fixture = fixture_mod.load_fixture(Path(fixture_path))
     click.echo("BEGIN;")
+    if replace:
+        for table in fixture.tables:
+            click.echo(f"DROP TABLE IF EXISTS {fixture_mod._quote_ident(table.name)};")
     for _, statement in fixture_mod.seed_statements(fixture):
         click.echo(statement)
     click.echo("COMMIT;")

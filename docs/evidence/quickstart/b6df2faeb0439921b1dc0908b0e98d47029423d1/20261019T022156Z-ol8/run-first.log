@@ -1,0 +1,42 @@
+== 01-install: bash examples/quickstart/walkthrough.sh install
+01-install rc=4
+    PASS A wrong password is refused (negative) 179ms
+    PASS Every database in the spec accepts a connection and a write 297ms
+    PASS The running server reports the port and limits that were asked for 
+136ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 36ms
+  teardown
+    PASS Remove everything the suite created 702ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 5793ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 35ms
+  python-modern: 2 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  airflow        passed     4/4  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  dlt            FAILED     0/3  │
+│  postgres       passed     6/6  │
+│  python-modern  passed     2/2  │
+╰─────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────╮
+│ the installer finished, but the system does not work                   │
+│                                                                        │
+│ Every step succeeded and verify passed. The acceptance suite found the │
+│ system failing anyway — which is the entire reason it runs.            │
+│                                                                        │
+│ what failed: dpagent audit 2                                           │
+│ re-run just the tests: dpagent test                                    │
+╰────────────────────────────────────────────────────────────────────────╯

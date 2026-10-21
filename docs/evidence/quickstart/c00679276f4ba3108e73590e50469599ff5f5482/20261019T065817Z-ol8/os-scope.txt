@@ -1,0 +1,9 @@
+scope: Oracle Linux 8.10 CONTAINER on a Docker host - not a native/VM install
+container os-release: Oracle Linux Server 8.10
+container kernel (shared with the host): 5.15.0-314.193.5.5.el8uek.x86_64
+container getenforce: Disabled   (SELinux is NOT exercised)
+container firewalld: inactive   (no firewall is exercised)
+docker host getenforce: Permissive
+docker host firewalld: active
+system python before: none
+system python unchanged: /usr/libexec/platform-python3.6 Python 3.6.8

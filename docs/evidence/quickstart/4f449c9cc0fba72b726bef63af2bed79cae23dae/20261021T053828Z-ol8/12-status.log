@@ -1,0 +1,57 @@
+  quickstart_sales · run 18 ok · started 2026-10-21T05:59:03+00:00  
+ stage    status  rows  gates             started                   
+ landing  passed     6  row_count_bounds  2026-10-21T05:59:12+00:00 
+ raw      passed     -  not_null, unique  2026-10-21T05:59:20+00:00 
+ curated  passed     -  not_null, unique  2026-10-21T05:59:30+00:00 
+quickstart_sales · run 18 · ok
+
+landing passed · 6 rows
+  row_count_bounds
+
+raw passed
+  not_null
+  unique
+
+curated passed
+  not_null
+  unique
+
+events
+ time            actor   kind              message                              
+ 05:59:03+00:00  user    pipeline.trigger  triggering Airflow DAG               
+                                           'quickstart_sales'                   
+ 05:59:06+00:00  engine  extract.start     quickstart_sales via odoo_postgres   
+ 05:59:10+00:00  engine  extract.done      quickstart_sales extract complete:   
+                                           orders +6                            
+ 05:59:12+00:00  engine  gate.passed       quickstart_sales/landing             
+                                           row_count_bounds: ok                 
+ 05:59:12+00:00  engine  stage.passed      quickstart_sales/landing gates       
+                                           passed                               
+ 05:59:13+00:00  engine  transform.start   quickstart_sales/raw via dbt         
+ 05:59:20+00:00  engine  transform.done    quickstart_sales/raw transform       
+                                           complete                             
+ 05:59:20+00:00  engine  gate.passed       quickstart_sales/raw not_null: ok    
+ 05:59:20+00:00  engine  gate.passed       quickstart_sales/raw unique: ok      
+ 05:59:20+00:00  engine  stage.passed      quickstart_sales/raw gates passed    
+ 05:59:22+00:00  engine  transform.start   quickstart_sales/curated via dbt     
+ 05:59:29+00:00  engine  transform.done    quickstart_sales/curated transform   
+                                           complete                             
+ 05:59:30+00:00  engine  gate.passed       quickstart_sales/curated not_null:   
+                                           ok                                   
+ 05:59:30+00:00  engine  gate.passed       quickstart_sales/curated unique: ok  
+ 05:59:30+00:00  engine  stage.passed      quickstart_sales/curated gates       
+                                           passed                               
+ 05:59:31+00:00  engine  pipeline.ok       DAG run 18 reached terminal state:   
+                                           ok                                   
+ pack             version  installed  tested    config           when           
+ airflow          1.0.0    installed  passed    c4126c2ab8b441…  2026-10-21T05… 
+ base             1.0.0    installed  passed    e429274fb41657…  2026-10-21T05… 
+ dbt              1.0.0    installed  passed    c9fb72b3e213a4…  2026-10-21T05… 
+ dlt              1.0.0    installed  passed    021876a71e8e5d…  2026-10-21T05… 
+ postgres         1.0.0    installed  passed    7c46d005d27bf6…  2026-10-21T05… 
+ python-modern    1.0.0    installed  passed    6323f765f4459b…  2026-10-21T05… 
+ superset         0.1.0    installed  passed    604a29703abdd6…  2026-10-21T05… 
+ superset-assets  0.1.0    installed  untested  8dbef5cfd1143e…  2026-10-21T05… 
+
+1 installed component(s) have never been proven to work.
+run: dpagent test

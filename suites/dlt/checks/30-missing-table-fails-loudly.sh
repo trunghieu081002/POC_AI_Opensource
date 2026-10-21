@@ -19,7 +19,7 @@ DB_USER="$DLT_SELFTEST_DB_USER"
 DB_PASSWORD="$DLT_SELFTEST_DB_PASSWORD"
 PYTHON="${INSTALL_DIR}/.venv/bin/python"
 
-if OUTPUT="$(DP_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${HOST}:${PORT}/${DATABASE}" \
+if OUTPUT="$(DP_URL="postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${HOST}:${PORT}/${DATABASE}" \
   DP_NS="$NS" DP_STATE_DIR="/tmp/${NS}_dlt_state" \
   "$PYTHON" - <<'PYEOF' 2>&1
 import os

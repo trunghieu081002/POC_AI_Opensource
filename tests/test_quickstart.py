@@ -178,3 +178,24 @@ def test_the_bi_spec_names_a_viewer_per_project_by_environment_variable_only():
     assert {p["name"]: [v["username"] for v in p["viewers"]] for p in projects} == {
         "quickstart-sales": ["qs.sales.viewer"], "quickstart-ops": ["qs.ops.viewer"]}
     assert all(set(v) == {"username", "password_env"} for p in projects for v in p["viewers"])
+
+
+def test_the_runner_can_target_an_oracle_linux_8_container_and_says_what_that_does_not_prove():
+    sh = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert "--os ubuntu|ol8" in sh and "m25-disposable-host-ol8.Dockerfile" in sh
+    assert "DPAGENT_PYTHON=/usr/bin/python3.11" in sh                 # EL8's system python is 3.6: never replaced
+    assert "SELinux is NOT exercised" in sh and "no firewall is exercised" in sh
+    assert "SYSTEM PYTHON CHANGED" in sh                              # the system python is compared before/after
+    assert "setenforce" not in sh and "systemctl stop firewalld" not in sh and "disable" not in sh.lower().replace("disabled", "")
+    docker = (ROOT / "scripts/m25-disposable-host-ol8.Dockerfile").read_text()
+    assert docker.startswith("# An Oracle Linux 8.10 userland") and "FROM oraclelinux:8" in docker
+    assert "CONTAINER" in docker and "NOT a native EL8 install" in docker
+
+
+def test_fixture_sql_replace_makes_the_demo_load_repeatable_without_changing_the_default():
+    plain = CliRunner().invoke(cli, ["pipeline", "fixture-sql", str(P / "fixture.yaml")]).output
+    replaced = CliRunner().invoke(cli, ["pipeline", "fixture-sql", str(P / "fixture.yaml"), "--replace"]).output
+    assert "DROP" not in plain
+    assert replaced.splitlines()[:2] == ["BEGIN;", 'DROP TABLE IF EXISTS "orders";']
+    assert replaced.replace('DROP TABLE IF EXISTS "orders";\n', "") == plain
+    assert "--replace" in (Q / "walkthrough.sh").read_text()

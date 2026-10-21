@@ -32,7 +32,7 @@ case "${1:-}" in
     ;;
   source)
     need QS_SRC_NAME QS_SRC_USER QS_SRC_PASSWORD
-    dpagent pipeline fixture-sql "$FX" \
+    dpagent pipeline fixture-sql "$FX" --replace \
       | PGPASSWORD="$QS_SRC_PASSWORD" psql -X -q -v ON_ERROR_STOP=1 -h "${QS_SRC_HOST:-localhost}" \
           -p "${QS_SRC_PORT:-5432}" -U "$QS_SRC_USER" -d "$QS_SRC_NAME"
     ;;

@@ -2,14 +2,14 @@
   "cleanup": {
     "overall": "fail",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_47FE1F90_SRC_DATABASE, DPAGENT_VALIDATE_47FE1F90_SRC_HOST, DPAGENT_VALIDATE_47FE1F90_SRC_PASSWORD, DPAGENT_VALIDATE_47FE1F90_SRC_PORT, DPAGENT_VALIDATE_47FE1F90_SRC_USER, DPAGENT_VALIDATE_47FE1F90_WH_DATABASE, DPAGENT_VALIDATE_47FE1F90_WH_HOST, DPAGENT_VALIDATE_47FE1F90_WH_PASSWORD, DPAGENT_VALIDATE_47FE1F90_WH_PORT, DPAGENT_VALIDATE_47FE1F90_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; dbt models removed; dlt state removed; secrets released: DPAGENT_VALIDATE_FF098405_SRC_DATABASE, DPAGENT_VALIDATE_FF098405_SRC_HOST, DPAGENT_VALIDATE_FF098405_SRC_PASSWORD, DPAGENT_VALIDATE_FF098405_SRC_PORT, DPAGENT_VALIDATE_FF098405_SRC_USER, DPAGENT_VALIDATE_FF098405_WH_DATABASE, DPAGENT_VALIDATE_FF098405_WH_HOST, DPAGENT_VALIDATE_FF098405_WH_PASSWORD, DPAGENT_VALIDATE_FF098405_WH_PORT, DPAGENT_VALIDATE_FF098405_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "not_applicable",
     "source_database": "pass",
     "source_role": "pass",
-    "warehouse_database": "fail: ERROR:  database \"dpagent_fixture_wh_e11480affc\" is being accessed by other users\nDETAIL:  There is 1 other session using the database.",
-    "warehouse_role": "fail: ERROR:  role \"dpagent_fixture_wh_e11480affc\" cannot be dropped because some objects depend on it\nDETAIL:  owner of database dpagent_fixture_wh_e11480affc\n10 objects in database dpagent_fixture_wh_e11480affc"
+    "warehouse_database": "fail: ERROR:  database \"dpagent_fixture_wh_c1ece061df\" is being accessed by other users\nDETAIL:  There is 1 other session using the database.",
+    "warehouse_role": "fail: ERROR:  role \"dpagent_fixture_wh_c1ece061df\" cannot be dropped because some objects depend on it\nDETAIL:  owner of database dpagent_fixture_wh_c1ece061df\n10 objects in database dpagent_fixture_wh_c1ece061df"
   },
-  "clone_name": "m25_monthly_sales__validate__47fe1f90",
+  "clone_name": "m25_monthly_sales__validate__ff098405",
   "comparison": {
     "idempotent": true,
     "run_1": "pass",
@@ -103,13 +103,9 @@
   "overall": "fail",
   "pipeline_hash": "sha256:3a31468a9bb6e219919171129462f023df6b4f2f736c9e1108c662786e71bdaf",
   "recovered_after_scenario": {
-    "databases": [
-      "dpagent_fixture_wh_e11480affc"
-    ],
+    "databases": [],
     "failed": [],
-    "roles": [
-      "dpagent_fixture_wh_e11480affc"
-    ]
+    "roles": []
   },
   "report_version": 2,
   "run_ids": [

@@ -1,0 +1,50 @@
+project: quickstart-bi
+╭─────── plan · ol 8.10 (rhel/dnf) ───────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"deploy", "approved_by": "quickstart.reviewer", "projects": [{"name": 
+"quickstart-sales", "revision": "v1", "bundle_dir": 
+"projects/quickstart-sales/bundle", "expected_file": 
+"projects/quickstart-sales/expected.yaml", "approved_sha256": 
+"2c931bd641ff3eee5576825ac3d57363d86b38109306945ed6b6184daf52d141", "viewers": 
+[{"username": "qs.sales.viewer", "password_env": "QS_SALES_VIEWER_PASSWORD"}]}, 
+{"name": "quickstart-ops", "revision": "v1", "bundle_dir": 
+"projects/quickstart-ops/bundle", "expected_file": 
+"projects/quickstart-ops/expected.yaml", "approved_sha256": 
+"b12aa0540f98272dea00d3e8f165ca75c326dd33b5c455bd2ff90e72afed6cf7", "viewers": 
+[{"username": "qs.ops.viewer", "password_env": "QS_OPS_VIEWER_PASSWORD"}]}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 18191ms
+  verify ok
+      quickstart-sales verified deploy
+      quickstart-ops verified deploy
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+ pack             result 
+ superset-assets  ok     
+verify only proves the component is alive. `dpagent test` proves it works.

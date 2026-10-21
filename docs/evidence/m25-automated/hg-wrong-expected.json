@@ -2,16 +2,16 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "bbb9dc74-0752-4cef-a37e-7b0f918b99a0",
+        "batch_id": "685c8c72-cbbd-49e9-b33a-d442fc715551",
         "loaded_rows": 6,
-        "manifest_sha256": "e70d7e0b28db9206ea6d47f606145213c6c40a4439efab3ae31d66d60da04641",
+        "manifest_sha256": "5e1badc8be4538082fd36341e6b1e53baad5bc0927197f6c0ac2b9946cab53ff",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/c13e1290",
+    "namespace": "dpagent-validate/964d0495",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 2,
@@ -22,14 +22,14 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_C13E1290_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_C13E1290_BRONZE_BUCKET, DPAGENT_VALIDATE_C13E1290_BRONZE_ENDPOINT, DPAGENT_VALIDATE_C13E1290_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_C13E1290_SRC_DATABASE, DPAGENT_VALIDATE_C13E1290_SRC_HOST, DPAGENT_VALIDATE_C13E1290_SRC_PASSWORD, DPAGENT_VALIDATE_C13E1290_SRC_PORT, DPAGENT_VALIDATE_C13E1290_SRC_USER, DPAGENT_VALIDATE_C13E1290_WH_DATABASE, DPAGENT_VALIDATE_C13E1290_WH_HOST, DPAGENT_VALIDATE_C13E1290_WH_PASSWORD, DPAGENT_VALIDATE_C13E1290_WH_PORT, DPAGENT_VALIDATE_C13E1290_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_964D0495_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_964D0495_BRONZE_BUCKET, DPAGENT_VALIDATE_964D0495_BRONZE_ENDPOINT, DPAGENT_VALIDATE_964D0495_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_964D0495_SRC_DATABASE, DPAGENT_VALIDATE_964D0495_SRC_HOST, DPAGENT_VALIDATE_964D0495_SRC_PASSWORD, DPAGENT_VALIDATE_964D0495_SRC_PORT, DPAGENT_VALIDATE_964D0495_SRC_USER, DPAGENT_VALIDATE_964D0495_WH_DATABASE, DPAGENT_VALIDATE_964D0495_WH_HOST, DPAGENT_VALIDATE_964D0495_WH_PASSWORD, DPAGENT_VALIDATE_964D0495_WH_PORT, DPAGENT_VALIDATE_964D0495_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__c13e1290",
+  "clone_name": "hg_dbt_branch__validate__964d0495",
   "comparison": {
     "idempotent": false,
     "run_1": "fail",
@@ -64,28 +64,6 @@
               "column": "dim_artist_sk",
               "failures": 0,
               "models": [
-                "dim_artist"
-              ],
-              "name": "not_null",
-              "severity": "error",
-              "status": "pass",
-              "test": "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e"
-            },
-            {
-              "column": "dim_artist_sk",
-              "failures": 0,
-              "models": [
-                "dim_artist_active"
-              ],
-              "name": "unique",
-              "severity": "error",
-              "status": "pass",
-              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
-            },
-            {
-              "column": "dim_artist_sk",
-              "failures": 0,
-              "models": [
                 "dim_artist_active"
               ],
               "name": "not_null",
@@ -103,6 +81,28 @@
               "severity": "error",
               "status": "pass",
               "test": "test.dwh_hgmedia.unique_dim_artist_dim_artist_sk.dee53748f5"
+            },
+            {
+              "column": "dim_artist_sk",
+              "failures": 0,
+              "models": [
+                "dim_artist"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_dim_artist_sk.dba85bf85e"
+            },
+            {
+              "column": "dim_artist_sk",
+              "failures": 0,
+              "models": [
+                "dim_artist_active"
+              ],
+              "name": "unique",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.unique_dim_artist_active_dim_artist_sk.bda9891951"
             }
           ],
           "untested_models": [],
@@ -111,7 +111,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__c13e1290/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "message": "hg_dbt_branch__validate__964d0495/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
         "required": 4,
@@ -142,17 +142,6 @@
           "status": "passed",
           "tests": [
             {
-              "column": "max_platform_id",
-              "failures": 0,
-              "models": [
-                "mart_artist_summary"
-              ],
-              "name": "not_null",
-              "severity": "error",
-              "status": "pass",
-              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_max_platform_id.fde9405b63"
-            },
-            {
               "column": "distinct_names",
               "failures": 0,
               "models": [
@@ -164,17 +153,6 @@
               "test": "test.dwh_hgmedia.not_null_mart_artist_summary_distinct_names.270bff7db0"
             },
             {
-              "column": "min_platform_id",
-              "failures": 0,
-              "models": [
-                "mart_artist_summary"
-              ],
-              "name": "not_null",
-              "severity": "error",
-              "status": "pass",
-              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_min_platform_id.8aaaeea712"
-            },
-            {
               "column": "artists",
               "failures": 0,
               "models": [
@@ -184,6 +162,28 @@
               "severity": "error",
               "status": "pass",
               "test": "test.dwh_hgmedia.not_null_mart_artist_summary_artists.43325cd272"
+            },
+            {
+              "column": "max_platform_id",
+              "failures": 0,
+              "models": [
+                "mart_artist_summary"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_max_platform_id.fde9405b63"
+            },
+            {
+              "column": "min_platform_id",
+              "failures": 0,
+              "models": [
+                "mart_artist_summary"
+              ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_mart_artist_summary_min_platform_id.8aaaeea712"
             }
           ],
           "untested_models": [],
@@ -192,7 +192,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__c13e1290/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "message": "hg_dbt_branch__validate__964d0495/gold: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
         "required": 4,
@@ -204,7 +204,7 @@
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-8c3bf387bb7c1752",
+  "evidence_id": "ev-61ab8396262cbb63",
   "expected_hash": "sha256:eab6dcdc21f7f4eb4a0f9ca2a51927641d7e97800683d0f6bf3c798330870ad7",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {

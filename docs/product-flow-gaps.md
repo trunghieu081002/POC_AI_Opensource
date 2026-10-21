@@ -20,7 +20,7 @@ are **not** one automated flow; this table says which step an operator can do wi
 | Update | edit files → validate → promote → deploy; BI: new `revision` → validate → new fingerprint → deploy | #46 CLI v1→v2 | — |
 | Undeploy | `pipeline undeploy`; `superset-assets mode: undeploy`; `dpagent rollback <pack>` | matrix, #45, #46 | — |
 | Viewer access | `superset-assets` `projects[].viewers` (username + password env var) | quickstart viewer RBAC PASS `ea2076d` | other chart types, RLS, SSO/LDAP |
-| Native OS | packs declare `debian`, `rhel` | Ubuntu 22.04 systemd containers only | Oracle Linux / RHEL install never exercised |
+| Native OS | packs declare `debian`, `rhel` | Ubuntu 22.04 containers (everything); Oracle Linux 8.10 **container**: quickstart + viewer PASS (`0f1b76a`) | native OL8/RHEL VM install of the full stack not done; SELinux/firewalld not exercised |
 
 ## What a new project has to add (no engine change)
 
@@ -47,5 +47,14 @@ that stays `maturity: draft` until `dpagent promote` — the catalog never claim
    dashboard → update/rerun → status/audit → undeploy, with no test helper approving anything. Two
    links were added: `dpagent pipeline fixture-sql` (demo source data) and dependency-only packs are no longer
    reconfigured with defaults (found by the run).
-2. **Viewer RBAC** — **done** (PASS on `ea2076d`): per-project read-only viewers; API and real-browser checks as the viewer; writes refused with 403; the other project 404.
-3. **Native Oracle Linux** in a clean VM (or clearly labelled container scope).
+2. **Viewer RBAC** — **done** (PASS on `ea2076d`; ownership refusals PASS on `35c5bf4`): per-project read-only viewers; API and real-browser checks as the viewer; writes refused with 403; the other project 404; a squatted role, a foreign member or an extra role is refused with Superset unchanged.
+3. **Oracle Linux 8.10** — **container scope done** (`bash scripts/quickstart-acceptance-ci.sh --os ol8`, PASS on
+   `c006792`, evidence `docs/evidence/quickstart/c006792…-ol8`): six EL8 defects found and fixed (dlt source
+   driver, `pg_isready` preflight, rerun of the demo source, evidence-key permissions, Superset rhel build deps,
+   shared dbt project collision); Ubuntu regression PASS (`9f36534`), bronze matrix 34/34, leaks=0 (`862a71a`).
+   Since then: the seal key is never granted to the journal group (narrow, no-follow grant; key checked before
+   deploy) and Superset runs gthread workers (gevent intermittently dropped a fresh login session -
+   `docs/evidence/superset-login/`); both re-verified: quickstart + viewer PASS on Ubuntu and OL8 (`0f1b76a`),
+   bronze deploy scenarios 6/6, leaks=0 (`4f449c9`, `docs/evidence/m25-subsets/`).
+   **Native VM acceptance not done**: needs a clean VM with a snapshot or a dedicated machine (the shared host is
+   96 % full and its existing VMs are not touched). SELinux enforcing and firewalld were not exercised.

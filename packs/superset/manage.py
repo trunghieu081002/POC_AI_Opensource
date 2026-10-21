@@ -121,6 +121,10 @@ with app.app_context():
     app([str(VENV/"bin/superset"),"init"])
 
 def service():
+    # gthread, not gevent: under gevent, Superset 6.1 intermittently fails to load the user of a session that was
+    # just logged in ("Failed to add user to db session: Class 'werkzeug.local.LocalProxy' is not mapped") and
+    # sends the browser back to /login - 3 of 140 real browser logins (admin as well as viewers); 0 of 100 with
+    # gthread on the same host (docs/evidence/superset-login/).
     host=param("bind_host","127.0.0.1")
     import ipaddress
     ipaddress.ip_address(host)
@@ -134,7 +138,7 @@ User=superset
 Group=superset
 WorkingDirectory=/opt/superset/home
 EnvironmentFile=/opt/superset/superset.env
-ExecStart=/opt/superset/.venv/bin/gunicorn --workers 2 --worker-class gevent --timeout 120 --bind {host}:{port} superset.app:create_app()
+ExecStart=/opt/superset/.venv/bin/gunicorn --workers 2 --worker-class gthread --threads 8 --timeout 120 --bind {host}:{port} superset.app:create_app()
 Restart=on-failure
 RestartSec=5
 UMask=0077

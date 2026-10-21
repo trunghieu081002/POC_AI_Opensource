@@ -21,7 +21,10 @@ DATASET="${NS}_landing_pg"
 
 [ -x "$PYTHON" ] || dp_fail "dlt venv python missing at ${PYTHON}"
 
+# The source URL names its driver (see runtime.py's SRC_URL): SQLAlchemy 2.1 defaults a bare postgresql:// to
+# psycopg v3, which this venv does not install. The destination keeps the plain URL dlt parses itself.
 OUTPUT="$(DP_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${HOST}:${PORT}/${DATABASE}" \
+  DP_SRC_URL="postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${HOST}:${PORT}/${DATABASE}" \
   DP_NS="$NS" DP_DATASET="$DATASET" DP_STATE_DIR="/tmp/${NS}_dlt_state" \
   "$PYTHON" - <<'PYEOF' 2>&1
 import os
@@ -31,7 +34,7 @@ from dlt.sources.sql_database import sql_database
 url = os.environ["DP_URL"]
 ns = os.environ["DP_NS"]
 
-source = sql_database(credentials=url, schema=f"{ns}_src", table_names=["items"])
+source = sql_database(credentials=os.environ["DP_SRC_URL"], schema=f"{ns}_src", table_names=["items"])
 pipeline = dlt.pipeline(
     pipeline_name=f"{ns}_pg_selftest",
     destination=dlt.destinations.postgres(credentials=url),
