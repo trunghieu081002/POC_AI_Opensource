@@ -125,7 +125,7 @@ elif "FROM pg_tables" in sql: print(sum(1 for t in lines("tables") if t == "orde
 elif "pg_database_size" in sql: print(1000)
 '''
 FAKE_SU = r'''#!/usr/bin/env bash
-# su airflow -s /bin/bash -c "... airflow dags list -o plain"
+# sudo -u airflow bash -c "... airflow dags list -o plain"   (deploy._airflow_cli_command)
 [ -n "${FAKE_AIRFLOW_FAIL:-}" ] && { echo "airflow: database is locked (injected)" >&2; exit 1; }
 echo "dag_id | fileloc"; cat "$FAKE_STATE/dags" 2>/dev/null; true
 '''
@@ -162,7 +162,7 @@ def host(tmp_path):
     c["scales"]["unit"] = {"rows": 200, "min_free_disk_gb": 0, "min_available_ram_gb": 0, "timeout_s": 60}
     c["scales"]["huge"] = {"rows": 200, "min_free_disk_gb": 10 ** 9, "min_available_ram_gb": 0, "timeout_s": 60}
     (repo / "test-config.yaml").write_text(yaml.safe_dump(c))
-    for name, body in (("runuser", FAKE_PG), ("su", FAKE_SU), ("dpagent", FAKE_DPAGENT), ("psql", FAKE_PSQL)):
+    for name, body in (("runuser", FAKE_PG), ("sudo", FAKE_SU), ("dpagent", FAKE_DPAGENT), ("psql", FAKE_PSQL)):
         (bin_ / name).write_text(body); (bin_ / name).chmod(0o755)
     (repo / "wt.sh").write_text(FAKE_WALKTHROUGH)
     env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", FAKE_STATE=str(st), BENCH_REPO=str(repo),

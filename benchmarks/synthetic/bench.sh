@@ -36,7 +36,10 @@ timed() {  # timed <label> <command...>: run, keep its log, record wall seconds
   [ "$rc" -eq 0 ] || { tail -30 "$OUT/$label.log"; exit "$rc"; }
 }
 pg() { runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 "$@"; }
-airflow_dags() { su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list -o plain"; }
+airflow_dags() {  # the product's own way to call the Airflow CLI (as `airflow`, with its env file and venv)
+  "$PY" -c 'import subprocess, sys; from dpagent.pipelines import deploy
+sys.exit(subprocess.run(deploy._airflow_cli_command("dags", "list", "-o", "plain")).returncode)'
+}
 
 # ---- 1. refuse before anything exists
 set +e; "$PY" "$B/preflight.py" "$SCALE" --disk-path "$DISK_PATH" --config "$CONFIG" > "$OUT/preflight-host-inside.json"; prc=$?; set -e
