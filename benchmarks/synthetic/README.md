@@ -48,5 +48,8 @@ query failing, an undeploy failing, a failed run after load.
 |---|---|
 | `24b6a7d/20261021T140603Z-smoke` (Ubuntu container; host preflight: 39.1 GB free, 3.1 GB available) | **PASS**: 20,000 rows, 24 months, warehouse = answer key (all 5 checks), cleanup verified, secret scan clean. Pipeline run 32.6 s wall (mostly Airflow scheduling: the journal's stages took 0-1 s at 1 s resolution); generate 0.2 s, load 0.2 s; peak RSS of all processes 4.8 GB (the whole idle stack), minimum available memory 1.9 GB, peak database size 69.5 MB. Not a performance claim: one run, a shared loaded host |
 
+| `a5673d9/20261021T163046Z-smoke` (cleanup registered first, every rc checked) | **FAILED, kept**: benchmark result = answer key, but cleanup **not proven** (exit 5): the DAG audit called the Airflow CLI without Airflow's env file and it failed; the stricter cleanup recorded "unknown" instead of "no DAG". The quickstart's undeploy check had the same call behind `2>/dev/null \| grep -q`, so it could never fail |
+| `83dac62/20261021T164632Z-smoke` (both use the product's Airflow CLI call) | **PASS**: warehouse = answer key (5/5); cleanup proven for all four resources (every removal and audit rc=0, 0 left, the DAG listed by Airflow itself); run 30.3 s wall; peak RSS 4.8 GB; host had 34 GB available. Quickstart + viewer on the same commit: **PASS**, with the fixed DAG check |
+
 What smoke does not show: stage timing needs a larger scale (`small`/`medium`) to be meaningful, and the journal
 records no row count for dbt stages (`rows: null`) - the independent check counts rows itself.

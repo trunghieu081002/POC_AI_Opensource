@@ -1,0 +1,85 @@
+{
+ "ok": true,
+ "created": [
+  "source_table",
+  "warehouse_schemas",
+  "pipeline",
+  "data_file"
+ ],
+ "resources": [
+  {
+   "resource": "source_table",
+   "removed_and_verified": true,
+   "steps": [
+    {
+     "step": "drop",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "audit",
+     "rc": 0,
+     "remaining": "0"
+    }
+   ]
+  },
+  {
+   "resource": "warehouse_schemas",
+   "removed_and_verified": true,
+   "steps": [
+    {
+     "step": "list",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "drop quickstart_sales",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "drop quickstart_sales_landing",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "audit",
+     "rc": 0,
+     "remaining": "0"
+    }
+   ]
+  },
+  {
+   "resource": "pipeline",
+   "removed_and_verified": true,
+   "steps": [
+    {
+     "step": "undeploy",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "audit-dag",
+     "rc": 0,
+     "remaining": "0"
+    }
+   ]
+  },
+  {
+   "resource": "data_file",
+   "removed_and_verified": true,
+   "steps": [
+    {
+     "step": "remove",
+     "rc": 0,
+     "remaining": null
+    },
+    {
+     "step": "audit",
+     "rc": 0,
+     "remaining": "0"
+    }
+   ]
+  }
+ ]
+}

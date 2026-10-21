@@ -1,0 +1,25 @@
+written:
+  /opt/dpagent/pipelines/quickstart_sales/build/dags/quickstart_sales.py
+  /opt/dpagent/pipelines/quickstart_sales/build/models/quickstart_sales/raw/sche
+ma.yml
+  /opt/dpagent/pipelines/quickstart_sales/build/models/quickstart_sales/curated/
+schema.yml
+schema ensured: quickstart_sales
+dbt models published:
+  /opt/dbt/project/models/quickstart_sales/stg_orders.sql
+  /opt/dbt/project/models/quickstart_sales/schema_raw.yml
+  /opt/dbt/project/models/quickstart_sales/fct_monthly_revenue.sql
+  /opt/dbt/project/models/quickstart_sales/schema_curated.yml
+pipeline files published: /opt/dpagent/pipelines/quickstart_sales
+pipeline secrets: synced to Airflow's own environment, airflow-scheduler 
+restarted
+DAG installed: /opt/airflow/home/dags/quickstart_sales.py
+DAG unpaused: a run can start (manual-only DAG)
+deployed
+triggered — dpagent run 5
+waiting up to 1800s for run 5 to finish...
+  quickstart_sales · run 5 ok · started 2026-10-21T17:12:28+00:00   
+ stage    status  rows  gates             started                   
+ landing  passed     6  row_count_bounds  2026-10-21T17:12:36+00:00 
+ raw      passed     -  not_null, unique  2026-10-21T17:12:46+00:00 
+ curated  passed     -  not_null, unique  2026-10-21T17:12:56+00:00 
