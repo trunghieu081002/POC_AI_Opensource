@@ -1,0 +1,1 @@
+{"ok": true, "checks": {"fact_equals_expected": true, "landing_rows": true, "landing_ids_unique": true, "done_orders_total": true, "done_revenue_total": true}, "months": 24, "landing_rows": 20000, "first_mismatch": null, "label": "synthetic benchmark, not HG load"}

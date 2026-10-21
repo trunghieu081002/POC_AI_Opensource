@@ -1,0 +1,135 @@
+{
+ "label": "synthetic benchmark, not HG load",
+ "seed": 20261021,
+ "scale": "smoke",
+ "rows": 20000,
+ "csv_sha256": "dfb4d69021ca10ceda26d2ab571679a27991e9e9eca712fb39449e575cd654cf",
+ "expected": [
+  {
+   "month": "2025-01",
+   "orders": 601,
+   "revenue": "3051646.27"
+  },
+  {
+   "month": "2025-02",
+   "orders": 634,
+   "revenue": "3187324.70"
+  },
+  {
+   "month": "2025-03",
+   "orders": 569,
+   "revenue": "2841418.27"
+  },
+  {
+   "month": "2025-04",
+   "orders": 569,
+   "revenue": "2846904.80"
+  },
+  {
+   "month": "2025-05",
+   "orders": 569,
+   "revenue": "2914696.23"
+  },
+  {
+   "month": "2025-06",
+   "orders": 578,
+   "revenue": "2856185.40"
+  },
+  {
+   "month": "2025-07",
+   "orders": 576,
+   "revenue": "2866268.77"
+  },
+  {
+   "month": "2025-08",
+   "orders": 571,
+   "revenue": "2842077.34"
+  },
+  {
+   "month": "2025-09",
+   "orders": 560,
+   "revenue": "2937449.81"
+  },
+  {
+   "month": "2025-10",
+   "orders": 588,
+   "revenue": "2927881.24"
+  },
+  {
+   "month": "2025-11",
+   "orders": 579,
+   "revenue": "2820155.66"
+  },
+  {
+   "month": "2025-12",
+   "orders": 558,
+   "revenue": "2798218.50"
+  },
+  {
+   "month": "2026-01",
+   "orders": 562,
+   "revenue": "2805221.45"
+  },
+  {
+   "month": "2026-02",
+   "orders": 542,
+   "revenue": "2694479.54"
+  },
+  {
+   "month": "2026-03",
+   "orders": 578,
+   "revenue": "2991426.45"
+  },
+  {
+   "month": "2026-04",
+   "orders": 611,
+   "revenue": "2979619.82"
+  },
+  {
+   "month": "2026-05",
+   "orders": 551,
+   "revenue": "2658682.69"
+  },
+  {
+   "month": "2026-06",
+   "orders": 578,
+   "revenue": "2982850.21"
+  },
+  {
+   "month": "2026-07",
+   "orders": 598,
+   "revenue": "3064045.60"
+  },
+  {
+   "month": "2026-08",
+   "orders": 636,
+   "revenue": "3170100.19"
+  },
+  {
+   "month": "2026-09",
+   "orders": 579,
+   "revenue": "2969725.45"
+  },
+  {
+   "month": "2026-10",
+   "orders": 619,
+   "revenue": "2993390.79"
+  },
+  {
+   "month": "2026-11",
+   "orders": 591,
+   "revenue": "2917529.43"
+  },
+  {
+   "month": "2026-12",
+   "orders": 584,
+   "revenue": "2814876.70"
+  }
+ ],
+ "invariants": {
+  "landing_rows": 20000,
+  "landing_distinct_ids": 20000,
+  "done_orders": 13981,
+  "done_revenue": "69932175.31"
+ }
+}

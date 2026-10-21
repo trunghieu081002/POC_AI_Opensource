@@ -35,3 +35,12 @@ removed by the runner.
   so numbers vary with its load - every result records the host preflight next to it.
 * Scales above `smoke` need a host with the free disk and memory in `config.yaml`; the shared development host
   (disk 96 % full) is not one.
+
+## Runs
+
+| Run | Result |
+|---|---|
+| `24b6a7d/20261021T140603Z-smoke` (Ubuntu container; host preflight: 39.1 GB free, 3.1 GB available) | **PASS**: 20,000 rows, 24 months, warehouse = answer key (all 5 checks), cleanup verified, secret scan clean. Pipeline run 32.6 s wall (mostly Airflow scheduling: the journal's stages took 0-1 s at 1 s resolution); generate 0.2 s, load 0.2 s; peak RSS of all processes 4.8 GB (the whole idle stack), minimum available memory 1.9 GB, peak database size 69.5 MB. Not a performance claim: one run, a shared loaded host |
+
+What smoke does not show: stage timing needs a larger scale (`small`/`medium`) to be meaningful, and the journal
+records no row count for dbt stages (`rows: null`) - the independent check counts rows itself.
