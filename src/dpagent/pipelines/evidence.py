@@ -106,21 +106,37 @@ def _key_path() -> Path:
 
 
 def _load_key(*, create: bool) -> bytes | None:
+    """The key is trusted only as a regular file owned by this (root's) process, mode 0600, opened without
+    following a symlink; the checks are made on the opened descriptor, so what is checked is what is read."""
     path = _key_path()
-    if path.exists():
-        mode = stat.S_IMODE(path.stat().st_mode)
-        if mode & 0o077:
-            raise PermissionError(
-                f"{path} is readable by group/other (mode {oct(mode)}); refusing to trust or "
-                f"use a seal key that others could read. If an older `dpagent pipeline deploy` loosened it "
-                f"(it made the whole journal directory group-writable), restore it once: "
-                f"chmod 600 {path} && chown root:root {path}")
-        return path.read_bytes()
+    restore = f"chmod 600 {path} && chown root:root {path}"
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        fd = None
+    except OSError as exc:   # ELOOP: a symlink
+        raise PermissionError(f"{path} is a symlink or cannot be opened safely ({exc.strerror}); "
+                              f"refusing to use it as the seal key") from None
+    if fd is not None:
+        with os.fdopen(fd, "rb") as handle:
+            st = os.fstat(handle.fileno())
+            mode = stat.S_IMODE(st.st_mode)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                raise PermissionError(f"{path} is not a single regular file; refusing to use it as the seal key")
+            if hasattr(os, "geteuid") and st.st_uid != os.geteuid():
+                raise PermissionError(f"{path} is owned by uid {st.st_uid}, not by this user; refusing to "
+                                      f"trust it. Restore it: {restore}")
+            if mode & 0o077:
+                raise PermissionError(
+                    f"{path} is readable by group/other (mode {oct(mode)}); refusing to trust or "
+                    f"use a seal key that others could read. If an older `dpagent pipeline deploy` loosened it "
+                    f"(it made the whole journal directory group-writable), restore it once: {restore}")
+            return handle.read()
     if not create:
         return None
     path.parent.mkdir(parents=True, exist_ok=True)
     key = os.urandom(32)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "wb") as handle:
         handle.write(key)
     return key
