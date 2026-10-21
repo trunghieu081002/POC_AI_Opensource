@@ -1,0 +1,15 @@
+# Calculated by hand from brd.md and fixture.yaml BEFORE any model ran - the model never sees this file.
+#   2026-01: eligible 1,2,3 (4 cancel, 5 draft)                                  -> 3
+#            delivered 1 (101,102), 2 (103); 3 has only a cancelled delivery + a return -> 2
+#            on time: 1 first delivery 01-07 15:00 <= 01-08 18:00 (102 is later, ignored); 2 delivered 01-13 09:00
+#            = 01-10 09:00 + 72 h (equal is on time)                              -> 2;  2/3 = 66.67 -> 66.7
+#   2026-02: eligible 6,7,8 -> 3; delivered 6 (107; 108 not done), 7 (109), 8 (110; 111 internal) -> 3
+#            on time: 6 02-06 09:00 > 02-05 08:00 late; 7 02-17 23:30:01 > 02-17 23:30:00 late;
+#            8 03-02 10:00 <= 03-03 00:00 on time (counts in February, its order month) -> 1;  1/3 = 33.33 -> 33.3
+#   2026-03: 9 sent, 10 cancel -> no eligible order -> no row.  Picking 112 has no order -> ignored.
+table: fct_delivery_sla
+row_count: 2
+columns: {month: text, eligible_orders: bigint, delivered_orders: bigint, on_time_orders: bigint, on_time_rate: numeric}
+rows:
+  - {month: "2026-01", eligible_orders: 3, delivered_orders: 2, on_time_orders: 2, on_time_rate: "66.7"}
+  - {month: "2026-02", eligible_orders: 3, delivered_orders: 3, on_time_orders: 1, on_time_rate: "33.3"}

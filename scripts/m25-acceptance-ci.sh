@@ -38,7 +38,7 @@ PROFILE=core
 A3=""               # scripted | real: run the A3 LLM-verification driver instead of the matrix
 A3_MAX_CALLS=8
 A3_AMBIGUOUS_RUNS=3
-A3_SUITE=artist      # artist (A3 artist_summary + ambiguous BRD) | khsx | label (owned dbt projects from a template)
+A3_SUITE=artist      # artist (A3 artist_summary + ambiguous BRD) | khsx | label (owned dbt projects from a template) | fulfil (delivery SLA: build + ambiguous + unsupported source; real mode only)
 A3_MAX_REVISIONS=2
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
     --a3) A3="$2"; shift 2 ;;                  # scripted | real (docs/llm-verification.md)
     --max-calls) A3_MAX_CALLS="$2"; shift 2 ;;
     --ambiguous-runs) A3_AMBIGUOUS_RUNS="$2"; shift 2 ;;
-    --a3-suite) A3_SUITE="$2"; shift 2 ;;          # artist | khsx | label (docs/llm-owned-dbt-project.md)
+    --a3-suite) A3_SUITE="$2"; shift 2 ;;          # artist | khsx | label (docs/llm-owned-dbt-project.md) | fulfil
     --max-revisions) A3_MAX_REVISIONS="$2"; shift 2 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
@@ -82,7 +82,7 @@ fi
 # Optional per-run destination keeps failed and successful regression evidence side by side.
 RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/m25-automated}"
 case "$A3" in ""|scripted|real|both) ;; *) echo "--a3 must be scripted, real or both" >&2; exit 2 ;; esac
-case "$A3_SUITE" in artist|khsx|label) ;; *) echo "--a3-suite must be artist, khsx or label" >&2; exit 2 ;; esac
+case "$A3_SUITE" in artist|khsx|label|fulfil) ;; *) echo "--a3-suite must be artist, khsx, label or fulfil" >&2; exit 2 ;; esac
 if [ -n "$A3" ]; then
   RESULTS_DIR="${M25_RESULTS_DIR:-${REPO_ROOT}/docs/evidence/a3-llm}"
   PROFILE=core      # A3 needs no object store
