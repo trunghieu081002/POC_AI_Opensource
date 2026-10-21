@@ -1,0 +1,18 @@
+# Synthetic benchmark of the quickstart_sales pipeline (docs/quickstart.md). NOT HG load: the data is generated,
+# its shape (one orders table, 5 columns) and its distribution are made up, and it says nothing about HG volumes,
+# skew, SLA or timezone. Those come from the data owner.
+label: "synthetic benchmark, not HG load"
+seed: 20261021            # fixed: the same scale always generates byte-identical data and the same expected
+months: ["2025-01", "2026-12"]
+statuses:                 # weight per raw status value; " DONE " exercises the pipeline's normalisation
+  done: 60
+  " DONE ": 10
+  cancelled: 15
+  draft: 15
+amount_cents: [100, 1000000]
+scales:
+  # min_free_disk_gb / min_available_ram_gb: what must be free on the HOST (the stack's own footprint is
+  # already known to fit from the quickstart acceptance); timeout_s bounds the pipeline run.
+  smoke:  {rows: 20000,    min_free_disk_gb: 5,  min_available_ram_gb: 1, timeout_s: 1800}
+  small:  {rows: 1000000,  min_free_disk_gb: 10, min_available_ram_gb: 4, timeout_s: 3600}
+  medium: {rows: 10000000, min_free_disk_gb: 40, min_available_ram_gb: 8, timeout_s: 7200}

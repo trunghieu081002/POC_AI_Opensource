@@ -5,8 +5,9 @@
 # milestone an independent check (tests/quickstart_acceptance/check*.py) compares with hand-calculated values.
 #   inside.sh first    install .. BI deploy with viewer accounts, viewer API checks
 #   inside.sh second   (after the host's viewer browser check) update, rerun, status, undeploy
+#   inside.sh bench S  the synthetic benchmark at scale S instead (benchmarks/synthetic/bench.sh)
 set -euo pipefail
-PHASE="${1:?first|second}"
+PHASE="${1:?first|second|bench}"
 cd /opt/dpagent
 OUT=/root/quickstart-evidence
 mkdir -p "$OUT"
@@ -85,6 +86,11 @@ refused_unchanged() {   # refused_unchanged <label> <command...>: must fail and 
 SALES_TITLE="Quickstart sales: completed orders and revenue by month"
 SALES_TITLE_V2="Quickstart sales (v2): completed orders and revenue by month"
 export QS_BI_APPROVED_BY=quickstart.reviewer
+
+if [ "$PHASE" = bench ]; then   # synthetic benchmark (benchmarks/synthetic/README.md) instead of the acceptance
+  rc=0; bash benchmarks/synthetic/bench.sh "${2:?bench needs a scale}" "$OUT" || rc=$?
+  exit "$rc"
+fi
 
 if [ "$PHASE" = first ]; then
   step 01-install     bash "$W" install

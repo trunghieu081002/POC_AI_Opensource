@@ -3,7 +3,10 @@
 # the committed source, the operator steps of examples/quickstart/walkthrough.sh (product commands only), and
 # independent checks after each milestone (tests/quickstart_acceptance/). No paid model call. Evidence lands in
 # docs/evidence/quickstart/<sha>/<utc>/ (or $QUICKSTART_RESULTS_DIR); failed runs are kept too.
-#   bash scripts/quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8]
+#   bash scripts/quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench smoke|small|medium]
+# --bench SCALE runs the synthetic benchmark (benchmarks/synthetic/README.md - "synthetic benchmark, not HG load")
+# on the same kind of host instead of the acceptance; it is refused (exit 4) before any build if the host's free
+# disk / available memory are below the scale's minimums. Evidence: docs/evidence/benchmark/<sha>/<utc>-<scale>/.
 # --os ol8 runs the SAME acceptance in an Oracle Linux 8.10 CONTAINER (systemd, dnf, EL8 python 3.6): it proves the
 # EL8 userland, not a native install - the container shares the Docker host's kernel and SELinux mode and has no
 # firewalld. The evidence says so (os-scope.txt).
@@ -11,13 +14,17 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 KEEP=0
 OS=ubuntu
+BENCH=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --os) OS="${2:?--os needs ubuntu or ol8}"; shift 2 ;;
-    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8]" >&2; exit 2 ;;
+    --bench) BENCH="${2:?--bench needs a scale}"; shift 2 ;;
+    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE]" >&2; exit 2 ;;
   esac
 done
+case "$BENCH" in ''|[a-z]*) ;; *) echo "invalid --bench scale" >&2; exit 2 ;; esac
+case "$BENCH" in *[!a-z]*) echo "invalid --bench scale" >&2; exit 2 ;; esac
 case "$OS" in
   ubuntu) IMAGE=dpagent-m25-disposable; DOCKERFILE=m25-disposable-host.Dockerfile; SUFFIX="" ;;
   ol8)    IMAGE=dpagent-ol8-disposable;  DOCKERFILE=m25-disposable-host-ol8.Dockerfile; SUFFIX="-ol8" ;;
@@ -27,8 +34,16 @@ command -v docker >/dev/null && docker info >/dev/null
 test -z "$(git -C "$ROOT" status --porcelain --untracked-files=all -- . ':!docs/evidence')" \
   || { echo 'Commit source first: evidence must name a commit' >&2; exit 2; }
 SHA=$(git -C "$ROOT" rev-parse HEAD)
-OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
-mkdir -p "$OUT"
+if [ -n "$BENCH" ]; then
+  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/benchmark/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$BENCH$SUFFIX}
+  mkdir -p "$OUT"
+  PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
+  "$PYH" "$ROOT/benchmarks/synthetic/preflight.py" "$BENCH" --disk-path "$(docker info -f '{{.DockerRootDir}}')" \
+    > "$OUT/preflight-host.json" || { echo "benchmark refused by the host preflight: $(cat "$OUT/preflight-host.json")" >&2; exit 4; }
+else
+  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
+  mkdir -p "$OUT"
+fi
 git -C "$ROOT" rev-parse HEAD 'HEAD^{tree}' > "$OUT/provenance.txt"
 NAME="dpagent-quickstart-acceptance-$$"
 docker build -q -t "$IMAGE" -f "$ROOT/scripts/$DOCKERFILE" "$ROOT" > "$OUT/image.txt"
@@ -84,6 +99,10 @@ else
     apt-get update -qq && apt-get install -y -qq sudo ca-certificates curl openssl python3 python3-venv python3-pip >/dev/null
     DPAGENT_SOURCE_DIR=/opt/src/clean bash /opt/src/clean/scripts/bootstrap.sh
   ' > "$OUT/bootstrap.log" 2>&1
+fi
+if [ -n "$BENCH" ]; then
+  docker exec "$NAME" bash -lc "bash /opt/dpagent/tests/quickstart_acceptance/inside.sh bench $BENCH" 2>&1 | tee "$OUT/run-bench.log"
+  exit 0
 fi
 docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh first' 2>&1 | tee "$OUT/run-first.log"
 
