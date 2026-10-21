@@ -23,9 +23,15 @@ Results land in `docs/evidence/benchmark/<sha>/<utc>-<scale>[-ol8]/bench/`: `mea
 wall seconds per step, peak RSS of all processes, minimum available memory, peak database size),
 `check.json`, `expected.json`, `timings.txt`, `samples.csv` and the logs. The generated data is never kept.
 
-Cleanup (on every exit after setup, verified): the pipeline undeployed (DAG gone), the `quickstart_sales*`
-warehouse schemas dropped, the source table dropped, the data file removed. The disposable host itself is then
-removed by the runner.
+Cleanup is registered before the first resource is created, and each resource is recorded just before the step
+that creates it, so a step failing half way still gets what it created removed: the pipeline (undeploy; audit:
+Airflow's DAG list), the `quickstart_sales*` warehouse schemas (validation clones included), the source table and
+the data file. Every removal and every audit query has its exit code recorded in `cleanup.json`; a query that
+fails is "unknown", never "0 left", and makes the run exit 5 if it would otherwise have passed. The inside
+preflight runs before anything is created (refusal: exit 4, `created: []`). The stack itself belongs to the
+disposable host, which the runner removes. Fault-injection tests (`tests/test_synthetic_benchmark.py`, fake
+host commands): a setup step failing half way, the inside preflight refusing, the Airflow CLI failing, an audit
+query failing, an undeploy failing, a failed run after load.
 
 ## Limits
 

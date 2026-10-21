@@ -100,6 +100,134 @@ def test_preflight_cli_exits_4_when_refused(tmp_path):
 def test_bench_cleans_up_on_any_exit_and_the_runner_preflights_before_building():
     bench = (B / "bench.sh").read_text()
     assert "trap cleanup EXIT" in bench and "DROP SCHEMA" in bench and "dpagent pipeline undeploy" in bench
-    assert bench.index("preflight.py") < bench.index("generate.py")
+    assert bench.index("preflight.py") < bench.index("trap cleanup EXIT") < bench.index("setup-source")
     runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
     assert runner.index("preflight.py") < runner.index("docker build")
+
+
+# ---- bench.sh cleanup under failure, with fake host commands (state kept in files)
+
+FAKE_PG = r'''#!/usr/bin/env python3
+# runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d DB -c SQL   (fake: state in $FAKE_STATE)
+import os, re, sys
+from pathlib import Path
+st = Path(os.environ["FAKE_STATE"]); a = sys.argv
+sql = a[a.index("-c") + 1] if "-c" in a else ""
+def lines(n): p = st / n; return [l for l in p.read_text().split("\n") if l] if p.exists() else []
+def save(n, v): (st / n).write_text("".join(x + "\n" for x in v))
+if os.environ.get("FAKE_PG_FAIL") and re.search(os.environ["FAKE_PG_FAIL"], sql):
+    sys.exit("psql: connection refused (injected)")
+if "SELECT nspname" in sql: print("\n".join(lines("schemas")))
+elif sql.startswith("DROP SCHEMA"): save("schemas", [s for s in lines("schemas") if s != sql.split('"')[1]])
+elif "FROM pg_namespace" in sql: print(len(lines("schemas")))
+elif sql.startswith("DROP TABLE"): save("tables", [t for t in lines("tables") if t != "orders"])
+elif "FROM pg_tables" in sql: print(sum(1 for t in lines("tables") if t == "orders"))
+elif "pg_database_size" in sql: print(1000)
+'''
+FAKE_SU = r'''#!/usr/bin/env bash
+# su airflow -s /bin/bash -c "... airflow dags list -o plain"
+[ -n "${FAKE_AIRFLOW_FAIL:-}" ] && { echo "airflow: database is locked (injected)" >&2; exit 1; }
+echo "dag_id | fileloc"; cat "$FAKE_STATE/dags" 2>/dev/null; true
+'''
+FAKE_DPAGENT = r'''#!/usr/bin/env bash
+case "$1 $2" in
+  "pipeline undeploy") [ -n "${FAKE_UNDEPLOY_FAIL:-}" ] && exit 1; : > "$FAKE_STATE/dags" ;;
+  "pipeline run") [ -n "${FAKE_RUN_FAIL:-}" ] && { echo "run failed (injected)"; exit 1; } ;;
+esac
+'''
+FAKE_WALKTHROUGH = r'''#!/usr/bin/env bash
+# fake product steps: each creates what the real one creates, and can fail half way (FAKE_FAIL_AT=<step>)
+echo "$1" >> "$FAKE_STATE/calls"
+case "$1" in
+  source)   echo orders >> "$FAKE_STATE/tables" ;;
+  validate) echo quickstart_sales__validation_1 >> "$FAKE_STATE/schemas" ;;
+  deploy)   echo quickstart_sales_landing >> "$FAKE_STATE/schemas"; echo quickstart_sales >> "$FAKE_STATE/dags" ;;
+esac
+[ "${FAKE_FAIL_AT:-}" = "$1" ] && { echo "$1 failed half way (injected)"; exit 1; }
+exit 0
+'''
+FAKE_PSQL = "#!/usr/bin/env bash\nexit 0\n"   # the source load
+
+
+@pytest.fixture
+def host(tmp_path):
+    import os
+    import shutil
+    import sys
+    repo, bin_, st, out = (tmp_path / d for d in ("repo", "bin", "state", "out"))
+    for d in (repo, bin_, st, out):
+        d.mkdir()
+    shutil.copytree(B, repo / "benchmarks" / "synthetic")
+    c = yaml.safe_load((B / "config.yaml").read_text())
+    c["scales"]["unit"] = {"rows": 200, "min_free_disk_gb": 0, "min_available_ram_gb": 0, "timeout_s": 60}
+    c["scales"]["huge"] = {"rows": 200, "min_free_disk_gb": 10 ** 9, "min_available_ram_gb": 0, "timeout_s": 60}
+    (repo / "test-config.yaml").write_text(yaml.safe_dump(c))
+    for name, body in (("runuser", FAKE_PG), ("su", FAKE_SU), ("dpagent", FAKE_DPAGENT), ("psql", FAKE_PSQL)):
+        (bin_ / name).write_text(body); (bin_ / name).chmod(0o755)
+    (repo / "wt.sh").write_text(FAKE_WALKTHROUGH)
+    env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", FAKE_STATE=str(st), BENCH_REPO=str(repo),
+               BENCH_WALKTHROUGH=str(repo / "wt.sh"), BENCH_PY=sys.executable, BENCH_CONFIG=str(repo / "test-config.yaml"),
+               BENCH_DATA=str(tmp_path / "orders.csv"), BENCH_JOURNAL=str(tmp_path / "none.db"),
+               BENCH_DISK_PATH=str(tmp_path), QS_SRC_NAME="qs_source", QS_SRC_USER="u", QS_SRC_PASSWORD="p")
+    return {"env": env, "state": st, "out": out, "data": tmp_path / "orders.csv"}
+
+
+def bench(host, scale="unit", **faults):
+    env = dict(host["env"], **{k: "1" if v is True else v for k, v in faults.items()})
+    proc = subprocess.run(["bash", str(B / "bench.sh"), scale, str(host["out"])], env=env,
+                          capture_output=True, text=True, timeout=120)
+    cleanup = json.loads((host["out"] / "bench" / "cleanup.json").read_text())
+    return proc, cleanup
+
+
+def left(host, name):
+    p = host["state"] / name
+    return [l for l in p.read_text().split("\n") if l] if p.exists() else []
+
+
+def test_a_setup_step_failing_half_way_still_gets_everything_it_created_removed(host):
+    proc, cleanup = bench(host, FAKE_FAIL_AT="deploy")          # deploy created the DAG and a schema, then failed
+    assert proc.returncode == 1                                   # the step's failure, not hidden by cleanup
+    assert cleanup["ok"] is True and cleanup["created"] == ["source_table", "warehouse_schemas", "pipeline"]
+    assert left(host, "dags") == [] and left(host, "schemas") == [] and left(host, "tables") == []
+    for r in cleanup["resources"]:
+        assert all(s["rc"] == 0 for s in r["steps"]) and any(s["step"].startswith("audit") for s in r["steps"])
+
+
+def test_the_inside_preflight_refuses_before_anything_is_created(host):
+    proc, cleanup = bench(host, scale="huge")
+    assert proc.returncode == 4
+    assert cleanup == {"ok": True, "created": [], "resources": []}
+    assert not (host["state"] / "calls").exists()                 # no product step ran
+    assert "nothing created" in (host["out"] / "bench" / "steps.log").read_text()
+
+
+def test_a_failing_airflow_cli_is_not_counted_as_the_dag_being_gone(host):
+    proc, cleanup = bench(host, FAKE_FAIL_AT="deploy", FAKE_AIRFLOW_FAIL=True)
+    assert proc.returncode == 1                                   # still the original failure
+    assert cleanup["ok"] is False
+    pipeline = next(r for r in cleanup["resources"] if r["resource"] == "pipeline")
+    audit = next(s for s in pipeline["steps"] if s["step"] == "audit-dag")
+    assert audit["rc"] != 0 and audit["remaining"] == "unknown" and not pipeline["removed_and_verified"]
+    assert "CLEANUP NOT PROVEN" in (host["out"] / "bench" / "steps.log").read_text()
+
+
+def test_a_failing_cleanup_query_is_never_counted_as_nothing_left(host):
+    # the run fails, then the audit query of the source table fails: "unknown", cleanup not proven
+    proc, cleanup = bench(host, FAKE_RUN_FAIL=True, FAKE_PG_FAIL="FROM pg_tables")
+    assert proc.returncode == 1 and cleanup["ok"] is False
+    source = next(r for r in cleanup["resources"] if r["resource"] == "source_table")
+    assert next(s for s in source["steps"] if s["step"] == "audit")["remaining"] == "unknown"
+
+
+def test_a_failed_run_after_load_removes_the_data_file_and_stops_the_sampler(host):
+    proc, cleanup = bench(host, FAKE_RUN_FAIL=True)
+    assert proc.returncode == 1 and cleanup["ok"] is True
+    assert "data_file" in cleanup["created"] and not host["data"].exists()
+    assert left(host, "tables") == [] and left(host, "schemas") == [] and left(host, "dags") == []
+
+
+def test_an_undeploy_failure_is_not_hidden_by_an_empty_dag_list(host):
+    proc, cleanup = bench(host, FAKE_FAIL_AT="deploy", FAKE_UNDEPLOY_FAIL=True)
+    pipeline = next(r for r in cleanup["resources"] if r["resource"] == "pipeline")
+    assert cleanup["ok"] is False and next(s for s in pipeline["steps"] if s["step"] == "undeploy")["rc"] == 1
