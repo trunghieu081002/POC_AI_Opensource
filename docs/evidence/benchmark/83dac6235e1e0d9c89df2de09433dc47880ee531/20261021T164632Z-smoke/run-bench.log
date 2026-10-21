@@ -1,0 +1,19 @@
+setup-install rc=0
+setup-source rc=0
+setup-validate rc=0
+setup-approve rc=0
+setup-deploy rc=0
+generate rc=0
+load rc=0
+run rc=0
+check ok: warehouse equals the generator's answer key ({"ok": true, "checks": {"fact_equals_expected": true, "landing_rows": true, "landing_ids_unique": true, "done_orders_total": true, "done_revenue_total": true}, "months": 24, "landing_rows": 20000, "first_mismatch": null, "label": "synthetic benchmark, not HG load"})
+BENCH PASS (smoke) - synthetic benchmark, not HG load
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to table quickstart_sales.stg_orders
+drop cascades to table quickstart_sales.fct_monthly_revenue
+NOTICE:  drop cascades to 4 other objects
+DETAIL:  drop cascades to table quickstart_sales_landing.orders
+drop cascades to table quickstart_sales_landing._dlt_loads
+drop cascades to table quickstart_sales_landing._dlt_pipeline_state
+drop cascades to table quickstart_sales_landing._dlt_version
+cleanup ok (source_table,warehouse_schemas,pipeline,data_file: every removal rc=0, every audit rc=0 and 0 left)

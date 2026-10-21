@@ -1,0 +1,8 @@
+setup-install 443.2
+setup-source 0.2
+setup-validate 84.8
+setup-approve 0.2
+setup-deploy 32.4
+generate 0.6
+load 0.3
+run 30.3
