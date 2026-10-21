@@ -134,7 +134,25 @@ def _print_validation_steps(report) -> None:
               help="Redraft over an existing draft pipeline of the same name. Refused "
                    "outright if that pipeline is maturity: reviewed - choose a "
                    "different name instead of clobbering real, promoted work.")
-def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, overwrite):
+@click.option("--dbt-template", default="",
+              help="Draft an owned dbt project from pipelines/dbt_templates/<NAME> (docs/llm-owned-dbt-project.md): "
+                   "the template's files are copied verbatim, the model writes pipeline.yaml and models only.")
+@click.option("--dbt-project-path", default="dwh_dbt", show_default=True,
+              help="Where the owned dbt project goes inside the pipeline (with --dbt-template).")
+@click.option("--fixture", "fixture_path", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="Validate the draft for real against this hand-written fixture (with --expected): the same "
+                   "sealed-evidence path as `pipeline validate`. Needs root, like validate.")
+@click.option("--expected", "expected_path", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="The independently calculated expected result. Never shown to the model.")
+@click.option("--max-revisions", type=click.IntRange(0, 5), default=0, show_default=True,
+              help="With --fixture/--expected: re-ask the model at most this many times with what the "
+                   "validators found (never the expected rows) when a draft does not validate.")
+@click.option("--max-calls", type=click.IntRange(1, 50), default=None,
+              help="Hard ceiling on model calls for the whole draft-and-fix loop (required with --fixture).")
+@click.option("--trace-dir", type=click.Path(file_okay=False), default=None,
+              help="Where the loop's trace goes (default: next to dpagent's journal, synth-traces/<name>/<utc>).")
+def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, overwrite, dbt_template,
+              dbt_project_path, fixture_path, expected_path, max_revisions, max_calls, trace_dir):
     """Draft a pipeline from a BRD - a model writes pipeline.yaml + its SQL.
 
     Writes a DRAFT (docs/layer2.md, "Authoring pipelines with a model") -
@@ -143,7 +161,24 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
     BRD is ambiguous about anything that would change the actual numbers, no
     files are written at all - the model is required to ask instead of
     guessing, and this command prints exactly what it needs answered.
+
+    With --fixture/--expected the draft is also validated for real (sealed
+    evidence, like `pipeline validate`) and, with --max-revisions N, re-asked
+    with the validators' findings until it validates or the budget runs out
+    (the A3 loop, llm_verify.run_case). It never approves anything: promote
+    stays a person's step.
     """
+    if bool(fixture_path) != bool(expected_path):
+        fail("--fixture and --expected must be given together")
+    if max_revisions and not fixture_path:
+        fail("--max-revisions needs --fixture/--expected: a re-ask is driven by what validation found")
+    if fixture_path and not max_calls:
+        fail("--fixture needs --max-calls: the draft-and-fix loop needs a hard ceiling on model calls")
+    if dbt_template:
+        try:
+            synth_mod.template_files(dbt_template)       # refuse an unknown template before any model call
+        except synth_mod.DraftRefused as exc:
+            fail(str(exc))
     if not llm.available():
         fail("no LLM credential found. Set GEMINI_API_KEY (free tier at "
             "https://aistudio.google.com/app/apikey) or point DPAGENT_MODEL at "
@@ -163,7 +198,13 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
         warehouse=dict(_STANDARD_WAREHOUSE_REFS, schema=warehouse_schema or name),
         secret_refs=secret_refs,
         hint=hint,
+        dbt_template=dbt_template,
+        dbt_project_path=dbt_project_path,
     )
+    if fixture_path:
+        _synth_and_fix(request, Path(fixture_path), Path(expected_path), overwrite=overwrite,
+                       max_revisions=max_revisions, max_calls=max_calls, trace_dir=trace_dir)
+        return
     try:
         result = synth_mod.synth(request, overwrite=overwrite)
     except (FileExistsError, ValueError, llm.LLMError) as exc:
@@ -198,6 +239,62 @@ def synth_cmd(name, brd_path, schema_path, secrets, warehouse_schema, hint, over
     console.print(f"\n[yellow]This is a draft, maturity: draft.[/yellow] Read every "
                  f"file under {result.root} before `dpagent pipeline promote {name}` - "
                  f"deploy refuses it until then.")
+
+
+def _synth_and_fix(request, fixture_path: Path, expected_path: Path, *, overwrite: bool,
+                   max_revisions: int, max_calls: int, trace_dir) -> None:
+    """Draft -> validate for real -> re-ask with the findings, through the A3 loop itself
+    (llm_verify.run_case): the same feedback rules (never the expected rows), call ceiling,
+    classification and trace as the verification runs. Exit 0 only for a validated draft."""
+    from datetime import datetime, timezone
+    from ..pipelines import llm_verify
+    root = pipelines_mod.PIPELINES_DIR / request.name
+    if root.exists() and not overwrite:
+        fail(f"{root} already exists - pass --overwrite to redraft a draft (an approved pipeline is "
+             f"refused either way)")
+    contract = fixture_mod.load_expected(expected_path)
+    case = llm_verify.Case(dir=fixture_path.parent, name=request.name, kind="build", brd=request.brd,
+                           schema=request.source_schema, request=request, fixture_path=fixture_path,
+                           expected_path=expected_path, required_tests=list(contract.required_dbt_tests),
+                           required_gates=list(contract.required_gates))
+    console.print(f"[dim]drafting {request.name} with[/dim] [magenta]{llm.get_model()}[/magenta] "
+                  f"[dim](at most {max_revisions} re-ask(s), {max_calls} call(s))[/dim]")
+    try:
+        trace, records = llm_verify.run_case(case, pipelines_mod.PIPELINES_DIR, max_calls=max_calls,
+                                             max_revisions=max_revisions)
+    except llm.LLMError as exc:
+        fail(str(exc))
+    out = Path(trace_dir) if trace_dir else (state.DB_PATH.parent / "synth-traces" / request.name /
+                                            datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    try:
+        trace_file = llm_verify.write_trace(trace, records, out)
+    except (OSError, llm_verify.LLMVerifyRefused) as exc:
+        trace_file = None
+        console.print(f"[yellow]trace not written: {exc}[/yellow]")
+
+    table = Table(title=f"{request.name}: {trace.classification}", show_lines=False)
+    for col in ("attempt", "by", "outcome", "detail"):
+        table.add_column(col)
+    for a in trace.attempts:
+        table.add_row(str(a.index), a.source, a.outcome, (a.detail or a.evidence_id or "")[:160])
+    console.print(table)
+    blockers = [b for a in trace.attempts for b in a.blockers]
+    if blockers:
+        console.print(Panel("\n".join(f"[bold]?[/bold] {b['question']}"
+                                       + (f"\n  [dim]{b['why_it_matters']}[/dim]" if b.get("why_it_matters") else "")
+                                       for b in blockers),
+                            title="cannot draft yet - needs clarification", border_style="red", expand=False))
+    console.print(f"[dim]model calls: {len(records)} (ceiling {max_calls})"
+                  + (f"; trace: {trace_file.parent}" if trace_file else "") + "[/dim]")
+    validated = trace.attempts and trace.attempts[-1].outcome == "validated"
+    if not validated:
+        console.print("[red]not validated[/red] - nothing to promote. Read the trace, fix the BRD/schema "
+                      "or the draft by hand, then `dpagent pipeline validate` again.")
+        sys.exit(1)
+    console.print(f"[green]validated[/green] (sealed evidence {trace.attempts[-1].evidence_id}). "
+                  f"Read every file under {pipelines_mod.PIPELINES_DIR / request.name}, then a person "
+                  f"approves it: dpagent pipeline promote {request.name} --fixture {fixture_path} "
+                  f"--expected {expected_path} --approved-by <name>")
 
 
 @pipeline_group.command("fixture-sql")
