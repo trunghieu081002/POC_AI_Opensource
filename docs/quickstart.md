@@ -83,6 +83,21 @@ identities, rerun without duplicates, status, scoped undeploy. Results: `docs/ev
 | After the attempts | the project's dashboard still returns the expected rows (nothing changed) |
 | Real Chromium (pinned Playwright image), logged in as the sales viewer | table renders the expected rows and equals the chart-data response; the select filter gives the filtered row; **no "Edit dashboard" control**; the ops dashboard URL renders no table and fires no successful chart-data request; 3 screenshots |
 | After the v2 update | the viewer still has the same access |
+
+**Ownership refusals** — `35c5bf4/20261021T033819Z` — **PASS** (all of the above again, plus, against the real
+Superset, each one refused with rc=3 and the Superset users/roles/permission counts/asset change times and both
+receipts byte-identical before and after):
+
+| Someone else's change | Refusal (operator message) |
+|---|---|
+| a role `dpagent-viewer-quickstart-sales` created before the first deploy, no receipt records it | "Viewer role not owned by this project" — nothing imported for either project, no viewer account |
+| a foreign user added to `dpagent-viewer-quickstart-ops` after deploy | "Viewer role has foreign members" — neither project redeployed |
+| `Alpha` granted to `qs.ops.viewer` | "Viewer account holds another role" — the account is neither stripped nor deleted |
+
+Every project of the spec is checked before any is deployed or undeployed. The user/role change itself is one
+transaction (unit-tested: Flask-AppBuilder helpers' own commits flush, their swallowed rollbacks stop the change).
+A spec re-applied with identical params is skipped by the engine (no change at all); the run on `67916e5` failed
+exactly there - the check never reached the pack - and is kept.
 | Secrets | no environment-file value and no viewer password in the evidence (scan; viewer auth file removed after the browser run) |
 
 Earlier attempts kept in the same directory tree: `20261018T174439Z` (and one before it) failed in `install`

@@ -1,0 +1,23 @@
+project: quickstart-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with default params (name it in the spec to change it)
+= superset — already installed at v0.1.0 with identical params
+= superset-assets — already installed at v0.1.0 with identical params
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+ pack             result 
+ superset-assets  ok     
+verify only proves the component is alive. `dpagent test` proves it works.

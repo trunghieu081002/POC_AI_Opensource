@@ -153,30 +153,30 @@ class FakeViewers:
     """Stands in for viewers.py: the real check() over an in-memory Superset user/role state."""
 
     def __init__(self):
-        self.role_exists, self.users, self.calls = False, {}, []
+        self.roles, self.users, self.calls = set(), {}, []
         self.fail_ensure = False
 
     def __call__(self, payload):
         self.calls.append(payload["action"])
         members = [u for u, roles in self.users.items() if payload["role"] in roles]
         names = set(payload.get("owned_users") or []) | {u["username"] for u in payload.get("users") or []}
-        viewers.check(payload, state(self.role_exists, members, {u: r for u, r in self.users.items() if u in names}))
+        viewers.check(payload, state(payload["role"] in self.roles, members, {u: r for u, r in self.users.items() if u in names}))
         if payload["action"] == "check":
             return {"role": payload["role"], "checked": True}
         if self.fail_ensure:
             raise RuntimeError("Viewer reconciliation failed: injected")
         if payload["action"] == "remove":
             for u in payload["owned_users"]: self.users.pop(u, None)
-            self.role_exists = False
+            self.roles.discard(payload["role"])
             return {"role": payload["role"], "removed": payload["owned_users"]}
-        self.role_exists = True
+        self.roles.add(payload["role"])
         for u in payload["users"]: self.users[u["username"]] = [payload["role"]]
         return {"role": payload["role"], "users": [u["username"] for u in payload["users"]], "permissions": ["p"]}
 
 
 def snapshot(client, fake, project):
     path = assets.deployment_path(project)
-    return (copy.deepcopy(client.store), copy.deepcopy(fake.users), fake.role_exists,
+    return (copy.deepcopy(client.store), copy.deepcopy(fake.users), set(fake.roles),
             path.read_bytes() if path.exists() else None)
 
 
@@ -198,7 +198,7 @@ def test_receipt_records_the_role_and_redeploy_owns_it(monkeypatch, project):
 
 
 def test_a_squatted_role_is_refused_before_any_asset_is_imported(monkeypatch, project):
-    fake = FakeViewers(); fake.role_exists = True; fake.users = {"someone": [ROLE]}
+    fake = FakeViewers(); fake.roles = {ROLE}; fake.users = {"someone": [ROLE]}
     monkeypatch.setattr(assets, "run_viewers", fake)
     client = _assets_tests.FakeClient(project["binding"])
     before = snapshot(client, fake, project)
@@ -249,5 +249,37 @@ def test_a_failed_viewer_change_after_import_restores_assets_and_keeps_the_recei
 def test_a_clean_undeploy_removes_the_viewers_and_role(monkeypatch, project):
     client, fake = deploy_ok(monkeypatch, project)
     assets.undeploy(client, project["name"])
-    assert fake.users == {} and fake.role_exists is False
+    assert fake.users == {} and fake.roles == set()
     assert not any(client.lookup(project["resources"]).values())
+
+
+# ---- several projects in one spec: refuse before ANY of them changes
+
+@pytest.fixture
+def two(project, tmp_path):
+    fixture.create(tmp_path / "projects" / "other", "other", "public", "other_gold")
+    config = {"name": "other", "bundle_dir": "projects/other/bundle", "expected_file": "projects/other/expected.yaml",
+              "viewers": [{"username": "other.viewer", "password_env": "RETAIL_VIEWER_PASSWORD"}]}
+    other = assets.read_project(config, project["binding"])
+    other["config"]["approved_sha256"] = other["fingerprint"]
+    return project, other
+
+
+def test_one_refused_project_leaves_the_other_projects_of_the_spec_untouched(monkeypatch, two):
+    project, other = two
+    fake = FakeViewers(); monkeypatch.setattr(assets, "run_viewers", fake)
+    client = _assets_tests.FakeClient(project["binding"])
+    assets.deploy_all(client, [project, other], "operator")
+    fake.users["intruder"] = ["dpagent-viewer-other"]          # someone joins the SECOND project's role
+    before = snapshot(client, fake, project), snapshot(client, fake, other); imports = client.imports
+    for project_ in (project, other):                           # a reviewed change to both
+        project_["content"][next(k for k in project_["content"] if k.startswith("charts/"))]["slice_name"] = "v2"
+        project_["fingerprint"] = "e" * 64; project_["config"]["approved_sha256"] = project_["fingerprint"]
+    with pytest.raises(viewers.Refused, match="intruder"):
+        assets.deploy_all(client, [project, other], "operator")
+    assert client.imports == imports                            # the first project was not deployed either
+    assert (snapshot(client, fake, project), snapshot(client, fake, other)) == before
+    with pytest.raises(viewers.Refused, match="intruder"):
+        assets.undeploy_all(client, ["retail", "other"])
+    assert (snapshot(client, fake, project), snapshot(client, fake, other)) == before
+    assert json.loads(assets.deployment_path(project).read_text())["status"] == "deployed"

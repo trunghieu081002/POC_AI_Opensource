@@ -1,0 +1,147 @@
+project: quickstart-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+= superset — already installed at v0.1.0 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "approved_by": "quickstart.reviewer", "projects": [{"name": 
+"quickstart-sales", "revision": "v2", "bundle_dir": 
+"projects/quickstart-sales/bundle", "expected_file": 
+"projects/quickstart-sales/expected.yaml", "approved_sha256": "", "viewers": 
+[{"username": "qs.sales.viewer", "password_env": "QS_SALES_VIEWER_PASSWORD"}]}, 
+{"name": "quickstart-ops", "revision": "v1", "bundle_dir": 
+"projects/quickstart-ops/bundle", "expected_file": 
+"projects/quickstart-ops/expected.yaml", "approved_sha256": "", "viewers": 
+[{"username": "qs.ops.viewer", "password_env": "QS_OPS_VIEWER_PASSWORD"}]}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 3885ms
+  verify ok
+      quickstart-sales verified validate
+      quickstart-ops verified validate
+
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 491ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 18ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 38ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 170ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 13ms
+  base: 4 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 482ms
+  checks
+    PASS A row written is the same row read back 494ms
+    PASS Committed data is still there after a service restart 15011ms
+    PASS A wrong password is refused (negative) 399ms
+    PASS Every database in the spec accepts a connection and a write 982ms
+    PASS The running server reports the port and limits that were asked for 
+331ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 42ms
+  teardown
+    PASS Remove everything the suite created 910ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 5739ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 27ms
+  python-modern: 2 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+651ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 371ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 677ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1956ms
+    PASS Restart preserves the same unique metadata connection and query result 
+10797ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 525ms
+  superset: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset-assets                                                              │
+│ Native BI approval, independent chart/filter results, stable identities and  │
+│ scoped removal                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create two namespaced warehouse fixtures and record metadata baseline 
+573ms
+  checks
+    PASS Reject deployment without content-bound approval before any mutation 
+(negative) 415ms
+    PASS Compare two saved charts and native filters with independent SQL and 
+literal expected 6226ms
+    PASS Repeat deployment without changing the exact native UUID and ID sets 
+5370ms
+    PASS Reject wrong expected without altering approval and remove validation 
+clones (negative) 1620ms
+    PASS Update content with stable IDs and remove only one project 2553ms
+  teardown
+    PASS Verify native metadata baseline and remove only owned warehouse fixture
+tables 647ms
+  superset-assets: 5 checks passed
+
+╭─────────── acceptance ────────────╮
+│  suite            result  checks  │
+│  base             passed     4/4  │
+│  postgres         passed     6/6  │
+│  python-modern    passed     2/2  │
+│  superset         passed     4/4  │
+│  superset-assets  passed     5/5  │
+╰───────────────────────────────────╯
+╭────────────────────────────────────╮
+│ installed and proven working       │
+│ install run 14 · acceptance run 15 │
+╰────────────────────────────────────╯
+review /var/lib/dpagent-bi-assets/quickstart-sales/validation.json, then approve its fingerprint:
+quickstart-sales status=pass fingerprint=6cfd654d3ad54764e055afa66c44ef18fe471d1da2022fb959af874630b40a2c
+review /var/lib/dpagent-bi-assets/quickstart-ops/validation.json, then approve its fingerprint:
+quickstart-ops status=pass fingerprint=b12aa0540f98272dea00d3e8f165ca75c326dd33b5c455bd2ff90e72afed6cf7

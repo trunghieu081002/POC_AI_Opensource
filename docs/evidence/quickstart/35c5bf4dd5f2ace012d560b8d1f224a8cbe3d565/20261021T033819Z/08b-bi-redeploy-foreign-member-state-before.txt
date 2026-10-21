@@ -1,0 +1,21 @@
+chart 19ad462c-b544-5246-b4ff-255f81069fd6 2026-10-21 03:57:15.864656
+chart d499d4da-5459-548e-8cd7-192d248c445a 2026-10-21 03:57:01.722481
+dashboard 4f2b6e97-1555-55f6-8287-b1f86e4f9403 2026-10-21 03:57:15.874834
+dashboard 71b1389c-7d6e-5622-bc93-87d3b1e0470f 2026-10-21 03:57:01.730249
+dataset 3642e01b-2cc8-5ea9-a57d-e6cf3e263132 2026-10-21 03:57:01.669427
+dataset 41576b64-580a-5fa3-92e5-63ead1615663 2026-10-21 03:57:15.813482
+role Admin perms=226
+role Alpha perms=117
+role Gamma perms=95
+role Public perms=0
+role dpagent-viewer-quickstart-ops perms=77
+role dpagent-viewer-quickstart-sales perms=77
+role sql_lab perms=30
+user admin active=true pw=d9b43987eed1de6d22e91434f06e4d5a roles=Admin
+user foreign.member active=true pw=d41d8cd98f00b204e9800998ecf8427e roles=dpagent-viewer-quickstart-ops
+user qs.ops.viewer active=true pw=c7799cdfed78dd2d4f29d18d8c310d1f roles=dpagent-viewer-quickstart-ops
+user qs.sales.viewer active=true pw=239c1ff7d77a06748586994e2c932a2c roles=dpagent-viewer-quickstart-sales
+fb3aa95c7d8d70fbefe5087d2652ee9811944d7338c1e127e524382583e9feac  /var/lib/dpagent-bi-assets/dpagent_selftest_7-1/deployment.json
+a50763fb25c0ac021fc35ab8dfc355c89f1210f54948388c18db17baadbaa2a4  /var/lib/dpagent-bi-assets/dpagent_selftest_7-2/deployment.json
+8709751893494b4a08c6a478cf68ec40b24a6961eb48b93129f07f908410c515  /var/lib/dpagent-bi-assets/quickstart-ops/deployment.json
+aee30637700ce6ed137cb5b62b86d0bec0550e21228f0c92dd8169eab682a7ba  /var/lib/dpagent-bi-assets/quickstart-sales/deployment.json
