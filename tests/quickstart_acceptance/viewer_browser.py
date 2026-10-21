@@ -58,11 +58,22 @@ try:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
         page.goto(BASE + "/login/", wait_until="networkidle")
+        login_responses = []
+        page.on("response", lambda r: login_responses.append({"url": r.url.replace(BASE, ""), "status": r.status})
+                if "/login" in r.url and r.request.method == "POST" else None)
         page.locator("#username").fill(AUTH["username"]); page.locator("#password").fill(AUTH["password"])
         page.get_by_role("button", name=re.compile("Sign In|Log in|Login", re.I)).first.click()
-        page.wait_for_load_state("networkidle")
-        if "/login" in page.url:
+        # The login form posts, then navigates: wait for the navigation itself (a networkidle right after the
+        # click can return before it starts on a loaded host). Login must still succeed - only the wait changed.
+        try:
+            page.wait_for_url(lambda url: "/login" not in url, timeout=60000)
+        except Exception:
+            page.screenshot(path=str(OUT / "login-failed.png"))
+            report["login"] = {"url": page.url.replace(BASE, ""), "posts": login_responses,
+                               "messages": [t.strip() for t in page.locator(
+                                   ".alert, [role=alert], .ant-alert, .ant-message").all_text_contents()][:5]}
             raise AssertionError("viewer login failed")
+        page.wait_for_load_state("networkidle")
         responses, statuses = [], []
 
         def record(resp):
