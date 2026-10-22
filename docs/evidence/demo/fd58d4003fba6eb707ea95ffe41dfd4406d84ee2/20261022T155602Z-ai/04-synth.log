@@ -1,0 +1,31 @@
+drafting fulfilment_sla with gemini/gemini-3.8-flash (at most 2 re-ask(s), 5 
+call(s))
+16:10:50 - LiteLLM:WARNING: vertex_and_google_ai_studio_gemini.py:1152 - DeprecationWarning: `temperature`, `top_p`, and `top_k` continue to function for Gemini 3+ (gemini-3.8-flash) but are planned for removal in a future release. Move sampling guidance into the `system` instructions instead.
+16:16:35 - LiteLLM:WARNING: vertex_and_google_ai_studio_gemini.py:1152 - DeprecationWarning: `temperature`, `top_p`, and `top_k` continue to function for Gemini 3+ (gemini-3.8-flash) but are planned for removal in a future release. Move sampling guidance into the `system` instructions instead.
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm.turn_on_debug()'.
+
+               fulfilment_sla: inconclusive-provider-unavailable                
+┏━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ attempt ┃ by           ┃ outcome              ┃ detail                       ┃
+┡━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1       │ llm          │ policy-fail          │ the pipeline does not meet   │
+│         │              │                      │ the requirement:             │
+│         │              │                      │ required a `unique` gate on  │
+│         │              │                      │ sale_order ['id'] in stage   │
+│         │              │                      │ 'landing': not declared      │
+│         │              │                      │ required a `unique` gate on  │
+│         │              │                      │ stock_pic                    │
+│ 2       │ llm-revision │ provider-unavailable │ ProviderUnavailable:         │
+│         │              │                      │ gemini/gemini-3.8-flash call │
+│         │              │                      │ failed:                      │
+│         │              │                      │ litellm.ServiceUnavailableE… │
+│         │              │                      │ GeminiException - {          │
+│         │              │                      │   "error": {                 │
+│         │              │                      │     "code": 503,             │
+│         │              │                      │     "message": "Thi          │
+└─────────┴──────────────┴──────────────────────┴──────────────────────────────┘
+model calls: 2 (ceiling 5); trace: /root/quickstart-evidence/ai-trace
+not validated - nothing to promote. Read the trace, fix the BRD/schema or the 
+draft by hand, then `dpagent pipeline validate` again.

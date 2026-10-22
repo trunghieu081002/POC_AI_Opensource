@@ -1,0 +1,82 @@
+name: fulfilment_sla
+summary: Monthly delivery SLA report tracking order fulfilment timeliness
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${FS_SRC_HOST}
+    port: ${FS_SRC_PORT}
+    database: ${FS_SRC_NAME}
+    user: ${FS_SRC_USER}
+    password: ${FS_SRC_PASSWORD}
+  tables:
+  - sale_order
+  - stock_picking
+warehouse:
+  host: ${WAREHOUSE_DB_HOST:-localhost}
+  port: ${WAREHOUSE_DB_PORT:-5432}
+  database: ${WAREHOUSE_DB_NAME:-warehouse}
+  user: ${WAREHOUSE_DB_USER}
+  password: ${WAREHOUSE_DB_PASSWORD}
+  schema: fulfilment_sla
+stages:
+- name: landing
+  gates:
+  - type: schema_contract
+    tables:
+      sale_order:
+        id: bigint
+        name: text
+        state: text
+        date_order: timestamp without time zone
+        commitment_date: timestamp without time zone
+      stock_picking:
+        id: bigint
+        sale_id: bigint
+        picking_type: text
+        state: text
+        date_done: timestamp without time zone
+- name: raw
+  engine: dbt
+  depends_on: landing
+  models:
+  - stg_sale_orders
+  - stg_stock_pickings
+  gates:
+  - type: unique
+    table: stg_sale_orders
+    columns:
+    - id
+  - type: not_null
+    table: stg_sale_orders
+    columns:
+    - id
+    - state
+    - date_order
+  - type: unique
+    table: stg_stock_pickings
+    columns:
+    - id
+  - type: not_null
+    table: stg_stock_pickings
+    columns:
+    - id
+    - picking_type
+    - state
+- name: curated
+  engine: dbt
+  depends_on: raw
+  models:
+  - fct_delivery_sla
+  gates:
+  - type: unique
+    table: fct_delivery_sla
+    columns:
+    - month
+  - type: not_null
+    table: fct_delivery_sla
+    columns:
+    - month
+    - eligible_orders
+    - delivered_orders
+    - on_time_orders
+    - on_time_rate
