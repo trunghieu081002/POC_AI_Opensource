@@ -74,7 +74,12 @@ elif [ -n "$DEMO" ]; then
   if [ "$DEMO" = ai ]; then
     # one tiny call before any host is built: key, model name, quota (not part of the run's call budget)
     PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
-    ( cd "$ROOT" && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src "$PYH" -m dpagent.pipelines.llm_verify probe ) > "$OUT/probe.json" 2>&1 \
+    # llm_verify probe: at most DEMO_PROBE_ATTEMPTS calls (default 2) counting retries; only a transient answer
+    # (503/429/timeout) is retried - a key, model-name or quota error stops at once
+    ( cd "$ROOT" && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src "$PYH" -c 'import json, os, sys
+from dpagent.pipelines.llm_verify import probe
+r = probe(attempts=int(os.environ.get("DEMO_PROBE_ATTEMPTS", "2")), wait_s=30)
+print(json.dumps(r, indent=1)); sys.exit(0 if r.get("ok") else 1)' ) > "$OUT/probe.json" 2>&1 \
       || { cat "$OUT/probe.json"; echo "the model probe failed - fix the key / model name / quota first; nothing was built" >&2; exit 2; }
   fi
 else

@@ -122,4 +122,5 @@ def test_refusals_are_checked_by_exact_code_and_reason_and_bad_data_by_run_id():
     assert 'check_run.py blocked "$RUN"' in inside and "check_run.py schedule" in inside
     assert 'grep -q "^model " "$OUT/draft-origin.txt"' in inside          # an ai run never falls back silently
     runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
-    assert runner.index("llm_verify probe") < runner.index("docker build")
+    assert runner.index("from dpagent.pipelines.llm_verify import probe") < runner.index("docker build")
+    assert 'DEMO_PROBE_ATTEMPTS", "2"' in runner
