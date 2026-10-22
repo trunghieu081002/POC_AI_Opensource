@@ -29,15 +29,19 @@ fi
 grep -q change-me "$ENV" && { echo "unfilled value in the environment file" >&2; exit 2; }
 set -a; . "$ENV"; set +a
 scan_secrets() {   # no secret value from the environment file or the model credential may reach the evidence
-  local rc=$?
-  { while IFS='=' read -r key value; do
-      case "$key" in *PASSWORD*|*SECRET*) printf '%s\n' "$value" ;; esac
-    done < "$ENV"
-    for v in GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY; do [ -n "${!v:-}" ] && printf '%s\n' "${!v}"; done
-  } | while IFS= read -r value; do
+  local rc=$? value key found=""
+  local -a values=()
+  while IFS='=' read -r key value; do
+    case "$key" in *PASSWORD*|*SECRET*) values+=("$value") ;; esac
+  done < "$ENV"
+  for key in GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY; do
+    if [ -n "${!key:-}" ]; then values+=("${!key}"); fi
+  done
+  for value in "${values[@]}"; do
     [ ${#value} -ge 8 ] || continue
-    if grep -rqF -- "$value" "$OUT"; then echo "a secret value found in evidence - evidence removed" >&2; rm -rf "$OUT"; exit 99; fi
-  done || exit 99
+    if grep -rqF -- "$value" "$OUT"; then found=1; fi
+  done
+  if [ -n "$found" ]; then echo "a secret value found in evidence - evidence removed" >&2; rm -rf "$OUT"; exit 99; fi
   echo "secret scan ($PHASE): no environment-file secret or model credential in evidence" >> "$OUT/steps.log"
   exit "$rc"
 }
