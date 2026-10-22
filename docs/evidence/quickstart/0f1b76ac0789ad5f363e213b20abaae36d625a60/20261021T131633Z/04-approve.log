@@ -1,0 +1,8 @@
+╭─ approving quickstart_sales means having read every line of these 3 file(s) ─╮
+│   · models/fct_monthly_revenue.sql                                           │
+│   · models/stg_orders.sql                                                    │
+│   · pipeline.yaml                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+quickstart_sales is now maturity: reviewed (approved by 'quickstart.reviewer' at
+2026-10-21T13:28:49+00:00, evidence ev-69b047e1773b9bb1) - `dpagent pipeline 
+deploy quickstart_sales` will apply it for real.

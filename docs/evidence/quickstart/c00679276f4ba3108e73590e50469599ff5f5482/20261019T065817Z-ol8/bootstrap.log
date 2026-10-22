@@ -1,0 +1,53 @@
+[36m::[0m detected Oracle Linux Server 8.10 (rhel family)
+[36m::[0m refreshing the package index
+Oracle Linux 8 BaseOS Latest (x86_64)           179 kB/s | 4.3 kB     00:00    
+Oracle Linux 8 Application Stream (x86_64)      161 kB/s | 4.5 kB     00:00    
+Metadata cache created.
+[36m::[0m installing certificates and a downloader
+Last metadata expiration check: 0:00:07 ago on Mon Oct 19 07:00:21 2026.
+Package ca-certificates-2025.2.80_v9.0.304-80.2.el8_10.noarch is already installed.
+Dependencies resolved.
+Nothing to do.
+Complete!
+[36m::[0m installing python and build prerequisites
+Last metadata expiration check: 0:00:13 ago on Mon Oct 19 07:00:21 2026.
+Package python36-3.6.8-39.module+el8.10.0+90473+c30184f9.x86_64 is already installed.
+Package python3-pip-9.0.3-24.el8.noarch is already installed.
+Package tar-2:1.30-13.el8_10.x86_64 is already installed.
+Package gzip-1.9-15.el8_10.x86_64 is already installed.
+Dependencies resolved.
+Nothing to do.
+Complete!
+[32mok[0m python 3.11 (/usr/bin/python3.11)
+[36m::[0m installing from the local source at /opt/src/clean (no network fetch)
+[36m::[0m creating the virtualenv
+[32mok[0m dpagent installed
+dpagent, version 0.4.0
+
+Everything else the packs need — locale, ss, fuser, a synced clock — is itself a
+pack. Install it first and the rest stop failing in confusing ways:
+
+  sudo -E dpagent install base
+
+Then:
+
+  dpagent info                                  what it detected and can install
+  dpagent packs                                 the pack library
+  sudo -E dpagent install postgres --dry-run    print every command, run nothing
+  sudo -E dpagent install postgres              install, then prove it works
+
+An install is not reported as successful until its acceptance suite passes.
+'dpagent status' shows anything that is installed but unproven.
+
+Installing needs no API key. A model is only involved in three places: routing a
+plain-language request (dpagent do), drafting a pack for a tool with no pack yet
+(dpagent synth), and proposing a catalog entry for a failure nothing matched:
+  sudo /opt/dpagent/.venv/bin/pip install -e '/opt/dpagent[llm]'   # litellm - once
+
+  cp /opt/dpagent/.env.example /opt/dpagent/.env
+  $EDITOR /opt/dpagent/.env                        # GEMINI_API_KEY is free; quote
+                                                 # any value with spaces or $/*
+  set -a; source /opt/dpagent/.env; set +a
+
+Note the -E in 'sudo -E': it keeps your environment, which is how ${SECRETS}
+referenced by a project.yaml and any http_proxy settings reach the agent.

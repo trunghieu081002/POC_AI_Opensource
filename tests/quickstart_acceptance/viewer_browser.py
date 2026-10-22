@@ -58,11 +58,31 @@ try:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
         page.goto(BASE + "/login/", wait_until="networkidle")
+        login_responses = []   # every document/xhr response from the click on: method, url, status, redirect target
+        page.on("response", lambda r: login_responses.append(
+            {"method": r.request.method, "url": r.url.replace(BASE, ""), "status": r.status,
+             "location": (r.headers.get("location") or "").replace(BASE, "")})
+            if r.request.resource_type in ("document", "xhr", "fetch") else None)
         page.locator("#username").fill(AUTH["username"]); page.locator("#password").fill(AUTH["password"])
         page.get_by_role("button", name=re.compile("Sign In|Log in|Login", re.I)).first.click()
-        page.wait_for_load_state("networkidle")
-        if "/login" in page.url:
+        # The login form posts, then navigates: wait for the navigation itself (a networkidle right after the
+        # click can return before it starts on a loaded host). Login must still succeed - only the wait changed.
+        try:
+            page.wait_for_url(lambda url: "/login" not in url, timeout=60000)
+        except Exception:
+            page.screenshot(path=str(OUT / "login-failed.png"))
+            me = page.request.get(BASE + "/api/v1/me/")   # the browser's own session: logged in at all?
+            report["login"] = {"url": page.url.replace(BASE, ""), "responses": login_responses[:20],
+                               "me_status": me.status, "me": (me.text()[:300] if me.ok else None),
+                               "cookies": sorted(c["name"] for c in page.context.cookies()),
+                               "messages": [t.strip() for t in page.locator(
+                                   ".alert, [role=alert], .ant-alert, .ant-message, .ant-notification"
+                               ).all_text_contents()][:5],
+                               "bootstrap_flash": page.evaluate(
+                                   "() => { try { return JSON.parse(document.getElementById('app')"
+                                   ".dataset.bootstrap).common.flash_messages } catch (e) { return String(e) } }")}
             raise AssertionError("viewer login failed")
+        page.wait_for_load_state("networkidle")
         responses, statuses = [], []
 
         def record(resp):

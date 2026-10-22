@@ -538,3 +538,32 @@ def test_single_host_connectors_are_not_patched(root, source):
     needless behaviour change for connectors that were never the problem."""
     script = _script_for(root, source)
     assert "_dp_ipv4_preferring_getaddrinfo" not in script
+
+
+def test_a_postgres_source_url_names_its_driver_while_the_destination_stays_plain(monkeypatch, tmp_path):
+    """SQLAlchemy 2.1 changed what a bare `postgresql://` means from psycopg2 to psycopg (v3), which the dlt
+    venv does not install. dlt's venv resolves SQLAlchemy 2.1 on Python >= 3.11 (found on Oracle Linux 8), so the
+    SOURCE url must say psycopg2; the DESTINATION url is parsed by dlt's own postgres destination and stays plain."""
+    from pathlib import Path
+    from dpagent.engine import state
+    from dpagent.pipelines import loader, runtime
+
+    monkeypatch.setattr(state, "DB_PATH", tmp_path / "state.db")
+    state.close()
+    seen = {}
+
+    def fake_run(cmd, *, env=None, **kw):
+        seen.update(env or {})
+        import subprocess
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(runtime, "_run", fake_run)
+    monkeypatch.setattr(runtime, "_dlt_python", lambda: "python")
+    for key in ("HG_POC_SOURCE_HOST", "HG_POC_SOURCE_NAME", "HG_POC_SOURCE_USER", "HG_POC_SOURCE_PASSWORD",
+                "HG_POC_WH_USER", "HG_POC_WH_PASSWORD"):
+        monkeypatch.setenv(key, "x")
+    pipeline = loader.load("quickstart_sales", Path(__file__).resolve().parents[1] / "pipelines")
+    for key in ("QS_SRC_NAME", "QS_SRC_USER", "QS_SRC_PASSWORD", "QS_WH_USER", "QS_WH_PASSWORD"):
+        monkeypatch.setenv(key, "value-" + key.lower())
+    runtime._run_extract(pipeline, "quickstart_sales", None)
+    assert seen["SRC_URL"].startswith("postgresql+psycopg2://")
+    assert seen["DEST_URL"].startswith("postgresql://") and "+psycopg" not in seen["DEST_URL"]

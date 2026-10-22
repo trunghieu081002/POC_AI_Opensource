@@ -5,8 +5,9 @@
 # milestone an independent check (tests/quickstart_acceptance/check*.py) compares with hand-calculated values.
 #   inside.sh first    install .. BI deploy with viewer accounts, viewer API checks
 #   inside.sh second   (after the host's viewer browser check) update, rerun, status, undeploy
+#   inside.sh bench S  the synthetic benchmark at scale S instead (benchmarks/synthetic/bench.sh)
 set -euo pipefail
-PHASE="${1:?first|second}"
+PHASE="${1:?first|second|bench}"
 cd /opt/dpagent
 OUT=/root/quickstart-evidence
 mkdir -p "$OUT"
@@ -85,6 +86,11 @@ refused_unchanged() {   # refused_unchanged <label> <command...>: must fail and 
 SALES_TITLE="Quickstart sales: completed orders and revenue by month"
 SALES_TITLE_V2="Quickstart sales (v2): completed orders and revenue by month"
 export QS_BI_APPROVED_BY=quickstart.reviewer
+
+if [ "$PHASE" = bench ]; then   # synthetic benchmark (benchmarks/synthetic/README.md) instead of the acceptance
+  rc=0; bash benchmarks/synthetic/bench.sh "${2:?bench needs a scale}" "$OUT" || rc=$?
+  exit "$rc"
+fi
 
 if [ "$PHASE" = first ]; then
   step 01-install     bash "$W" install
@@ -188,8 +194,11 @@ check after-undeploy-ops check.py bi-absent quickstart-ops
 v=$(runuser -u postgres -- psql -X -At -d superset_meta -c \
   "SELECT (SELECT count(*) FROM ab_user WHERE username LIKE 'qs.%') + (SELECT count(*) FROM ab_role WHERE name LIKE 'dpagent-viewer-%')")
 [ "$v" = 0 ] || { echo "viewer accounts/roles remain after undeploy ($v)" >&2; exit 1; }
-if su airflow -s /bin/bash -c "AIRFLOW_HOME=/opt/airflow/home /opt/airflow/.venv/bin/airflow dags list 2>/dev/null" | grep -q quickstart_sales; then
-  echo "DAG still present after undeploy" >&2; exit 1; fi
+# the product's own Airflow CLI call (env file + venv); a failing CLI is an error, never "no DAG"
+dags=$("$PY" -c 'import subprocess, sys; from dpagent.pipelines import deploy
+sys.exit(subprocess.run(deploy._airflow_cli_command("dags", "list", "-o", "plain")).returncode)' 2>"$OUT/dags-list.err") \
+  || { cat "$OUT/dags-list.err"; echo "could not list Airflow's DAGs after undeploy" >&2; exit 1; }
+if printf '%s\n' "$dags" | grep -qw quickstart_sales; then echo "DAG still present after undeploy" >&2; exit 1; fi
 # (the source tree is NOT removed when dpagent runs from /opt/dpagent: published == source there, by design)
 MODELS="$("$PY" -c 'from dpagent.pipelines import deploy; print(deploy._dbt_project_dir())')/models/quickstart_sales"
 [ ! -e "$MODELS" ] || { echo "published dbt models still present: $MODELS" >&2; exit 1; }

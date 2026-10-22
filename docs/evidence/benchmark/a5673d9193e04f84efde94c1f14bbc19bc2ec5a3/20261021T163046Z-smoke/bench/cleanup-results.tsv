@@ -1,0 +1,10 @@
+pipeline	undeploy	0	-
+pipeline	audit-dag	1	unknown
+warehouse_schemas	list	0	-
+warehouse_schemas	drop quickstart_sales	0	-
+warehouse_schemas	drop quickstart_sales_landing	0	-
+warehouse_schemas	audit	0	0
+source_table	drop	0	-
+source_table	audit	0	0
+data_file	remove	0	-
+data_file	audit	0	0

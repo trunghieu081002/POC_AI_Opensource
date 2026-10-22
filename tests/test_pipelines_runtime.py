@@ -183,8 +183,19 @@ def test_run_transform_dbt_branch_passes_an_explicit_profiles_dir_and_venv_binar
     binary plus an explicit --profiles-dir pointing at a profile this
     pipeline's own warehouse resolved to."""
     state = _state_in(tmp_path, monkeypatch)
+    shared = tmp_path / "shared_project"
+    (shared / "macros").mkdir(parents=True)
+    (shared / "dbt_project.yml").write_text("name: default\n")
+    (shared / "macros" / "generate_schema_name.sql").write_text("-- macro\n")
+    (shared / "models" / "dbt_demo").mkdir(parents=True)
+    (shared / "models" / "dbt_demo" / "stg_orders.sql").write_text("select 1")
+    # another deployed pipeline (or this one's own real deployment, seen from a validation clone) whose model
+    # materialises to the same schema.alias: dbt would refuse to parse the project with both present
+    (shared / "models" / "dbt_demo__validate__x").mkdir(parents=True)
+    (shared / "models" / "dbt_demo__validate__x" / "stg_orders__validate_x.sql").write_text(
+        "{{ config(alias='stg_orders') }} select 1")
     state.record_install("dbt", "1.8.0", {"install_dir": "/opt/dbt",
-                                          "project_dir": "/opt/dbt/project"},
+                                          "project_dir": str(shared)},
                          "hash", "rhel", "installed")
     pipeline = loader.Pipeline(
         name="dbt_demo", summary="", root=tmp_path,
@@ -208,6 +219,8 @@ def test_run_transform_dbt_branch_passes_an_explicit_profiles_dir_and_venv_binar
         # still exist on disk.
         captured["profile_existed_during_dbt_run"] = (
             Path(cmd[cmd.index("--profiles-dir") + 1], "profiles.yml").exists())
+        project = Path(cmd[cmd.index("--project-dir") + 1])
+        captured["project_files"] = sorted(str(f.relative_to(project)) for f in project.rglob("*") if f.is_file())
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(runtime.subprocess, "run", fake_run)
@@ -217,7 +230,11 @@ def test_run_transform_dbt_branch_passes_an_explicit_profiles_dir_and_venv_binar
     cmd = captured["cmd"]
     assert cmd[0] == "/opt/dbt/.venv/bin/dbt"
     assert "--select" in cmd and "stg_orders" in cmd
-    assert "--project-dir" in cmd and "/opt/dbt/project" in cmd
+    # a private view of the shared project: its config and macros, and ONLY this pipeline's own models
+    project_dir = cmd[cmd.index("--project-dir") + 1]
+    assert project_dir != str(shared) and not Path(project_dir).exists()        # removed after the run
+    assert captured["project_files"] == ["dbt_project.yml", "macros/generate_schema_name.sql",
+                                         "models/dbt_demo/stg_orders.sql"]
     assert "--profiles-dir" in cmd
     assert captured["profile_existed_during_dbt_run"] is True
     profiles_dir = cmd[cmd.index("--profiles-dir") + 1]

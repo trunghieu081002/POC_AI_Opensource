@@ -1,5 +1,5 @@
 name: superset
-version: 0.1.0
+version: 0.1.1
 summary: Apache Superset in its own virtualenv with PostgreSQL metadata and a read-only warehouse role
 maturity: draft
 provides: [superset, business-intelligence]

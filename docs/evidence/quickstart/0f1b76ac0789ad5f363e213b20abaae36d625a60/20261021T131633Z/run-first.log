@@ -1,0 +1,32 @@
+== 01-install: bash examples/quickstart/walkthrough.sh install
+01-install rc=0
+== 02-source: bash examples/quickstart/walkthrough.sh source
+02-source rc=0
+== 03-validate: bash examples/quickstart/walkthrough.sh validate
+03-validate rc=0
+== 04-approve: bash examples/quickstart/walkthrough.sh approve
+04-approve rc=0
+== 05-deploy: bash examples/quickstart/walkthrough.sh deploy
+05-deploy rc=0
+check after-first-run ok
+== 06-bi-validate: bash examples/quickstart/walkthrough.sh bi-validate
+06-bi-validate rc=0
+07-bi-deploy-wrong-fingerprint rc=3 (must be non-zero)
+check after-refused-deploy-sales ok
+check after-refused-deploy-ops ok
+07b-bi-deploy-squatted-role rc=3 (must be non-zero)
+check 07b-bi-deploy-squatted-role-state-unchanged ok
+check after-squatted-role-sales ok
+check after-squatted-role-ops ok
+== 08-bi-deploy: bash examples/quickstart/walkthrough.sh bi-deploy
+08-bi-deploy rc=0
+check after-bi-deploy ok
+check viewer-sales-api ok
+check viewer-ops-api ok
+check after-viewer-attempts ok
+08b-bi-redeploy-foreign-member rc=3 (must be non-zero)
+check 08b-bi-redeploy-foreign-member-state-unchanged ok
+08c-bi-redeploy-viewer-extra-role rc=3 (must be non-zero)
+check 08c-bi-redeploy-viewer-extra-role-state-unchanged ok
+check after-refusals ok
+PHASE first PASS

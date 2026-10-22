@@ -1,0 +1,327 @@
+╭───── target OS ─────╮
+│  id        ubuntu   │
+│  family    debian   │
+│  version   22.04    │
+│  pkg_mgr   apt      │
+│  svc_mgr   systemd  │
+│  firewall  none     │
+╰─────────────────────╯
+
+base  (no declared requirements)
+
+python-modern  (no declared requirements)
+
+dbt
+  ok   disk /opt: 39528MB free (needs 1024MB)
+  · installed=0
+
+dlt
+  ok   disk /opt: 39528MB free (needs 2048MB)
+  · installed=0
+
+postgres  (no declared requirements)
+
+airflow
+  ok   memory: 63904MB available (needs 2048MB)
+  ok   disk /opt: 39528MB free (needs 2048MB)
+
+╭────────────────────────────────────────────────╮
+│ this host satisfies every declared requirement │
+╰────────────────────────────────────────────────╯
+project: quickstart
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  dlt                4  requested  │
+│  5  postgres           5  requested  │
+│  6  airflow            7  requested  │
+╰──────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────╮
+│ base v1.0.0                                              │
+│ Foundational tooling every other pack assumes is present │
+╰──────────────────────────────────────────────────────────╯
+  params: {"install_time_sync": true, "locale": "en_US.UTF-8"}
+  preflight ok
+      ok preflight passed
+  1/3 packages · Install the shared command-line tooling
+      ok 18230ms
+  2/3 locale · Generate a UTF-8 locale
+      ok 1923ms
+  3/3 time-sync · Enable clock synchronisation
+      ok 99ms
+  verify ok
+      ok python3 runs
+      ok curl runs
+      ok openssl runs
+      ok tar runs
+      ok ss lists sockets
+      ok fuser is present
+      ok pgrep is present
+      ok CA bundle is usable
+      ok locale en_US.UTF-8 available
+      ok clock is synchronised
+      ok base tooling verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ python-modern v1.0.0                                                         │
+│ Ensure a Python 3.8+ interpreter exists, without touching the system python3 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "3.11"}
+  preflight ok
+      :: already satisfied: /usr/bin/python3.10
+      ok preflight passed
+  1/1 install · Install a Python 3.8+ interpreter alongside the system one
+      skip — guard says already applied
+  verify ok
+      ok python-modern verified: /usr/bin/python3.10 (3.10)
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ dbt v1.0.0                                                               │
+│ dbt-core in a dedicated virtualenv, configured against a Postgres target │
+╰──────────────────────────────────────────────────────────────────────────╯
+  params: {"adapter": "postgres", "dbt_version": "1.8.*", "install_dir": 
+"/opt/dbt", "project_dir": "/opt/dbt/project", "profile_name": "default", 
+"target": "dev", "host": "localhost", "port": 5432, "database": "warehouse", 
+"db_schema": "public", "db_user": "dbt_user", "db_password": "***REDACTED***", 
+"threads": 4}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      !! cannot reach localhost:5432 right now - dbt will still install, but 
+'dbt debug' and any real run will fail until the target database is reachable
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 14772ms
+  2/4 install · Install dbt-core and the postgres adapter into the venv
+      ok 76303ms
+  3/4 project · Seed a minimal dbt project and profiles.yml if none exists
+      ok 3515ms
+  4/4 wrapper · Put a `dbt` wrapper on PATH (sets DBT_PROFILES_DIR)
+      ok 17ms
+  verify ok
+      ok dbt binary present at /opt/dbt/.venv/bin/dbt
+      ok /usr/local/bin/dbt wrapper present
+      :: reported version:   - installed: 1.8.10
+      ok version matches the requested 1.8.*
+      ok dbt verified (liveness only - run 'dbt debug' to check the database 
+connection)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ dlt v1.0.0                                                                   │
+│ dlt (data load tool) in a dedicated virtualenv - extract+load only, never    │
+│ transforms                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"dlt_version": "1.*", "install_dir": "/opt/dlt", "host": "localhost",
+"port": 5432, "database": "dlt_selftest", "db_user": "dlt_user", "db_password": 
+"***REDACTED***"}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      !! cannot reach localhost:5432 right now - dlt will still install, but the
+acceptance suite (a real extract+load) will fail until that target is reachable
+      ok preflight passed
+  1/4 venv · Create a dedicated virtualenv under install_dir
+      ok 6635ms
+  2/4 install · Install dlt (postgres destination, sql_database source extras, 
+pymssql driver) into the venv
+      ok 67751ms
+  3/4 wrapper · Put a `dlt` wrapper on PATH
+      ok 148ms
+  4/4 selftest-config · Write the resolved self-test connection config 
+(root-only)
+      ok 27ms
+  verify ok
+      ok dlt binary present at /opt/dlt/.venv/bin/dlt
+      ok /usr/local/bin/dlt wrapper present
+      ok postgres destination and sql_database source both import cleanly
+      ok dlt verified (liveness only - dpagent's own acceptance suite proves an 
+actual extract+load)
+
+╭─────────────────────────────────────────────────────╮
+│ postgres v1.0.0                                     │
+│ PostgreSQL server from the official PGDG repository │
+╰─────────────────────────────────────────────────────╯
+  params: {"version": "15", "port": 5432, "listen_addresses": "localhost", 
+"max_connections": 200, "databases": ["warehouse", "airflow_meta", 
+"dlt_selftest", "superset_meta", "qs_source"], "users": [{"name": "dbt_user", 
+"password": "***REDACTED***", "databases": ["warehouse"]}, {"name": "airflow", 
+"password": "***REDACTED***", "databases": ["airflow_meta"]}, {"name": 
+"dlt_user", "password": "***REDACTED***", "databases": ["dlt_selftest"]}, 
+{"name": "superset_meta", "password": "***REDACTED***", "databases": 
+["superset_meta"]}, {"name": "qs_source", "password": "***REDACTED***", 
+"databases": ["qs_source"]}], "open_firewall": false}
+  preflight ok
+      :: preflight for postgres 15 on ubuntu 22.04
+      ok preflight passed
+  1/5 repo · Enable the PGDG repository for this distro
+      ok 11342ms
+  2/5 install · Install the PostgreSQL server packages
+      ok 38161ms
+  3/5 initdb · Initialise the data directory and start the service
+      skip — guard says already applied
+  4/5 config · Apply port, listen_addresses and connection settings
+      ok 2324ms
+  5/5 databases · Create the requested databases, roles and grants
+      ok 1031ms
+  verify ok
+      ok service postgresql is active
+      ok something is listening on 5432
+      ok pg_isready on port 5432
+      ok server answers queries: 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      ok database warehouse exists
+      ok database airflow_meta exists
+      ok database dlt_selftest exists
+      ok database superset_meta exists
+      ok database qs_source exists
+      ok postgres 15 verified
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ airflow v1.0.0                                                               │
+│ Apache Airflow (LocalExecutor) in a dedicated virtualenv, backed by Postgres │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "2.9.3", "install_dir": "/opt/airflow", "executor": 
+"LocalExecutor", "webserver_port": 8090, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "airflow_meta", "backend_user": "airflow", 
+"backend_password": "***REDACTED***", "admin_user": "admin", "admin_password": 
+"***REDACTED***", "admin_email": "admin@example.com", "load_examples": false}
+  preflight ok
+      :: will build the venv with /usr/bin/python3.10
+      ok preflight passed
+  1/7 user · Create the airflow system user and AIRFLOW_HOME
+      ok 280ms
+  2/7 venv · Create a dedicated virtualenv under install_dir
+      ok 8328ms
+  3/7 install · Install apache-airflow and the postgres provider (constrained)
+      ok 118189ms
+  4/7 config · Write the AIRFLOW__* environment file (executor, backend, port, 
+fernet key)
+      ok 151ms
+  5/7 db-migrate · Initialise/upgrade the metadata database schema
+      ok 3022ms
+  6/7 admin-user · Create the admin user if it does not already exist
+      ok 6694ms
+  7/7 services · Install and start the webserver and scheduler systemd units
+      ok 7512ms
+  verify ok
+      ok airflow-scheduler is active
+      ok airflow-webserver is active
+      ok port 8090 is listening
+      ok webserver /health responds
+      ok airflow db check succeeds
+      ok airflow verified
+
+
+╭──────────────────────────── acceptance suite ─────────────────────────────╮
+│ airflow                                                                   │
+│ Prove Airflow actually schedules, runs and correctly reports on real DAGs │
+╰───────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Deploy a DAG that succeeds and one that deliberately fails 8786ms
+  checks
+    PASS The scheduler and webserver systemd units are active 13ms
+    PASS The webserver's own /health endpoint reports the metadatabase healthy 
+52ms
+    PASS A triggered DAG actually runs its task and is reported as succeeded 
+3507ms
+    PASS A DAG whose task fails is reported as failed, not lost or silently 
+green (negative) 3866ms
+  teardown
+    PASS Remove the throwaway DAGs and their run history 6246ms
+  airflow: 4 checks passed
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 398ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 20ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 35ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 110ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 13ms
+  base: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ dbt                                                                          │
+│ Prove dbt actually connects to Postgres, transforms data, and catches bad    │
+│ data                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Write a good and a deliberately-broken throwaway dbt model 28ms
+  checks
+    PASS dbt can actually connect to the configured Postgres target 3913ms
+    PASS dbt run builds a model whose output matches the source data 5729ms
+    PASS A dbt test fails when the underlying data violates it (negative) 
+10238ms
+    PASS A dbtread member other than whoever ran dbt first can still write to 
+the project 564ms
+  teardown
+    PASS Remove the throwaway models and the tables they built 150ms
+  dbt: 4 checks passed
+
+╭───────────────────────────── acceptance suite ──────────────────────────────╮
+│ dlt                                                                         │
+│ Prove dlt actually extracts and loads real data through both MVP connectors │
+╰─────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create a throwaway source table and a throwaway CSV file 258ms
+  checks
+    PASS sql_database source lands a real Postgres table as-received 3227ms
+    PASS A CSV file lands as-received through the csv connector's mechanism 
+2174ms
+    PASS A source table that does not exist halts extraction instead of moving 
+nothing (negative) 3025ms
+  teardown
+    PASS Remove the throwaway schemas, CSV fixture, and dlt run state 76ms
+  dlt: 3 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 180ms
+  checks
+    PASS A row written is the same row read back 412ms
+    PASS Committed data is still there after a service restart 12147ms
+    PASS A wrong password is refused (negative) 383ms
+    PASS Every database in the spec accepts a connection and a write 723ms
+    PASS The running server reports the port and limits that were asked for 
+299ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 46ms
+  teardown
+    PASS Remove everything the suite created 816ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 5775ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 25ms
+  python-modern: 2 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  airflow        passed     4/4  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  dlt            passed     3/3  │
+│  postgres       passed     6/6  │
+│  python-modern  passed     2/2  │
+╰─────────────────────────────────╯
+╭──────────────────────────────────╮
+│ installed and proven working     │
+│ install run 1 · acceptance run 2 │
+╰──────────────────────────────────╯

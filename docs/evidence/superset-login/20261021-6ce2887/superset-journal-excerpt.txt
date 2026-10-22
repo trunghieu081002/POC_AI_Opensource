@@ -1,0 +1,8 @@
+Oct 21 09:28:06 11be204f090f gunicorn[21911]: 2026-10-21 09:28:06,624:WARNING:root:Failed to add user to db session: Class 'werkzeug.local.LocalProxy' is not mapped
+Oct 21 09:30:13 11be204f090f gunicorn[21912]: 2026-10-21 09:30:13,429:WARNING:root:Failed to add user to db session: Class 'werkzeug.local.LocalProxy' is not mapped
+Oct 21 09:31:51 11be204f090f gunicorn[21911]: 2026-10-21 09:31:51,556:WARNING:root:Failed to add user to db session: Class 'werkzeug.local.LocalProxy' is not mapped
+Oct 21 09:41:25 11be204f090f systemd[1]: Stopping Apache Superset (managed by dpagent)...
+Oct 21 09:41:29 11be204f090f systemd[1]: Started Apache Superset (managed by dpagent).
+Oct 21 09:44:06 11be204f090f gunicorn[23434]: 2026-10-21 09:44:06,328:WARNING:root:Failed to add user to db session: Class 'werkzeug.local.LocalProxy' is not mapped
+Oct 21 09:51:35 11be204f090f systemd[1]: Stopping Apache Superset (managed by dpagent)...
+Oct 21 09:51:37 11be204f090f systemd[1]: Started Apache Superset (managed by dpagent).

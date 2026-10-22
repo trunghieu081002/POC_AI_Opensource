@@ -2,16 +2,16 @@
   "bronze": {
     "batches": [
       {
-        "batch_id": "ecef4971-1d0f-4880-a695-2abb63212367",
+        "batch_id": "4669d9a1-33f2-4224-af45-8f35aab686c2",
         "loaded_rows": 6,
-        "manifest_sha256": "657b23add30c33afe56907727fd3a26a0440939222a7afaa255946a75eab4d6a",
+        "manifest_sha256": "893fa9166ee6e1f77dc0d8626320db122e8e6e7b7bab5179c1c116ccab53db03",
         "object_count": 1,
         "status": "loaded",
         "table_name": "res_partner",
         "total_rows": 6
       }
     ],
-    "namespace": "dpagent-validate/dc6da3bb",
+    "namespace": "dpagent-validate/eb460b30",
     "s3": {
       "error": "",
       "objects_found_at_teardown": 2,
@@ -22,14 +22,14 @@
   "cleanup": {
     "overall": "pass",
     "pipeline_artifacts": "pass",
-    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_DC6DA3BB_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_DC6DA3BB_BRONZE_BUCKET, DPAGENT_VALIDATE_DC6DA3BB_BRONZE_ENDPOINT, DPAGENT_VALIDATE_DC6DA3BB_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_DC6DA3BB_SRC_DATABASE, DPAGENT_VALIDATE_DC6DA3BB_SRC_HOST, DPAGENT_VALIDATE_DC6DA3BB_SRC_PASSWORD, DPAGENT_VALIDATE_DC6DA3BB_SRC_PORT, DPAGENT_VALIDATE_DC6DA3BB_SRC_USER, DPAGENT_VALIDATE_DC6DA3BB_WH_DATABASE, DPAGENT_VALIDATE_DC6DA3BB_WH_HOST, DPAGENT_VALIDATE_DC6DA3BB_WH_PASSWORD, DPAGENT_VALIDATE_DC6DA3BB_WH_PORT, DPAGENT_VALIDATE_DC6DA3BB_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
+    "pipeline_artifacts_detail": "DAG removed; published files removed; secrets released: DPAGENT_VALIDATE_EB460B30_BRONZE_ACCESS_KEY, DPAGENT_VALIDATE_EB460B30_BRONZE_BUCKET, DPAGENT_VALIDATE_EB460B30_BRONZE_ENDPOINT, DPAGENT_VALIDATE_EB460B30_BRONZE_SECRET_KEY, DPAGENT_VALIDATE_EB460B30_SRC_DATABASE, DPAGENT_VALIDATE_EB460B30_SRC_HOST, DPAGENT_VALIDATE_EB460B30_SRC_PASSWORD, DPAGENT_VALIDATE_EB460B30_SRC_PORT, DPAGENT_VALIDATE_EB460B30_SRC_USER, DPAGENT_VALIDATE_EB460B30_WH_DATABASE, DPAGENT_VALIDATE_EB460B30_WH_HOST, DPAGENT_VALIDATE_EB460B30_WH_PASSWORD, DPAGENT_VALIDATE_EB460B30_WH_PORT, DPAGENT_VALIDATE_EB460B30_WH_USER | verified gone: DAG (file + Airflow registration + published files + dbt models + dlt state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs",
     "s3_objects": "pass",
     "source_database": "pass",
     "source_role": "pass",
     "warehouse_database": "pass",
     "warehouse_role": "pass"
   },
-  "clone_name": "hg_dbt_branch__validate__dc6da3bb",
+  "clone_name": "hg_dbt_branch__validate__eb460b30",
   "comparison": {
     "idempotent": false,
     "run_1": "not_run",
@@ -64,17 +64,6 @@
               "column": "dim_artist_sk",
               "failures": 0,
               "models": [
-                "dim_artist_active"
-              ],
-              "name": "not_null",
-              "severity": "error",
-              "status": "pass",
-              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
-            },
-            {
-              "column": "dim_artist_sk",
-              "failures": 0,
-              "models": [
                 "dim_artist"
               ],
               "name": "unique",
@@ -99,6 +88,17 @@
               "models": [
                 "dim_artist_active"
               ],
+              "name": "not_null",
+              "severity": "error",
+              "status": "pass",
+              "test": "test.dwh_hgmedia.not_null_dim_artist_active_dim_artist_sk.0e2f88f299"
+            },
+            {
+              "column": "dim_artist_sk",
+              "failures": 0,
+              "models": [
+                "dim_artist_active"
+              ],
               "name": "unique",
               "severity": "error",
               "status": "pass",
@@ -111,7 +111,7 @@
         "errored": 0,
         "failed": 0,
         "kind": "dbt.test.passed",
-        "message": "hg_dbt_branch__validate__dc6da3bb/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
+        "message": "hg_dbt_branch__validate__eb460b30/silver: dbt test passed - ran 4 (4 passed, 0 failed, 0 errored, 0 warned, 0 skipped) of 4 required",
         "passed": 4,
         "ran": 4,
         "required": 4,
@@ -123,7 +123,7 @@
     "run_2": []
   },
   "deploy_error": "",
-  "evidence_id": "ev-398c3f4a70747d5f",
+  "evidence_id": "ev-0e51a96dcedf93a4",
   "expected_hash": "sha256:4559343912f7ed0fe57938f098a1df84afe952e9d176441798bf08aabe82d032",
   "fixture_hash": "sha256:c15da2fa1594cfe273bc18759d23024445f66b5969d8c38b8f6d54c4d0079de7",
   "gates": {

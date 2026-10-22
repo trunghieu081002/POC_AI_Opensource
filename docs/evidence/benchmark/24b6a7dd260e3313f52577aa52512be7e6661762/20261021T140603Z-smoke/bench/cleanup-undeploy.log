@@ -1,0 +1,11 @@
+undeployed quickstart_sales
+  removed  DAG file in Airflow's DAGS_FOLDER
+  removed  DAG registration and run history in Airflow
+  absent   published copy /opt/dpagent/pipelines/quickstart_sales
+  removed  published dbt models
+  removed  dlt local working state
+  released secrets: QS_SRC_HOST, QS_SRC_NAME, QS_SRC_PASSWORD, QS_SRC_PORT, 
+QS_SRC_USER, QS_WH_HOST, QS_WH_NAME, QS_WH_PASSWORD, QS_WH_PORT, QS_WH_USER  
+(airflow-scheduler restarted)
+left in place: warehouse schemas 'quickstart_sales' and 
+'quickstart_sales_landing' with all their tables, and dpagent's run history

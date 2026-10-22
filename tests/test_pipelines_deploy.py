@@ -244,10 +244,11 @@ def test_ensure_airflow_can_run_pipelines_does_nothing_when_already_correct(
     from dpagent.engine import state
     monkeypatch.setattr(state, "DB_PATH", journal_dir / "dpagent.db")
 
-    monkeypatch.setattr(deploy.grp, "getgrgid",
-                        lambda gid: type("G", (), {"gr_name": deploy._SHARED_GROUP})())
-    # Force the group-permission bits so the "already correct" branch is taken.
+    monkeypatch.setattr(deploy.grp, "getgrnam",
+                        lambda name: type("G", (), {"gr_gid": os.getgid()})())
+    # Group and group-permission bits already right: nothing to grant.
     os.chmod(journal_dir, 0o2770)
+    os.chmod(journal_dir / "dpagent.db", 0o660)
 
     checkout_root = tmp_path / "checkout"
     (checkout_root / "src").mkdir(parents=True)
@@ -1295,3 +1296,212 @@ def test_undeploy_never_deletes_the_source_tree_it_shares_with_the_published_dir
     result = deploy.undeploy(p)
     assert (shared / "demo" / "pipeline.yaml").is_file(), "operator's source must survive"
     assert result.published_files_removed is False
+
+
+# ---------------------------------------------------------------- the journal grant and the seal key
+
+def _journal(tmp_path, key_mode=0o600):
+    """A journal directory as a host has it: the SQLite journal (+ a leftover rollback journal), the seal key
+    and an unrelated file - none group-accessible yet."""
+    import os
+    d = tmp_path / "var_lib_dpagent"
+    d.mkdir(mode=0o755)
+    (d / "dpagent.db").write_bytes(b"journal"); (d / "dpagent.db").chmod(0o644)
+    (d / "dpagent.db-journal").write_bytes(b"j"); (d / "dpagent.db-journal").chmod(0o644)
+    (d / "notes.txt").write_bytes(b"other"); (d / "notes.txt").chmod(0o600)
+    key = d / deploy.SEAL_KEY_NAME
+    fd = os.open(key, os.O_WRONLY | os.O_CREAT | os.O_EXCL, key_mode)
+    os.write(fd, os.urandom(32)); os.close(fd)
+    os.chmod(key, key_mode)
+    return d, key
+
+
+def _mode(path):
+    import os
+    import stat
+    return stat.S_IMODE(os.lstat(path).st_mode)
+
+
+def _watch_permission_calls(monkeypatch):
+    """Every path deploy changes ownership/mode of, through any API (descriptors resolved via /proc)."""
+    import os
+    touched = []
+
+    def by_fd(real):
+        def wrapper(fd, *a):
+            touched.append(os.readlink(f"/proc/self/fd/{fd}"))
+            return real(fd, *a)
+        return wrapper
+
+    def by_path(real):
+        def wrapper(path, *a, **k):
+            touched.append(str(path))
+            return real(path, *a, **k)
+        return wrapper
+    for name in ("fchmod", "fchown"):
+        monkeypatch.setattr(os, name, by_fd(getattr(os, name)))
+    for name in ("chmod", "chown", "lchown"):
+        monkeypatch.setattr(os, name, by_path(getattr(os, name)))
+    return touched
+
+
+def test_grant_gives_the_group_only_the_journal_and_never_touches_the_seal_key(tmp_path, monkeypatch):
+    import os
+    d, key = _journal(tmp_path)
+    content = key.read_bytes()
+    touched = _watch_permission_calls(monkeypatch)
+    changed = deploy.grant_journal_to_group(d, "dpagent.db", os.getgid())
+    assert _mode(d) & 0o070 == 0o070
+    assert _mode(d / "dpagent.db") & 0o060 == 0o060 and _mode(d / "dpagent.db-journal") & 0o060 == 0o060
+    assert _mode(key) == 0o600 and key.read_bytes() == content          # never loosened, not even for a moment:
+    assert str(key) not in touched                                       # no permission call ever named it
+    assert _mode(d / "notes.txt") == 0o600 and str(d / "notes.txt") not in touched   # only the journal
+    assert set(changed) == {str(d), str(d / "dpagent.db"), str(d / "dpagent.db-journal")}
+    assert deploy.grant_journal_to_group(d, "dpagent.db", os.getgid()) == []   # idempotent
+
+
+def test_grant_refuses_a_symlinked_journal_entry_and_changes_nothing(tmp_path):
+    import os
+    d, key = _journal(tmp_path)
+    target = tmp_path / "elsewhere"; target.write_bytes(b"x"); target.chmod(0o600)
+    (d / "dpagent.db-wal").symlink_to(target)
+    before = {p.name: _mode(p) for p in d.iterdir() if not p.is_symlink()}
+    with pytest.raises(deploy.DeployError, match="symlink is never followed"):
+        deploy.grant_journal_to_group(d, "dpagent.db", os.getgid())
+    assert _mode(target) == 0o600
+    # entries before the symlink in the fixed order (directory, db, -journal) may already be granted -
+    # all of them are the journal's own; nothing outside the journal and never the key
+    assert _mode(key) == 0o600 and _mode(d / "notes.txt") == 0o600
+
+
+def test_grant_refuses_a_symlinked_journal_directory(tmp_path):
+    import os
+    d, _ = _journal(tmp_path)
+    link = tmp_path / "linked"; link.symlink_to(d)
+    with pytest.raises(deploy.DeployError, match="not a plain directory"):
+        deploy.grant_journal_to_group(link, "dpagent.db", os.getgid())
+    assert _mode(d) == 0o755
+
+
+@pytest.mark.parametrize("make, match", [
+    ("symlink", "not a regular file"),
+    ("hardlink", "hard links"),
+    ("loose", "group or other"),
+    ("directory", "not a regular file"),
+])
+def test_check_seal_key_refuses_anything_but_a_private_regular_file(tmp_path, monkeypatch, make, match):
+    import os
+    monkeypatch.setattr(deploy, "_ROOT_UID", os.getuid())
+    d, key = _journal(tmp_path)
+    if make == "symlink":
+        real = tmp_path / "real.key"; os.rename(key, real); key.symlink_to(real)
+    elif make == "hardlink":
+        os.link(key, tmp_path / "second.key")
+    elif make == "loose":
+        key.chmod(0o640)
+    else:
+        key.unlink(); key.mkdir()
+    with pytest.raises(deploy.DeployError, match=match):
+        deploy.check_seal_key(d)
+
+
+def test_check_seal_key_refuses_a_key_root_does_not_own(tmp_path, monkeypatch):
+    import os
+    d, _ = _journal(tmp_path)
+    monkeypatch.setattr(deploy, "_ROOT_UID", os.getuid() + 1)
+    with pytest.raises(deploy.DeployError, match="not root"):
+        deploy.check_seal_key(d)
+
+
+def test_check_seal_key_accepts_a_private_key_and_its_absence(tmp_path, monkeypatch):
+    import os
+    monkeypatch.setattr(deploy, "_ROOT_UID", os.getuid())
+    d, key = _journal(tmp_path)
+    assert deploy.check_seal_key(d) is None
+    key.unlink()
+    assert deploy.check_seal_key(d) is None
+
+
+def _root_host(monkeypatch, tmp_path, d, *, fail_acl=False):
+    """ensure_airflow_can_run_pipelines on a host whose group/user/venv are already right; the journal is `d`."""
+    import os
+    from dpagent.engine import state
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(deploy, "_ROOT_UID", os.getuid())                   # "root" = the key's owner here
+    monkeypatch.setattr(state, "DB_PATH", d / "dpagent.db")
+    monkeypatch.setattr(deploy.grp, "getgrnam", lambda name: type("G", (), {"gr_gid": os.getgid()})())
+    checkout = tmp_path / "checkout"; (checkout / "src").mkdir(parents=True, exist_ok=True)
+    os.chmod(checkout, 0o700 if fail_acl else 0o755)
+    monkeypatch.setattr(deploy, "_dpagent_checkout_root", lambda: checkout)
+    monkeypatch.setattr(deploy, "_airflow_paths", lambda: (tmp_path / "venvbin", tmp_path / "env"))
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:2] == ["getent", "group"]:
+            return subprocess.CompletedProcess(cmd, 0)
+        if cmd[:2] == ["id", "-nG"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="airflow dpagent\n")
+        if cmd[-1] == "import dpagent":
+            return subprocess.CompletedProcess(cmd, 0)
+        if cmd[0] == "setfacl":
+            return subprocess.CompletedProcess(cmd, 1, stderr="setfacl: injected failure")
+        raise AssertionError(f"unexpected command: {cmd}")
+    monkeypatch.setattr(deploy.subprocess, "run", fake_run)
+
+
+def test_deploy_redeploy_and_a_failed_deploy_keep_the_seal_key_byte_for_byte(tmp_path, monkeypatch):
+    import os
+    d, key = _journal(tmp_path)
+    content, inode = key.read_bytes(), os.stat(key).st_ino
+    touched = _watch_permission_calls(monkeypatch)
+    _root_host(monkeypatch, tmp_path, d)
+    first = deploy.ensure_airflow_can_run_pipelines()            # deploy
+    assert any("may now write" in line for line in first)
+    assert deploy.ensure_airflow_can_run_pipelines() == []       # redeploy: nothing left to change
+    _root_host(monkeypatch, tmp_path, d, fail_acl=True)          # a deploy failing after the grant
+    with pytest.raises(deploy.DeployError, match="injected failure"):
+        deploy.ensure_airflow_can_run_pipelines()
+    assert key.read_bytes() == content and os.stat(key).st_ino == inode and _mode(key) == 0o600
+    assert str(key) not in touched
+    from dpagent.engine import state
+    from dpagent.pipelines import evidence
+    monkeypatch.setattr(os, "geteuid", os.getuid, raising=False)            # the CLI reading its own key
+    assert state.DB_PATH == d / "dpagent.db" and evidence._load_key(create=False) == content
+
+
+def test_deploy_stops_before_granting_anything_when_the_key_is_wrong(tmp_path, monkeypatch):
+    d, key = _journal(tmp_path, key_mode=0o660)
+    _root_host(monkeypatch, tmp_path, d)
+    with pytest.raises(deploy.DeployError, match="restore it once"):
+        deploy.ensure_airflow_can_run_pipelines()
+    assert _mode(d) == 0o755 and _mode(d / "dpagent.db") == 0o644 and _mode(key) == 0o660
+
+
+@pytest.mark.parametrize("make, match", [("symlink", "symlink"), ("loose", "readable by group/other"),
+                                         ("hardlink", "single regular file")])
+def test_the_seal_key_reader_never_follows_a_link_or_trusts_a_loose_key(tmp_path, monkeypatch, make, match):
+    import os
+    from dpagent.engine import state
+    from dpagent.pipelines import evidence
+    d, key = _journal(tmp_path)
+    monkeypatch.setattr(state, "DB_PATH", d / "dpagent.db")
+    if make == "symlink":
+        real = tmp_path / "real.key"; os.rename(key, real); key.symlink_to(real)   # a valid 0600 key behind it
+    elif make == "loose":
+        key.chmod(0o660)
+    else:
+        os.link(key, tmp_path / "second.key")
+    with pytest.raises(PermissionError, match=match):
+        evidence._load_key(create=False)
+    with pytest.raises(PermissionError, match=match):
+        evidence._load_key(create=True)                          # never replaced behind the operator's back
+
+
+def test_the_seal_key_reader_refuses_a_key_owned_by_someone_else(tmp_path, monkeypatch):
+    import os
+    from dpagent.engine import state
+    from dpagent.pipelines import evidence
+    d, _ = _journal(tmp_path)
+    monkeypatch.setattr(state, "DB_PATH", d / "dpagent.db")
+    monkeypatch.setattr(os, "geteuid", lambda: os.getuid() + 1, raising=False)
+    with pytest.raises(PermissionError, match="owned by uid"):
+        evidence._load_key(create=False)

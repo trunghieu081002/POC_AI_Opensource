@@ -599,6 +599,69 @@ def _run_root_command(cmd: list[str], *, what: str) -> None:
         raise DeployError(f"{what} failed:\n{proc.stderr.strip() or proc.stdout.strip()}")
 
 
+SEAL_KEY_NAME = "evidence.key"
+_ROOT_UID = 0
+_SQLITE_SIDECARS = ("", "-journal", "-wal", "-shm")
+
+
+def check_seal_key(journal_dir: Path) -> None:
+    """The evidence seal key (evidence.py) lives next to the journal but belongs to root's CLI alone: a regular
+    file (never a symlink, one link), owned by root, mode 0600. Read with lstat - nothing is followed - and
+    never changed here: deploy grants nothing on it in the first place (grant_journal_to_group). Absent is fine
+    (no validation sealed yet); anything else wrong stops the deploy before it grants anything."""
+    key = Path(journal_dir) / SEAL_KEY_NAME
+    try:
+        st = os.lstat(key)
+    except FileNotFoundError:
+        return
+    restore = f"chmod 600 {key} && chown root:root {key}"
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+        raise DeployError(f"{key} is not a regular file (a symlink or special file) - refusing to deploy next to it")
+    if st.st_nlink != 1:
+        raise DeployError(f"{key} has {st.st_nlink} hard links - refusing; the seal key must exist once")
+    if st.st_uid != _ROOT_UID:
+        raise DeployError(f"{key} is owned by uid {st.st_uid}, not root - restore it: {restore}")
+    if stat.S_IMODE(st.st_mode) & 0o077:
+        raise DeployError(f"{key} is readable/writable by group or other (mode {oct(stat.S_IMODE(st.st_mode))}) - "
+                          f"an older deploy loosened it; restore it once (validate refuses it as is): {restore}")
+
+
+def grant_journal_to_group(journal_dir: Path, db_name: str, gid: int) -> list[str]:
+    """Exactly what the airflow user must write to record its runs: the journal directory (SQLite creates its
+    rollback journal next to the database) and the database with its existing SQLite side files - group
+    `gid`, group read/write (+x on the directory). Nothing else in the directory is touched, so the seal key
+    is never group-accessible, not even for a moment. Each entry is lstat-ed, refused if it is a symlink or of
+    the wrong type, then changed through an O_NOFOLLOW descriptor checked to be that same inode."""
+    changed = []
+    journal_dir = Path(journal_dir)
+    for path in [journal_dir] + [journal_dir / (db_name + suffix) for suffix in _SQLITE_SIDECARS]:
+        try:
+            st = os.lstat(path)
+        except FileNotFoundError:
+            continue
+        is_dir = path == journal_dir
+        if stat.S_ISLNK(st.st_mode) or not (stat.S_ISDIR(st.st_mode) if is_dir else stat.S_ISREG(st.st_mode)):
+            raise DeployError(f"refusing to grant {path}: not a plain {'directory' if is_dir else 'file'} "
+                              f"(a symlink is never followed)")
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | (os.O_DIRECTORY if is_dir else 0))
+        try:
+            now = os.fstat(fd)
+            if (now.st_dev, now.st_ino) != (st.st_dev, st.st_ino):
+                raise DeployError(f"{path} changed while being granted - refusing")
+            mode = stat.S_IMODE(now.st_mode)
+            wanted = mode | (0o070 if is_dir else 0o060)
+            if now.st_gid != gid:
+                os.fchown(fd, -1, gid)
+                changed.append(str(path))
+            if mode != wanted:
+                os.fchmod(fd, wanted)
+                if str(path) not in changed:
+                    changed.append(str(path))
+        finally:
+            os.close(fd)
+    return changed
+
+
 def ensure_airflow_can_run_pipelines() -> list[str]:
     """Makes true, idempotently, the three host preconditions a real
     Airflow run needs that were done by hand at least once getting `dpagent
@@ -641,14 +704,10 @@ def ensure_airflow_can_run_pipelines() -> list[str]:
 
     journal_dir = state.DB_PATH.parent
     journal_dir.mkdir(parents=True, exist_ok=True)
-    dir_stat = journal_dir.stat()
-    if (grp.getgrgid(dir_stat.st_gid).gr_name != _SHARED_GROUP
-            or not (dir_stat.st_mode & stat.S_IRWXG)):
-        _run_root_command(["chgrp", "-R", _SHARED_GROUP, str(journal_dir)],
-                          what="chgrp-ing dpagent's own journal directory")
-        _run_root_command(["chmod", "-R", "g+rwX", str(journal_dir)],
-                          what="making dpagent's own journal directory group-writable")
-        done.append(f"{journal_dir} is now group-writable by {_SHARED_GROUP!r}")
+    check_seal_key(journal_dir)
+    granted = grant_journal_to_group(journal_dir, state.DB_PATH.name, grp.getgrnam(_SHARED_GROUP).gr_gid)
+    if granted:
+        done.append(f"group {_SHARED_GROUP!r} may now write dpagent's journal: {', '.join(granted)}")
 
     # 2. A narrow ACL so the `airflow` OS user can traverse to wherever this
     # checkout actually lives - the first ancestor directory not already

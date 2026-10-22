@@ -1,0 +1,38 @@
+{
+ "run_id": 6,
+ "stages": [
+  {
+   "stage": "landing",
+   "status": "passed",
+   "rows": 20000,
+   "seconds": 0.0
+  },
+  {
+   "stage": "raw",
+   "status": "passed",
+   "rows": null,
+   "seconds": 1.0
+  },
+  {
+   "stage": "curated",
+   "status": "passed",
+   "rows": null,
+   "seconds": 0.0
+  }
+ ],
+ "stage_time_resolution_s": 1,
+ "wall_seconds": {
+  "setup-install": 494.8,
+  "setup-source": 0.4,
+  "setup-validate": 83.8,
+  "setup-approve": 0.2,
+  "setup-deploy": 33.8,
+  "generate": 0.2,
+  "load": 0.2,
+  "run": 32.6
+ },
+ "peak_rss_all_processes_mb": 4817,
+ "min_mem_available_mb": 1924,
+ "peak_database_bytes": 69504980,
+ "samples": 7
+}
