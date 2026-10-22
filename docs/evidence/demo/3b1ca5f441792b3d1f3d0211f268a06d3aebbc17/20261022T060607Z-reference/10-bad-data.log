@@ -1,0 +1,8 @@
+triggered — dpagent run 12
+waiting up to 1800s for run 12 to finish...
+       fulfilment_sla · run 12 failed · started 2026-10-22T06:24:02+00:00       
+ stage    status  rows  gates                         started                   
+ landing  failed    10  row_count_bounds, unique,     2026-10-22T06:24:10+00:00 
+                        unique                                                  
+run 12 failed - why: dpagent pipeline audit 12
+run with a repeated source id: rc=1 (must be non-zero)

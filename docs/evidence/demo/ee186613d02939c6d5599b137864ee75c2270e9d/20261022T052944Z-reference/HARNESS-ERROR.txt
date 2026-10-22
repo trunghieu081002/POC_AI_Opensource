@@ -1,0 +1,1 @@
+Harness error, not a product result: the inside secret scan exited 99 after 'PHASE first PASS' because its pipeline ended with a failing [ -n "$KEY" ] && printf (no model key in a reference run) under pipefail - no secret was found and the evidence was not removed. Fixed in the next commit; this run is kept (phase first PASS, phase second not run).

@@ -1,6 +1,6 @@
 """Viewer RBAC in a real Chromium (the pinned Playwright image of tests/data_platform_acceptance/browser.Dockerfile),
 logged in AS THE VIEWER. /run/viewer-auth.json: {"username", "password"}; /run/viewer-targets.json:
-{"own": {"url", "rows", "filter_values", "filtered_rows"}, "other": {"url"}}. Writes /output/viewer-browser.json.
+{"own": {"url", "rows", "filter_values", "filtered_rows"}, "other": {"url"}} ("other" optional). Writes /output/viewer-browser.json.
 
 Own dashboard: the table renders the expected rows (and the chart-data response says the same), the native filter
 gives the filtered rows, and there is no "Edit dashboard" control. Other project's dashboard: no table renders and
@@ -110,15 +110,18 @@ try:
         report["own_filtered"] = wait_rows(page, own["filtered_rows"], responses, start)
         page.screenshot(path=str(OUT / "viewer-own-filtered.png"), full_page=True)
 
-        responses.clear(); statuses.clear()
-        page.goto(BASE + T["other"]["url"], wait_until="networkidle")
-        page.wait_for_timeout(5000)
-        tables = page.locator("table tbody tr").count()
-        report["other"] = {"final_url": page.url.replace(BASE, ""), "table_rows": tables,
-                           "chart_data_statuses": statuses, "chart_data_ok": len(responses)}
-        page.screenshot(path=str(OUT / "viewer-other.png"), full_page=True)
-        if tables or responses:
-            raise AssertionError("the viewer could see the other project's dashboard data")
+        if "other" in T:   # absent when only one project is deployed (the demo): nothing to compare against
+            responses.clear(); statuses.clear()
+            page.goto(BASE + T["other"]["url"], wait_until="networkidle")
+            page.wait_for_timeout(5000)
+            tables = page.locator("table tbody tr").count()
+            report["other"] = {"final_url": page.url.replace(BASE, ""), "table_rows": tables,
+                               "chart_data_statuses": statuses, "chart_data_ok": len(responses)}
+            page.screenshot(path=str(OUT / "viewer-other.png"), full_page=True)
+            if tables or responses:
+                raise AssertionError("the viewer could see the other project's dashboard data")
+        else:
+            report["other"] = "not checked: one project deployed"
         browser.close()
     report["status"] = "pass"
 except Exception:
@@ -128,4 +131,5 @@ finally:
     (OUT / "viewer-browser.json").write_text(json.dumps(report, indent=2, default=str) + "\n")
 if report["status"] != "pass":
     raise SystemExit(1)
-print("viewer browser: own dashboard and filter match expected, no edit control, other project not visible")
+print("viewer browser: own dashboard and filter match expected, no edit control"
+      + (", other project not visible" if "other" in T else ""))

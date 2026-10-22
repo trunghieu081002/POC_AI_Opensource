@@ -10,21 +10,43 @@
 # --os ol8 runs the SAME acceptance in an Oracle Linux 8.10 CONTAINER (systemd, dnf, EL8 python 3.6): it proves the
 # EL8 userland, not a native install - the container shares the Docker host's kernel and SELinux mode and has no
 # firewalld. The evidence says so (os-scope.txt).
+# --demo reference|ai runs the 3-layer demo (docs/demo.md, examples/demo/demo.sh) instead: layer 1 install, layer 3
+# draft (ai: `dpagent pipeline synth` with the model named by DPAGENT_MODEL - its credential is passed into the host
+# by NAME, never written anywhere; reference: the labelled hand-written pipeline), approval, layer 2 deploy/run,
+# dashboard + viewer, schedule, bad data blocked, recovery, undeploy. Evidence: docs/evidence/demo/<sha>/<utc>-<draft>/.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 KEEP=0
 OS=ubuntu
 BENCH=""
+DEMO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --os) OS="${2:?--os needs ubuntu or ol8}"; shift 2 ;;
     --bench) BENCH="${2:?--bench needs a scale}"; shift 2 ;;
-    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE]" >&2; exit 2 ;;
+    --demo) DEMO="${2:?--demo needs reference or ai}"; shift 2 ;;
+    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE | --demo reference|ai]" >&2; exit 2 ;;
   esac
 done
 case "$BENCH" in ''|[a-z]*) ;; *) echo "invalid --bench scale" >&2; exit 2 ;; esac
 case "$BENCH" in *[!a-z]*) echo "invalid --bench scale" >&2; exit 2 ;; esac
+case "$DEMO" in ''|reference|ai) ;; *) echo "--demo must be reference or ai" >&2; exit 2 ;; esac
+[ -z "$BENCH" ] || [ -z "$DEMO" ] || { echo "--bench and --demo are separate runs" >&2; exit 2; }
+PASSENV=()
+if [ "$DEMO" = ai ]; then
+  [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
+  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_TIMEOUT DPAGENT_LLM_MAX_TOKENS; do
+    [ -n "${!v:-}" ] && PASSENV+=(-e "$v")          # by name: docker reads the value from this environment
+  done
+fi
+# what the acceptance phases use (quickstart, or the demo)
+INSIDE=tests/quickstart_acceptance/inside.sh; ENVFILE=/root/quickstart-dev.env
+OWN=quickstart-sales; OTHER=quickstart-ops; VIEWER=qs.sales.viewer; PWVAR=QS_SALES_VIEWER_PASSWORD
+if [ -n "$DEMO" ]; then
+  INSIDE=tests/demo_acceptance/inside.sh; ENVFILE=/root/demo-dev.env
+  OWN=fulfil-sla; OTHER=""; VIEWER=fulfil.viewer; PWVAR=FS_VIEWER_PASSWORD
+fi
 case "$OS" in
   ubuntu) IMAGE=dpagent-m25-disposable; DOCKERFILE=m25-disposable-host.Dockerfile; SUFFIX="" ;;
   ol8)    IMAGE=dpagent-ol8-disposable;  DOCKERFILE=m25-disposable-host-ol8.Dockerfile; SUFFIX="-ol8" ;;
@@ -40,6 +62,9 @@ if [ -n "$BENCH" ]; then
   PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
   "$PYH" "$ROOT/benchmarks/synthetic/preflight.py" "$BENCH" --disk-path "$(docker info -f '{{.DockerRootDir}}')" \
     > "$OUT/preflight-host.json" || { echo "benchmark refused by the host preflight: $(cat "$OUT/preflight-host.json")" >&2; exit 4; }
+elif [ -n "$DEMO" ]; then
+  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
+  mkdir -p "$OUT"
 else
   OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
   mkdir -p "$OUT"
@@ -104,28 +129,32 @@ if [ -n "$BENCH" ]; then
   docker exec "$NAME" bash -lc "bash /opt/dpagent/tests/quickstart_acceptance/inside.sh bench $BENCH" 2>&1 | tee "$OUT/run-bench.log"
   exit 0
 fi
-docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh first' 2>&1 | tee "$OUT/run-first.log"
+docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE first" 2>&1 | tee "$OUT/run-first.log"
 
 # Viewer RBAC in a real browser, logged in as the sales viewer: a Playwright container sharing the host's network
 # namespace (Superset binds loopback). The password goes through a 0600 file that is removed right after.
 docker build -q -t dpagent-quickstart-browser -f "$ROOT/tests/data_platform_acceptance/browser.Dockerfile" \
   "$ROOT/tests/data_platform_acceptance" > "$OUT/browser-image.txt"
 RUNDIR=$(mktemp -d); chmod 700 "$RUNDIR"
-docker exec "$NAME" bash -c 'set -a; . /root/quickstart-dev.env; set +a
-  printf "{\"username\": \"qs.sales.viewer\", \"password\": \"%s\"}" "$QS_SALES_VIEWER_PASSWORD"' > "$RUNDIR/viewer-auth.json"
+docker exec -e "ENVFILE=$ENVFILE" -e "VIEWER=$VIEWER" -e "PWVAR=$PWVAR" "$NAME" bash -c 'set -a; . "$ENVFILE"; set +a
+  printf "{\"username\": \"%s\", \"password\": \"%s\"}" "$VIEWER" "${!PWVAR}"' > "$RUNDIR/viewer-auth.json"
 chmod 600 "$RUNDIR/viewer-auth.json"
-docker exec -i "$NAME" /opt/superset/.venv/bin/python - > "$RUNDIR/viewer-targets.json" <<'PY'
+docker exec -i -e "OWN=$OWN" -e "OTHER=$OTHER" "$NAME" /opt/superset/.venv/bin/python - > "$RUNDIR/viewer-targets.json" <<'PY'
 import json, subprocess, yaml
 from pathlib import Path
 def dash_id(project):
     key = yaml.safe_load(Path(f"/opt/dpagent/projects/{project}/bundle/dashboards/overview.yaml").read_text())["uuid"]
     return subprocess.check_output(["runuser", "-u", "postgres", "--", "psql", "-X", "-At", "-d", "superset_meta",
                                     "-c", f"SELECT id FROM dashboards WHERE uuid = '{key}'"], cwd="/", text=True).strip()
-check = yaml.safe_load(Path("/opt/dpagent/projects/quickstart-sales/expected.yaml").read_text())["checks"][0]
+import os
+own, other = os.environ["OWN"], os.environ.get("OTHER") or ""
+check = yaml.safe_load(Path(f"/opt/dpagent/projects/{own}/expected.yaml").read_text())["checks"][0]
 f = check["filters"][0]
-print(json.dumps({"own": {"url": f"/superset/dashboard/{dash_id('quickstart-sales')}/", "rows": check["rows"],
-                          "filter_values": [str(v) for v in f["values"]], "filtered_rows": f["rows"]},
-                  "other": {"url": f"/superset/dashboard/{dash_id('quickstart-ops')}/"}}, default=str))
+targets = {"own": {"url": f"/superset/dashboard/{dash_id(own)}/", "rows": check["rows"],
+                   "filter_values": [str(v) for v in f["values"]], "filtered_rows": f["rows"]}}
+if other:
+    targets["other"] = {"url": f"/superset/dashboard/{dash_id(other)}/"}
+print(json.dumps(targets, default=str))
 PY
 mkdir -p "$OUT/browser"
 set +e
@@ -142,7 +171,7 @@ rm -rf "$RUNDIR"
 echo "viewer browser rc=$BROWSER_RC" | tee -a "$OUT/browser/run.log"
 [ "$BROWSER_RC" -eq 0 ] || { tail -30 "$OUT/browser/run.log"; exit 1; }
 
-docker exec "$NAME" bash -lc 'bash /opt/dpagent/tests/quickstart_acceptance/inside.sh second' 2>&1 | tee "$OUT/run-second.log"
+docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE second" 2>&1 | tee "$OUT/run-second.log"
 if [ "$OS" = ol8 ]; then
   docker exec "$NAME" bash -lc '
     echo "$(readlink -f /usr/bin/python3) $(python3 --version)" > /root/system-python-after.txt

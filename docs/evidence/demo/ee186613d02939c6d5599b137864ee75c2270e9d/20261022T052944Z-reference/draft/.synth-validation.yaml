@@ -1,0 +1,134 @@
+generated_at: '2026-10-22T05:48:15+00:00'
+generator: dpagent pipeline validate
+model: ''
+content_hash: sha256:bf841f4e77037930b22c0c66ff19199e5c241a986204452b8586fa52424ddf93
+steps:
+  structure:
+    status: pass
+  load:
+    status: pass
+  dbt_compile:
+    status: pass
+    detail: 1 model(s) parsed clean
+    method: dbt project/Jinja parse only - structure, Jinja rendering, ref()/config
+      resolution; no live database, so it does NOT confirm the SQL itself is valid
+      Postgres (a typo like 'SELEC ...' still parses clean). Not dbt compile/run.
+      The SQL is only actually proven by steps 4-5 (dbt run against a real fixture
+      database).
+  procedures:
+    status: skipped
+    detail: no procedure-engine stage in this pipeline
+  dbt_dependencies:
+    status: pass
+    detail: 1 model(s), no ref()/source() dependency
+    checks_for: ref()/source() Jinja calls - not supported by this validation harness
+      (see check_dbt_dependencies's own docstring); models must read from a fully-schema-qualified
+      physical table instead
+  fixture:
+    clone_name: fulfilment_sla__validate__cf258925
+    pipeline_hash: sha256:bf841f4e77037930b22c0c66ff19199e5c241a986204452b8586fa52424ddf93
+    fixture_hash: sha256:c12eac7e3ac5068ea30b491d45954365adbc8d4445dd1d0061e75c083b4ce22e
+    expected_hash: sha256:410d0a71606f763c01356e75dfc6b43dd8b1a8983e62993bdcc5a404ad49d523
+    deploy_error: ''
+    run_ids:
+    - 3
+    - 4
+    run_status:
+      run_1: ok
+      run_2: ok
+    comparison:
+      run_1: pass
+      run_2: pass
+      idempotent: true
+    gates:
+      run_1:
+        landing:
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 10
+          rows_rejected: null
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 10
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 12
+          rows_rejected: 0
+        curated:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 2
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 2
+          rows_rejected: 0
+      run_2:
+        landing:
+        - type: row_count_bounds
+          status: passed
+          detail: ''
+          rows_checked: 10
+          rows_rejected: null
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 10
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 12
+          rows_rejected: 0
+        curated:
+        - type: not_null
+          status: passed
+          detail: ''
+          rows_checked: 2
+          rows_rejected: 0
+        - type: unique
+          status: passed
+          detail: ''
+          rows_checked: 2
+          rows_rejected: 0
+    dbt_tests:
+      run_1: []
+      run_2: []
+    cleanup:
+      pipeline_artifacts: pass
+      pipeline_artifacts_detail: 'DAG removed; published files removed; dbt models
+        removed; dlt state removed; secrets released: DPAGENT_VALIDATE_CF258925_SRC_DATABASE,
+        DPAGENT_VALIDATE_CF258925_SRC_HOST, DPAGENT_VALIDATE_CF258925_SRC_PASSWORD,
+        DPAGENT_VALIDATE_CF258925_SRC_PORT, DPAGENT_VALIDATE_CF258925_SRC_USER, DPAGENT_VALIDATE_CF258925_WH_DATABASE,
+        DPAGENT_VALIDATE_CF258925_WH_HOST, DPAGENT_VALIDATE_CF258925_WH_PASSWORD,
+        DPAGENT_VALIDATE_CF258925_WH_PORT, DPAGENT_VALIDATE_CF258925_WH_USER | verified
+        gone: DAG (file + Airflow registration + published files + dbt models + dlt
+        state), no clone secrets left in /opt/airflow/home/pipelines.env, no active
+        runs'
+      source_database: pass
+      source_role: pass
+      warehouse_database: pass
+      warehouse_role: pass
+      s3_objects: not_applicable
+      overall: pass
+    unavailable_reason: ''
+    overall: pass
+    report_version: 2
+    validator:
+      dpagent: 0.4.0
+      report: 2
+      bronze_manifest_format: 1
+      postgres: PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg22.04+2)
+      dbt: 1.8.10
+    inputs:
+      bronze_staging: false
+      dbt_project: false
+    evidence_id: ev-8602444cf915537b
+assumptions: ''
+open_questions: []

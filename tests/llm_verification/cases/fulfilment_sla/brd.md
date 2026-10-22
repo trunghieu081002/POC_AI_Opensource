@@ -32,3 +32,10 @@ Bảng `fct_delivery_sla`, **mỗi tháng một dòng**, chỉ các tháng có �
 | `on_time_rate` | numeric | `on_time_orders / eligible_orders × 100`, làm tròn 1 chữ số thập phân (0,05 làm tròn lên) |
 
 Đơn được tính vào tháng đặt hàng của nó, dù được giao trong tháng sau.
+
+## Vận hành
+
+- **Lịch chạy:** hằng ngày lúc 02:00 UTC.
+- **Dữ liệu nguồn sai thì dừng:** nếu trong một lần nạp, `sale_order.id` hoặc `stock_picking.id` bị lặp, lần chạy
+  phải **dừng ở bước nạp** và không cập nhật bảng báo cáo (bảng giữ nguyên kết quả của lần chạy tốt gần nhất).
+  Không được tự chọn một trong các dòng trùng.

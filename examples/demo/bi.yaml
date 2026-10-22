@@ -1,0 +1,30 @@
+# Demo BI (docs/demo.md): Superset + the fulfil-sla dashboard. The dashboard is a HAND-WRITTEN artifact
+# (projects/fulfil-sla, native Superset YAML) attached through the existing superset-assets mechanism - DPAgent does not
+# generate dashboards. Applied after the pipeline's first run. Step chosen by DEMO_BI_MODE (validate | deploy | undeploy);
+# deploy needs DEMO_BI_APPROVED_BY and the reviewed fingerprint DEMO_BI_APPROVED_SHA256.
+project: demo-bi
+components:
+  - superset:
+      version: "6.1.0"
+      backend_db: superset_meta
+      backend_user: superset_meta
+      backend_password: "${SUPERSET_METADATA_PASSWORD}"
+      secret_key: "${SUPERSET_SECRET_KEY}"
+      admin_password: "${SUPERSET_ADMIN_PASSWORD}"
+      warehouse_db: warehouse
+      warehouse_role: superset_reader
+      warehouse_password: "${SUPERSET_WAREHOUSE_PASSWORD}"
+      warehouse_schemas: [fulfilment_sla]
+      warehouse_creator_roles: ["${WAREHOUSE_DB_USER}"]
+  - superset-assets:
+      environment: "${DEMO_ENVIRONMENT:-dev}"
+      mode: "${DEMO_BI_MODE:-validate}"
+      approved_by: "${DEMO_BI_APPROVED_BY:-}"
+      projects:
+        - name: fulfil-sla
+          revision: "${DEMO_BI_REVISION:-v1}"
+          bundle_dir: projects/fulfil-sla/bundle
+          expected_file: projects/fulfil-sla/expected.yaml
+          approved_sha256: "${DEMO_BI_APPROVED_SHA256:-}"
+          viewers:
+            - {username: fulfil.viewer, password_env: FS_VIEWER_PASSWORD}

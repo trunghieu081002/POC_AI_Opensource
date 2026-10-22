@@ -1,0 +1,8 @@
+draft origin: reference (hand-written, examples/demo/reference/fulfilment_sla) - not drafted by a model
+╭─ approving fulfilment_sla means having read every line of these 2 file(s) ─╮
+│   · models/fct_delivery_sla.sql                                            │
+│   · pipeline.yaml                                                          │
+╰────────────────────────────────────────────────────────────────────────────╯
+fulfilment_sla is now maturity: reviewed (approved by 'demo.reviewer' at 
+2026-10-22T06:17:47+00:00, evidence ev-cffdef52b5a38cfa) - `dpagent pipeline 
+deploy fulfilment_sla` will apply it for real.
