@@ -1,0 +1,74 @@
+{
+  "status": "pass",
+  "user": "fulfil.viewer",
+  "own_unfiltered": {
+    "rendered": [
+      {
+        "month": "2026-01",
+        "eligible_orders": "3",
+        "delivered_orders": "2",
+        "on_time_orders": "2",
+        "on_time_rate": "66.7"
+      },
+      {
+        "month": "2026-02",
+        "eligible_orders": "3",
+        "delivered_orders": "3",
+        "on_time_orders": "1",
+        "on_time_rate": "33.3"
+      }
+    ],
+    "headers": [
+      "month",
+      "eligible_orders",
+      "delivered_orders",
+      "on_time_orders",
+      "on_time_rate"
+    ],
+    "api_rows": [
+      {
+        "month": "2026-01",
+        "eligible_orders": 3,
+        "delivered_orders": 2,
+        "on_time_orders": 2,
+        "on_time_rate": "66.7"
+      },
+      {
+        "month": "2026-02",
+        "eligible_orders": 3,
+        "delivered_orders": 3,
+        "on_time_orders": 1,
+        "on_time_rate": "33.3"
+      }
+    ]
+  },
+  "edit_controls": 0,
+  "own_filtered": {
+    "rendered": [
+      {
+        "month": "2026-02",
+        "eligible_orders": "3",
+        "delivered_orders": "3",
+        "on_time_orders": "1",
+        "on_time_rate": "33.3"
+      }
+    ],
+    "headers": [
+      "month",
+      "eligible_orders",
+      "delivered_orders",
+      "on_time_orders",
+      "on_time_rate"
+    ],
+    "api_rows": [
+      {
+        "month": "2026-02",
+        "eligible_orders": 3,
+        "delivered_orders": 3,
+        "on_time_orders": 1,
+        "on_time_rate": "33.3"
+      }
+    ]
+  },
+  "other": "not checked: one project deployed"
+}

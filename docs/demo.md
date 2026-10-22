@@ -70,7 +70,7 @@ fingerprint) is missing.
 | `synth` (reference) | `pipeline validate` passes: two runs match the expected result, idempotent |
 | `approve` | `promoted` with your name; `deploy` refused before this |
 | `check` | `{"ok": true}`: 2026-01 → 3 eligible / 2 delivered / 2 on time / 66.7 %; 2026-02 → 3 / 3 / 1 / 33.3 %; landing holds each source row once |
-| `schedule` | `fulfilment_sla … 0 2 * * * … deployed` |
+| `schedule` | `fulfilment_sla … 0 2 * * * … deployed`; in Airflow the DAG is unpaused with its next run known. Deploying unpauses it, and Airflow then starts **one** `scheduled` run for the latest past 02:00 interval (`catchup=False` means no older ones) besides your `manual` runs |
 | `bi-deploy` | the dashboard deployed; as `fulfil.viewer`: the table shows the two rows above, the Month filter works, no edit control; every write refused (403) |
 | `bad-data` | `run with a repeated source id: rc=1 (must be non-zero)`; the audit names the failed `unique` gate on `stock_picking`; `check --fact-only` still shows the last good result |
 | `fix-data` | the run passes; `check` is `ok` again |

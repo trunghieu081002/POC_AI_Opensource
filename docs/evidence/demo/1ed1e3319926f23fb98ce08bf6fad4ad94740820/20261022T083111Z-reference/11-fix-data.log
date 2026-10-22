@@ -1,0 +1,7 @@
+triggered — dpagent run 13
+waiting up to 1800s for run 13 to finish...
+         fulfilment_sla · run 13 ok · started 2026-10-22T08:54:09+00:00         
+ stage    status  rows  gates                         started                   
+ landing  passed    10  row_count_bounds, unique,     2026-10-22T08:54:17+00:00 
+                        unique                                                  
+ curated  passed     -  not_null, unique              2026-10-22T08:54:26+00:00 

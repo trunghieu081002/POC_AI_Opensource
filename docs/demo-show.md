@@ -29,7 +29,7 @@ D="bash examples/demo/demo.sh"
 | 3 | The evidence a reviewer reads | `$D validate` (or the trace: `ls /root/quickstart-evidence/ai-trace`) | two runs match the hand-calculated expected result, idempotent |
 | 4 | **A person approves** | `DEMO_APPROVED_BY=<the reviewer's name> $D approve` | `promoted`; before this, `dpagent pipeline deploy` refuses the draft |
 | 5 | Layer 2: deploy and run | `$D deploy` then `$D check` | `ok`; 2026-01 66.7 %, 2026-02 33.3 % |
-| 6 | Schedule | `$D schedule` | `0 2 * * *` (UTC), deployed. This is the deployed schedule; a run the scheduler starts appears with run type `scheduled` |
+| 6 | Schedule | `$D schedule` | `0 2 * * *` (UTC), deployed. This is the deployed schedule. Deploying also makes Airflow start one `scheduled` run for the latest past 02:00 interval; later scheduler runs appear with run type `scheduled`, yours with `manual` |
 | 7 | Dashboard, reviewed | `$D bi-validate`, then `DEMO_BI_APPROVED_BY=<name> DEMO_BI_APPROVED_SHA256=<printed fingerprint> $D bi-deploy` | dashboard live |
 | 8 | Viewer | browser on the Docker host: `http://127.0.0.1:8088` (inside the container's network: `docker run --network container:<host> …`, or an SSH tunnel), user `fulfil.viewer`, password `FS_VIEWER_PASSWORD` from `/root/demo-dev.env` | the table, the Month filter; no edit control |
 

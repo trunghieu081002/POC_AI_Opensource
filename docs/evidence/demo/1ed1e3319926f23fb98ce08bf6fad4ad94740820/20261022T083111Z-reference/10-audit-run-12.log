@@ -1,0 +1,26 @@
+fulfilment_sla · run 12 · failed
+
+landing failed · 10 rows
+  row_count_bounds
+  unique
+  unique — 2/13 row(s) in stock_picking failed unique, no quarantine declared
+
+events
+ time            actor   kind              message                              
+ 08:53:56+00:00  user    pipeline.trigger  triggering Airflow DAG               
+                                           'fulfilment_sla'                     
+ 08:53:59+00:00  engine  extract.start     fulfilment_sla via odoo_postgres     
+ 08:54:01+00:00  engine  extract.done      fulfilment_sla extract complete:     
+                                           sale_order +10, stock_picking +13    
+ 08:54:02+00:00  engine  gate.passed       fulfilment_sla/landing               
+                                           row_count_bounds: ok                 
+ 08:54:03+00:00  engine  gate.passed       fulfilment_sla/landing unique: ok    
+ 08:54:03+00:00  engine  gate.failed       fulfilment_sla/landing unique: 2/13  
+                                           row(s) in stock_picking failed       
+                                           unique, no quarantine declared       
+ 08:54:03+00:00  engine  stage.failed      fulfilment_sla/landing halted:       
+                                           unique: 2/13 row(s) in stock_picking 
+                                           failed unique, no quarantine         
+                                           declared                             
+ 08:54:05+00:00  engine  pipeline.failed   DAG run 12 reached terminal state:   
+                                           failed                               

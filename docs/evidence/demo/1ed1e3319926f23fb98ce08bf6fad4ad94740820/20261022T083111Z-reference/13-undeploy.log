@@ -1,0 +1,54 @@
+project: demo-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+= superset — already installed at v0.1.1 with identical params
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"undeploy", "projects": [{"name": "fulfil-sla", "revision": "v1", "bundle_dir": 
+"projects/fulfil-sla/bundle", "expected_file": 
+"projects/fulfil-sla/expected.yaml", "approved_sha256": "", "viewers": 
+[{"username": "fulfil.viewer", "password_env": "FS_VIEWER_PASSWORD"}]}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 13131ms
+  verify ok
+
+╭───────────────────────────────────────────────────────────────────╮
+│ installed, but NOT tested                                         │
+│ --no-test was given. `dpagent status` will show these as untested │
+│ until `dpagent test` has run.                                     │
+╰───────────────────────────────────────────────────────────────────╯
+undeployed fulfilment_sla
+  removed  DAG file in Airflow's DAGS_FOLDER
+  removed  DAG registration and run history in Airflow
+  absent   published copy /opt/dpagent/pipelines/fulfilment_sla
+  removed  published dbt models
+  removed  dlt local working state
+  released secrets: FS_SRC_HOST, FS_SRC_NAME, FS_SRC_PASSWORD, FS_SRC_PORT, 
+FS_SRC_USER  (airflow-scheduler restarted)
+  kept     WAREHOUSE_DB_HOST - still used by: demo, quickstart, quickstart_dbt
+  kept     WAREHOUSE_DB_NAME - still used by: demo, quickstart, quickstart_dbt
+  kept     WAREHOUSE_DB_PASSWORD - still used by: demo, quickstart, 
+quickstart_dbt
+  kept     WAREHOUSE_DB_PORT - still used by: demo, quickstart, quickstart_dbt
+  kept     WAREHOUSE_DB_USER - still used by: demo, quickstart, quickstart_dbt
+left in place: warehouse schemas 'fulfilment_sla' and 'fulfilment_sla_landing' 
+with all their tables, and dpagent's run history
