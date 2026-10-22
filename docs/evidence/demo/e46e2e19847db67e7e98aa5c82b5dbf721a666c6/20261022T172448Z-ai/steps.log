@@ -1,0 +1,46 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=0
+== 03-source: bash examples/demo/demo.sh source
+03-source rc=0
+04-synth rc=1 draft=ai
+{
+ "model": "gemini/gemini-3.8-flash",
+ "classification": "inconclusive-provider-unavailable",
+ "synth_exit_code": 1,
+ "calls": 6,
+ "call_ceiling": 3,
+ "revisions": 2,
+ "format_repairs": 0,
+ "provider_errors": [
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n"
+ ],
+ "transient_retries": 4,
+ "human_edits": 0,
+ "attempts": [
+  {
+   "index": 1,
+   "source": "llm",
+   "outcome": "structural-fail",
+   "evidence_id": ""
+  },
+  {
+   "index": 2,
+   "source": "llm-revision",
+   "outcome": "policy-fail",
+   "evidence_id": "ev-10bad67d3ae312a3"
+  },
+  {
+   "index": 3,
+   "source": "llm-revision",
+   "outcome": "provider-unavailable",
+   "evidence_id": ""
+  }
+ ],
+ "tokens": 28055
+}
+secret scan (first): no environment-file secret or model credential in evidence
