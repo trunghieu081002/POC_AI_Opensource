@@ -66,7 +66,8 @@ case "${1:-}" in
         --secret "FS_SRC_PASSWORD=source database password" \
         --hint "Source connection fields use the secret refs above. Use the standard warehouse refs." \
         --fixture "$FX" --expected "$EX" --max-revisions "${DEMO_MAX_REVISIONS:-2}" \
-        --max-calls "${DEMO_MAX_CALLS:-6}" ${DEMO_TRACE_DIR:+--trace-dir "$DEMO_TRACE_DIR"} "${over[@]}"
+        --max-calls "${DEMO_MAX_CALLS:-6}" --transient-retries "${DEMO_TRANSIENT_RETRIES:-0}" \
+        --retry-wait "${DEMO_RETRY_WAIT:-120}" ${DEMO_TRACE_DIR:+--trace-dir "$DEMO_TRACE_DIR"} "${over[@]}"
       echo "model $DPAGENT_MODEL via dpagent pipeline synth (classification in the trace)" > "$(origin_file)"
     fi
     ;;
