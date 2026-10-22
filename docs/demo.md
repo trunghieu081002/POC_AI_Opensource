@@ -104,6 +104,17 @@ demo.
 | `3b1ca5f/20261022T060607Z-reference` | reference (hand-written) | **PASS**, both phases: layer 1 install + suites; reference validated (2 runs = expected); draft not approved, deploy before approval refused (rc=1), approval without a person refused (rc=2); approved by `demo.reviewer`; deploy + run = expected (psql); schedule `0 2 * * *` deployed; unreviewed dashboard fingerprint refused (rc=3), nothing in Superset; dashboard + viewer: API as `fulfil.viewer` = expected, writes refused; real browser as the viewer; repeated `stock_picking.id` -> run rc=1, audit `2/13 row(s) in stock_picking failed unique`, report unchanged; source fixed -> rerun = expected; undeploy: dashboard, viewer, DAG (Airflow's list), secrets, dbt models gone; secret scan clean |
 | `--demo ai` | the model through `pipeline synth` | **not run**: no model credential in this environment |
 
+## Several tables: HG (already verified, not re-run here)
+
+The demo problem has two source tables. The multi-table path on the same engine is shown with HG's own report,
+whose SQL was written by people (not by a model):
+- `gold.resources_useage_number`: 6 source tables, one bronze batch (one source snapshot, one load transaction),
+  staging, silver, gold and a Superset dashboard. See `docs/hg-resources-useage-number.md`, and
+  `docs/hg-bronze-multi-table.md` for the batch guarantees.
+- Bronze matrix 34/34, leaks=0 on `862a71a` (`docs/evidence/m25-automated/`), including the HG scenarios.
+
+It illustrates the flow with several tables. **It is not HG load acceptance**: that needs HG's data, scale and SLA.
+
 ## Limits
 
 - One small fixture (10 orders, 12 transfers). It proves behaviour, not load; HG representative load is a separate
