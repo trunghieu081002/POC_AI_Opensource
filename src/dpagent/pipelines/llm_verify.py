@@ -84,7 +84,8 @@ class Case:
 
     def input_hashes(self) -> dict:
         out = {"brd": _sha(self.brd), "source_schema": _sha(self.schema),
-               "request_yaml": _sha((self.dir / "request.yaml").read_bytes()),
+               **({"request_yaml": _sha((self.dir / "request.yaml").read_bytes())}
+                  if (self.dir / "request.yaml").is_file() else {}),     # absent for a CLI request
                "synth_system_prompt_name": synth_mod.system_prompt_name(self.request),
                "synth_system_prompt": _sha(llm.load_prompt(synth_mod.system_prompt_name(self.request)))}
         if self.request.dbt_template:
