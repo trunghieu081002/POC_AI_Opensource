@@ -131,3 +131,10 @@ def test_only_an_ai_demo_installs_the_llm_extra_and_a_reused_probe_must_have_pas
     assert 'WITH_LLM=1' in runner[runner.index('if [ "$DEMO" = ai ]; then'):runner.index("# what the acceptance phases use")]
     assert runner.count('docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM"') == 2          # ubuntu and ol8 bootstrap
     assert 'grep -q \'"ok": true\' "$DEMO_PROBE_EVIDENCE"' in runner
+
+
+def test_the_call_ceiling_of_an_ai_demo_reaches_the_host():
+    runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert "DEMO_MAX_CALLS DEMO_MAX_REVISIONS" in runner
+    demo = (D / "demo.sh").read_text()
+    assert '--max-calls "${DEMO_MAX_CALLS:-6}"' in demo and '--max-revisions "${DEMO_MAX_REVISIONS:-2}"' in demo

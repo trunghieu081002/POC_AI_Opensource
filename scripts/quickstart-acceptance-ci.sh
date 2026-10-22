@@ -41,7 +41,8 @@ WITH_LLM=""                                     # bootstrap's [llm] extra (litel
 if [ "$DEMO" = ai ]; then
   WITH_LLM=1
   [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
-  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_REASONING_EFFORT; do
+  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_REASONING_EFFORT \
+           DEMO_MAX_CALLS DEMO_MAX_REVISIONS; do
     [ -n "${!v:-}" ] && PASSENV+=(-e "$v")          # by name: docker reads the value from this environment
   done
   # the same limits the A3 runner uses (scripts/m25-acceptance-ci.sh): a reasoning model's hidden thinking shares
