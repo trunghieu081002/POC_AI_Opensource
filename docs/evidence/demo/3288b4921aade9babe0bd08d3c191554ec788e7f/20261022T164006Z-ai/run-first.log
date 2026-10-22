@@ -1,0 +1,44 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=4
+drop-in exists but is not being read
+      XX password_encryption is '' — new passwords will be stored weakly
+      XX the running server does not match the spec
+    FAIL With listen_addresses=localhost, the server is not reachable off-host 
+(negative)
+      XX nothing is bound to port 5432 at all
+  teardown
+    PASS Remove everything the suite created 119ms
+  postgres: 5 of 6 checks failed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 7971ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 27ms
+  python-modern: 2 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  airflow        passed     4/4  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  dlt            passed     3/3  │
+│  postgres       FAILED     1/6  │
+│  python-modern  passed     2/2  │
+╰─────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────╮
+│ the installer finished, but the system does not work                   │
+│                                                                        │
+│ Every step succeeded and verify passed. The acceptance suite found the │
+│ system failing anyway — which is the entire reason it runs.            │
+│                                                                        │
+│ what failed: dpagent audit 2                                           │
+│ re-run just the tests: dpagent test                                    │
+╰────────────────────────────────────────────────────────────────────────╯
