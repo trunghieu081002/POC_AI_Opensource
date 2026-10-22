@@ -1,7 +1,7 @@
 """Viewer RBAC through Superset's HTTP API, logged in AS THE VIEWER (never as admin). Independent of the pack's
 code: object IDs come from Superset's metadata by UUID, expected rows from the project's literal expected file.
 
-  check_viewer.py USERNAME PASSWORD_ENV OWN_PROJECT OTHER_PROJECT
+  check_viewer.py USERNAME PASSWORD_ENV OWN_PROJECT OTHER_PROJECT     (OTHER_PROJECT "-": none deployed)
 
 Must hold: the account's only role is its project's viewer role; its project's dashboard and chart are readable and
 return the expected rows, also with the native filter's value applied; every write (edit/delete a chart or dashboard,
@@ -73,7 +73,7 @@ def main(username: str, password_env: str, own: str, other: str) -> dict:
     if report["roles"] != ["dpagent-viewer-" + own]:
         bad(f"roles are {report['roles']}, want only dpagent-viewer-{own}")
 
-    mine, theirs = ids(own), ids(other)
+    mine, theirs = ids(own), (ids(other) if other != "-" else None)
     report["ids"] = {"own": mine, "other": theirs}
     check = expected(own)
 
@@ -123,10 +123,11 @@ def main(username: str, password_env: str, own: str, other: str) -> dict:
         if resp.status_code not in DENIED:
             bad(f"{label}: {resp.status_code} (want a permission refusal 403/404): {resp.text[:200]}")
 
-    # the other project: not readable, not listed
-    for kind, path in (("dashboard", f"/api/v1/dashboard/{theirs['dashboard']}"),
-                       ("chart", f"/api/v1/chart/{theirs['chart']}"),
-                       ("dataset", f"/api/v1/dataset/{theirs['dataset']}")):
+    # the other project: not readable, not listed (OTHER_PROJECT "-": only one project is deployed)
+    for kind, path in (() if theirs is None else (
+            ("dashboard", f"/api/v1/dashboard/{theirs['dashboard']}"),
+            ("chart", f"/api/v1/chart/{theirs['chart']}"),
+            ("dataset", f"/api/v1/dataset/{theirs['dataset']}"))):
         code = s.get(BASE + path, timeout=30).status_code
         report.setdefault("other_project", {})[kind] = code
         if code not in DENIED:

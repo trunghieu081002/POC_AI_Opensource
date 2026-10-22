@@ -1,0 +1,48 @@
+# Hand-written reference (examples/demo/reference/fulfilment_sla/ORIGIN.md) - same BRD as the AI case
+# tests/llm_verification/cases/fulfilment_sla/brd.md. Connections are ${VAR} only.
+name: fulfilment_sla
+summary: sale_order + stock_picking -> landing -> curated (dbt) - on-time delivery rate by order month
+schedule: "0 2 * * *"
+
+source:
+  connector: odoo_postgres
+  connection:
+    host: "${FS_SRC_HOST}"
+    port: "${FS_SRC_PORT}"
+    database: "${FS_SRC_NAME}"
+    user: "${FS_SRC_USER}"
+    password: "${FS_SRC_PASSWORD}"
+  tables: [sale_order, stock_picking]
+
+warehouse:
+  host: "${WAREHOUSE_DB_HOST:-localhost}"
+  port: "${WAREHOUSE_DB_PORT:-5432}"
+  database: "${WAREHOUSE_DB_NAME:-warehouse}"
+  user: "${WAREHOUSE_DB_USER}"
+  password: "${WAREHOUSE_DB_PASSWORD}"
+  schema: fulfilment_sla
+
+stages:
+  - name: landing
+    gates:
+      - type: row_count_bounds
+        table: sale_order
+        min: 1
+      - type: unique
+        table: sale_order
+        columns: [id]
+      - type: unique
+        table: stock_picking
+        columns: [id]
+
+  - name: curated
+    engine: dbt
+    depends_on: landing
+    models: [fct_delivery_sla]
+    gates:
+      - type: not_null
+        table: fct_delivery_sla
+        columns: [month, eligible_orders, delivered_orders, on_time_orders, on_time_rate]
+      - type: unique
+        table: fct_delivery_sla
+        columns: [month]

@@ -1,0 +1,72 @@
+dashboard_title: 'Fulfilment: on-time delivery by order month'
+slug: fulfil-sla
+uuid: 16622e72-34f9-5b4f-a5a0-e0e9fa330a2e
+version: 1.0.0
+published: true
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    id: ROOT_ID
+    type: ROOT
+    children:
+    - GRID_ID
+  GRID_ID:
+    id: GRID_ID
+    type: GRID
+    children:
+    - ROW-1
+    parents:
+    - ROOT_ID
+  ROW-1:
+    id: ROW-1
+    type: ROW
+    children:
+    - CHART-1
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-1:
+    id: CHART-1
+    type: CHART
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-1
+    meta:
+      chartId: 100
+      uuid: 48b808a2-8856-5218-b16c-380ebe5034c6
+      width: 12
+      height: 50
+      sliceName: 'Fulfilment: on-time delivery by order month'
+metadata:
+  native_filter_configuration:
+  - id: NATIVE_FILTER-dimension
+    name: Month
+    filterType: filter_select
+    targets:
+    - datasetUuid: a38301ca-e87e-5e30-a795-81cd73fea601
+      column:
+        name: month
+    defaultDataMask:
+      extraFormData: {}
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    controlValues:
+      enableEmptyFilter: false
+      multiSelect: true
+      searchAllOptions: false
+      inverseSelection: false
+    type: NATIVE_FILTER
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  timed_refresh_immune_slices: []
+  expanded_slices: {}
+  cross_filters_enabled: false

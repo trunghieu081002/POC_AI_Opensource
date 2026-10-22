@@ -1,0 +1,41 @@
+table_name: fct_delivery_sla
+schema: fulfilment_sla
+uuid: a38301ca-e87e-5e30-a795-81cd73fea601
+database_uuid: c924145e-5c55-5d80-8a6d-e3fd766d6b37
+version: 1.0.0
+filter_select_enabled: true
+columns:
+- column_name: month
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: eligible_orders
+  type: BIGINT
+  groupby: false
+  filterable: true
+  is_dttm: false
+- column_name: delivered_orders
+  type: BIGINT
+  groupby: false
+  filterable: true
+  is_dttm: false
+- column_name: on_time_orders
+  type: BIGINT
+  groupby: false
+  filterable: true
+  is_dttm: false
+- column_name: on_time_rate
+  type: NUMERIC
+  groupby: false
+  filterable: true
+  is_dttm: false
+metrics:
+- metric_name: eligible_orders
+  expression: SUM(eligible_orders)
+- metric_name: delivered_orders
+  expression: SUM(delivered_orders)
+- metric_name: on_time_orders
+  expression: SUM(on_time_orders)
+- metric_name: on_time_rate
+  expression: MAX(on_time_rate)

@@ -1,0 +1,29 @@
+slice_name: 'Fulfilment: on-time delivery by order month'
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 100
+  viz_type: table
+  query_mode: aggregate
+  groupby:
+  - month
+  metrics:
+  - eligible_orders
+  - delivered_orders
+  - on_time_orders
+  - on_time_rate
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": ["month"], "metrics": ["eligible_orders", "delivered_orders", "on_time_orders",
+  "on_time_rate"], "filters": [], "time_range": "No filter", "orderby": [], "row_limit":
+  1000, "extras": {"having": "", "where": ""}}], "form_data": {"datasource": "0__table",
+  "slice_id": 100, "viz_type": "table", "query_mode": "aggregate", "groupby": ["month"],
+  "metrics": ["eligible_orders", "delivered_orders", "on_time_orders", "on_time_rate"],
+  "adhoc_filters": [], "row_limit": 1000, "order_desc": false, "show_cell_bars": false},
+  "result_format": "json", "result_type": "full"}'
+uuid: 48b808a2-8856-5218-b16c-380ebe5034c6
+dataset_uuid: a38301ca-e87e-5e30-a795-81cd73fea601
+version: 1.0.0

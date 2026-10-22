@@ -1,0 +1,4 @@
+name: fulfil-sla
+revision: v1
+bundle_dir: projects/fulfil-sla/bundle
+expected_file: projects/fulfil-sla/expected.yaml
