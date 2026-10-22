@@ -40,6 +40,9 @@ import run_matrix  # noqa: E402  (its leak detection and the promote probe are r
 
 CASES = Path(__file__).resolve().parent / "cases"
 BUILD, AMBIGUOUS = "artist_summary", "revenue_ambiguous"
+# A business problem nobody wrote SQL or a processing order for (two tables, first delivery per order, a
+# default due date, an inclusive boundary, month of the order); its expected result was fixed by hand first.
+FULFIL, FULFIL_VAGUE, FULFIL_MONGO = "fulfilment_sla", "fulfilment_sla_ambiguous", "fulfilment_sla_mongodb"
 KHSX = "fact_khsx_detail"
 LABEL = "fact_label_operation"  # two tables, LEFT JOIN, filter, one row per raw ISRC (smallest id)      # an owned dbt project drafted from a template (docs/llm-owned-dbt-project.md)
 NAME = "a3_artist_summary"
@@ -438,7 +441,11 @@ def label_scripted_scenarios(out: Path) -> list[dict]:
 
 # ------------------------------------------------------------------ real mode
 
-def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions: int) -> list[dict]:
+def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions: int, *,
+                   build: str = BUILD, ambiguous: str = AMBIGUOUS, build_label: str = "R1-build-artist-summary",
+                   unsupported: str | None = None) -> list[dict]:
+    """R1 build (re-asked at most max_revisions times), R2 the ambiguous BRD `ambiguous_runs` times, and - when
+    `unsupported` names a case - R3 one request the platform cannot serve, where the right answer is to say so."""
     llm_verify.ensure_opted_in(max_calls)
     if not llm.available():
         print("no provider credential in the environment", file=sys.stderr)
@@ -448,7 +455,7 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
     print(f"model: {llm.get_model()}  call ceiling: {max_calls}", flush=True)
 
     retries = int(os.environ.get("A3_TRANSIENT_RETRIES", "5"))
-    r = run_one(BUILD, out, "R1-build-artist-summary", max_calls=remaining,
+    r = run_one(build, out, build_label, max_calls=remaining,
                 max_revisions=max_revisions, transient_retries=retries)
     rows.append(r)
     ran["build"] += 1
@@ -461,7 +468,7 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
         if remaining < 1:
             print(f"call budget used up before ambiguous run {i}", flush=True)
             break
-        r = run_one(AMBIGUOUS, out, f"R2-ambiguous-brd-run{i}", max_calls=min(remaining, 3),
+        r = run_one(ambiguous, out, f"R2-ambiguous-brd-run{i}", max_calls=min(remaining, 3),
                     max_revisions=0, deploy=False, transient_retries=retries)
         ran["ambiguous"] += 1
         remaining -= r["calls"]
@@ -470,8 +477,21 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
         print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R2 run{i} {r['classification']}",
               flush=True)
 
+    if unsupported:
+        if remaining < 1:
+            print("call budget used up before the unsupported-source run", flush=True)
+        else:
+            r = run_one(unsupported, out, "R3-unsupported-source", max_calls=min(remaining, 3),
+                        max_revisions=0, deploy=False, transient_retries=retries)
+            ran["unsupported"] = 1
+            remaining -= r["calls"]
+            r["criteria_problems"] = llm_verify.ambiguous_problems(r)   # it must say what is missing, not build
+            rows.append(r)
+            print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R3 {r['classification']}", flush=True)
+
     # budget exhaustion must show up as INCOMPLETE, not as a pass over the runs that fit
-    missing = llm_verify.completeness({"build": 1, "ambiguous": ambiguous_runs}, ran)
+    missing = llm_verify.completeness({"build": 1, "ambiguous": ambiguous_runs,
+                                       **({"unsupported": 1} if unsupported else {})}, ran)
     if missing:
         rows.append({"label": "INCOMPLETE", "classification": "incomplete", "criteria_problems": missing,
                      "calls": 0})
@@ -530,7 +550,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--max-calls", type=int, default=0)
     ap.add_argument("--max-revisions", type=int, default=2)
     ap.add_argument("--ambiguous-runs", type=int, default=3)
-    ap.add_argument("--suite", choices=["artist", "khsx", "label"], default="artist",
+    ap.add_argument("--suite", choices=["artist", "khsx", "label", "fulfil"], default="artist",
                     help="artist: the A3 artist_summary case + ambiguous BRD; khsx: the owned dbt "
                          "project from a template (fact_khsx_detail); label: fact_label_operation")
     args = ap.parse_args(argv)
@@ -550,6 +570,13 @@ def main(argv: list[str]) -> int:
             rows = (label_scripted_scenarios(out) if args.mode == "scripted"
                     else owned_real_scenarios(LABEL, "R4-build-fact-label-operation", out,
                                               args.max_calls, args.max_revisions))
+        elif args.suite == "fulfil":
+            if args.mode == "scripted":
+                print("the fulfil suite has no scripted drafts: it exists to measure a real model", file=sys.stderr)
+                return 2
+            rows = real_scenarios(out, args.max_calls, args.ambiguous_runs, args.max_revisions,
+                                  build=FULFIL, ambiguous=FULFIL_VAGUE, build_label="R1-build-fulfilment-sla",
+                                  unsupported=FULFIL_MONGO)
         elif args.suite == "khsx":
             rows = (khsx_scripted_scenarios(out) if args.mode == "scripted"
                     else khsx_real_scenarios(out, args.max_calls, args.max_revisions))

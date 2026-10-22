@@ -1,0 +1,30 @@
+# Hand-written input (never shown to the model). Each row is here for one rule of brd.md.
+tables:
+  - name: sale_order
+    columns: {id: bigint, name: text, state: text, date_order: timestamp, commitment_date: timestamp}
+    rows:
+      - {id: 1, name: S1, state: sale, date_order: "2026-01-05 10:00:00", commitment_date: "2026-01-08 18:00:00"}   # two deliveries: the first is on time, the second late
+      - {id: 2, name: S2, state: done, date_order: "2026-01-10 09:00:00", commitment_date: null}                   # no commitment: due 2026-01-13 09:00, delivered exactly then
+      - {id: 3, name: S3, state: sale, date_order: "2026-01-20 12:00:00", commitment_date: "2026-01-22 12:00:00"}   # only a cancelled delivery and a return: not delivered
+      - {id: 4, name: S4, state: cancel, date_order: "2026-01-21 08:00:00", commitment_date: "2026-01-25 00:00:00"} # cancelled order, delivered on time: not counted
+      - {id: 5, name: S5, state: draft, date_order: "2026-01-25 08:00:00", commitment_date: null}                  # draft: not counted
+      - {id: 6, name: S6, state: sale, date_order: "2026-02-02 08:00:00", commitment_date: "2026-02-05 08:00:00"}   # late; also a delivery not done yet
+      - {id: 7, name: S7, state: sale, date_order: "2026-02-14 23:30:00", commitment_date: null}                   # no commitment, delivered one second after the 72 h
+      - {id: 8, name: S8, state: done, date_order: "2026-02-28 22:00:00", commitment_date: "2026-03-03 00:00:00"}   # delivered in March, counts in February; internal transfer ignored
+      - {id: 9, name: S9, state: sent, date_order: "2026-03-03 09:00:00", commitment_date: null}                   # quotation sent: not counted
+      - {id: 10, name: S10, state: cancel, date_order: "2026-03-10 09:00:00", commitment_date: null}               # March has no eligible order: no March row
+  - name: stock_picking
+    columns: {id: bigint, sale_id: bigint, picking_type: text, state: text, date_done: timestamp}
+    rows:
+      - {id: 101, sale_id: 1, picking_type: outgoing, state: done, date_done: "2026-01-07 15:00:00"}
+      - {id: 102, sale_id: 1, picking_type: outgoing, state: done, date_done: "2026-01-09 10:00:00"}
+      - {id: 103, sale_id: 2, picking_type: outgoing, state: done, date_done: "2026-01-13 09:00:00"}
+      - {id: 104, sale_id: 3, picking_type: outgoing, state: cancel, date_done: null}
+      - {id: 105, sale_id: 3, picking_type: incoming, state: done, date_done: "2026-01-21 10:00:00"}
+      - {id: 106, sale_id: 4, picking_type: outgoing, state: done, date_done: "2026-01-22 10:00:00"}
+      - {id: 107, sale_id: 6, picking_type: outgoing, state: done, date_done: "2026-02-06 09:00:00"}
+      - {id: 108, sale_id: 6, picking_type: outgoing, state: assigned, date_done: null}
+      - {id: 109, sale_id: 7, picking_type: outgoing, state: done, date_done: "2026-02-17 23:30:01"}
+      - {id: 110, sale_id: 8, picking_type: outgoing, state: done, date_done: "2026-03-02 10:00:00"}
+      - {id: 111, sale_id: 8, picking_type: internal, state: done, date_done: "2026-03-01 08:00:00"}
+      - {id: 112, sale_id: null, picking_type: outgoing, state: done, date_done: "2026-01-15 08:00:00"}
