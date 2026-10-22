@@ -442,7 +442,7 @@ def label_scripted_scenarios(out: Path) -> list[dict]:
 # ------------------------------------------------------------------ real mode
 
 def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions: int, *,
-                   build: str = BUILD, ambiguous: str = AMBIGUOUS, build_label: str = "R1-build-artist-summary",
+                   build: str | None = BUILD, ambiguous: str = AMBIGUOUS, build_label: str = "R1-build-artist-summary",
                    unsupported: str | None = None) -> list[dict]:
     """R1 build (re-asked at most max_revisions times), R2 the ambiguous BRD `ambiguous_runs` times, and - when
     `unsupported` names a case - R3 one request the platform cannot serve, where the right answer is to say so."""
@@ -455,14 +455,15 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
     print(f"model: {llm.get_model()}  call ceiling: {max_calls}", flush=True)
 
     retries = int(os.environ.get("A3_TRANSIENT_RETRIES", "5"))
-    r = run_one(build, out, build_label, max_calls=remaining,
-                max_revisions=max_revisions, transient_retries=retries)
-    rows.append(r)
-    ran["build"] += 1
-    remaining -= r["calls"]
-    r["criteria_problems"] = llm_verify.build_problems(r)
-    print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R1 {r['classification']}  "
-          f"calls={r['calls']}  {r['criteria_problems']}", flush=True)
+    if build is not None:     # None: the build is measured elsewhere (the demo's `pipeline synth` run)
+        r = run_one(build, out, build_label, max_calls=remaining,
+                    max_revisions=max_revisions, transient_retries=retries)
+        rows.append(r)
+        ran["build"] += 1
+        remaining -= r["calls"]
+        r["criteria_problems"] = llm_verify.build_problems(r)
+        print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R1 {r['classification']}  "
+              f"calls={r['calls']}  {r['criteria_problems']}", flush=True)
 
     for i in range(1, ambiguous_runs + 1):
         if remaining < 1:
@@ -490,7 +491,7 @@ def real_scenarios(out: Path, max_calls: int, ambiguous_runs: int, max_revisions
             print(f"{'ok  ' if not r['criteria_problems'] else 'FAIL'}  R3 {r['classification']}", flush=True)
 
     # budget exhaustion must show up as INCOMPLETE, not as a pass over the runs that fit
-    missing = llm_verify.completeness({"build": 1, "ambiguous": ambiguous_runs,
+    missing = llm_verify.completeness({**({"build": 1} if build is not None else {}), "ambiguous": ambiguous_runs,
                                        **({"unsupported": 1} if unsupported else {})}, ran)
     if missing:
         rows.append({"label": "INCOMPLETE", "classification": "incomplete", "criteria_problems": missing,
@@ -550,7 +551,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--max-calls", type=int, default=0)
     ap.add_argument("--max-revisions", type=int, default=2)
     ap.add_argument("--ambiguous-runs", type=int, default=3)
-    ap.add_argument("--suite", choices=["artist", "khsx", "label", "fulfil"], default="artist",
+    ap.add_argument("--suite", choices=["artist", "khsx", "label", "fulfil", "fulfil-asks"], default="artist",
                     help="artist: the A3 artist_summary case + ambiguous BRD; khsx: the owned dbt "
                          "project from a template (fact_khsx_detail); label: fact_label_operation")
     args = ap.parse_args(argv)
@@ -570,6 +571,12 @@ def main(argv: list[str]) -> int:
             rows = (label_scripted_scenarios(out) if args.mode == "scripted"
                     else owned_real_scenarios(LABEL, "R4-build-fact-label-operation", out,
                                               args.max_calls, args.max_revisions))
+        elif args.suite == "fulfil-asks":   # only the runs where the right answer is a question / a refusal
+            if args.mode == "scripted":
+                print("the fulfil-asks suite has no scripted drafts: it exists to measure a real model", file=sys.stderr)
+                return 2
+            rows = real_scenarios(out, args.max_calls, args.ambiguous_runs, 0, build=None,
+                                  ambiguous=FULFIL_VAGUE, unsupported=FULFIL_MONGO)
         elif args.suite == "fulfil":
             if args.mode == "scripted":
                 print("the fulfil suite has no scripted drafts: it exists to measure a real model", file=sys.stderr)

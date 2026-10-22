@@ -4,8 +4,10 @@
 # milestone and the refusals the demo must show. DEMO_DRAFT (from the runner): ai | reference.
 #   inside.sh first    layer 1 install, layer 3 draft + approval, layer 2 deploy/run, schedule, dashboard + viewer API
 #   inside.sh second   (after the host's viewer browser check) bad data blocked, recovery, status, undeploy + audit
+#   inside.sh show     a host for a live demo: layer 1 + the draft, then it STOPS before approval (no cleanup) - the
+#                      presenter's reviewer approves live (docs/demo-show.md)
 set -euo pipefail
-PHASE="${1:?first|second}"
+PHASE="${1:?first|second|show}"
 DRAFT="${DEMO_DRAFT:?ai|reference}"
 cd /opt/dpagent
 OUT=/root/quickstart-evidence          # the runner copies this directory out
@@ -54,11 +56,13 @@ step() {   # step <label> <command...>: run, keep its log and exit code, stop on
   echo "$label rc=$rc" | tee -a "$OUT/steps.log"
   [ "$rc" -eq 0 ] || { tail -40 "$OUT/$label.log"; exit "$rc"; }
 }
-refused() {   # refused <label> <command...>: must fail
-  local label="$1"; shift
-  set +e; "$@" > "$OUT/$label.log" 2>&1; local rc=$?; set -e
-  echo "$label rc=$rc (must be non-zero)" | tee -a "$OUT/steps.log"
-  [ "$rc" -ne 0 ] || { echo "$label was not refused" >&2; exit 1; }
+refused() {   # refused <label> <exit code> <reason text> <command...>: must fail with exactly that code and reason
+  local label="$1" want="$2" reason="$3"; shift 3
+  set +e; COLUMNS=400 "$@" > "$OUT/$label.log" 2>&1; local rc=$?; set -e
+  echo "$label rc=$rc (want $want)" | tee -a "$OUT/steps.log"
+  [ "$rc" -eq "$want" ] || { tail -20 "$OUT/$label.log"; echo "$label: exit $rc, want $want" >&2; exit 1; }
+  tr -s ' \n' ' ' < "$OUT/$label.log" | grep -qF -- "$reason" \
+    || { tail -20 "$OUT/$label.log"; echo "$label: refused for another reason (want: $reason)" >&2; exit 1; }
 }
 ok() { echo "check $1 ok" | tee -a "$OUT/steps.log"; }
 meta() { runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d superset_meta -c "$1"; }
@@ -67,7 +71,7 @@ fingerprint() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[
 dags() { "$PY" -c 'import subprocess, sys; from dpagent.pipelines import deploy
 sys.exit(subprocess.run(deploy._airflow_cli_command("dags", "list", "-o", "plain")).returncode)'; }
 
-if [ "$PHASE" = first ]; then
+if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
   # ---- layer 1: the stack
   step 01-preflight bash "$DEMO" preflight
   step 02-install   bash "$DEMO" install
@@ -79,13 +83,24 @@ if [ "$PHASE" = first ]; then
   echo "04-synth rc=$rc draft=$DRAFT" | tee -a "$OUT/steps.log"
   cp pipelines/fulfilment_sla/.draft-origin "$OUT/draft-origin.txt" 2>/dev/null || echo "no draft" > "$OUT/draft-origin.txt"
   [ -d pipelines/fulfilment_sla ] && cp -r pipelines/fulfilment_sla "$OUT/draft" || true
+  if [ "$DRAFT" = ai ]; then   # never a silent fallback: an ai run is the model's draft or it fails
+    grep -q "^model " "$OUT/draft-origin.txt" || { echo "an ai run without a model draft" >&2; exit 1; }
+    "$PY" tests/demo_acceptance/ai_summary.py "$OUT/ai-trace/trace.json" "$rc" > "$OUT/ai-summary.json" \
+      || echo "{\"error\": \"no readable trace\", \"synth_exit_code\": $rc}" > "$OUT/ai-summary.json"
+    tee -a "$OUT/steps.log" < "$OUT/ai-summary.json"
+  fi
   [ "$rc" -eq 0 ] || { tail -60 "$OUT/04-synth.log"; exit "$rc"; }
   [ ! -e pipelines/fulfilment_sla/.approved.yaml ] || { echo "the draft step approved something" >&2; exit 1; }
   ok "draft-not-approved (synth/validate never approve)"
+  if [ "$PHASE" = show ]; then
+    echo "SHOW READY: draft validated, nothing approved - a person approves live (docs/demo-show.md)" | tee -a "$OUT/steps.log"
+    exit 0
+  fi
 
   # nothing deploys before a person approves; approve itself refuses without a name
-  refused 05a-deploy-before-approval dpagent pipeline deploy fulfilment_sla --yes
-  refused 05b-approve-without-a-person env DEMO_APPROVED_BY= bash "$DEMO" approve
+  refused 05a-deploy-before-approval 1 "fulfilment_sla is maturity: draft (never reviewed)" \
+    dpagent pipeline deploy fulfilment_sla --yes
+  refused 05b-approve-without-a-person 2 "set DEMO_APPROVED_BY" env DEMO_APPROVED_BY= bash "$DEMO" approve
   DEMO_APPROVED_BY=demo.reviewer step 05-approve bash "$DEMO" approve
 
   # ---- layer 2: deploy, run, compare
@@ -94,13 +109,15 @@ if [ "$PHASE" = first ]; then
     || { cat "$OUT/check-after-first-run.json"; exit 1; }
   ok "after-first-run (warehouse = hand-calculated expected; landing = source rows once)"
   step 07-schedule bash "$DEMO" schedule
-  grep -q "0 2 \* \* \*" "$OUT/07-schedule.log" || { echo "the deployed pipeline has no daily 02:00 UTC schedule (BRD)" >&2; exit 1; }
-  ok "schedule (0 2 * * * UTC, deployed)"
+  "$PY" tests/demo_acceptance/check_run.py schedule > "$OUT/check-schedule.json" \
+    || { cat "$OUT/check-schedule.json"; echo "Airflow does not hold the daily 02:00 UTC schedule (BRD)" >&2; exit 1; }
+  ok "schedule-deployed (Airflow: 0 2 * * *, unpaused, next run known; scheduler-triggered runs so far: $("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["scheduler_triggered_runs"])' "$OUT/check-schedule.json"))"
 
   # ---- BI: the hand-written dashboard artifact, reviewed fingerprint, viewer
   step 08-bi-validate bash "$DEMO" bi-validate
   fingerprint > "$OUT/fingerprint-v1.txt"
-  refused 09a-bi-deploy-unreviewed env DEMO_BI_APPROVED_BY=demo.reviewer \
+  refused 09a-bi-deploy-unreviewed 3 "Validate and review the new fingerprint before supplying approved_sha256." \
+    env DEMO_BI_APPROVED_BY=demo.reviewer \
     DEMO_BI_APPROVED_SHA256="$(printf '0%.0s' $(seq 64))" bash "$DEMO" bi-deploy
   "$SPY" tests/quickstart_acceptance/check.py bi-absent fulfil-sla > "$OUT/check-after-refused-bi.json" \
     || { cat "$OUT/check-after-refused-bi.json"; exit 1; }
@@ -115,16 +132,14 @@ if [ "$PHASE" = first ]; then
 fi
 
 # ---------------------------------------------------------------- second phase: operations
-before=$("$PY" examples/demo/check_fulfil.py "$EX" --fact-only)
+"$PY" tests/demo_acceptance/check_run.py snapshot > "$OUT/report-before-bad-data.json"
 step 10-bad-data bash "$DEMO" bad-data
-"$PY" examples/demo/check_fulfil.py "$EX" --fact-only > "$OUT/check-after-bad-data.json" \
-  || { cat "$OUT/check-after-bad-data.json"; echo "the report table changed after a run that had to stop" >&2; exit 1; }
-[ "$("$PY" -c 'import json,sys; print(json.loads(sys.argv[1])["rows"])' "$before")" = \
-  "$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["rows"])' "$OUT/check-after-bad-data.json")" ] \
-  || { echo "report rows differ after the blocked run" >&2; exit 1; }
-dpagent pipeline audit > "$OUT/10-audit-after-bad-data.log" 2>&1 || true
-grep -qi "unique" "$OUT/10-audit-after-bad-data.log" || { echo "the audit does not name the failed unique gate" >&2; exit 1; }
-ok "bad-data-blocked (run failed at landing on the repeated id; report table unchanged; audit names the gate)"
+RUN=$(sed -n 's/.*dpagent run \([0-9][0-9]*\).*/\1/p' "$OUT/10-bad-data.log" | tail -1)
+[ -n "$RUN" ] || { echo "no dpagent run id in the bad-data run's output" >&2; exit 1; }
+dpagent pipeline audit "$RUN" > "$OUT/10-audit-run-$RUN.log" 2>&1 || true
+"$PY" tests/demo_acceptance/check_run.py blocked "$RUN" "$OUT/report-before-bad-data.json" > "$OUT/check-bad-data-run-$RUN.json" \
+  || { cat "$OUT/check-bad-data-run-$RUN.json"; exit 1; }
+ok "bad-data-blocked (run $RUN: failed; landing failed on exactly the stock_picking unique gate; no later stage ran; report table same relation, same rows)"
 
 step 11-fix-data bash "$DEMO" fix-data
 "$PY" examples/demo/check_fulfil.py "$EX" > "$OUT/check-after-recovery.json" || { cat "$OUT/check-after-recovery.json"; exit 1; }
@@ -132,6 +147,8 @@ ok "recovery (source fixed, rerun = expected, landing without duplicates)"
 
 step 12-status bash "$DEMO" status
 grep -q fulfilment_sla "$OUT/12-status.log"
+"$PY" tests/demo_acceptance/check_run.py schedule > "$OUT/check-schedule-before-undeploy.json" || true
+ok "runs-by-type before undeploy: $("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["runs_by_type"])' "$OUT/check-schedule-before-undeploy.json")"
 
 step 13-undeploy bash "$DEMO" undeploy
 "$SPY" tests/quickstart_acceptance/check.py bi-absent fulfil-sla > "$OUT/check-after-undeploy-bi.json" \

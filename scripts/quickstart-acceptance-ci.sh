@@ -20,12 +20,14 @@ KEEP=0
 OS=ubuntu
 BENCH=""
 DEMO=""
+SHOW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --os) OS="${2:?--os needs ubuntu or ol8}"; shift 2 ;;
     --bench) BENCH="${2:?--bench needs a scale}"; shift 2 ;;
     --demo) DEMO="${2:?--demo needs reference or ai}"; shift 2 ;;
+    --show) SHOW=1; KEEP=1; shift ;;         # with --demo: a host for a live demo, stopped before approval
     *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE | --demo reference|ai]" >&2; exit 2 ;;
   esac
 done
@@ -33,6 +35,7 @@ case "$BENCH" in ''|[a-z]*) ;; *) echo "invalid --bench scale" >&2; exit 2 ;; es
 case "$BENCH" in *[!a-z]*) echo "invalid --bench scale" >&2; exit 2 ;; esac
 case "$DEMO" in ''|reference|ai) ;; *) echo "--demo must be reference or ai" >&2; exit 2 ;; esac
 [ -z "$BENCH" ] || [ -z "$DEMO" ] || { echo "--bench and --demo are separate runs" >&2; exit 2; }
+[ "$SHOW" = 0 ] || [ -n "$DEMO" ] || { echo "--show needs --demo reference|ai" >&2; exit 2; }
 PASSENV=()
 if [ "$DEMO" = ai ]; then
   [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
@@ -63,14 +66,21 @@ if [ -n "$BENCH" ]; then
   "$PYH" "$ROOT/benchmarks/synthetic/preflight.py" "$BENCH" --disk-path "$(docker info -f '{{.DockerRootDir}}')" \
     > "$OUT/preflight-host.json" || { echo "benchmark refused by the host preflight: $(cat "$OUT/preflight-host.json")" >&2; exit 4; }
 elif [ -n "$DEMO" ]; then
-  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
+  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo$([ "$SHOW" = 1 ] && echo -show)/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
   mkdir -p "$OUT"
+  if [ "$DEMO" = ai ]; then
+    # one tiny call before any host is built: key, model name, quota (not part of the run's call budget)
+    PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
+    ( cd "$ROOT" && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src "$PYH" -m dpagent.pipelines.llm_verify probe ) > "$OUT/probe.json" 2>&1 \
+      || { cat "$OUT/probe.json"; echo "the model probe failed - fix the key / model name / quota first; nothing was built" >&2; exit 2; }
+  fi
 else
   OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
   mkdir -p "$OUT"
 fi
 git -C "$ROOT" rev-parse HEAD 'HEAD^{tree}' > "$OUT/provenance.txt"
 NAME="dpagent-quickstart-acceptance-$$"
+[ "$SHOW" = 0 ] || NAME="dpagent-demo-show-$DEMO-$$"     # never confused with an acceptance host
 docker build -q -t "$IMAGE" -f "$ROOT/scripts/$DOCKERFILE" "$ROOT" > "$OUT/image.txt"
 CID=''
 cleanup() {
@@ -127,6 +137,11 @@ else
 fi
 if [ -n "$BENCH" ]; then
   docker exec "$NAME" bash -lc "bash /opt/dpagent/tests/quickstart_acceptance/inside.sh bench $BENCH" 2>&1 | tee "$OUT/run-bench.log"
+  exit 0
+fi
+if [ "$SHOW" = 1 ]; then
+  docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE show" 2>&1 | tee "$OUT/run-show.log"
+  echo "live-demo host: $NAME (docs/demo-show.md)" | tee "$OUT/show-host.txt"
   exit 0
 fi
 docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE first" 2>&1 | tee "$OUT/run-first.log"
