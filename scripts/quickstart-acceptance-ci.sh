@@ -39,9 +39,12 @@ case "$DEMO" in ''|reference|ai) ;; *) echo "--demo must be reference or ai" >&2
 PASSENV=()
 if [ "$DEMO" = ai ]; then
   [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
-  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_TIMEOUT DPAGENT_LLM_MAX_TOKENS; do
+  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_REASONING_EFFORT; do
     [ -n "${!v:-}" ] && PASSENV+=(-e "$v")          # by name: docker reads the value from this environment
   done
+  # the same limits the A3 runner uses (scripts/m25-acceptance-ci.sh): a reasoning model's hidden thinking shares
+  # the output-token limit, and it is slow
+  PASSENV+=(-e "DPAGENT_LLM_TIMEOUT=${DPAGENT_LLM_TIMEOUT:-900}" -e "DPAGENT_LLM_MAX_TOKENS=${DPAGENT_LLM_MAX_TOKENS:-48000}")
 fi
 # what the acceptance phases use (quickstart, or the demo)
 INSIDE=tests/quickstart_acceptance/inside.sh; ENVFILE=/root/quickstart-dev.env
