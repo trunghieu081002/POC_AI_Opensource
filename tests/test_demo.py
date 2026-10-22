@@ -124,3 +124,10 @@ def test_refusals_are_checked_by_exact_code_and_reason_and_bad_data_by_run_id():
     runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
     assert runner.index("from dpagent.pipelines.llm_verify import probe") < runner.index("docker build")
     assert 'DEMO_PROBE_ATTEMPTS", "2"' in runner
+
+
+def test_only_an_ai_demo_installs_the_llm_extra_and_a_reused_probe_must_have_passed():
+    runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert 'WITH_LLM=1' in runner[runner.index('if [ "$DEMO" = ai ]; then'):runner.index("# what the acceptance phases use")]
+    assert runner.count('docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM"') == 2          # ubuntu and ol8 bootstrap
+    assert 'grep -q \'"ok": true\' "$DEMO_PROBE_EVIDENCE"' in runner

@@ -1,0 +1,1 @@
+FAILED - harness/environment, not the provider or the model: the host's dpagent venv was bootstrapped without the [llm] extra, so 'pipeline synth' stopped with 'litellm is not installed' before any call (model calls: 0). The probe before the build passed with 1 call (probe.json). Fixed: --demo ai bootstraps with DPAGENT_WITH_LLM=1.

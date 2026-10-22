@@ -37,7 +37,9 @@ case "$DEMO" in ''|reference|ai) ;; *) echo "--demo must be reference or ai" >&2
 [ -z "$BENCH" ] || [ -z "$DEMO" ] || { echo "--bench and --demo are separate runs" >&2; exit 2; }
 [ "$SHOW" = 0 ] || [ -n "$DEMO" ] || { echo "--show needs --demo reference|ai" >&2; exit 2; }
 PASSENV=()
+WITH_LLM=""                                     # bootstrap's [llm] extra (litellm): only an ai demo calls a model
 if [ "$DEMO" = ai ]; then
+  WITH_LLM=1
   [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
   for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_REASONING_EFFORT; do
     [ -n "${!v:-}" ] && PASSENV+=(-e "$v")          # by name: docker reads the value from this environment
@@ -72,8 +74,15 @@ elif [ -n "$DEMO" ]; then
   OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo$([ "$SHOW" = 1 ] && echo -show)/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
   mkdir -p "$OUT"
   if [ "$DEMO" = ai ]; then
-    # one tiny call before any host is built: key, model name, quota (not part of the run's call budget)
+    # one tiny call before any host is built: key, model name, quota (it counts in the overall call budget)
     PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
+    if [ "${DEMO_PROBE_ATTEMPTS:-2}" = 0 ]; then
+      # a probe already passed for this model: reuse its evidence and spend no call on another one
+      [ -f "${DEMO_PROBE_EVIDENCE:-}" ] && grep -q '"ok": true' "$DEMO_PROBE_EVIDENCE" \
+        || { echo "DEMO_PROBE_ATTEMPTS=0 needs DEMO_PROBE_EVIDENCE: the probe.json of a passed probe" >&2; exit 2; }
+      printf '{"skipped": true, "reason": "a passed probe is reused, no call spent", "evidence": "%s"}\n' \
+        "${DEMO_PROBE_EVIDENCE#$ROOT/}" > "$OUT/probe.json"
+    else
     # llm_verify probe: at most DEMO_PROBE_ATTEMPTS calls (default 2) counting retries; only a transient answer
     # (503/429/timeout) is retried - a key, model-name or quota error stops at once
     ( cd "$ROOT" && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src "$PYH" -c 'import json, os, sys
@@ -81,6 +90,7 @@ from dpagent.pipelines.llm_verify import probe
 r = probe(attempts=int(os.environ.get("DEMO_PROBE_ATTEMPTS", "2")), wait_s=30)
 print(json.dumps(r, indent=1)); sys.exit(0 if r.get("ok") else 1)' ) > "$OUT/probe.json" 2>&1 \
       || { cat "$OUT/probe.json"; echo "the model probe failed - fix the key / model name / quota first; nothing was built" >&2; exit 2; }
+    fi
   fi
 else
   OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
@@ -128,7 +138,7 @@ if [ "$OS" = ol8 ]; then
     echo "bare image python3 (before the OS packages python3/python3.11 are installed): $(docker exec "$NAME" sh -c 'command -v python3 >/dev/null && python3 --version || echo none')"
     echo "system python baseline = after those OS packages, before DPAgent (system-python-before.txt); compared at the end"
   } > "$OUT/os-scope.txt"
-  docker exec "$NAME" bash -lc '
+  docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM" "$NAME" bash -lc '
     set -euo pipefail
     dnf -y install python3 python3.11 python3.11-pip >/dev/null
     PYBIN=$(readlink -f /usr/bin/python3); echo "$PYBIN $(python3 --version)" > /root/system-python-before.txt
@@ -136,7 +146,7 @@ if [ "$OS" = ol8 ]; then
     DPAGENT_PYTHON=/usr/bin/python3.11 DPAGENT_SOURCE_DIR=/opt/src/clean bash /opt/src/clean/scripts/bootstrap.sh
   ' > "$OUT/bootstrap.log" 2>&1
 else
-  docker exec "$NAME" bash -lc '
+  docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM" "$NAME" bash -lc '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq && apt-get install -y -qq sudo ca-certificates curl openssl python3 python3-venv python3-pip >/dev/null

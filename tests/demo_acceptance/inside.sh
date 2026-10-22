@@ -84,10 +84,10 @@ if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
   cp pipelines/fulfilment_sla/.draft-origin "$OUT/draft-origin.txt" 2>/dev/null || echo "no draft" > "$OUT/draft-origin.txt"
   [ -d pipelines/fulfilment_sla ] && cp -r pipelines/fulfilment_sla "$OUT/draft" || true
   if [ "$DRAFT" = ai ]; then   # never a silent fallback: an ai run is the model's draft or it fails
-    grep -q "^model " "$OUT/draft-origin.txt" || { echo "an ai run without a model draft" >&2; exit 1; }
     "$PY" tests/demo_acceptance/ai_summary.py "$OUT/ai-trace/trace.json" "$rc" > "$OUT/ai-summary.json" \
       || echo "{\"error\": \"no readable trace\", \"synth_exit_code\": $rc}" > "$OUT/ai-summary.json"
     tee -a "$OUT/steps.log" < "$OUT/ai-summary.json"
+    grep -q "^model " "$OUT/draft-origin.txt" || { tail -20 "$OUT/04-synth.log"; echo "an ai run without a model draft" >&2; exit 1; }
   fi
   [ "$rc" -eq 0 ] || { tail -60 "$OUT/04-synth.log"; exit "$rc"; }
   [ ! -e pipelines/fulfilment_sla/.approved.yaml ] || { echo "the draft step approved something" >&2; exit 1; }

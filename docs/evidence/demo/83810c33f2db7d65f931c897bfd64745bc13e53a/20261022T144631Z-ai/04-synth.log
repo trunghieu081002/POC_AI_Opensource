@@ -1,0 +1,12 @@
+drafting fulfilment_sla with gemini/gemini-3.8-flash (at most 2 re-ask(s), 6 
+call(s))
+                         fulfilment_sla: not-validated                          
+┏━━━━━━━━━┳━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ attempt ┃ by  ┃ outcome   ┃ detail                                           ┃
+┡━━━━━━━━━╇━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1       │ llm │ llm-error │ LLMError: litellm is not installed — pip install │
+│         │     │           │ -e '.'                                           │
+└─────────┴─────┴───────────┴──────────────────────────────────────────────────┘
+model calls: 0 (ceiling 6); trace: /root/quickstart-evidence/ai-trace
+not validated - nothing to promote. Read the trace, fix the BRD/schema or the 
+draft by hand, then `dpagent pipeline validate` again.
