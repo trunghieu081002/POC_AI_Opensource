@@ -100,7 +100,9 @@ demo.
 
 | Run | Draft | Result |
 |---|---|---|
-| (filled in by the runs) | | |
+| `ee18661/20261022T052944Z-reference` | reference (hand-written) | phase first **PASS**, then a **harness error** (the inside secret scan exited 99 without finding anything); kept, scan fixed |
+| `3b1ca5f/20261022T060607Z-reference` | reference (hand-written) | **PASS**, both phases: layer 1 install + suites; reference validated (2 runs = expected); draft not approved, deploy before approval refused (rc=1), approval without a person refused (rc=2); approved by `demo.reviewer`; deploy + run = expected (psql); schedule `0 2 * * *` deployed; unreviewed dashboard fingerprint refused (rc=3), nothing in Superset; dashboard + viewer: API as `fulfil.viewer` = expected, writes refused; real browser as the viewer; repeated `stock_picking.id` -> run rc=1, audit `2/13 row(s) in stock_picking failed unique`, report unchanged; source fixed -> rerun = expected; undeploy: dashboard, viewer, DAG (Airflow's list), secrets, dbt models gone; secret scan clean |
+| `--demo ai` | the model through `pipeline synth` | **not run**: no model credential in this environment |
 
 ## Limits
 

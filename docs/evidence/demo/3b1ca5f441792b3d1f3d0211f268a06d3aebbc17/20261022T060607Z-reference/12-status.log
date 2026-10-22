@@ -1,0 +1,48 @@
+         fulfilment_sla · run 13 ok · started 2026-10-22T06:24:15+00:00         
+ stage    status  rows  gates                         started                   
+ landing  passed    10  row_count_bounds, unique,     2026-10-22T06:24:24+00:00 
+                        unique                                                  
+ curated  passed     -  not_null, unique              2026-10-22T06:24:34+00:00 
+fulfilment_sla · run 13 · ok
+
+landing passed · 10 rows
+  row_count_bounds
+  unique
+  unique
+
+curated passed
+  not_null
+  unique
+
+events
+ time            actor   kind              message                              
+ 06:24:15+00:00  user    pipeline.trigger  triggering Airflow DAG               
+                                           'fulfilment_sla'                     
+ 06:24:20+00:00  engine  extract.start     fulfilment_sla via odoo_postgres     
+ 06:24:22+00:00  engine  extract.done      fulfilment_sla extract complete:     
+                                           sale_order +10, stock_picking +12    
+ 06:24:24+00:00  engine  gate.passed       fulfilment_sla/landing               
+                                           row_count_bounds: ok                 
+ 06:24:24+00:00  engine  gate.passed       fulfilment_sla/landing unique: ok    
+ 06:24:25+00:00  engine  gate.passed       fulfilment_sla/landing unique: ok    
+ 06:24:25+00:00  engine  stage.passed      fulfilment_sla/landing gates passed  
+ 06:24:27+00:00  engine  transform.start   fulfilment_sla/curated via dbt       
+ 06:24:33+00:00  engine  transform.done    fulfilment_sla/curated transform     
+                                           complete                             
+ 06:24:35+00:00  engine  gate.passed       fulfilment_sla/curated not_null: ok  
+ 06:24:35+00:00  engine  gate.passed       fulfilment_sla/curated unique: ok    
+ 06:24:35+00:00  engine  stage.passed      fulfilment_sla/curated gates passed  
+ 06:24:36+00:00  engine  pipeline.ok       DAG run 13 reached terminal state:   
+                                           ok                                   
+ pack             version  installed  tested    config           when           
+ airflow          1.0.0    installed  passed    c4126c2ab8b441…  2026-10-22T06… 
+ base             1.0.0    installed  passed    e429274fb41657…  2026-10-22T06… 
+ dbt              1.0.0    installed  passed    c9fb72b3e213a4…  2026-10-22T06… 
+ dlt              1.0.0    installed  passed    021876a71e8e5d…  2026-10-22T06… 
+ postgres         1.0.0    installed  passed    8da242fe97f1e5…  2026-10-22T06… 
+ python-modern    1.0.0    installed  passed    6323f765f4459b…  2026-10-22T06… 
+ superset         0.1.1    installed  passed    b3f3f7b8e3673b…  2026-10-22T06… 
+ superset-assets  0.1.0    installed  untested  8a7036aa2a62e2…  2026-10-22T06… 
+
+1 installed component(s) have never been proven to work.
+run: dpagent test

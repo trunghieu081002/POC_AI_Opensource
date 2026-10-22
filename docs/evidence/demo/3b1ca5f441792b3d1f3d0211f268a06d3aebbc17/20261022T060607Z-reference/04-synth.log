@@ -1,0 +1,36 @@
+load: pass
+dbt project/Jinja parse: pass - 1 model(s) parsed clean
+  (structure/Jinja/config only, no live database - does NOT confirm the SQL 
+itself is valid Postgres, e.g. a 'SELEC ...' typo still parses clean; not dbt 
+compile/run; the SQL is only actually proven by steps 4-5's real dbt run against
+a fixture)
+procedures: skipped - no procedure-engine stage in this pipeline
+dbt ref()/source() check: pass - 1 model(s), no ref()/source() dependency
+content hash at validation time: 
+sha256:bf841f4e77037930b22c0c66ff19199e5c241a986204452b8586fa52424ddf93
+
+written: /opt/dpagent/pipelines/fulfilment_sla/.synth-validation.yaml
+
+running fixture through a real, --allow-draft deploy of an isolated validation 
+clone (2 runs, for idempotency)...
+validation clone: fulfilment_sla__validate__f8bc4a0a
+sealed evidence: ev-cffdef52b5a38cfa (what `dpagent pipeline promote 
+fulfilment_sla --fixture ... --expected ...` checks)
+run 1 vs expected: match - 2 row(s) matched exactly
+run 2 vs expected: match - 2 row(s) matched exactly
+cleanup (pipeline artifacts): complete - DAG removed; published files removed; 
+dbt models removed; dlt state removed; secrets released: 
+DPAGENT_VALIDATE_F8BC4A0A_SRC_DATABASE, DPAGENT_VALIDATE_F8BC4A0A_SRC_HOST, 
+DPAGENT_VALIDATE_F8BC4A0A_SRC_PASSWORD, DPAGENT_VALIDATE_F8BC4A0A_SRC_PORT, 
+DPAGENT_VALIDATE_F8BC4A0A_SRC_USER, DPAGENT_VALIDATE_F8BC4A0A_WH_DATABASE, 
+DPAGENT_VALIDATE_F8BC4A0A_WH_HOST, DPAGENT_VALIDATE_F8BC4A0A_WH_PASSWORD, 
+DPAGENT_VALIDATE_F8BC4A0A_WH_PORT, DPAGENT_VALIDATE_F8BC4A0A_WH_USER | verified 
+gone: DAG (file + Airflow registration + published files + dbt models + dlt 
+state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs
+cleanup (source database): dropped
+cleanup (source role): dropped
+cleanup (warehouse database): dropped
+cleanup (warehouse role): dropped
+
+fixture run: both runs matched expected, idempotent, cleanup complete (pipeline 
+artifacts + both throwaway databases)
