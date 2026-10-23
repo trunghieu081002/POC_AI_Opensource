@@ -47,8 +47,12 @@ class ProviderUnavailable(LLMError):
     Callers that evaluate a model must report it as inconclusive, never as the model failing."""
 
 
-TRANSIENT = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|"
-                       r"rate.?limit|timed? ?out|Timeout\w*|wall-clock)\b", re.IGNORECASE)
+# The provider ANSWERED that it is busy (the request is over): safe to retry.
+BUSY = re.compile(r"\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|rate.?limit)\b",
+                  re.IGNORECASE)
+# No answer in time: the request may still be running (and billed) at the provider. Never retried.
+TIMEOUT = re.compile(r"\b(timed? ?out|Timeout\w*|wall-clock)\b", re.IGNORECASE)
+TRANSIENT = re.compile(f"(?:{BUSY.pattern})|(?:{TIMEOUT.pattern})", re.IGNORECASE)   # either: inconclusive
 
 
 @dataclass
@@ -68,7 +72,15 @@ class CallRecord:
     duration_s: float = 0.0
     error: str = ""
     finish_reason: str = ""
-    transient: bool = False     # a provider-busy answer; not counted against the call ceiling
+    # ok | busy (the provider answered 503/429: over, retryable) | timeout (no answer in time: it may
+    # still be running and billed, never retried) | error. Every kind is a request that was SENT and
+    # counts against the ceiling.
+    kind: str = ""
+    transient: bool = False     # busy or timeout: says nothing about the model
+    # "reported" when the provider returned token usage, else "unknown" (never assumed 0: a failed or
+    # timed-out request may still have been processed). Cost is never reported by the provider here.
+    usage_status: str = "unknown"
+    cost: str = "unknown"
 
 
 class _Recorder:
@@ -79,9 +91,9 @@ class _Recorder:
         self.records: list[CallRecord] = []
 
     def used(self) -> int:
-        """Calls that count against the ceiling: everything except a provider-busy answer
-        (which returned no tokens and cost nothing)."""
-        return sum(1 for r in self.records if not r.transient)
+        """Requests sent so far - every one counts against the ceiling: answered, failed, busy
+        (503/429), timed out, a JSON format repair, a revision, a retry."""
+        return len(self.records)
 
 
 _recorders: list[_Recorder] = []
@@ -90,14 +102,15 @@ _recorders: list[_Recorder] = []
 @contextlib.contextmanager
 def record_calls(max_calls: int | None = None, *, transient_retries: int = 0,
                  wait_s: float = 20.0):
-    """Record every `chat()` call made inside the block (including the JSON
-    re-asks `chat_json` makes) and refuse the (max_calls+1)th BEFORE it reaches
-    the provider - a verification run must have a hard ceiling on spend.
+    """Record every request `chat()` sends inside the block (including the JSON re-asks
+    `chat_json` makes and every retry) and refuse the (max_calls+1)th request BEFORE it reaches
+    the provider - a verification run must have a hard ceiling on what it sends.
 
-    `transient_retries`: how many times ONE chat() call is repeated when the provider says it
-    is busy (waiting `wait_s`, `2*wait_s`, ... between tries). Each try is its own record,
-    flagged `transient`, and is not counted against `max_calls`; if the last try is still busy
-    chat() raises ProviderUnavailable."""
+    `transient_retries`: how many times ONE chat() call is repeated when the provider ANSWERS that
+    it is busy (503/429), waiting `wait_s`, `2*wait_s`, ... between tries. Each try is its own
+    record and counts against `max_calls`; a retry the ceiling does not allow is not sent. A
+    timeout is never retried (the request may still be running). If the last try is still busy,
+    or the ceiling stops the retry, chat() raises ProviderUnavailable."""
     recorder = _Recorder(max_calls, transient_retries, wait_s)
     _recorders.append(recorder)
     try:
@@ -181,12 +194,20 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
         extra["reasoning_effort"] = effort
     recorder = _recorders[-1] if _recorders else None
     tries = 1 + (recorder.transient_retries if recorder else 0)
+    litellm.drop_params = True
+    litellm.num_retries = 0                     # no retry below this function: every request is counted here
     for n in range(1, tries + 1):
         record = None
         if recorder is not None:
             if recorder.max_calls is not None and recorder.used() >= recorder.max_calls:
-                raise LLMError(f"call budget exhausted ({recorder.max_calls} call(s)) - "
+                if n > 1:
+                    raise ProviderUnavailable(
+                        f"{get_model()} was busy and the request ceiling ({recorder.max_calls}) leaves no "
+                        f"request for a retry")
+                raise LLMError(f"call budget exhausted ({recorder.max_calls} request(s)) - "
                                f"refusing to call {get_model()}")
+        _refuse_while_abandoned_requests_run()
+        if recorder is not None:
             record = CallRecord(
                 index=len(recorder.records) + 1,
                 at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -194,7 +215,6 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 system_sha256=_sha(system), user_sha256=_sha(user))
             recorder.records.append(record)
 
-        litellm.drop_params = True
         started = time.monotonic()
         try:
             response = _completion_with_deadline(
@@ -205,27 +225,31 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 temperature=temperature,
                 max_tokens=max_tokens_,
                 timeout=get_timeout(),
+                num_retries=0, max_retries=0,       # LiteLLM's and the SDK's own retries: off
                 **extra,
             )
         except Exception as exc:                       # litellm wraps many providers
-            transient = bool(TRANSIENT.search(f"{type(exc).__name__} {exc}"))
+            text_ = f"{type(exc).__name__} {exc}"
+            kind = "busy" if BUSY.search(text_) else "timeout" if TIMEOUT.search(text_) else "error"
             if record is not None:
                 record.error = f"{type(exc).__name__}: {exc}"[:500]
-                record.transient = transient
+                record.kind, record.transient = kind, kind in ("busy", "timeout")
                 record.duration_s = round(time.monotonic() - started, 2)
-            if transient and n < tries:
+            if kind == "busy" and n < tries:
                 _sleep(recorder.wait_s * n)
                 continue
-            cls = ProviderUnavailable if transient else LLMError
+            cls = ProviderUnavailable if kind in ("busy", "timeout") else LLMError
             raise cls(f"{get_model()} call failed: {exc}") from exc
 
         text = response.choices[0].message.content or ""
         if record is not None:
+            record.kind = "ok"
             record.finish_reason = str(getattr(response.choices[0], "finish_reason", "") or "")
             record.response, record.response_sha256 = text, _sha(text)
             record.duration_s = round(time.monotonic() - started, 2)
             usage = getattr(response, "usage", None)
-            if usage is not None:
+            if usage is not None and getattr(usage, "total_tokens", None) is not None:
+                record.usage_status = "reported"
                 record.usage = {k: getattr(usage, k, None)
                                 for k in ("prompt_tokens", "completion_tokens", "total_tokens")}
                 details = getattr(usage, "completion_tokens_details", None)
@@ -267,11 +291,27 @@ def prefer_ipv4() -> None:
     _ipv4_first_installed = True
 
 
+# Requests given up at the wall-clock limit whose thread is still running: the provider may still be
+# working on them. No new request is sent while one is alive (it could overlap and be billed twice).
+_abandoned: list = []
+
+
+def _refuse_while_abandoned_requests_run() -> None:
+    for worker in list(_abandoned):
+        worker.join(get_timeout())
+        if worker.is_alive():
+            raise ProviderUnavailable(
+                "a request abandoned at the wall-clock limit is still running - refusing to send "
+                "another one that could overlap it")
+        _abandoned.remove(worker)
+
+
 def _completion_with_deadline(completion, seconds: float, **kwargs):
     """Run the provider call with a wall-clock limit that does not depend on the library
-    honouring its own `timeout=` (a one-token probe took 1052 s with timeout=300). On expiry
-    the call is abandoned (its thread is a daemon and cannot keep the process alive) and
-    reported as a timeout - a transient, retryable condition."""
+    honouring its own `timeout=` (a one-token probe took 1052 s with timeout=300). A thread
+    cannot be cancelled: on expiry the call is reported as a timeout and its thread is kept in
+    `_abandoned`, so no further request is sent until it has ended (it may still be processed
+    and billed by the provider). A timeout is never retried."""
     import threading
     box: dict = {}
 
@@ -285,8 +325,9 @@ def _completion_with_deadline(completion, seconds: float, **kwargs):
     worker.start()
     worker.join(seconds)
     if worker.is_alive():
+        _abandoned.append(worker)
         raise TimeoutError(f"no answer from the provider within {seconds:g}s (wall-clock limit "
-                           f"DPAGENT_LLM_TIMEOUT); the request was abandoned")
+                           f"DPAGENT_LLM_TIMEOUT); the request was abandoned but may still be running")
     if "error" in box:
         raise box["error"]
     return box["value"]

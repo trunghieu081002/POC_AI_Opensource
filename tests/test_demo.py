@@ -138,3 +138,15 @@ def test_the_call_ceiling_of_an_ai_demo_reaches_the_host():
     assert "DEMO_MAX_CALLS DEMO_MAX_REVISIONS" in runner
     demo = (D / "demo.sh").read_text()
     assert '--max-calls "${DEMO_MAX_CALLS:-6}"' in demo and '--max-revisions "${DEMO_MAX_REVISIONS:-2}"' in demo
+
+
+def test_ai_summary_separates_requests_tokens_and_cost(tmp_path):
+    import json
+    trace = {"budget": {"max_calls": 3}, "attempts": [],
+             "calls": [{"kind": "busy", "transient": True, "usage": {}},
+                       {"kind": "ok", "usage": {"total_tokens": 50}}]}
+    (tmp_path / "t.json").write_text(json.dumps(trace))
+    s = json.loads(subprocess.run(["python3", str(ROOT / "tests/demo_acceptance/ai_summary.py"), str(tmp_path / "t.json"), "1"],
+                                  capture_output=True, text=True, check=True).stdout)
+    assert s["requests"] == 2 and s["requests_by_kind"] == {"ok": 1, "busy": 1, "timeout": 0, "error": 0}
+    assert s["tokens_reported"] == 50 and s["requests_with_unknown_usage"] == 1 and s["cost"] == "unknown"

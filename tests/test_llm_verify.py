@@ -425,16 +425,20 @@ def test_an_empty_probe_reply_is_not_ok_and_says_why(monkeypatch):
 BUSY = RuntimeError("litellm.ServiceUnavailableError: 503 UNAVAILABLE: high demand")
 
 
-def test_busy_provider_is_retried_and_the_retries_do_not_eat_the_call_ceiling(provider, case, tmp_path, monkeypatch):
+def test_busy_provider_is_retried_and_every_retry_counts_against_the_ceiling(provider, case, tmp_path, monkeypatch):
     waits = []
     monkeypatch.setattr(llm, "_sleep", waits.append)
     p = provider([BUSY, BUSY, _bundle("good")])
-    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=1, transient_retries=3,
+    trace, records = llm_verify.run_case(case, tmp_path / "w", max_calls=3, transient_retries=3,
                                          wait_s=5, runner=scripted_runner(_section()))
-    assert trace.classification == "llm-first-draft"          # max_calls=1 and still got an answer
+    assert trace.classification == "llm-first-draft"
     assert len(p.calls) == 3 and waits == [5, 10]
     assert [c["transient"] for c in trace.calls] == [True, True, False]
     assert trace.attempts[0].format_repairs == 0                # busy answers are not format repairs
+    p = provider([BUSY, BUSY, _bundle("good")])
+    trace, records = llm_verify.run_case(case, tmp_path / "w2", max_calls=1, transient_retries=3,
+                                         wait_s=5, runner=scripted_runner(_section()))
+    assert len(p.calls) == 1 and trace.classification == "inconclusive-provider-unavailable"   # no retry left
 
 
 def test_a_provider_that_stays_busy_is_inconclusive_not_a_model_failure(provider, case, tmp_path, monkeypatch):

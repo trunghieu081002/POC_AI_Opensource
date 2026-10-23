@@ -111,8 +111,12 @@ working tree). `scripted` mode is **not evidence about a model**: its replies ar
 
 ### A busy provider is not a failing model
 
-A 503 / 429 / timeout is retried (`A3_TRANSIENT_RETRIES`, default 5, waiting 20 s, 40 s, …); the tries
-are recorded (`transient: true`) but do not consume `--max-calls`. If the provider is still unavailable the
+A provider-busy **answer** (503 / 429) is retried (`A3_TRANSIENT_RETRIES`, default 5, waiting 20 s, 40 s, …). Every
+try is a request: it is recorded (`kind: busy`) and **counts against `--max-calls`** like any other request - answered,
+failed, timed out, a JSON format repair or a re-ask; a retry the ceiling does not allow is not sent. A **timeout** is
+never retried: the request may still be running (and billed) at the provider, and no further request is sent while it
+may be. LiteLLM's and the SDK's own retries are switched off, so nothing is sent outside this count. Token usage is
+recorded only when the provider reports it (`usage_status: reported`), otherwise `unknown`; cost is `unknown`. If the provider is still unavailable the
 run is **`inconclusive-provider-unavailable`**: it fails the criteria (exit 1) and says nothing about the model —
 re-run it. Per-call time limit: `DPAGENT_LLM_TIMEOUT` (script default 900 s; reasoning models are slow).
 

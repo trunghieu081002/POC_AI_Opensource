@@ -148,10 +148,12 @@ def _print_validation_steps(report) -> None:
               help="With --fixture/--expected: re-ask the model at most this many times with what the "
                    "validators found (never the expected rows) when a draft does not validate.")
 @click.option("--max-calls", type=click.IntRange(1, 50), default=None,
-              help="Hard ceiling on model calls for the whole draft-and-fix loop (required with --fixture).")
+              help="Hard ceiling on REQUESTS sent to the model for the whole draft-and-fix loop - answered, failed, "
+                   "busy, timed out, format repairs, re-asks and retries all count (required with --fixture).")
 @click.option("--transient-retries", type=click.IntRange(0, 3), default=0, show_default=True,
-              help="With --fixture: retry a provider call that failed transiently (503/429/timeout) at most this "
-                   "many times, after --retry-wait seconds; every retry is recorded in the trace.")
+              help="With --fixture: retry a request the provider answered as busy (503/429) at most this many times "
+                   "per call, after --retry-wait seconds. Every retry is a request and counts against --max-calls; "
+                   "a timeout is never retried.")
 @click.option("--retry-wait", type=click.FloatRange(0, 600), default=120.0, show_default=True,
               help="Seconds to wait before a transient retry (multiplied by the retry number).")
 @click.option("--trace-dir", type=click.Path(file_okay=False), default=None,
@@ -293,8 +295,9 @@ def _synth_and_fix(request, fixture_path: Path, expected_path: Path, *, overwrit
                                        + (f"\n  [dim]{b['why_it_matters']}[/dim]" if b.get("why_it_matters") else "")
                                        for b in blockers),
                             title="cannot draft yet - needs clarification", border_style="red", expand=False))
-    console.print(f"[dim]model calls: {len(records)} (ceiling {max_calls}, of which transient retries: "
-                  f"{sum(1 for r in records if r.transient)}; at most {transient_retries} allowed)"
+    console.print(f"[dim]requests sent: {len(records)} (ceiling {max_calls}; provider busy/timeout: "
+                  f"{sum(1 for r in records if r.transient)}; token usage reported for "
+                  f"{sum(1 for r in records if r.usage_status == 'reported')}, unknown for the rest; cost unknown)"
                   + (f"; trace: {trace_file.parent}" if trace_file else "") + "[/dim]")
     validated = trace.attempts and trace.attempts[-1].outcome == "validated"
     if not validated:
