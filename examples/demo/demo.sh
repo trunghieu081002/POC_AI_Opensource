@@ -5,6 +5,7 @@
 # (and, for BI, the fingerprint that person reviewed).
 #   Layer 1  preflight   dpagent doctor against the demo stack (installs nothing)
 #            install     install + verify + acceptance-test every pack of the stack
+#            lock        the Python venvs at the exact versions of the accepted run (examples/demo/lock), checked
 #            source      the demo source tables (sale_order, stock_picking) from the fulfil fixture
 #   Layer 3  synth       DEMO_DRAFT=ai (default): the model drafts pipelines/fulfilment_sla from the BRD + verified
 #                        schema, validated for real against the hand-written fixture/expected, re-asked at most
@@ -58,6 +59,9 @@ case "${1:-}" in
          AIRFLOW_ADMIN_PASSWORD DLT_DB_PASSWORD SUPERSET_METADATA_PASSWORD
     dpagent doctor --spec "$D/stack.yaml"
     dpagent spec "$D/stack.yaml" --yes
+    ;;
+  lock)
+    "$PY" "$D/deps_lock.py" apply
     ;;
   source)
     need FS_SRC_NAME FS_SRC_USER FS_SRC_PASSWORD

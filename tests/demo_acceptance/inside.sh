@@ -64,6 +64,12 @@ refused() {   # refused <label> <exit code> <reason text> <command...>: must fai
   tr -s ' \n' ' ' < "$OUT/$label.log" | grep -qF -- "$reason" \
     || { tail -20 "$OUT/$label.log"; echo "$label: refused for another reason (want: $reason)" >&2; exit 1; }
 }
+versions() {   # versions FILE: every venv's installed packages (importlib.metadata: the superset venv has no pip) + psql
+  { for v in /opt/dpagent/.venv /opt/airflow/.venv /opt/superset/.venv /opt/dbt/.venv /opt/dlt/.venv; do
+      [ -x "$v/bin/python" ] && { echo "# $v"; "$v/bin/python" -c 'import importlib.metadata as m
+print("\n".join(sorted({"%s==%s" % (d.metadata["Name"], d.version) for d in m.distributions()}, key=str.lower)))'; }
+    done; psql --version 2>/dev/null; } > "$1" || true
+}
 ok() { echo "check $1 ok" | tee -a "$OUT/steps.log"; }
 meta() { runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d superset_meta -c "$1"; }
 fingerprint() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["fingerprint"])' \
@@ -75,10 +81,8 @@ if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
   # ---- layer 1: the stack
   step 01-preflight bash "$DEMO" preflight
   step 02-install   bash "$DEMO" install
-  { for v in /opt/dpagent/.venv /opt/airflow/.venv /opt/superset/.venv /opt/dbt/.venv /opt/dlt/.venv; do
-      [ -x "$v/bin/python" ] && { echo "# $v"; "$v/bin/python" -c 'import importlib.metadata as m
-print("\n".join(sorted({"%s==%s" % (d.metadata["Name"], d.version) for d in m.distributions()}, key=str.lower)))'; }
-    done; psql --version 2>/dev/null; } > "$OUT/dependency-versions.txt" || true
+  step 02b-lock    bash "$DEMO" lock
+  versions "$OUT/dependency-versions.txt"
   step 03-source    bash "$DEMO" source
 
   # ---- layer 3: the draft (ai: the model through `pipeline synth`; reference: labelled hand-written)
@@ -106,6 +110,7 @@ print("\n".join(sorted({"%s==%s" % (d.metadata["Name"], d.version) for d in m.di
   [ ! -e pipelines/fulfilment_sla/.approved.yaml ] || { echo "the draft step approved something" >&2; exit 1; }
   ok "draft-not-approved (synth/validate never approve)"
   if [ "$PHASE" = show ]; then
+    "$PY" examples/demo/deps_lock.py check > "$OUT/deps-lock-check.json"
     echo "SHOW READY: draft validated, nothing approved - a person approves live (docs/demo-show.md)" | tee -a "$OUT/steps.log"
     exit 0
   fi
@@ -174,4 +179,5 @@ if grep -q '^FS_SRC_' /opt/airflow/home/pipelines.env 2>/dev/null; then echo "pi
 MODELS="$("$PY" -c 'from dpagent.pipelines import deploy; print(deploy._dbt_project_dir())')/models/fulfilment_sla"
 [ ! -e "$MODELS" ] || { echo "published dbt models still present: $MODELS" >&2; exit 1; }
 ok "undeploy-audit (dashboard UUIDs, viewer, DAG via Airflow, secrets, dbt models gone; warehouse data kept by design)"
+versions "$OUT/dependency-versions-final.txt"     # superset is installed by bi-validate, after the first capture
 echo PASS | tee -a "$OUT/steps.log"
