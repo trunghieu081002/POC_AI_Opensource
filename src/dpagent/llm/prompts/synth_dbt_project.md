@@ -94,7 +94,9 @@ dbt_project:
   path: <project>
 stages:
   - name: landing
-    gates: [...]                  # structural only: schema_contract / row_count_bounds / freshness
+    gates: [...]                  # structural (schema_contract / row_count_bounds / freshness) and, when
+                                  # the BRD says bad source rows must stop the load, row-level
+                                  # unique / not_null - see Rules
   - name: <layer>
     engine: dbt
     depends_on: landing
@@ -113,6 +115,14 @@ Rules, all non-negotiable:
   given; do not invent new ones.
 - Every table/column you reference must come from the verified source schema or from a model
   this project builds. Never reference a column you were not told exists.
+- Landing never has `quarantine`. Its gates are structural ones, plus a row-level `unique` /
+  `not_null` on a landing table whenever the BRD says bad source data (e.g. a repeated key) must
+  stop the run: with no quarantine, a violation fails the run at landing, before any model is
+  built, and the previous output stays as it was.
+- Every requirement in the BRD about stopping, rejecting or checking data ("must stop", "must
+  fail", "may not repeat", "must not be NULL") must map to a declared gate or dbt test - name it
+  in `mapping`. A project whose numbers are right but which misses such a check does not meet
+  the BRD.
 
 # What "verified source schema" means
 

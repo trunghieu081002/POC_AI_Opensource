@@ -132,3 +132,11 @@ def test_the_shared_pipeline_prompt_allows_a_stopping_gate_at_landing_and_maps_e
     assert "row-level `unique` / `not_null` on a landing table" in prompt and "must map\n  to a declared gate" in prompt
     for case_specific in ("fulfil", "sale_order", "stock_picking", "HG", "res_partner_x"):
         assert case_specific not in prompt          # a shared prompt: no case is written into it
+
+
+def test_the_owned_dbt_prompt_gives_the_same_landing_gate_guidance():
+    prompt = llm.load_prompt("synth_dbt_project")
+    assert "structural only" not in prompt
+    assert "row-level `unique` /\n  `not_null` on a landing table" in prompt and "must map to a declared gate or dbt test" in prompt
+    for case_specific in ("fulfil", "sale_order", "stock_picking", "khsx", "label"):
+        assert case_specific not in prompt

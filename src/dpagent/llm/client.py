@@ -41,6 +41,11 @@ class ReplyTruncated(LLMError):
         self.text = text
 
 
+class BudgetRefused(LLMError):
+    """The shared request ledger (dpagent.llm.ledger, DPAGENT_LLM_LEDGER) refused to send: its budget or
+    this part of it is spent, or an earlier request has no recorded end. Nothing was sent."""
+
+
 class ProviderUnavailable(LLMError):
     """The provider answered "busy / rate limited / timed out" (503, 429, RESOURCE_EXHAUSTED,
     timeout) - a statement about the service at that moment, not about the model's ability.
@@ -207,6 +212,11 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
                 raise LLMError(f"call budget exhausted ({recorder.max_calls} request(s)) - "
                                f"refusing to call {get_model()}")
         _refuse_while_abandoned_requests_run()
+        from dpagent.llm import ledger
+        try:
+            ledger_n = ledger.reserve(get_model())      # before sending, across processes and sessions
+        except ledger.LedgerRefused as exc:
+            raise BudgetRefused(f"request ledger: {exc} - refusing to call {get_model()}") from exc
         if recorder is not None:
             record = CallRecord(
                 index=len(recorder.records) + 1,
@@ -218,7 +228,7 @@ def chat(system: str, user: str, *, temperature: float = 0.1,
         started = time.monotonic()
         try:
             response = _completion_with_deadline(
-                litellm.completion, get_timeout(),
+                litellm.completion, get_timeout(), ledger_n=ledger_n,
                 model=get_model(),
                 messages=[{"role": "system", "content": system},
                           {"role": "user", "content": user}],
@@ -306,13 +316,18 @@ def _refuse_while_abandoned_requests_run() -> None:
         _abandoned.remove(worker)
 
 
-def _completion_with_deadline(completion, seconds: float, **kwargs):
+def _completion_with_deadline(completion, seconds: float, *, ledger_n: int | None = None, **kwargs):
     """Run the provider call with a wall-clock limit that does not depend on the library
     honouring its own `timeout=` (a one-token probe took 1052 s with timeout=300). A thread
     cannot be cancelled: on expiry the call is reported as a timeout and its thread is kept in
     `_abandoned`, so no further request is sent until it has ended (it may still be processed
-    and billed by the provider). A timeout is never retried."""
+    and billed by the provider). A timeout is never retried.
+
+    That guard lives in this process. Across processes the request ledger carries it: the thread
+    itself writes the request's `done` line when the provider call really ends, so a request whose
+    process died (or exited) before that stays unfinished there and blocks every later sender."""
     import threading
+    from dpagent.llm import ledger
     box: dict = {}
 
     def run():
@@ -320,12 +335,18 @@ def _completion_with_deadline(completion, seconds: float, **kwargs):
             box["value"] = completion(**kwargs)
         except BaseException as exc:                    # noqa: BLE001 - re-raised below
             box["error"] = exc
+        finally:
+            err = box.get("error")
+            text_ = f"{type(err).__name__} {err}" if err is not None else ""
+            ledger.mark(ledger_n, "done", outcome=("ok" if err is None else "busy" if BUSY.search(text_)
+                                                   else "timeout" if TIMEOUT.search(text_) else "error"))
 
     worker = threading.Thread(target=run, daemon=True, name="llm-call")
     worker.start()
     worker.join(seconds)
     if worker.is_alive():
         _abandoned.append(worker)
+        ledger.mark(ledger_n, "abandoned", after_s=seconds)
         raise TimeoutError(f"no answer from the provider within {seconds:g}s (wall-clock limit "
                            f"DPAGENT_LLM_TIMEOUT); the request was abandoned but may still be running")
     if "error" in box:

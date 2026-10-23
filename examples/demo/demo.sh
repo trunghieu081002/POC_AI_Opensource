@@ -9,7 +9,10 @@
 #   Layer 3  synth       DEMO_DRAFT=ai (default): the model drafts pipelines/fulfilment_sla from the BRD + verified
 #                        schema, validated for real against the hand-written fixture/expected, re-asked at most
 #                        DEMO_MAX_REVISIONS times within DEMO_MAX_CALLS calls. DEMO_DRAFT=reference: the hand-written
-#                        reference instead (examples/demo/reference, labelled; never reported as the model's work)
+#                        reference instead (examples/demo/reference, labelled; never reported as the model's work).
+#                        DEMO_DRAFT=artifact: an accepted ai draft from DEMO_ARTIFACT (an ai evidence directory), its
+#                        files checked against the trace's hashes (DEMO_ARTIFACT_TRACE_SHA256 pins the trace) - no
+#                        model call, no approval carried over; then validated on this host
 #            validate    validate the draft again (sealed evidence) - e.g. after reading or editing it
 #            approve     a person promotes it on that evidence (needs DEMO_APPROVED_BY)
 #   Layer 2  deploy      deploy + run once and wait
@@ -68,6 +71,13 @@ case "${1:-}" in
       fi
       rm -rf "pipelines/$P"; cp -r "$D/reference/$P" "pipelines/$P"; rm -f "pipelines/$P/ORIGIN.md"
       echo "reference (hand-written, examples/demo/reference/$P) - not drafted by a model" > "$(origin_file)"
+      dpagent pipeline validate "$P" --fixture "$FX" --expected "$EX"
+    elif [ "${DEMO_DRAFT:-ai}" = artifact ]; then
+      need DEMO_ARTIFACT
+      rep=(); [ "${DEMO_REDRAFT:-0}" = 1 ] && rep=(--replace)
+      "$PY" "$D/import_ai_draft.py" "$DEMO_ARTIFACT" "pipelines/$P" \
+        ${DEMO_ARTIFACT_TRACE_SHA256:+--trace-sha256 "$DEMO_ARTIFACT_TRACE_SHA256"} "${rep[@]}"
+      dpagent pipeline lint "$P"
       dpagent pipeline validate "$P" --fixture "$FX" --expected "$EX"
     else
       need DPAGENT_MODEL

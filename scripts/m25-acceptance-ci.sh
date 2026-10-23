@@ -90,10 +90,17 @@ if [ -n "$A3" ]; then
     # fail before building anything if the opt-in is missing
     [ "${DPAGENT_LLM_VERIFY:-}" = 1 ] || { echo "real model calls need DPAGENT_LLM_VERIFY=1 (and a provider key in the environment)" >&2; exit 2; }
     [ -n "${DPAGENT_MODEL:-}" ] || { echo "set DPAGENT_MODEL to the model under test (e.g. gemini/gemini-3.8-flash)" >&2; exit 2; }
+    # optional shared request ledger (src/dpagent/llm/ledger.py): the probe counts in part `probe`, the suite in
+    # A3_LEDGER_SEGMENT (default `asks`) - the same file as the demo runner's, never reset by a new run
+    if [ -n "${DPAGENT_LLM_LEDGER:-}" ]; then
+      case "$DPAGENT_LLM_LEDGER" in /*) ;; *) echo "DPAGENT_LLM_LEDGER must be an absolute path" >&2; exit 2 ;; esac
+      [ -f "$DPAGENT_LLM_LEDGER" ] || { echo "no request ledger at $DPAGENT_LLM_LEDGER" >&2; exit 2; }
+      LEDGER_DIR=$(dirname "$DPAGENT_LLM_LEDGER")
+    fi
     # one tiny call BEFORE the (long) host build: is the key valid, the model served, quota left?
     if [ "${A3_NO_PROBE:-0}" != 1 ]; then
       echo ":: probing ${DPAGENT_MODEL} (1 call)" >&2
-      ( cd "$(dirname "${BASH_SOURCE[0]}")/.." && DPAGENT_LLM_VERIFY=1 PYTHONPATH=src python -m dpagent.pipelines.llm_verify probe ) \
+      ( cd "$(dirname "${BASH_SOURCE[0]}")/.." && DPAGENT_LLM_VERIFY=1 DPAGENT_LLM_LEDGER_SEGMENT=probe PYTHONPATH=src python -m dpagent.pipelines.llm_verify probe ) \
         || { echo "XX the model probe failed - fix the key / model name / quota first (A3_NO_PROBE=1 skips this)" >&2; exit 2; }
     fi
   fi
@@ -162,6 +169,7 @@ docker run -d --name "${CONTAINER}" "${CGROUPNS_ARGS[@]}" \
   --tmpfs /run --tmpfs /run/lock \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
   -v "${REPO_ROOT}:/opt/src/dpagent-src:ro" \
+  ${LEDGER_DIR:+-v "$LEDGER_DIR:/var/lib/dpagent-ledger:rw"} \
   "${IMAGE}" >/dev/null
 # systemd needs a moment before it will answer is-system-running at all.
 for _ in $(seq 1 30); do
@@ -259,6 +267,8 @@ if [ -n "$A3" ]; then
   # shell); they are never written to a file, a log line or the evidence.
   PASS=(-e DPAGENT_LLM_VERIFY -e DPAGENT_MODEL -e "DPAGENT_LLM_TIMEOUT=${DPAGENT_LLM_TIMEOUT:-900}" -e "A3_TRANSIENT_RETRIES=${A3_TRANSIENT_RETRIES:-5}" -e "DPAGENT_LLM_MAX_TOKENS=${DPAGENT_LLM_MAX_TOKENS:-48000}")
   [ -z "${DPAGENT_LLM_REASONING_EFFORT:-}" ] || PASS+=(-e DPAGENT_LLM_REASONING_EFFORT)
+  [ -z "${LEDGER_DIR:-}" ] || PASS+=(-e "DPAGENT_LLM_LEDGER=/var/lib/dpagent-ledger/$(basename "$DPAGENT_LLM_LEDGER")"
+                                     -e "DPAGENT_LLM_LEDGER_SEGMENT=${A3_LEDGER_SEGMENT:-asks}")
   if [ "$A3" = real ] || [ "$A3" = both ]; then
     for k in GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
       [ -z "${!k:-}" ] || PASS+=(-e "$k")

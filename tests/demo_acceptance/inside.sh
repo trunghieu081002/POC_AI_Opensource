@@ -8,7 +8,7 @@
 #                      presenter's reviewer approves live (docs/demo-show.md)
 set -euo pipefail
 PHASE="${1:?first|second|show}"
-DRAFT="${DEMO_DRAFT:?ai|reference}"
+DRAFT="${DEMO_DRAFT:?ai|reference|artifact}"
 cd /opt/dpagent
 OUT=/root/quickstart-evidence          # the runner copies this directory out
 mkdir -p "$OUT"
@@ -91,6 +91,15 @@ if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
       || echo "{\"error\": \"no readable trace\", \"synth_exit_code\": $rc}" > "$OUT/ai-summary.json"
     tee -a "$OUT/steps.log" < "$OUT/ai-summary.json"
     grep -q "^model " "$OUT/draft-origin.txt" || { tail -20 "$OUT/04-synth.log"; echo "an ai run without a model draft" >&2; exit 1; }
+  fi
+  if [ "$DRAFT" = artifact ]; then   # the accepted model draft, imported: no synth ran here, no credential is present
+    grep -q "^model .* imported from .* matched the trace's sha256; no model call on this host" "$OUT/draft-origin.txt" \
+      || { tail -20 "$OUT/04-synth.log"; echo "not an imported model draft" >&2; exit 1; }
+    [ ! -e "$OUT/ai-trace" ] || { echo "a synth trace was written on an artifact host" >&2; exit 1; }
+    for key in GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_MODEL; do
+      [ -z "${!key:-}" ] || { echo "$key is set on an artifact host" >&2; exit 1; }
+    done
+    ok "artifact-imported (files = the accepted trace's hashes; no model, no credential on this host)"
   fi
   [ "$rc" -eq 0 ] || { tail -60 "$OUT/04-synth.log"; exit "$rc"; }
   [ ! -e pipelines/fulfilment_sla/.approved.yaml ] || { echo "the draft step approved something" >&2; exit 1; }
