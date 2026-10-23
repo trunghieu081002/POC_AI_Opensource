@@ -1,0 +1,6 @@
+commit=ca8e7d7b8f3e30050ff957e14b4aeca17ca8e728
+tree=d685b14c5068127ffbfe2dc28fc463f8b55f579c
+working_tree_clean=yes
+profile=core
+cgroupns=host
+finished=2026-10-23T06:10:59Z

@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Cột thời gian nào được dùng để xác định mốc `month` của báo cáo: ngày đặt hàng (`sale_order.date_order`), ngày cam kết giao (`sale_order.commitment_date`), hay ngày thực tế giao hàng (`stock_picking.date_done`)?",
+      "why_it_matters": "Quyết định một đơn hàng rơi vào tháng nào trong báo cáo - ba lựa chọn cho ra các tập dữ liệu và con số hoàn toàn khác nhau theo từng tháng."
+    },
+    {
+      "question": "Những trạng thái đơn bán nào (`sale_order.state`) được đưa vào báo cáo, có loại trừ các đơn nháp (`draft`, `sent`) và đơn huỷ (`cancel`) không?",
+      "why_it_matters": "Ảnh hưởng trực tiếp đến chỉ số tổng số đơn hàng và mẫu số tính tỷ lệ giao đúng hẹn (%)."
+    },
+    {
+      "question": "Những đơn bán không có ngày hẹn giao (`sale_order.commitment_date` IS NULL) được xử lý ra sao trong tính toán SLA?",
+      "why_it_matters": "Schema cho thấy `commitment_date` có thể NULL; nếu không xác định rõ đơn đó có được tính là đúng hạn, trễ hạn, hay loại khỏi tỷ lệ SLA thì không thể tính toán chính xác."
+    },
+    {
+      "question": "Nếu một đơn bán có nhiều phiếu xuất kho (`stock_picking`), mốc giao hàng thực tế để so với `commitment_date` được tính theo phiếu xuất kho nào (phiếu đầu tiên, phiếu cuối cùng `max(date_done)`, hay phải toàn bộ phiếu đều hoàn thành)?",
+      "why_it_matters": "Một đơn hàng có thể giao nhiều đợt; chọn mốc nào sẽ quyết định đơn đó được tính là 'đã giao' và có đúng hẹn hay không."
+    }
+  ]
+}

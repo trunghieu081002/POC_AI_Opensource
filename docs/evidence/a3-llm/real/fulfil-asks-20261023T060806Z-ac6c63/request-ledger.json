@@ -1,0 +1,19 @@
+{
+ "abandoned": [],
+ "by_segment": {
+  "asks": 4,
+  "main": 2,
+  "probe": 1
+ },
+ "limits": {
+  "asks": 6,
+  "main": 6,
+  "probe": 2,
+  "total": 14
+ },
+ "outcomes": {
+  "ok": 7
+ },
+ "sent": 7,
+ "unfinished": []
+}

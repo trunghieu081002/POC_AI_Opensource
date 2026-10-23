@@ -1,0 +1,34 @@
+{
+  "approval_file_exists": false,
+  "attempt_detail": "",
+  "attempts": [
+    {
+      "evidence_id": "",
+      "n": 1,
+      "outcome": "blocked",
+      "source": "llm"
+    }
+  ],
+  "calls": 1,
+  "case": "fulfilment_sla_ambiguous",
+  "classification": "asked-blocker",
+  "counts": {
+    "format_repairs": 0,
+    "human_edits": 0,
+    "pipeline_revisions": 0,
+    "provider_errors": 0,
+    "provider_errors_transient": 0
+  },
+  "files_written": [],
+  "label": "R2-ambiguous-brd-run1",
+  "last_outcome": "blocked",
+  "last_validation": {},
+  "leaked_and_recovered": {
+    "databases": [],
+    "failed": [],
+    "roles": []
+  },
+  "model": "gemini/gemini-3.8-flash",
+  "tokens": 4830,
+  "validation_stages": {}
+}

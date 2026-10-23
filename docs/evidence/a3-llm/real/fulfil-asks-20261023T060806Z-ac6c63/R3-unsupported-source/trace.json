@@ -1,0 +1,70 @@
+{
+  "attempts": [
+    {
+      "blockers": [
+        {
+          "question": "Hệ thống hiện không có connector hỗ trợ MongoDB (catalog hiện tại chỉ gồm: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server). Dữ liệu từ MongoDB sẽ được cung cấp qua phương thức nào (ví dụ: REST API wrapper, export định kỳ ra CSV, hay bổ sung connector MongoDB vào catalog)?",
+          "why_it_matters": "Không thể cấu hình `source.connector` cho MongoDB khi connector này chưa có trong catalog; việc tự đặt tên connector ngoài catalog sẽ bị parser từ chối khi load manifest."
+        }
+      ],
+      "call_indexes": [
+        1
+      ],
+      "detail": "",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "blocked",
+      "source": "llm",
+      "template_files": {},
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 3,
+    "max_revisions": 0,
+    "transient_retries": 1,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-23T06:10:35+00:00",
+      "cost": "unknown",
+      "duration_s": 20.89,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "kind": "ok",
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:544284cff083a73774511d0351f9bc7d39f8e4fd9e55a5d0f6d3a3055d768eeb",
+      "system_sha256": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 2517,
+        "prompt_tokens": 3498,
+        "reasoning_tokens": 2370,
+        "total_tokens": 6015
+      },
+      "usage_status": "reported",
+      "user_sha256": "sha256:601dd1c90448c12767df698ba1b6a392026ec3a260dbc5b0c8fe6fa2b60c10ed"
+    }
+  ],
+  "case": "a3_fulfilment_sla_mongodb",
+  "classification": "asked-blocker",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:0c9c76b5444e81bdb73b5d411665b0bcaa34bc99763ebb5fdffabf030c4a2624",
+    "request_yaml": "sha256:62d2a57217e7fe39b238abace33d6a28173d770387bc9c1373d66c255e060381",
+    "source_schema": "sha256:5b79a1992ffe7e601e531b9751540152b1dff246cdb3b1c41bedb7518711b0ce",
+    "synth_system_prompt": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+    "synth_system_prompt_name": "synth_pipeline"
+  },
+  "kind": "ambiguous",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "",
+  "started_at": "2026-10-23T06:10:35+00:00",
+  "trace_version": 1
+}
