@@ -13,6 +13,7 @@ Requests are model requests sent (every kind counts: answered, busy 503/429, tim
 | `fd58d40/20261022T155602Z-ai` | model | 2 | same as 726c3db |
 | `3288b49/20261022T164006Z-ai` | model | 0 | **infrastructure**: postgres restart > 300 s at host load ~17 |
 | `e46e2e1/20261022T172448Z-ai` | model | 6 (2 answered, 4 busy) | structural fix after one re-ask, numbers matched, gates still missing; next re-ask 503 ×2 → inconclusive |
+| `4fce834/20261023T052117Z-ai` | model `gemini/gemini-3.8-flash`, prompt `synth_pipeline` `2f86b1a2…` | 3 (probe 1 + synth 2, all answered; 27 233 tokens; cost unknown) | **PASS**, both phases. `llm-after-1-revision(s)`: attempt 1 structural-fail (a `business_rule` gate with `expect: 0`), fed back; attempt 2 validated (`ev-76438bb551f38ddc`) with both landing `unique` gates. Refusals rc 1/2/3; deploy+run = expected; schedule `0 2 * * *`; dashboard + viewer (API and browser); bad-data run 12 failed at landing on exactly the `stock_picking` unique gate, no later stage, report same oid/rows; recovery = expected; undeploy audit clean; secret scans clean. Trace sha256 `2cbfa290…`. `demo.reviewer` approved as a **test** stand-in |
 
 Old budget (11 of 14 used, stopped there). Root causes found afterwards and fixed on `0a55ea8`…`25f623f`:
 - busy/timed-out requests and their retries were not counted against `--max-calls` (now every request counts, a

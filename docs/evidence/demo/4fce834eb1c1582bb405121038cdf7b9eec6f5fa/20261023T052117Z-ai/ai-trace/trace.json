@@ -1,0 +1,140 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "/opt/dpagent/pipelines/fulfilment_sla/pipeline.yaml stage 'curated': business_rule gate's expect 0 must be 'no_rows' (the only kind implemented)",
+      "drafted_files": [
+        "models/fct_delivery_sla.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {
+        "models/fct_delivery_sla.sql": "sha256:007d9875cef98ba524fd4dc857d1018fbbe70f2e3097760acbd360161b3f3e9c",
+        "pipeline.yaml": "sha256:bf47b21ee2f24063c2bbf28502d9d2b93bb3047d569fde4a99d7f1fd432623dc"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "structural-fail",
+      "source": "llm",
+      "template_files": {},
+      "validation": {}
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        2
+      ],
+      "detail": "",
+      "drafted_files": [
+        "models/fct_delivery_sla.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-76438bb551f38ddc",
+      "fed_back": "",
+      "files": {
+        "models/fct_delivery_sla.sql": "sha256:007d9875cef98ba524fd4dc857d1018fbbe70f2e3097760acbd360161b3f3e9c",
+        "pipeline.yaml": "sha256:829a10e11d1ccb4ab5ec22305997b60eb3ef217e7713230dfca571ea1b3d081a"
+      },
+      "format_repairs": 0,
+      "index": 2,
+      "outcome": "validated",
+      "source": "llm-revision",
+      "template_files": {},
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "fulfilment_sla__validate__4db05698",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "dbt_tests": {
+          "run_1": [],
+          "run_2": []
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          3,
+          4
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 6,
+    "max_revisions": 2,
+    "transient_retries": 1,
+    "wait_s": 120.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-23T05:38:15+00:00",
+      "cost": "unknown",
+      "duration_s": 111.85,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "kind": "ok",
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:68a9e39ebf005dcc2f46833b2038283dd73facf8d331268245ed61678fcd5516",
+      "system_sha256": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 14591,
+        "prompt_tokens": 3712,
+        "reasoning_tokens": 12885,
+        "total_tokens": 18303
+      },
+      "usage_status": "reported",
+      "user_sha256": "sha256:780f1e51ce46b695b96a06abd083779ecfd297d94cc55246476c4cb8a2f90d81"
+    },
+    {
+      "at": "2026-10-23T05:40:07+00:00",
+      "cost": "unknown",
+      "duration_s": 77.18,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 2,
+      "kind": "ok",
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:10e26dc70078c923ba60f987125de06c16edadddd8ec26c2a5fe53016e60ceed",
+      "system_sha256": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 4076,
+        "prompt_tokens": 4854,
+        "reasoning_tokens": 2306,
+        "total_tokens": 8930
+      },
+      "usage_status": "reported",
+      "user_sha256": "sha256:ca00329158b230ef1f5efaafaec832eda2a25841a68a09adc38e795eeac1bedc"
+    }
+  ],
+  "case": "fulfilment_sla",
+  "classification": "llm-after-1-revision(s)",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:733d6cd7526c5ac0c4eb2ea4b659ce90482caa0afabe89e82bf974264b7260d3",
+    "expected": "sha256:410d0a71606f763c01356e75dfc6b43dd8b1a8983e62993bdcc5a404ad49d523",
+    "fixture": "sha256:c12eac7e3ac5068ea30b491d45954365adbc8d4445dd1d0061e75c083b4ce22e",
+    "request_yaml": "sha256:4ed65d13e82b13422b17c25640f22ea1f731c58b7612acf109a0c7be740447b7",
+    "source_schema": "sha256:71e11b554a69cfe0699fd5e9a4bc6f20d780a45604814a25f5f6fd3610acae1c",
+    "synth_system_prompt": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+    "synth_system_prompt_name": "synth_pipeline"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/opt/dpagent/pipelines/fulfilment_sla",
+  "started_at": "2026-10-23T05:38:12+00:00",
+  "trace_version": 1
+}

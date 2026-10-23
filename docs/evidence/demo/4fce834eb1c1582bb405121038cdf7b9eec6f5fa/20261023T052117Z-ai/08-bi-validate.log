@@ -1,0 +1,193 @@
+project: demo-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.1  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["fulfilment_sla"], "warehouse_creator_roles": ["dbt_user"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 17257ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 189989ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 47ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      ok 221ms
+  5/6 metadata · Migrate metadata and create one admin without loading example 
+data
+      ok 48749ms
+  6/6 service · Enable the Superset systemd service
+      ok 284ms
+  verify ok
+      No broken requirements found.
+      Loaded your LOCAL configuration at [/opt/superset/superset_config.py]
+      Superset PostgreSQL engine discovery passed
+      2026-10-23 05:47:58,167⚠superset.initialization:We haven't found any 
+Content Security Policy (CSP) defined in the configurations. Please make sure to
+configure CSP using the TALISMAN_ENABLED and TALISMAN_CONFIG keys or any other 
+external software. Failing to configure CSP have serious security implications. 
+Check https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP for more 
+information. You can disable this warning using the 
+CONTENT_SECURITY_POLICY_WARNING key.
+      2026-10-23 05:47:58,855:INFO:alembic.runtime.migration:Context impl 
+PostgresqlImpl.
+      2026-10-23 05:47:58,856:INFO:alembic.runtime.migration:Will assume 
+transactional DDL.
+      2026-10-23 05:47:59,451:INFO:superset.app:Syncing configuration to 
+database...
+      2026-10-23 05:47:59,460:INFO:superset.app:Configuration sync to database 
+completed successfully
+      2026-10-23 05:48:00,428:INFO:superset.core.mcp.core_mcp_injection:fastmcp 
+is not installed, skipping MCP initialization. Install it with: pip install 
+'apache-superset[fastmcp]'
+      ok Superset healthy
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset-assets v0.1.0  DRAFT                                                │
+│ Validate and deploy project-owned Superset assets through native UUID-based  │
+│ import                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"base_url": "http://127.0.0.1:8088", "environment": "dev", "mode": 
+"validate", "projects": [{"name": "fulfil-sla", "revision": "v1", "bundle_dir": 
+"projects/fulfil-sla/bundle", "expected_file": 
+"projects/fulfil-sla/expected.yaml", "approved_sha256": "", "viewers": 
+[{"username": "fulfil.viewer", "password_env": "FS_VIEWER_PASSWORD"}]}]}
+  preflight ok
+  1/1 reconcile-projects · Validate isolated clones, require content-bound 
+approval and reconcile owned UUIDs
+      ok 2820ms
+  verify ok
+      fulfil-sla verified validate
+
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 489ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 18ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 31ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 91ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 12ms
+  base: 4 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 268ms
+  checks
+    PASS A row written is the same row read back 575ms
+    PASS Committed data is still there after a service restart 18215ms
+    PASS A wrong password is refused (negative) 336ms
+    PASS Every database in the spec accepts a connection and a write 976ms
+    PASS The running server reports the port and limits that were asked for 
+275ms
+    PASS With listen_addresses=localhost, the server is not reachable off-host 
+(negative) 49ms
+  teardown
+    PASS Remove everything the suite created 2116ms
+  postgres: 6 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 6296ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 26ms
+  python-modern: 2 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset                                                                     │
+│ Authenticate, query a warehouse, refuse writes and retain metadata across a  │
+│ restart                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create namespaced warehouse rows and one namespaced API connection 
+741ms
+  checks
+    PASS An authenticated SQL Lab query matches independent fixture totals 662ms
+    PASS SQL Lab and PostgreSQL refuse warehouse writes (negative) 848ms
+    PASS SELECT remains permitted after the real creator recreates the table 
+1799ms
+    PASS Restart preserves the same unique metadata connection and query result 
+10397ms
+  teardown
+    PASS Remove only this namespace's connection and warehouse table 1117ms
+  superset: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ superset-assets                                                              │
+│ Native BI approval, independent chart/filter results, stable identities and  │
+│ scoped removal                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create two namespaced warehouse fixtures and record metadata baseline 
+633ms
+  checks
+    PASS Reject deployment without content-bound approval before any mutation 
+(negative) 449ms
+    PASS Compare two saved charts and native filters with independent SQL and 
+literal expected 9429ms
+    PASS Repeat deployment without changing the exact native UUID and ID sets 
+8138ms
+    PASS Reject wrong expected without altering approval and remove validation 
+clones (negative) 1388ms
+    PASS Update content with stable IDs and remove only one project 4255ms
+  teardown
+    PASS Verify native metadata baseline and remove only owned warehouse fixture
+tables 1980ms
+  superset-assets: 5 checks passed
+
+╭─────────── acceptance ────────────╮
+│  suite            result  checks  │
+│  base             passed     4/4  │
+│  postgres         passed     6/6  │
+│  python-modern    passed     2/2  │
+│  superset         passed     4/4  │
+│  superset-assets  passed     5/5  │
+╰───────────────────────────────────╯
+╭──────────────────────────────────╮
+│ installed and proven working     │
+│ install run 7 · acceptance run 8 │
+╰──────────────────────────────────╯
+fulfil-sla status=pass fingerprint=6511989d510ba3f6739bd1f67250c35e12a56e2d4dbd1d307f98e58e5101044c
+review /var/lib/dpagent-bi-assets/fulfil-sla/validation.json, then approve that fingerprint (bi-deploy)
