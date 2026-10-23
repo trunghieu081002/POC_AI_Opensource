@@ -76,7 +76,8 @@ if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
   step 01-preflight bash "$DEMO" preflight
   step 02-install   bash "$DEMO" install
   { for v in /opt/dpagent/.venv /opt/airflow/.venv /opt/superset/.venv /opt/dbt/.venv /opt/dlt/.venv; do
-      [ -x "$v/bin/pip" ] && { echo "# $v"; "$v/bin/pip" freeze 2>/dev/null; }
+      [ -x "$v/bin/python" ] && { echo "# $v"; "$v/bin/python" -c 'import importlib.metadata as m
+print("\n".join(sorted({"%s==%s" % (d.metadata["Name"], d.version) for d in m.distributions()}, key=str.lower)))'; }
     done; psql --version 2>/dev/null; } > "$OUT/dependency-versions.txt" || true
   step 03-source    bash "$DEMO" source
 
