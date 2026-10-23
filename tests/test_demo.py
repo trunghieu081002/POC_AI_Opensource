@@ -150,3 +150,11 @@ def test_ai_summary_separates_requests_tokens_and_cost(tmp_path):
                                   capture_output=True, text=True, check=True).stdout)
     assert s["requests"] == 2 and s["requests_by_kind"] == {"ok": 1, "busy": 1, "timeout": 0, "error": 0}
     assert s["tokens_reported"] == 50 and s["requests_with_unknown_usage"] == 1 and s["cost"] == "unknown"
+
+
+def test_the_ai_preflight_checks_the_llm_dependency_model_and_credential_without_showing_it():
+    demo = (D / "demo.sh").read_text()
+    pre = demo[demo.index("  preflight)"):demo.index("  install)")]
+    assert "import litellm" in pre and "need DPAGENT_MODEL" in pre and "client.available()" in pre
+    assert "GEMINI_API_KEY" not in pre and "MemAvailable" in pre
+    assert "dependency-versions.txt" in (ROOT / "tests/demo_acceptance/inside.sh").read_text()

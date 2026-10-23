@@ -75,6 +75,9 @@ if [ "$PHASE" = first ] || [ "$PHASE" = show ]; then
   # ---- layer 1: the stack
   step 01-preflight bash "$DEMO" preflight
   step 02-install   bash "$DEMO" install
+  { for v in /opt/dpagent/.venv /opt/airflow/.venv /opt/superset/.venv /opt/dbt/.venv /opt/dlt/.venv; do
+      [ -x "$v/bin/pip" ] && { echo "# $v"; "$v/bin/pip" freeze 2>/dev/null; }
+    done; psql --version 2>/dev/null; } > "$OUT/dependency-versions.txt" || true
   step 03-source    bash "$DEMO" source
 
   # ---- layer 3: the draft (ai: the model through `pipeline synth`; reference: labelled hand-written)

@@ -37,6 +37,18 @@ origin_file() { echo "pipelines/$P/.draft-origin"; }
 case "${1:-}" in
   preflight)
     dpagent doctor --spec "$D/stack.yaml"
+    # resources the demo needs (the stack's own footprint was measured at ~5 GB RSS)
+    awk '/MemAvailable/ {printf "memory available: %.1f GB\n", $2/1048576; if ($2 < 4194304) bad=1} END {exit bad}' /proc/meminfo \
+      || echo "WARNING: less than 4 GB of memory available" >&2
+    df -h / | awk 'NR==2 {print "disk free on /: " $4}'
+    if [ "${DEMO_DRAFT:-ai}" = ai ]; then   # layer 3 needs the LLM extra, a model name and its key (values never shown)
+      "$PY" -c 'import litellm' 2>/dev/null \
+        || { echo "litellm is not installed in $PY - bootstrap with DPAGENT_WITH_LLM=1 (pip install -e '.[llm]')" >&2; exit 2; }
+      need DPAGENT_MODEL
+      "$PY" -c 'from dpagent.llm import client; import sys; sys.exit(0 if client.available() else 1)' \
+        || { echo "no credential for $DPAGENT_MODEL in the environment" >&2; exit 2; }
+      echo "layer 3: litellm $("$PY" -c 'import importlib.metadata as m; print(m.version("litellm"))'), model $DPAGENT_MODEL, credential present"
+    fi
     ;;
   install)
     need FS_SRC_NAME FS_SRC_USER FS_SRC_PASSWORD WAREHOUSE_DB_USER WAREHOUSE_DB_PASSWORD AIRFLOW_DB_PASSWORD \
