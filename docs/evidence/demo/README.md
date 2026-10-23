@@ -25,3 +25,8 @@ Old budget (11 of 14 used, stopped there). Root causes found afterwards and fixe
 
 New budget from 2026-10-23: at most 14 more requests (probe 2, main run 6, fulfil-asks 6) in the ledger
 `request-ledger.json` of each run; total history at most 25.
+
+Show host (`docs/evidence/demo-show/`): `9c1e17d/20261023T063056Z-artifact` - `--demo artifact --show` with
+`DEMO_ARTIFACT=docs/evidence/demo/4fce834…/20261023T052117Z-ai` and its trace hash pinned; the 2 drafted files matched
+the trace, validated on the new host (`ev-fa4bf4fe272b0425`), **stopped before approval**, no model call and no
+credential on that host (ledger unchanged at 7). Container `dpagent-demo-show-artifact-2981311`.

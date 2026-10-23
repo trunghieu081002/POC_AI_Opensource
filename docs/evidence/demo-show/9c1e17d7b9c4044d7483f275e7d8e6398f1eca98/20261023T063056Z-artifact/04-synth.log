@@ -1,0 +1,54 @@
+{
+ "origin": "model gemini/gemini-3.8-flash via dpagent pipeline synth (llm-after-1-revision(s), attempt 2), imported from docs/evidence/demo/4fce834eb1c1582bb405121038cdf7b9eec6f5fa/20261023T052117Z-ai - source commit 4fce834eb1c1582bb405121038cdf7b9eec6f5fa, trace sha256:2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8, 2 file(s) matched the trace's sha256; no model call on this host, nothing approved",
+ "files": {
+  "models/fct_delivery_sla.sql": "sha256:007d9875cef98ba524fd4dc857d1018fbbe70f2e3097760acbd360161b3f3e9c",
+  "pipeline.yaml": "sha256:829a10e11d1ccb4ab5ec22305997b60eb3ef217e7713230dfca571ea1b3d081a"
+ },
+ "trace_sha256": "sha256:2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8",
+ "classification": "llm-after-1-revision(s)",
+ "model": "gemini/gemini-3.8-flash",
+ "source_commit": "4fce834eb1c1582bb405121038cdf7b9eec6f5fa"
+}
+╭─────────────────────── fulfilment_sla · odoo_postgres ───────────────────────╮
+│  stage    engine  depends_on  gates                              quarantine  │
+│  landing  dlt     -           schema_contract, unique, unique    -           │
+│  curated  dbt     landing     unique, not_null, business_rule,   -           │
+│                               business_rule                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+lint clean
+load: pass
+dbt project/Jinja parse: pass - 1 model(s) parsed clean
+  (structure/Jinja/config only, no live database - does NOT confirm the SQL 
+itself is valid Postgres, e.g. a 'SELEC ...' typo still parses clean; not dbt 
+compile/run; the SQL is only actually proven by steps 4-5's real dbt run against
+a fixture)
+procedures: skipped - no procedure-engine stage in this pipeline
+dbt ref()/source() check: pass - 1 model(s), no ref()/source() dependency
+content hash at validation time: 
+sha256:e03fbf03566e87ee5c0215c1799588467009546196fbfbf3bf55e6a532f5ded7
+
+written: /opt/dpagent/pipelines/fulfilment_sla/.synth-validation.yaml
+
+running fixture through a real, --allow-draft deploy of an isolated validation 
+clone (2 runs, for idempotency)...
+validation clone: fulfilment_sla__validate__9299c6d2
+sealed evidence: ev-fa4bf4fe272b0425 (what `dpagent pipeline promote 
+fulfilment_sla --fixture ... --expected ...` checks)
+run 1 vs expected: match - 2 row(s) matched exactly
+run 2 vs expected: match - 2 row(s) matched exactly
+cleanup (pipeline artifacts): complete - DAG removed; published files removed; 
+dbt models removed; dlt state removed; secrets released: 
+DPAGENT_VALIDATE_9299C6D2_SRC_DATABASE, DPAGENT_VALIDATE_9299C6D2_SRC_HOST, 
+DPAGENT_VALIDATE_9299C6D2_SRC_PASSWORD, DPAGENT_VALIDATE_9299C6D2_SRC_PORT, 
+DPAGENT_VALIDATE_9299C6D2_SRC_USER, DPAGENT_VALIDATE_9299C6D2_WH_DATABASE, 
+DPAGENT_VALIDATE_9299C6D2_WH_HOST, DPAGENT_VALIDATE_9299C6D2_WH_PASSWORD, 
+DPAGENT_VALIDATE_9299C6D2_WH_PORT, DPAGENT_VALIDATE_9299C6D2_WH_USER | verified 
+gone: DAG (file + Airflow registration + published files + dbt models + dlt 
+state), no clone secrets left in /opt/airflow/home/pipelines.env, no active runs
+cleanup (source database): dropped
+cleanup (source role): dropped
+cleanup (warehouse database): dropped
+cleanup (warehouse role): dropped
+
+fixture run: both runs matched expected, idempotent, cleanup complete (pipeline 
+artifacts + both throwaway databases)

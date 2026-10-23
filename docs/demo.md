@@ -172,6 +172,18 @@ included: `draft-origin.txt` says who wrote the pipeline, `ai-trace/` and `ai-su
 
 Runs so far (all kept): see [docs/evidence/demo/README.md](evidence/demo/README.md).
 
+### Release candidate: "integrated 3-layer demo"
+
+| | |
+|---|---|
+| Source | `9c1e17d` (the show host's build); AI accepted on `4fce834` - between them only the dlt pin and the version capture changed |
+| AI acceptance | `docs/evidence/demo/4fce834…/20261023T052117Z-ai`: `gemini/gemini-3.8-flash`, `llm-after-1-revision(s)`, full flow **PASS**; trace sha256 `2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8` |
+| Asks | `docs/evidence/a3-llm/real/fulfil-asks-20261023T060806Z-ac6c63`: 4/4 (asked ×3, unsupported source refused) |
+| Show host | `docs/evidence/demo-show/9c1e17d…/20261023T063056Z-artifact`: the accepted draft imported (2 files = the trace's hashes), validated on that host (`ev-fa4bf4fe272b0425`), nothing approved, no model credential |
+| Requests | 7 of the 14 granted on 2026-10-23 (probe 1, synth 2, asks 4; all answered); 18 in the whole history |
+| Versions | postgres 15.19, python 3.11, airflow 2.9.3, dbt-core 1.8.10 / dbt-postgres 1.8.2, dlt 1.31.0, superset 6.1.0 (pack pins), litellm 1.106.2 (the run's; `>=1.40` in `pyproject.toml`) - full lists in each run's `dependency-versions.txt` |
+| Not accepted | native OL8 (SELinux/firewalld), HG representative load, production operations; dbt and litellm are version ranges resolved at install time |
+
 ## Several tables: HG (already verified, not re-run here)
 
 The multi-table path on the same engine is shown with HG's own report, whose SQL was written by people (not by a
