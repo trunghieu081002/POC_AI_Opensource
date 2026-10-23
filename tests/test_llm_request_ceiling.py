@@ -124,3 +124,11 @@ def test_a_revision_loop_never_sends_more_than_its_ceiling(provider, tmp_path):
                                          transient_retries=5, runner=runner)
     assert len(p.calls) == 3 and len(records) == 3
     assert trace.classification == "inconclusive-provider-unavailable"
+
+
+def test_the_shared_pipeline_prompt_allows_a_stopping_gate_at_landing_and_maps_every_data_rule():
+    prompt = llm.load_prompt("synth_pipeline")
+    assert "Landing's gates are structural only" not in prompt and "structural only" not in prompt
+    assert "row-level `unique` / `not_null` on a landing table" in prompt and "must map\n  to a declared gate" in prompt
+    for case_specific in ("fulfil", "sale_order", "stock_picking", "HG", "res_partner_x"):
+        assert case_specific not in prompt          # a shared prompt: no case is written into it

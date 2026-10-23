@@ -88,7 +88,8 @@ warehouse:
   schema: <this pipeline's own schema, never shared with another pipeline>
 stages:
   - name: landing
-    gates: [...]           # structural only - schema_contract/row_count_bounds/freshness
+    gates: [...]           # structural (schema_contract/row_count_bounds/freshness) and, when the BRD
+                           # says bad source rows must stop the load, row-level unique/not_null - see Rules
   - name: raw
     engine: dbt            # or procedure
     depends_on: landing
@@ -118,8 +119,15 @@ Rules, all non-negotiable:
 - Every table/column name in every gate, model, and procedure must come
   from the verified source schema you were given, or from a table your own
   earlier stage creates. Never reference a column you were not told exists.
-- Landing's gates are structural only (no quarantine) - the same rule every
-  reference pipeline in this project follows.
+- Landing never has `quarantine`. Its gates are structural ones, plus a
+  row-level `unique` / `not_null` on a landing table whenever the BRD says
+  bad source data (e.g. a repeated key) must stop the run: with no
+  quarantine, a violation fails the run at landing, before any transform,
+  and the previous output stays as it was.
+- Every requirement in the BRD about stopping, rejecting or checking data
+  ("must stop", "must fail", "may not repeat", "must not be NULL") must map
+  to a declared gate - name it in `mapping`. A pipeline whose numbers are
+  right but which misses such a gate does not meet the BRD.
 - Use `quarantine.reject_threshold_pct` on any stage with a row-level gate
   where discarding some bad rows and keeping the run alive is the right
   call; omit it where a single bad row means the transform logic itself is
