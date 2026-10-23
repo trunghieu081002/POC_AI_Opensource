@@ -1,0 +1,3 @@
+kpis:
+- {name: orders, label: Completed orders, meaning: "completed orders", expression: "SUM(orders)"}
+- {name: revenue, label: Revenue, meaning: "revenue of completed orders", expression: "SUM(revenue)"}

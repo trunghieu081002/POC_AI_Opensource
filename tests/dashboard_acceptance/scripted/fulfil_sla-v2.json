@@ -1,0 +1,32 @@
+{
+ "title": "Delivery SLA by month (v2)",
+ "dataset": {
+  "schema": "fulfilment_sla",
+  "table": "fct_delivery_sla"
+ },
+ "charts": [
+  {
+   "name": "sla_by_month",
+   "title": "On-time delivery by order month",
+   "type": "table",
+   "groupby": [
+    "month"
+   ],
+   "metrics": [
+    "eligible_orders",
+    "delivered_orders",
+    "on_time_orders",
+    "on_time_rate"
+   ]
+  }
+ ],
+ "filters": [
+  {
+   "name": "month",
+   "label": "Month",
+   "column": "month",
+   "type": "select"
+  }
+ ],
+ "mapping": "- per order month: eligible, delivered, on time, rate -> sla_by_month\n- pick months -> month"
+}

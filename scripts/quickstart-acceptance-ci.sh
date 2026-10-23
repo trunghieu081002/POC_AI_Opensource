@@ -126,7 +126,7 @@ CID=''
 cleanup() {
   rc=$?; trap - EXIT
   echo "$rc" > "$OUT/exit-code.txt"
-  [ -z "${LEDGER_DIR:-}" ] || ( cd "$ROOT" && PYTHONPATH=src "${PYH:-python3}" -m dpagent.llm.ledger status "$DPAGENT_LLM_LEDGER" ) \
+  [ -z "${LEDGER_DIR:-}" ] || ( cd "$ROOT" && PYTHONPATH=src "${PYH:-python3}" -m dpagent.llm.ledger status "${DPAGENT_LLM_LEDGER:-}" ) \
     > "$OUT/request-ledger.json" 2>&1 || true
   if [ -n "$CID" ]; then
     docker cp "$NAME:/root/quickstart-evidence/." "$OUT/" 2>/dev/null || true
@@ -139,6 +139,8 @@ cleanup() {
   exit "$rc"
 }
 trap cleanup EXIT
+# another runner may mount a request ledger's directory into this host (scripts/dashboard-acceptance-ci.sh --draft ai)
+LEDGER_DIR=${LEDGER_DIR:-${MOUNT_LEDGER_DIR:-}}
 CID=$(docker run -d --name "$NAME" --privileged --cgroupns host --tmpfs /run --tmpfs /run/lock \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$ROOT:/opt/src/dpagent-src:ro" \
   ${LEDGER_DIR:+-v "$LEDGER_DIR:/var/lib/dpagent-ledger:rw"} "$IMAGE")
