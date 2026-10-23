@@ -30,3 +30,9 @@ Show host (`docs/evidence/demo-show/`): `9c1e17d/20261023T063056Z-artifact` - `-
 `DEMO_ARTIFACT=docs/evidence/demo/4fce834…/20261023T052117Z-ai` and its trace hash pinned; the 2 drafted files matched
 the trace, validated on the new host (`ev-fa4bf4fe272b0425`), **stopped before approval**, no model call and no
 credential on that host (ledger unchanged at 7). Container `dpagent-demo-show-artifact-2981311`.
+
+Rebuild without a model (`docs/evidence/demo/941f9afb5964410b4de2ba861ba3a421f8c9ccee/20261023T070034Z-artifact`): `--demo artifact` on a new host - the accepted draft
+imported (2 files = trace hashes, trace pinned), `demo.sh lock` (every locked venv at the accepted versions), then
+the full flow **PASS**: refusals rc 1/2/3, deploy/run = expected, schedule, dashboard + viewer (API and browser),
+bad-data run 12 blocked at landing on the `stock_picking` unique gate, recovery, undeploy audit, secret scans clean.
+No model call, no credential on the host. Final versions incl. Superset: `dependency-versions-final.txt`.

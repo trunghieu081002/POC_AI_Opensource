@@ -1,13 +1,13 @@
 # DPAgent demo: three layers, product commands only
 
-The one guide for the demo: install → configure → draft (AI) → validate → a person approves → deploy/run →
-dashboard → bad data / recovery → cleanup, plus how to run it live and what it does **not** prove.
+The one guide for the demo: what it shows, how to rebuild it from a fixed commit, how to run it with the accepted
+AI draft (no key) or a new AI draft (your key and budget), how to show it live, and what it does **not** prove.
 
 One business problem, **on-time delivery by month** (`fulfilment_sla`), goes through the whole platform:
 
 | Layer | What happens | Command (step of `examples/demo/demo.sh`) |
 |---|---|---|
-| 1 Platform | check the host, install + verify + acceptance-test every pack | `preflight`, `install` |
+| 1 Platform | check the host, install + verify + acceptance-test every pack, pin the Python environments | `preflight`, `install`, `lock` |
 | 3 AI authoring | a model drafts the pipeline from a BRD + verified schema; it is validated for real against an independent expected result and re-asked with the findings; **a person approves** | `synth`, `validate`, `approve` |
 | 2 Data | deploy, run, compare; the daily schedule; bad data stops the run; recovery; undeploy + audit | `deploy`, `check`, `schedule`, `bad-data`, `fix-data`, `status`, `undeploy` |
 | BI | the dashboard and a real read-only viewer | `bi-validate`, `bi-deploy` |
@@ -20,169 +20,219 @@ What a person still does, by design:
 **The dashboard is hand-written** (`projects/fulfil-sla`, native Superset YAML). DPAgent attaches it through the
 `superset-assets` mechanism; it does not generate dashboards.
 
+## Release: `v0.4.0-demo-rc1` (proposed tag)
+
+| | |
+|---|---|
+| Source | the tagged commit; evidence for it below. Release notes: [release-notes-v0.4.0-demo-rc1.md](release-notes-v0.4.0-demo-rc1.md) |
+| AI draft | made once, in the accepted run `docs/evidence/demo/4fce834…/20261023T052117Z-ai`: `gemini/gemini-3.8-flash`, `llm-after-1-revision(s)`, trace sha256 `2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8` |
+| Show host | `__SHOW_HOST__` on `ol8-19.localdomain` (section 5) |
+
 ## Scope
 
 | | Status |
 |---|---|
 | Ubuntu 22.04 host (disposable systemd container) | verified, every step below |
-| Oracle Linux 8.10 | userland verified in a container only; a **native** OL8 VM (SELinux, firewalld) is **not** accepted |
-| Data size | one small fixture (10 orders, 12 transfers): behaviour, **not** load. HG representative load is **not** accepted |
+| Oracle Linux 8.10 | userland verified in a container only; a **native** OL8 VM (SELinux, firewalld) is **not** accepted - [backlog](demo-backlog.md) |
+| Data size | one small fixture (10 orders, 12 transfers): behaviour, **not** load. HG representative load is **not** accepted - [backlog](demo-backlog.md) |
 | Dashboard | hand-written, attached by DPAgent |
-| Model | the one named in the evidence below; another model is a new acceptance with its own provenance |
-| Production operations (HA, backup, monitoring, upgrades) | not part of this demo |
+| Model | `gemini/gemini-3.8-flash` on this one case; another model or case is a new acceptance with its own provenance |
+| Production operations (HA, backup, monitoring, upgrades) | not part of this demo - [backlog](demo-backlog.md) |
 
-## 1. Install
+## 1. Rebuild from the fixed commit
 
-- A host or VM where you may install system packages (PostgreSQL 15, dbt, Airflow 2.9, dlt, Superset 6.1).
-  About 8 GB free memory, 10 GB free disk, network access to package mirrors and PyPI. Root (`sudo -E`).
-- DPAgent from a checkout of the release commit (below): `sudo DPAGENT_SOURCE_DIR=$PWD bash scripts/bootstrap.sh`;
-  add `DPAGENT_WITH_LLM=1` for layer 3 with a model (it installs `litellm`).
-- Dependency versions: every pack pins its tool version (`packs/*/pack.yaml`); the versions an acceptance run
-  actually installed - every venv's `pip freeze` and PostgreSQL - are in its evidence (`dependency-versions.txt`).
+Host: Ubuntu 22.04 (or a disposable systemd container of it), root, about 8 GB free memory and 10 GB free disk,
+network access to the Ubuntu/PGDG mirrors and PyPI.
+
+```bash
+git clone https://github.com/trunghieu081002/POC_AI_Opensource.git dpagent && cd dpagent
+git checkout v0.4.0-demo-rc1                              # the fixed commit, never a branch head
+sudo DPAGENT_SOURCE_DIR=$PWD bash scripts/bootstrap.sh    # + DPAGENT_WITH_LLM=1 only for a NEW AI draft (litellm)
+cd /opt/dpagent                                           # bootstrap's copy; every command below runs here
+```
+
+Dependencies - what is fixed and how:
+
+| What | Fixed by | Accepted version |
+|---|---|---|
+| PostgreSQL | pack param `version: "15"` (PGDG apt) | 15.19 - the minor follows the mirror, recorded per run |
+| Python | pack `python-modern` `3.11` | 3.11 |
+| Airflow venv | pack `2.9.3` + Airflow's published constraints, and `examples/demo/lock/airflow.txt` | apache-airflow 2.9.3 |
+| dbt venv | `examples/demo/lock/dbt.txt` (the pack param is `1.8.*`) | dbt-core 1.8.10, dbt-postgres 1.8.2 |
+| dlt venv | `examples/demo/stack.yaml` `dlt_version: "1.31.0"` and `examples/demo/lock/dlt.txt` | dlt 1.31.0 |
+| DPAgent venv | `examples/demo/lock/dpagent.txt` (incl. litellm when the `[llm]` extra is installed) | litellm 1.106.2 |
+| Superset venv | `packs/superset/requirements.txt` (app + ABI-sensitive pins), `pip check` | superset 6.1.0; full list per run in `dependency-versions-final.txt` |
+
+`demo.sh lock` (after `install`) brings every package installed in the four locked venvs to its locked version
+(`--no-deps`: nothing is resolved anew), runs `pip check`, and fails if any installed package differs from or is
+missing in its lock. `python examples/demo/deps_lock.py check` re-checks at any time. The locks were generated from
+the accepted run's `dependency-versions.txt`; the product's own dependency policy (pack params) is unchanged.
 
 ## 2. Configure
 
 ```bash
 cp examples/demo/dev.env.example examples/demo/dev.env   # fill every value; never commit it
 set -a; . examples/demo/dev.env; set +a
-# layer 3 with a model: a credential file OUTSIDE the repo, mode 600 (examples/demo/llm.env.example)
-set -a; . ~/.dpagent-llm.env; set +a                      # DPAGENT_MODEL + the provider key; never printed
 S="sudo -E bash examples/demo/demo.sh"
 $S preflight     # installs nothing: what the host lacks; memory/disk; for ai: litellm, model named, key present
+$S install       # layer 1: packs installed, verified and acceptance-tested
+$S lock          # the Python environments at the accepted versions, checked
+$S source        # demo source tables (from the fulfil fixture; a real project uses its real source)
 ```
 
-Every model request is paid. Two limits apply, both counting **every request sent** - answered, failed, busy (503/429),
-timed out, a JSON format repair, a re-ask, a retry:
-- per run: `DEMO_MAX_CALLS` (default 6) and `DEMO_MAX_REVISIONS` (default 2). `DEMO_TRANSIENT_RETRIES` (default 0)
-  lets one request be repeated when the provider answers "busy"; each retry is a request. A timeout is never
-  retried.
-- across runs, commands and sessions: the **request ledger** (`DPAGENT_LLM_LEDGER`, `src/dpagent/llm/ledger.py`). It
-  is created once with its parts and total (`python -m dpagent.llm.ledger init FILE probe=2 main=6 asks=6 total=14`)
-  and never reset; each request is written there before it is sent. A request with no recorded end (a timeout, a
-  killed process) blocks every later request in any process until a person states it is over
-  (`python -m dpagent.llm.ledger resolve FILE N "why"`). `status FILE` shows the counts.
+On hosts built by the acceptance runner the environment file is `/root/demo-dev.env`, generated with random values
+on that host; it never leaves the host and is never in Git. Read one value when you need it, e.g.
+`docker exec <host> grep '^FS_VIEWER_PASSWORD=' /root/demo-dev.env`.
 
-## 3. Draft, validate, approve, run
+## 3. The draft: accepted artifact (no key) or a new AI draft (your key, your budget)
+
+**Accepted AI artifact - the default for showing and rebuilding.** No model, no key, no budget:
 
 ```bash
-$S install            # layer 1: packs installed, verified and acceptance-tested
-$S source             # demo source tables (from the fulfil fixture; a real project uses its real source)
-$S synth              # layer 3 - one of:
-                      #   DEMO_DRAFT=ai (default): model draft -> real validation -> re-ask on failure -> validated or exit 1
-                      #   DEMO_DRAFT=artifact DEMO_ARTIFACT=<accepted ai evidence dir> [DEMO_ARTIFACT_TRACE_SHA256=..]:
-                      #     the accepted model draft, its files checked against the trace's hashes - no model call
-                      #   DEMO_DRAFT=reference: the hand-written reference (labelled; never reported as the model's)
-$S validate           # re-validate (sealed evidence) - e.g. after reading the draft
-DEMO_APPROVED_BY=your.name $S approve      # a PERSON approves on that evidence
-$S deploy             # layer 2: deploy + first run
-$S check              # warehouse == hand-calculated expected (independent psql check)
-$S schedule           # daily 02:00 UTC, deployed, last run
-$S bi-validate        # prints the dashboard fingerprint to review
-DEMO_BI_APPROVED_BY=your.name DEMO_BI_APPROVED_SHA256=<fingerprint> $S bi-deploy
-#   open http://127.0.0.1:8088/superset/dashboard/fulfil-sla/ as fulfil.viewer (password FS_VIEWER_PASSWORD)
-$S bad-data           # a repeated source id: the run stops at landing, the report keeps the last good result
-$S fix-data           # source fixed, rerun recovers
-$S status             # status, the last run's audit, installed/proven packs
-$S undeploy           # dashboard (project-scoped), then the pipeline
+export DEMO_DRAFT=artifact \
+  DEMO_ARTIFACT=docs/evidence/demo/4fce834eb1c1582bb405121038cdf7b9eec6f5fa/20261023T052117Z-ai \
+  DEMO_ARTIFACT_TRACE_SHA256=2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8
+$S synth         # imports the 2 files of the validated attempt, each checked against the trace's sha256;
+                 # writes .draft-origin (model, trace hash, source commit); then lint + validate on THIS host
 ```
 
-Every step can be run again. `approve` and `bi-deploy` stop when a person's name (and, for BI, the reviewed
-fingerprint) is missing. Nothing in `synth`/`validate` approves anything.
+Nothing is approved and no approval or sealed evidence comes from another host. **This is the draft the model wrote
+in the accepted run; replaying it is not a live AI generation.** Say so when you show it.
 
-## Expected results
+**A new AI draft** - only when you choose to configure a key and a budget:
+
+```bash
+# a credential file OUTSIDE the repo, mode 600 (examples/demo/llm.env.example): DPAGENT_MODEL + the provider key
+set -a; . ~/.dpagent-llm.env; set +a                      # never printed, never `set -x`
+python -m dpagent.llm.ledger init ~/dpagent-budget/ledger.jsonl probe=2 main=6 asks=6 total=14   # once
+export DPAGENT_LLM_LEDGER=~/dpagent-budget/ledger.jsonl DPAGENT_LLM_LEDGER_SEGMENT=main DEMO_DRAFT=ai
+$S synth         # model draft -> real validation -> re-ask with the findings -> validated, or exit 1
+```
+
+Every request is counted, whatever happens to it (answered, 503/429, timed out, JSON repair, re-ask, retry):
+- per run by `DEMO_MAX_CALLS` (default 6) and `DEMO_MAX_REVISIONS` (default 2);
+- across runs, commands and sessions by the ledger, which is never reset. A request with no recorded end blocks
+  every later request until a person resolves it (`python -m dpagent.llm.ledger resolve FILE N "why"`).
+
+A new draft is a new result. It is accepted only by a new run of the acceptance (section 7) with its own
+provenance; it never replaces the artifact above silently.
+
+**Hand-written reference** (`DEMO_DRAFT=reference`): labelled, never reported as the model's work. A backup only.
+
+## 4. Approve, run, dashboard, failure, recovery, cleanup
+
+```bash
+$S validate                                    # sealed evidence a reviewer reads (two runs = expected, idempotent)
+DEMO_APPROVED_BY=<your name> $S approve        # a PERSON approves; deploy is refused before this
+$S deploy                                      # layer 2: deploy + first run
+$S check                                       # warehouse == hand-calculated expected (independent psql)
+$S schedule                                    # daily 02:00 UTC, deployed, last run
+$S bi-validate                                 # prints the dashboard fingerprint to review
+DEMO_BI_APPROVED_BY=<your name> DEMO_BI_APPROVED_SHA256=<printed fingerprint> $S bi-deploy
+$S bad-data                                    # a repeated source id: the run stops at landing
+$S fix-data                                    # source fixed, rerun recovers
+$S status                                      # status, the last run's audit, installed/proven packs
+$S undeploy                                    # cleanup, a separate decision: dashboard, then the pipeline
+```
 
 | Step | You should see |
 |---|---|
-| `install` | every pack `installed and proven working`; acceptance suites pass |
-| `synth` (ai) | a table of attempts, `requests sent: N (ceiling M; provider busy/timeout: K; token usage …; cost unknown)` and a classification: `llm-first-draft` or `llm-after-N-revision(s)`; `validated (sealed evidence ev-…)`. The trace is under `/var/lib/dpagent/synth-traces/fulfilment_sla/<utc>/` (or `DEMO_TRACE_DIR`). **No approval is created** |
+| `install` / `lock` | every pack `installed and proven working`; `lock`: every locked venv `differs: {}`, `not_in_lock: []` |
 | `synth` (artifact) | the imported files and their origin (`model … imported from … matched the trace's sha256; no model call on this host`), then `validate` passes |
-| `synth` (reference) | `pipeline validate` passes: two runs match the expected result, idempotent |
+| `synth` (ai) | a table of attempts, `requests sent: N (ceiling M; …; cost unknown)`, a classification (`llm-first-draft` / `llm-after-N-revision(s)`), `validated (sealed evidence ev-…)`. **No approval is created** |
 | `approve` | `promoted` with your name; `deploy` refused before this |
-| `check` | `{"ok": true}`: 2026-01 → 3 eligible / 2 delivered / 2 on time / 66.7 %; 2026-02 → 3 / 3 / 1 / 33.3 %; landing holds each source row once |
-| `schedule` | `fulfilment_sla … 0 2 * * * … deployed`; the DAG unpaused, next run known. Deploying unpauses it and Airflow starts **one** `scheduled` run for the latest past 02:00 interval (`catchup=False`) besides your `manual` runs |
-| `bi-deploy` | the dashboard deployed; as `fulfil.viewer`: the two rows above, the Month filter works, no edit control; every write refused (403) |
-| `bad-data` | the run fails (rc ≠ 0) at **landing** on the `unique` gate of `stock_picking`; no later stage runs; the report table is the same relation with the same rows |
+| `check` | `{"ok": true}`: 2026-01 → 3 eligible / 2 delivered / 2 on time / 66.7 %; 2026-02 → 3 / 3 / 1 / 33.3 % |
+| `schedule` | `0 2 * * *` deployed; the DAG unpaused, next run known. Deploying makes Airflow start **one** `scheduled` run for the latest past 02:00 interval besides your `manual` runs |
+| `bi-deploy` | the dashboard live; as `fulfil.viewer`: the two rows above, the Month filter works, no edit control, every write refused |
+| `bad-data` | the run fails at **landing** on the `unique` gate of `stock_picking`; no later stage runs; the dashboard keeps the last good numbers |
 | `fix-data` | the run passes; `check` is `ok` again |
 | `undeploy` | dashboard, viewer, DAG, published dbt models and the pipeline's secrets gone; warehouse data kept (by design) |
 
-## When something fails
+Where to read logs:
+- each step's output in the terminal; `dpagent pipeline status fulfilment_sla`, `dpagent pipeline audit <run id>`
+  (the gates of one run, from DPAgent's journal `/var/lib/dpagent/dpagent.db`);
+- Airflow's task logs in its UI (section 5) or under `/opt/airflow/home/logs/`;
+- a model draft's trace (calls, drafts per attempt): `/var/lib/dpagent/synth-traces/fulfilment_sla/<utc>/`;
+- an acceptance run: `docs/evidence/demo[-show]/<sha>/<utc>-<draft>/` (`steps.log` first).
 
 | Symptom | Cause | What to do |
 |---|---|---|
-| `synth`: `cannot draft yet - needs clarification` | the model found the BRD ambiguous (the right behaviour) | answer the questions in the BRD, run `synth` again with `DEMO_REDRAFT=1` (new requests) |
-| `synth`: `not validated - nothing to promote` | every attempt failed validation within the budget | read the trace (`calls/`, `drafts/attempt-N/`); fix the BRD or schema, or edit the draft by hand. A hand edit makes the result **human-assisted**; never report it as the model's |
-| `synth`: `call budget exhausted` / `request ledger: … spent` | the run's ceiling or the ledger's part/total is used up | stop; a larger budget is a deliberate decision, never automatic |
-| `synth`: `provider unavailable` / `inconclusive-provider-unavailable` | the provider was busy or timed out | says nothing about the model; retry later within the budget |
-| `request ledger: request(s) [N] … have no recorded end` | an earlier request timed out or its process was killed: it may still be running | wait; when it is known to be over, `python -m dpagent.llm.ledger resolve FILE N "why"` |
+| `synth`: `cannot draft yet - needs clarification` | the model found the BRD ambiguous (the right behaviour) | answer the questions in the BRD; `DEMO_REDRAFT=1` (new requests) |
+| `synth`: `not validated - nothing to promote` | no attempt validated within the budget | read the trace; a hand edit makes the result **human-assisted**, never the model's |
+| `synth`: `call budget exhausted` / `request ledger: … spent` | the run ceiling or the ledger is used up | stop; more budget is a deliberate decision |
+| `synth`: `provider unavailable` | the provider was busy or timed out | says nothing about the model; retry later within the budget |
+| `synth` (artifact): `refused: …` | the files or the trace are not the accepted ones | use the committed evidence directory and its trace hash |
+| `lock`: `differs` / `not_in_lock` | an install resolved other versions | `lock` again; if a package is not in the lock, the host is not the accepted environment |
 | `approve`: `set DEMO_APPROVED_BY` | no person named | a person approves; the demo does not |
 | `deploy`: refused as draft | not approved, or the files changed after approval | `validate`, then `approve` again |
-| `bi-deploy`: `Validate and review the new fingerprint` | the fingerprint is not the reviewed one | `bi-validate`, review, use the printed fingerprint |
-| `install`: `postgresql restart … timed out` | a loaded host | re-run `install` (completed steps are skipped) |
-| `bad-data` passes | the pipeline has no `unique` gate on the source ids | the draft does not meet the BRD; `validate` reports the missing required gate |
+| `bi-deploy`: `Validate and review the new fingerprint` | not the reviewed fingerprint | `bi-validate`, review, use the printed fingerprint |
+| `install`: `postgresql restart … timed out` | a loaded host | run `install` again (completed steps are skipped) |
 
-## 4. Live show
+## 5. Live show (10-15 minutes)
 
-Hosts (Docker containers on the demo machine):
+Hosts on `ol8-19.localdomain` (Docker containers):
 
-| Host | Made by | Use |
+| Host | State | Use |
 |---|---|---|
-| `dpagent-demo-show-artifact-<n>` | `DEMO_ARTIFACT=<accepted ai evidence> DEMO_ARTIFACT_TRACE_SHA256=<its trace hash> bash scripts/quickstart-acceptance-ci.sh --demo artifact --show`: stack installed, **the accepted model draft** imported and validated on this host, **nothing approved**, no model credential | the demo |
-| `dpagent-demo-backup-reference` | `--demo reference --show`: same point, the **hand-written reference** | backup if something is wrong with the main host; **say so** when you use it |
+| `__SHOW_HOST__` | built from the release commit with `--demo artifact --show`: stack installed, venvs at the locked versions, the **accepted AI draft** imported and validated on this host, **nothing approved**, no model credential | the demo |
+| `dpagent-demo-backup-reference` | older build (`3b1ca5f`), the **hand-written reference** draft, nothing approved | backup only if the main host fails; **say so** when you use it |
+
+From a Windows laptop (PowerShell, OpenSSH client). Airflow listens on the container's bridge address; Superset
+listens only inside the container, so start the forwarder once after `bi-deploy`:
 
 ```bash
-docker exec -it <host> bash
+# on ol8-19
+docker exec -d __SHOW_HOST__ /opt/dpagent/.venv/bin/python /opt/dpagent/examples/demo/port_forward.py 0.0.0.0:18088 127.0.0.1:8088
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' __SHOW_HOST__     # -> __SHOW_IP__
+```
+```powershell
+# on Windows: keep this window open
+ssh -N -L 8088:__SHOW_IP__:18088 -L 8090:__SHOW_IP__:8090 oracle@ol8-19.localdomain
+```
+
+Then open `http://localhost:8088` (Superset: `fulfil.viewer` / `FS_VIEWER_PASSWORD`, or `admin` /
+`SUPERSET_ADMIN_PASSWORD`) and `http://localhost:8090` (Airflow: `admin` / `AIRFLOW_ADMIN_PASSWORD`). Read the
+passwords on the host (section 2); they are not written anywhere else.
+
+```bash
+docker exec -it __SHOW_HOST__ bash
 cd /opt/dpagent && set -a && . /root/demo-dev.env && set +a
 D="bash examples/demo/demo.sh"
 ```
 
-| # | Show | Command | What people should see |
+| Min | Show | Command | Say / point at |
 |---|---|---|---|
-| 1 | Layer 1: the platform | `$D preflight` then `dpagent status` | every pack installed and proven |
-| 2 | Layer 3: what the model was given and what it wrote | `cat tests/llm_verification/cases/fulfilment_sla/brd.md`; `ls pipelines/fulfilment_sla; cat pipelines/fulfilment_sla/.draft-origin` | the BRD; the drafted `pipeline.yaml` + SQL with its gates; the origin (model, trace hash, source commit) |
-| 3 | The evidence a reviewer reads | `$D validate`; the model's calls: `ls $DEMO_ARTIFACT/ai-trace` (in `/opt/dpagent`) | two runs match the hand-calculated expected result, idempotent |
-| 4 | **A person approves** | `DEMO_APPROVED_BY=<the reviewer's name> $D approve` | `promoted`; before this, `dpagent pipeline deploy` refuses the draft |
-| 5 | Layer 2: deploy and run | `$D deploy` then `$D check` | `ok`; 2026-01 66.7 %, 2026-02 33.3 % |
-| 6 | Schedule | `$D schedule` | `0 2 * * *` (UTC), deployed |
-| 7 | Dashboard, reviewed | `$D bi-validate`, then `DEMO_BI_APPROVED_BY=<name> DEMO_BI_APPROVED_SHA256=<printed fingerprint> $D bi-deploy` | dashboard live |
-| 8 | Viewer | browser: `http://127.0.0.1:8088` (via `docker run --network container:<host> …` or an SSH tunnel), user `fulfil.viewer`, password `FS_VIEWER_PASSWORD` from `/root/demo-dev.env` | the table, the Month filter; no edit control |
+| 0-2 | The problem | `cat tests/llm_verification/cases/fulfilment_sla/brd.md` | on-time delivery by month; a repeated source id must stop the load |
+| 2-4 | Layer 1: the platform | `dpagent status`; `python3 examples/demo/deps_lock.py check` | every pack installed and proven; the environments are the accepted ones |
+| 4-7 | Layer 3: what the AI wrote | `cat pipelines/fulfilment_sla/.draft-origin`; `cat pipelines/fulfilment_sla/pipeline.yaml`; `ls $DEMO_ARTIFACT/ai-trace/` with `DEMO_ARTIFACT` from section 3 | **made in the accepted run, replayed here - not generated live**; the first draft had a gate syntax error, the validator's finding went back and the model fixed it; both landing `unique` gates come from the BRD |
+| 7-8 | **A person approves** | `$D validate`; `DEMO_APPROVED_BY=<your name> $D approve` | nothing deploys before this; `deploy` was refused |
+| 8-10 | Layer 2: data | `$D deploy`; `$D check`; Airflow UI | the run; 66.7 % and 33.3 % as calculated by hand; schedule `0 2 * * *` |
+| 10-12 | Dashboard | `$D bi-validate`; `DEMO_BI_APPROVED_BY=<your name> DEMO_BI_APPROVED_SHA256=<fingerprint> $D bi-deploy`; start the forwarder; browser as `fulfil.viewer` | read-only viewer, Month filter; the dashboard is hand-written |
+| 12-14 | Failure and recovery | `$D bad-data`; `$D fix-data` | the run stops at landing on `stock_picking` - the dashboard keeps the last good numbers; after the fix it recovers |
+| 14-15 | Questions | | |
 
-**Stop here** if time is short: the dashboard is working. Optional:
+After the show **leave it running** - the dashboard stays live. Cleanup is a separate decision: `$D undeploy`
+(dashboard, viewer, DAG, secrets), then `docker rm -f __SHOW_HOST__` when the host is no longer needed. To show again
+from the pre-approval point without rebuilding: `$D undeploy`, `$D source`, then from `validate`.
 
-| # | Show | Command | What people should see |
-|---|---|---|---|
-| 9 | Bad data is stopped | `$D bad-data` | the run fails at landing (`… stock_picking failed unique`); the dashboard keeps the last good numbers |
-| 10 | Recovery | `$D fix-data` | the run passes; numbers as in step 5 |
-| 11 | Cleanup (last) | `$D undeploy` | dashboard, viewer, DAG, secrets gone; warehouse data kept |
+The approvals are done by a **real person** who has read the draft and the evidence; no approval is copied from
+another host. `demo.reviewer` in the acceptance runs is a **test** stand-in.
 
-The approvals in steps 4 and 7 are done by a **real person** who has read the draft and the evidence. The name
-`demo.reviewer` in the acceptance runs (`tests/demo_acceptance/inside.sh`) is a **test** stand-in, not an approval.
+## 6. Do not
 
-Reset: after a show, `$D undeploy`, `$D source`, then from step 3. Do not redraft the model's draft on a show host:
-that is new model calls and a new result. To start from nothing, `docker rm -f <host>` and build it again.
+- commit `dev.env`, `/root/demo-dev.env`, a provider key or a ledger with a key in it (it holds none);
+- report the reference or a hand-edited draft as the model's work;
+- re-run `synth` with a model on the show host - that is a new, paid, unaccepted result;
+- touch services on the machine that are not DPAgent's.
 
-## Evidence
+## 7. Evidence and acceptance
 
-`bash scripts/quickstart-acceptance-ci.sh --demo reference|ai|artifact [--keep|--show] [--os ol8]` runs all of the
-above on a new disposable host, with independent checks (psql, Airflow's metadata, DPAgent's journal read-only, the
-Superset API and a real browser as the viewer) and the refusals (deploy before approval rc=1, approval without a
-person rc=2, an unreviewed dashboard fingerprint rc=3). An `ai` run probes the model first (part `probe` of the
-ledger) and needs `DPAGENT_LLM_LEDGER`. Results land in `docs/evidence/demo[-show]/<sha>/<utc>-<draft>/`, failed runs
-included: `draft-origin.txt` says who wrote the pipeline, `ai-trace/` and `ai-summary.json` hold the model's requests
-(by kind, tokens when reported, cost unknown), `request-ledger.json` the ledger after the run.
-
-Runs so far (all kept): see [docs/evidence/demo/README.md](evidence/demo/README.md).
-
-### Release candidate: "integrated 3-layer demo"
-
-| | |
-|---|---|
-| Source | `9c1e17d` (the show host's build); AI accepted on `4fce834` - between them only the dlt pin and the version capture changed |
-| AI acceptance | `docs/evidence/demo/4fce834…/20261023T052117Z-ai`: `gemini/gemini-3.8-flash`, `llm-after-1-revision(s)`, full flow **PASS**; trace sha256 `2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8` |
-| Asks | `docs/evidence/a3-llm/real/fulfil-asks-20261023T060806Z-ac6c63`: 4/4 (asked ×3, unsupported source refused) |
-| Show host | `docs/evidence/demo-show/9c1e17d…/20261023T063056Z-artifact`: the accepted draft imported (2 files = the trace's hashes), validated on that host (`ev-fa4bf4fe272b0425`), nothing approved, no model credential |
-| Requests | 7 of the 14 granted on 2026-10-23 (probe 1, synth 2, asks 4; all answered); 18 in the whole history |
-| Versions | postgres 15.19, python 3.11, airflow 2.9.3, dbt-core 1.8.10 / dbt-postgres 1.8.2, dlt 1.31.0, superset 6.1.0 (pack pins), litellm 1.106.2 (the run's; `>=1.40` in `pyproject.toml`) - full lists in each run's `dependency-versions.txt` |
-| Not accepted | native OL8 (SELinux/firewalld), HG representative load, production operations; dbt and litellm are version ranges resolved at install time |
+`bash scripts/quickstart-acceptance-ci.sh --demo reference|ai|artifact [--keep|--show] [--os ol8]` runs the steps on a
+new disposable host from the committed source, with independent checks (psql, Airflow's metadata, DPAgent's journal
+read-only, the Superset API and a real browser as the viewer) and the refusals (deploy before approval rc=1,
+approval without a person rc=2, an unreviewed dashboard fingerprint rc=3). `ai` needs the key, the ledger and a
+budget; `artifact` needs `DEMO_ARTIFACT` (+ its trace hash) and no key. Results:
+`docs/evidence/demo[-show]/<sha>/<utc>-<draft>/`, failed runs included. All runs: [evidence/demo/README.md](evidence/demo/README.md).
 
 ## Several tables: HG (already verified, not re-run here)
 
@@ -195,4 +245,5 @@ It illustrates the flow with several tables. **It is not HG load acceptance**.
 
 - One small fixture; it proves behaviour, not load. The fixture is also the demo source data.
 - The model sees the BRD, the verified schema and the capability catalog, never the fixture or the expected result.
-- One model, one case. A pass is a measured result of that model on that case, not a promise for others.
+- One model, one case: a measured result, not a promise for other models, cases or runs.
+- PostgreSQL's minor version follows the PGDG mirror; Superset's transitive packages are pinned by its pack only.

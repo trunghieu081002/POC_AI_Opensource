@@ -1,0 +1,19 @@
+{
+ "airflow": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dbt": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dlt": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dpagent": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "superset": "not installed"
+}
