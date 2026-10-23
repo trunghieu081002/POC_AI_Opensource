@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Cột ngày nào được dùng làm mốc xác định tháng (`month`) của báo cáo: `sale_order.date_order` (ngày đặt hàng), `sale_order.commitment_date` (hạn cam kết), hay `stock_picking.date_done` (ngày giao hàng thực tế)?",
+      "why_it_matters": "Quyết định đơn hàng được ghi nhận vào tháng nào; mỗi mốc thời gian sẽ cho ra số lượng đơn và tỷ lệ SLA hoàn toàn khác nhau trong từng tháng."
+    },
+    {
+      "question": "Những trạng thái nào của `sale_order` và `stock_picking` được tính vào báo cáo? Các đơn hoặc phiếu kho ở trạng thái `cancel` hoặc `draft` có bị loại trừ không?",
+      "why_it_matters": "Quyết định mẫu số (tổng số đơn) và tử số (đơn đã giao/đúng hẹn); nếu tính cả đơn nháp hoặc đơn huỷ sẽ làm sai lệch toàn bộ số liệu vận hành."
+    },
+    {
+      "question": "Nếu một đơn bán có nhiều phiếu xuất kho (`picking_type = 'outgoing'`), ví dụ do giao hàng nhiều lần, thì ngày hoàn thành giao hàng được tính theo lần giao đầu tiên hay lần giao cuối cùng để đối chiếu với `commitment_date`?",
+      "why_it_matters": "Quyết định thời điểm đơn được coi là đã giao xong để so với hạn cam kết; chọn lần đầu hay lần cuối sẽ trực tiếp thay đổi kết quả đúng hẹn hay trễ hạn."
+    },
+    {
+      "question": "Các đơn hàng không có hạn cam kết (`commitment_date IS NULL`) sẽ được xử lý ra sao trong việc tính tỷ lệ đúng hẹn?",
+      "why_it_matters": "Cần làm rõ đơn không có cam kết ngày giao có được tính vào mẫu số SLA không, hay bị loại ra, hay mặc định tính là trễ hạn."
+    }
+  ]
+}

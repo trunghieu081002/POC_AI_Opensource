@@ -1,0 +1,57 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=0
+== 03-source: bash examples/demo/demo.sh source
+03-source rc=0
+04-synth rc=1 draft=ai
+{
+ "model": "gemini/gemini-3.8-flash",
+ "classification": "inconclusive-provider-unavailable",
+ "synth_exit_code": 1,
+ "calls": 2,
+ "call_ceiling": 5,
+ "revisions": 1,
+ "format_repairs": 0,
+ "provider_errors": [
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n"
+ ],
+ "transient_retries": 1,
+ "human_edits": 0,
+ "attempts": [
+  {
+   "index": 1,
+   "source": "llm",
+   "outcome": "policy-fail",
+   "evidence_id": "ev-b1c3c0ea3655e5a9"
+  },
+  {
+   "index": 2,
+   "source": "llm-revision",
+   "outcome": "provider-unavailable",
+   "evidence_id": ""
+  }
+ ],
+ "tokens": 25577
+}
+┡━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1       │ llm          │ policy-fail          │ the pipeline does not meet   │
+│         │              │                      │ the requirement:             │
+│         │              │                      │ required a `unique` gate on  │
+│         │              │                      │ sale_order ['id'] in stage   │
+│         │              │                      │ 'landing': not declared      │
+│         │              │                      │ required a `unique` gate on  │
+│         │              │                      │ stock_pic                    │
+│ 2       │ llm-revision │ provider-unavailable │ ProviderUnavailable:         │
+│         │              │                      │ gemini/gemini-3.8-flash call │
+│         │              │                      │ failed:                      │
+│         │              │                      │ litellm.ServiceUnavailableE… │
+│         │              │                      │ GeminiException - {          │
+│         │              │                      │   "error": {                 │
+│         │              │                      │     "code": 503,             │
+│         │              │                      │     "message": "Thi          │
+└─────────┴──────────────┴──────────────────────┴──────────────────────────────┘
+model calls: 2 (ceiling 5); trace: /root/quickstart-evidence/ai-trace
+not validated - nothing to promote. Read the trace, fix the BRD/schema or the 
+draft by hand, then `dpagent pipeline validate` again.
+an ai run without a model draft

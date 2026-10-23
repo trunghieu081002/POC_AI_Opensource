@@ -5,6 +5,7 @@ each; the required certificate gate (blocker B1) is part of the acceptance contr
 and the model is shown neither HG's SQL nor the fixture/expected."""
 import datetime
 import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -181,13 +182,33 @@ def test_the_model_sees_brd_schema_and_template_never_hg_sql_fixture_or_expected
     assert p.calls[0]["system"] == (REPO / "src/dpagent/llm/prompts/synth_dbt_project.md").read_text()
 
 
-def test_the_case_reuses_38s_prompt_and_template_unchanged():
+def test_the_case_shares_khsxs_prompt_and_template():
     case = llm_verify.load_case(CASE_DIR)
     khsx = llm_verify.load_case(CASE_DIR.parent / "fact_khsx_detail")
     a, b = case.input_hashes(), khsx.input_hashes()
     assert a["synth_system_prompt"] == b["synth_system_prompt"]
-    assert a["synth_system_prompt"] == "sha256:72429722d34fb802a9599acd4fa5fff0a2e2f2b255e84906fde98eb444c1ac88"
     assert a["dbt_template_files"] == b["dbt_template_files"]
+
+
+REAL_RUNS = ["docs/evidence/a3-llm/real/khsx-20261012T113944Z-91d8b7/R3-build-fact-khsx-detail",
+             "docs/evidence/a3-llm/real/label-20261012T151931Z-e77327/R4-build-fact-label-operation"]
+
+
+@pytest.mark.parametrize("run", REAL_RUNS)
+def test_a_recorded_prompt_hash_is_the_prompt_at_that_runs_commit(run):
+    """The hash a real run recorded is checked against the prompt as it was at the commit that run names in its
+    run-info.txt - not against today's file, which has changed since (landing-gate guidance)."""
+    import subprocess
+    trace = json.loads((REPO / run / "trace.json").read_text())
+    info = dict(line.split("=", 1) for line in (REPO / run).parent.joinpath("run-info.txt").read_text().split())
+    try:
+        old = subprocess.run(["git", "-C", str(REPO), "show", f"{info['commit']}:src/dpagent/llm/prompts/synth_dbt_project.md"],
+                             capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("no git history with that commit here")
+    recorded = trace["inputs"]["synth_system_prompt"]
+    assert recorded == "sha256:" + hashlib.sha256(old).hexdigest()
+    assert recorded != llm_verify.load_case(CASE_DIR).input_hashes()["synth_system_prompt"]
 
 
 @pytest.mark.parametrize("threshold", [0, 50, 100])

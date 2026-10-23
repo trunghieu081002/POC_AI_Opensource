@@ -1,0 +1,1 @@
+FAILED - infrastructure, before any model call (0 calls): layer-1 install, postgres suite 'restart' timed out after 300 s at host load ~17; every check after it lost the server. Budget unchanged: 5 of 14.

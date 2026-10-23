@@ -214,7 +214,8 @@ def _call_summary(rec: llm.CallRecord) -> dict:
             "system_sha256": rec.system_sha256, "user_sha256": rec.user_sha256,
             "response_sha256": rec.response_sha256, "usage": rec.usage,
             "finish_reason": rec.finish_reason,
-            "duration_s": rec.duration_s, "error": rec.error, "transient": rec.transient}
+            "duration_s": rec.duration_s, "error": rec.error, "transient": rec.transient,
+            "kind": rec.kind, "usage_status": rec.usage_status, "cost": rec.cost}
 
 
 def _secret_values() -> list[str]:
@@ -642,8 +643,10 @@ def probe(*, attempts: int = 3, wait_s: float = 30.0, sleep=None) -> dict:
                                 max_tokens=1024)
             except llm.LLMError as exc:
                 err = str(exc)[:400]
-                tries.append({"attempt": n, "error": err, "transient": bool(_TRANSIENT.search(err))})
-                if not tries[-1]["transient"] or n == attempts:
+                # only a provider-busy ANSWER is retried; a timeout may still be running at the provider
+                busy = bool(llm.BUSY.search(err)) and not llm.TIMEOUT.search(err)
+                tries.append({"attempt": n, "error": err, "transient": bool(_TRANSIENT.search(err)), "busy": busy})
+                if not busy or n == attempts:
                     return {"ok": False, "model": llm.get_model(), "error": err,
                             "transient": tries[-1]["transient"], "attempts": tries}
                 sleep(wait_s)

@@ -1,0 +1,29 @@
+{
+ "model": "gemini/gemini-3.8-flash",
+ "classification": "inconclusive-provider-unavailable",
+ "synth_exit_code": 1,
+ "calls": 2,
+ "call_ceiling": 5,
+ "revisions": 1,
+ "format_repairs": 0,
+ "provider_errors": [
+  "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n"
+ ],
+ "transient_retries": 1,
+ "human_edits": 0,
+ "attempts": [
+  {
+   "index": 1,
+   "source": "llm",
+   "outcome": "policy-fail",
+   "evidence_id": "ev-b1c3c0ea3655e5a9"
+  },
+  {
+   "index": 2,
+   "source": "llm-revision",
+   "outcome": "provider-unavailable",
+   "evidence_id": ""
+  }
+ ],
+ "tokens": 25577
+}

@@ -1,0 +1,127 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "call_indexes": [
+        1
+      ],
+      "detail": "the pipeline does not meet the requirement:\nrequired a `unique` gate on sale_order ['id'] in stage 'landing': not declared\nrequired a `unique` gate on stock_picking ['id'] in stage 'landing': not declared",
+      "drafted_files": [
+        "models/fct_delivery_sla.sql",
+        "models/stg_sale_order.sql",
+        "models/stg_stock_picking.sql",
+        "pipeline.yaml"
+      ],
+      "evidence_id": "ev-7210f4e2739b8513",
+      "fed_back": "the pipeline does not meet the requirement:\nrequired a `unique` gate on sale_order ['id'] in stage 'landing': not declared\nrequired a `unique` gate on stock_picking ['id'] in stage 'landing': not declared",
+      "files": {
+        "models/fct_delivery_sla.sql": "sha256:8417a6ace2eba3c59da40aaed691b701e985890273c5b0f489a7fc00d9175964",
+        "models/stg_sale_order.sql": "sha256:97278ae9410c3309baf8c9e7e969b21c8c3bd28fa3270d6b7f77a37fe828b6ac",
+        "models/stg_stock_picking.sql": "sha256:630cf6cd20679c19ef83793c1ba0738ec7d1a00474592d9b5f6a0f07375bf142",
+        "pipeline.yaml": "sha256:15b674b887c27d5396909ca2c19c80932ab338f98523f77529dbe085564b5be5"
+      },
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "policy-fail",
+      "source": "llm",
+      "template_files": {},
+      "validation": {
+        "cleanup": "pass",
+        "clone_name": "fulfilment_sla__validate__6cc7a212",
+        "comparison": {
+          "idempotent": true,
+          "run_1": "pass",
+          "run_2": "pass"
+        },
+        "dbt_tests": {
+          "run_1": [],
+          "run_2": []
+        },
+        "deploy_error": "",
+        "overall": "pass",
+        "run_ids": [
+          3,
+          4
+        ],
+        "run_status": {
+          "run_1": "ok",
+          "run_2": "ok"
+        },
+        "unavailable_reason": ""
+      }
+    },
+    {
+      "blockers": [],
+      "call_indexes": [
+        2
+      ],
+      "detail": "ProviderUnavailable: gemini/gemini-3.8-flash call failed: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 2,
+      "outcome": "provider-unavailable",
+      "source": "llm-revision",
+      "template_files": {},
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 6,
+    "max_revisions": 2,
+    "transient_retries": 0,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-22T15:44:00+00:00",
+      "duration_s": 164.76,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:b632d671252d156818c208dd97bca63510870f63736621b8f67dbbc0a9fcb1eb",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 19560,
+        "prompt_tokens": 3549,
+        "reasoning_tokens": 17834,
+        "total_tokens": 23109
+      },
+      "user_sha256": "sha256:780f1e51ce46b695b96a06abd083779ecfd297d94cc55246476c4cb8a2f90d81"
+    },
+    {
+      "at": "2026-10-22T15:48:26+00:00",
+      "duration_s": 1.72,
+      "error": "ServiceUnavailableError: litellm.ServiceUnavailableError: GeminiException - {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "finish_reason": "",
+      "index": 2,
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "",
+      "system_sha256": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+      "transient": true,
+      "usage": {},
+      "user_sha256": "sha256:2db2d27cbd38fa42b07a00dd4283ddda53c38835b61b3685329e9c7ea5fc7e6d"
+    }
+  ],
+  "case": "fulfilment_sla",
+  "classification": "inconclusive-provider-unavailable",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:733d6cd7526c5ac0c4eb2ea4b659ce90482caa0afabe89e82bf974264b7260d3",
+    "expected": "sha256:410d0a71606f763c01356e75dfc6b43dd8b1a8983e62993bdcc5a404ad49d523",
+    "fixture": "sha256:c12eac7e3ac5068ea30b491d45954365adbc8d4445dd1d0061e75c083b4ce22e",
+    "request_yaml": "sha256:4ed65d13e82b13422b17c25640f22ea1f731c58b7612acf109a0c7be740447b7",
+    "source_schema": "sha256:71e11b554a69cfe0699fd5e9a4bc6f20d780a45604814a25f5f6fd3610acae1c",
+    "synth_system_prompt": "sha256:ca937d3e3f7fbc7098e11bd53f17a00736ae328b3414589a2a8d7c61c5ae70a1",
+    "synth_system_prompt_name": "synth_pipeline"
+  },
+  "kind": "build",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "/opt/dpagent/pipelines/fulfilment_sla",
+  "started_at": "2026-10-22T15:43:56+00:00",
+  "trace_version": 1
+}

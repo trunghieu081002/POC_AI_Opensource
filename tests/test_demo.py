@@ -99,3 +99,62 @@ def test_the_model_credential_reaches_the_host_by_name_only():
     assert 'PASSENV+=(-e "$v")' in runner and "GEMINI_API_KEY=" not in runner
     inside = (ROOT / "tests/demo_acceptance/inside.sh").read_text()
     assert "GEMINI_API_KEY" in inside[inside.index("scan_secrets()"):inside.index("trap scan_secrets EXIT")]
+
+
+def test_ai_run_summary_is_read_from_the_trace(tmp_path):
+    import json
+    trace = {"model": "gemini/x", "classification": "llm-first-draft", "budget": {"max_calls": 6},
+             "calls": [{"usage": {"total_tokens": 100}}, {"error": "503", "transient": True, "usage": {}}],
+             "attempts": [{"index": 1, "source": "llm", "outcome": "validated", "evidence_id": "ev-1", "format_repairs": 1}]}
+    (tmp_path / "trace.json").write_text(json.dumps(trace))
+    out = subprocess.run(["python3", str(ROOT / "tests/demo_acceptance/ai_summary.py"), str(tmp_path / "trace.json"), "0"],
+                         capture_output=True, text=True, check=True).stdout
+    s = json.loads(out)
+    assert (s["calls"], s["call_ceiling"], s["revisions"], s["format_repairs"], s["transient_retries"], s["tokens"]) == (2, 6, 0, 1, 1, 100)
+    assert s["provider_errors"] == ["503"] and s["human_edits"] == 0 and s["classification"] == "llm-first-draft"
+
+
+def test_refusals_are_checked_by_exact_code_and_reason_and_bad_data_by_run_id():
+    inside = (ROOT / "tests/demo_acceptance/inside.sh").read_text()
+    assert 'refused 05a-deploy-before-approval 1 "fulfilment_sla is maturity: draft (never reviewed)"' in inside
+    assert 'refused 05b-approve-without-a-person 2 "set DEMO_APPROVED_BY"' in inside
+    assert 'refused 09a-bi-deploy-unreviewed 3 "Validate and review the new fingerprint' in inside
+    assert 'check_run.py blocked "$RUN"' in inside and "check_run.py schedule" in inside
+    assert 'grep -q "^model " "$OUT/draft-origin.txt"' in inside          # an ai run never falls back silently
+    runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert runner.index("from dpagent.pipelines.llm_verify import probe") < runner.index("docker build")
+    assert 'DEMO_PROBE_ATTEMPTS", "2"' in runner
+
+
+def test_only_an_ai_demo_installs_the_llm_extra_and_a_reused_probe_must_have_passed():
+    runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert 'WITH_LLM=1' in runner[runner.index('if [ "$DEMO" = ai ]; then'):runner.index("# what the acceptance phases use")]
+    assert runner.count('docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM"') == 2          # ubuntu and ol8 bootstrap
+    assert 'grep -q \'"ok": true\' "$DEMO_PROBE_EVIDENCE"' in runner
+
+
+def test_the_call_ceiling_of_an_ai_demo_reaches_the_host():
+    runner = (ROOT / "scripts/quickstart-acceptance-ci.sh").read_text()
+    assert "DEMO_MAX_CALLS DEMO_MAX_REVISIONS" in runner
+    demo = (D / "demo.sh").read_text()
+    assert '--max-calls "${DEMO_MAX_CALLS:-6}"' in demo and '--max-revisions "${DEMO_MAX_REVISIONS:-2}"' in demo
+
+
+def test_ai_summary_separates_requests_tokens_and_cost(tmp_path):
+    import json
+    trace = {"budget": {"max_calls": 3}, "attempts": [],
+             "calls": [{"kind": "busy", "transient": True, "usage": {}},
+                       {"kind": "ok", "usage": {"total_tokens": 50}}]}
+    (tmp_path / "t.json").write_text(json.dumps(trace))
+    s = json.loads(subprocess.run(["python3", str(ROOT / "tests/demo_acceptance/ai_summary.py"), str(tmp_path / "t.json"), "1"],
+                                  capture_output=True, text=True, check=True).stdout)
+    assert s["requests"] == 2 and s["requests_by_kind"] == {"ok": 1, "busy": 1, "timeout": 0, "error": 0}
+    assert s["tokens_reported"] == 50 and s["requests_with_unknown_usage"] == 1 and s["cost"] == "unknown"
+
+
+def test_the_ai_preflight_checks_the_llm_dependency_model_and_credential_without_showing_it():
+    demo = (D / "demo.sh").read_text()
+    pre = demo[demo.index("  preflight)"):demo.index("  install)")]
+    assert "import litellm" in pre and "need DPAGENT_MODEL" in pre and "client.available()" in pre
+    assert "GEMINI_API_KEY" not in pre and "MemAvailable" in pre
+    assert "dependency-versions.txt" in (ROOT / "tests/demo_acceptance/inside.sh").read_text()

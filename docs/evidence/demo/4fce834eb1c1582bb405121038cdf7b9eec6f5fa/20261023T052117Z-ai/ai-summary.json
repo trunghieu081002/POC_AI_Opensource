@@ -1,0 +1,37 @@
+{
+ "model": "gemini/gemini-3.8-flash",
+ "classification": "llm-after-1-revision(s)",
+ "synth_exit_code": 0,
+ "requests": 2,
+ "calls": 2,
+ "call_ceiling": 6,
+ "requests_by_kind": {
+  "ok": 2,
+  "busy": 0,
+  "timeout": 0,
+  "error": 0
+ },
+ "revisions": 1,
+ "format_repairs": 0,
+ "provider_errors": [],
+ "transient_retries": 0,
+ "human_edits": 0,
+ "attempts": [
+  {
+   "index": 1,
+   "source": "llm",
+   "outcome": "structural-fail",
+   "evidence_id": ""
+  },
+  {
+   "index": 2,
+   "source": "llm-revision",
+   "outcome": "validated",
+   "evidence_id": "ev-76438bb551f38ddc"
+  }
+ ],
+ "tokens_reported": 27233,
+ "requests_with_unknown_usage": 0,
+ "tokens": 27233,
+ "cost": "unknown"
+}

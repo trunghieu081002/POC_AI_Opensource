@@ -117,3 +117,21 @@ def test_without_a_fixture_the_command_is_the_one_shot_draft_it_was(env, monkeyp
                         and pipeline_cli.synth_mod.SynthResult(name=request.name, root=env["tmp"], files=[]))
     r = synth(env, "--dbt-template", "hg_dwh_dbt")
     assert "loop" not in called and called["one_shot"].dbt_template == "hg_dwh_dbt", r.output
+
+
+def test_a_transient_provider_failure_is_retried_once_and_recorded(env, monkeypatch):
+    # the retry is a request like any other: --max-calls 2 = the busy answer + the retry
+    monkeypatch.setattr("dpagent.llm.client._sleep", lambda s: None)
+    provider = env["install"]([TimeoutError("503 high demand"), scripted.bundle("good")], section())
+    r = synth(env, *loop("--max-calls", "2", "--transient-retries", "1", "--retry-wait", "0"))
+    assert r.exit_code == 0, r.output
+    assert len(provider.calls) == 2 and "provider busy/timeout: 1" in re.sub(r"\s+", " ", r.output)
+    trace = json.loads((env["tmp"] / "trace" / "trace.json").read_text())
+    assert [c["transient"] for c in trace["calls"]] == [True, False]
+
+
+def test_without_retries_a_transient_failure_is_inconclusive(env, monkeypatch):
+    monkeypatch.setattr("dpagent.llm.client._sleep", lambda s: None)
+    env["install"]([TimeoutError("503 high demand")])
+    r = synth(env, *loop("--max-calls", "2"))
+    assert r.exit_code == 1 and "inconclusive-provider-unavailable" in r.output

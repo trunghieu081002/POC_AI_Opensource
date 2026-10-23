@@ -1,0 +1,8 @@
+draft origin: model gemini/gemini-3.8-flash via dpagent pipeline synth (classification in the trace)
+╭─ approving fulfilment_sla means having read every line of these 2 file(s) ─╮
+│   · models/fct_delivery_sla.sql                                            │
+│   · pipeline.yaml                                                          │
+╰────────────────────────────────────────────────────────────────────────────╯
+fulfilment_sla is now maturity: reviewed (approved by 'demo.reviewer' at 
+2026-10-23T05:42:44+00:00, evidence ev-76438bb551f38ddc) - `dpagent pipeline 
+deploy fulfilment_sla` will apply it for real.

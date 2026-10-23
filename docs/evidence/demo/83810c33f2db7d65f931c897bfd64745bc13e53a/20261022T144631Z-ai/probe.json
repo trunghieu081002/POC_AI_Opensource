@@ -1,0 +1,19 @@
+21:46:35 - LiteLLM:WARNING: vertex_and_google_ai_studio_gemini.py:1085 - DeprecationWarning: `temperature`, `top_p`, and `top_k` continue to function for Gemini 3+ (gemini-3.8-flash) but are planned for removal in a future release. Move sampling guidance into the `system` instructions instead.
+{
+ "ok": true,
+ "model": "gemini/gemini-3.8-flash",
+ "reply": "OK",
+ "usage": {
+  "prompt_tokens": 14,
+  "completion_tokens": 99,
+  "total_tokens": 113,
+  "reasoning_tokens": 98
+ },
+ "finish_reason": "stop",
+ "duration_s": 106.99,
+ "attempts": [
+  {
+   "attempt": 1
+  }
+ ]
+}

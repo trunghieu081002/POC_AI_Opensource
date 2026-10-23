@@ -1,0 +1,278 @@
+Pipeline name: fulfilment_sla
+Operator hint: Source connection fields use the secret refs above. Use the standard warehouse refs.
+
+BRD / report spec:
+# Báo cáo: Tỷ lệ giao hàng đúng hẹn theo tháng (delivery SLA)
+
+Bộ phận vận hành cần biết mỗi tháng có bao nhiêu đơn bán đã được giao, và bao nhiêu đơn được giao đúng hẹn.
+Nguồn: đơn bán `sale_order` và phiếu kho `stock_picking` — xem schema nguồn đã xác minh.
+
+## Định nghĩa
+
+- **Tháng của một đơn** là tháng của `date_order` (thời điểm đặt hàng), dạng `YYYY-MM`. Mọi thời điểm trong nguồn
+  đều là giờ UTC, không có múi giờ khác.
+- **Đơn hợp lệ**: đơn có `state` là `sale` hoặc `done`. Đơn ở mọi trạng thái khác (`draft`, `sent`, `cancel`, …)
+  không được tính vào bất kỳ chỉ số nào, kể cả khi đã có phiếu giao.
+- **Lần giao** của một đơn: phiếu kho của đơn đó có `picking_type` là `outgoing` và `state` là `done`.
+  Phiếu trả hàng (`incoming`), phiếu nội bộ (`internal`) và phiếu chưa hoàn tất (mọi `state` khác `done`) **không
+  phải** lần giao. Phiếu không gắn với đơn nào (`sale_id` NULL) bị bỏ qua.
+- **Thời điểm giao** của một đơn là `date_done` **sớm nhất** trong các lần giao của đơn đó (một đơn có thể được
+  giao làm nhiều lần; chỉ lần đầu tiên quyết định đúng hẹn hay không).
+- **Đơn đã giao**: đơn hợp lệ có ít nhất một lần giao.
+- **Hạn cam kết**: `commitment_date` của đơn; nếu NULL thì hạn là `date_order` cộng đúng **3 ngày** (72 giờ).
+- **Đơn giao đúng hẹn**: đơn đã giao có thời điểm giao **nhỏ hơn hoặc bằng** hạn cam kết. Đúng bằng hạn vẫn là
+  đúng hẹn; trễ dù một giây là trễ hẹn.
+
+## Đầu ra
+
+Bảng `fct_delivery_sla`, **mỗi tháng một dòng**, chỉ các tháng có ít nhất một đơn hợp lệ:
+
+| cột | kiểu | ý nghĩa |
+|---|---|---|
+| `month` | text | `YYYY-MM` |
+| `eligible_orders` | bigint | số đơn hợp lệ của tháng |
+| `delivered_orders` | bigint | số đơn đã giao (mỗi đơn đếm một lần, dù giao bao nhiêu lần) |
+| `on_time_orders` | bigint | số đơn giao đúng hẹn |
+| `on_time_rate` | numeric | `on_time_orders / eligible_orders × 100`, làm tròn 1 chữ số thập phân (0,05 làm tròn lên) |
+
+Đơn được tính vào tháng đặt hàng của nó, dù được giao trong tháng sau.
+
+## Vận hành
+
+- **Lịch chạy:** hằng ngày lúc 02:00 UTC.
+- **Dữ liệu nguồn sai thì dừng:** nếu trong một lần nạp, `sale_order.id` hoặc `stock_picking.id` bị lặp, lần chạy
+  phải **dừng ở bước nạp** và không cập nhật bảng báo cáo (bảng giữ nguyên kết quả của lần chạy tốt gần nhất).
+  Không được tự chọn một trong các dòng trùng.
+
+
+Verified source schema (real table/column names and types - do not invent any not listed here):
+Source: PostgreSQL (Odoo), connector `odoo_postgres`. Two tables are needed; only the columns below exist in
+this feed. Timestamps are `timestamp without time zone` holding UTC.
+
+`public.sale_order` — one row per sales order
+
+| column          | type      | meaning |
+|-----------------|-----------|---------|
+| id              | bigint    | order id; primary key (never NULL, never repeated) |
+| name            | text      | order reference (e.g. S00042) - not used by this report |
+| state           | text      | `draft`, `sent`, `sale`, `done` or `cancel`; never NULL |
+| date_order      | timestamp | when the order was placed (UTC); never NULL |
+| commitment_date | timestamp | promised delivery time (UTC); may be NULL |
+
+`public.stock_picking` — one row per stock transfer
+
+| column       | type      | meaning |
+|--------------|-----------|---------|
+| id           | bigint    | transfer id; primary key |
+| sale_id      | bigint    | the sales order it belongs to; may be NULL |
+| picking_type | text      | `outgoing` (delivery to the customer), `incoming` (return), `internal`; never NULL |
+| state        | text      | `draft`, `assigned`, `done` or `cancel`; never NULL |
+| date_done    | timestamp | when the transfer was completed (UTC); NULL unless `state` is `done` |
+
+
+Warehouse target (use these exact ${ENV_VAR} refs, never a literal value): {'host': '${WAREHOUSE_DB_HOST:-localhost}', 'port': '${WAREHOUSE_DB_PORT:-5432}', 'database': '${WAREHOUSE_DB_NAME:-warehouse}', 'user': '${WAREHOUSE_DB_USER}', 'password': '${WAREHOUSE_DB_PASSWORD}', 'schema': 'fulfilment_sla'}
+
+Secret refs available: 
+  FS_SRC_HOST: source Postgres host
+  FS_SRC_PORT: source Postgres port
+  FS_SRC_NAME: source database name
+  FS_SRC_USER: source database user
+  FS_SRC_PASSWORD: source database password
+
+Capability catalog (the only connectors/engines/gates you may use):
+Connectors: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server
+Transform engines: dbt, procedure
+Gate types (required fields):
+  - business_rule: ['name', 'sql', 'expect', 'table', 'id_column'] (no other keys are accepted)
+  - freshness: ['tables', 'column', 'max_age'] - shape: tables: [..], column: <timestamp column>, max_age: '24h'|'30m'|'7d' (no other keys are accepted)
+  - not_null: ['table', 'columns'] - shape: table: <table>, columns: [<column>, ..] (no other keys are accepted)
+  - referential_integrity: ['table', 'column', 'references'] (no other keys are accepted)
+  - row_count_bounds: ['table'] - shape: table: <table>; optional min/max: integers (optional: ['min', 'max', 'max_delta_pct']; no other keys are accepted)
+  - schema_contract: ['tables'] - shape: tables: {table_name: {column_name: postgres_type}} (no other keys are accepted)
+  - unique: ['table', 'columns'] - shape: table: <table>, columns: [<column>, ..] (no other keys are accepted)
+
+Emit the pipeline JSON.
+
+Your previous draft was run through dpagent's validators and did NOT pass.
+Previous draft:
+--- models/fct_delivery_sla.sql ---
+{{ config(materialized='table', schema='fulfilment_sla') }}
+
+with eligible_orders as (
+    select
+        id as order_id,
+        to_char(date_order, 'YYYY-MM') as month,
+        date_order,
+        coalesce(commitment_date, date_order + interval '3 days') as commitment_deadline
+    from fulfilment_sla.stg_sale_order
+    where state in ('sale', 'done')
+),
+
+deliveries as (
+    select
+        sale_id,
+        min(date_done) as first_delivery_date
+    from fulfilment_sla.stg_stock_picking
+    where picking_type = 'outgoing'
+      and state = 'done'
+      and sale_id is not null
+    group by sale_id
+),
+
+order_status as (
+    select
+        o.order_id,
+        o.month,
+        o.commitment_deadline,
+        d.first_delivery_date,
+        case
+            when d.first_delivery_date is not null then 1
+            else 0
+        end as is_delivered,
+        case
+            when d.first_delivery_date is not null and d.first_delivery_date <= o.commitment_deadline then 1
+            else 0
+        end as is_on_time
+    from eligible_orders o
+    left join deliveries d on o.order_id = d.sale_id
+)
+
+select
+    month::text as month,
+    count(*)::bigint as eligible_orders,
+    sum(is_delivered)::bigint as delivered_orders,
+    sum(is_on_time)::bigint as on_time_orders,
+    round((sum(is_on_time)::numeric / count(*)::numeric) * 100, 1)::numeric as on_time_rate
+from order_status
+group by month
+order by month
+
+
+--- models/stg_sale_order.sql ---
+{{ config(materialized='table', schema='fulfilment_sla') }}
+
+select
+    id,
+    name,
+    state,
+    date_order,
+    commitment_date
+from fulfilment_sla_landing.sale_order
+
+
+--- models/stg_stock_picking.sql ---
+{{ config(materialized='table', schema='fulfilment_sla') }}
+
+select
+    id,
+    sale_id,
+    picking_type,
+    state,
+    date_done
+from fulfilment_sla_landing.stock_picking
+
+
+--- pipeline.yaml ---
+name: fulfilment_sla
+summary: Monthly delivery SLA report comparing order placement and fulfillment timing
+schedule: 0 2 * * *
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${FS_SRC_HOST}
+    port: ${FS_SRC_PORT}
+    database: ${FS_SRC_NAME}
+    user: ${FS_SRC_USER}
+    password: ${FS_SRC_PASSWORD}
+  tables:
+  - sale_order
+  - stock_picking
+warehouse:
+  host: ${WAREHOUSE_DB_HOST:-localhost}
+  port: ${WAREHOUSE_DB_PORT:-5432}
+  database: ${WAREHOUSE_DB_NAME:-warehouse}
+  user: ${WAREHOUSE_DB_USER}
+  password: ${WAREHOUSE_DB_PASSWORD}
+  schema: fulfilment_sla
+stages:
+- name: landing
+  gates:
+  - type: schema_contract
+    tables:
+      sale_order:
+        id: bigint
+        name: text
+        state: text
+        date_order: timestamp
+        commitment_date: timestamp
+      stock_picking:
+        id: bigint
+        sale_id: bigint
+        picking_type: text
+        state: text
+        date_done: timestamp
+- name: raw
+  engine: dbt
+  depends_on: landing
+  models:
+  - stg_sale_order
+  - stg_stock_picking
+  gates:
+  - type: unique
+    table: stg_sale_order
+    columns:
+    - id
+  - type: unique
+    table: stg_stock_picking
+    columns:
+    - id
+  - type: not_null
+    table: stg_sale_order
+    columns:
+    - id
+    - state
+    - date_order
+  - type: not_null
+    table: stg_stock_picking
+    columns:
+    - id
+    - picking_type
+    - state
+- name: curated
+  engine: dbt
+  depends_on: raw
+  models:
+  - fct_delivery_sla
+  gates:
+  - type: unique
+    table: fct_delivery_sla
+    columns:
+    - month
+  - type: not_null
+    table: fct_delivery_sla
+    columns:
+    - month
+    - eligible_orders
+    - delivered_orders
+    - on_time_orders
+    - on_time_rate
+  - type: business_rule
+    name: on_time_le_delivered
+    table: fct_delivery_sla
+    id_column: month
+    sql: select month from fulfilment_sla.fct_delivery_sla where on_time_orders >
+      delivered_orders
+    expect: 0
+  - type: business_rule
+    name: delivered_le_eligible
+    table: fct_delivery_sla
+    id_column: month
+    sql: select month from fulfilment_sla.fct_delivery_sla where delivered_orders
+      > eligible_orders
+    expect: 0
+
+
+Validator output:
+manifest did not load: /opt/dpagent/pipelines/fulfilment_sla/pipeline.yaml stage 'curated': business_rule gate's expect 0 must be 'no_rows' (the only kind implemented)
+
+Return a corrected complete bundle under every rule above. If the failure shows the BRD does not actually say what is needed, return `blockers` instead of guessing.

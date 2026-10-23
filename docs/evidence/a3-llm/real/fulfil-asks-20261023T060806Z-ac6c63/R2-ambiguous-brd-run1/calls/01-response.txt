@@ -1,0 +1,20 @@
+{
+  "blockers": [
+    {
+      "question": "Mốc thời gian để phân nhóm theo tháng (`month`) dựa trên ngày nào: ngày đặt hàng (`sale_order.date_order`), ngày cam kết giao hàng (`sale_order.commitment_date`), hay ngày hoàn thành giao hàng (`stock_picking.date_done`)?",
+      "why_it_matters": "Mỗi lựa chọn sẽ gom đơn hàng vào các tháng khác nhau, làm thay đổi hoàn toàn các chỉ số số đơn, số đơn đã giao và tỷ lệ SLA của từng tháng."
+    },
+    {
+      "question": "Các trạng thái đơn bán (`sale_order.state`) nào được đưa vào báo cáo? Có loại trừ các đơn nháp (`draft`), đơn báo giá (`sent`), hoặc đơn bị huỷ (`cancel`) không?",
+      "why_it_matters": "Quyết định tập dữ liệu đơn hàng đầu vào, ảnh hưởng trực tiếp đến mẫu số 'số đơn' và tỷ lệ hoàn thành SLA."
+    },
+    {
+      "question": "Đơn hàng không có hạn cam kết (`commitment_date IS NULL`) được xử lý như thế nào?",
+      "why_it_matters": "Không có mốc cam kết thì không thể so sánh để xác định đúng hẹn hay trễ hẹn; cần làm rõ đơn này có tính vào tổng số đơn hay loại khỏi báo cáo SLA."
+    },
+    {
+      "question": "Trường hợp một đơn bán có nhiều lần xuất kho (`stock_picking` loại `outgoing`), ngày giao hàng thực tế để tính SLA lấy theo đợt giao đầu tiên (`MIN(date_done)`), đợt giao cuối cùng (`MAX(date_done)`), hay yêu cầu tất cả các phiếu xuất đều phải hoàn thành trước hạn?",
+      "why_it_matters": "Nếu đơn hàng được giao nhiều lần, việc chọn mốc thời gian giao hàng khác nhau sẽ trực tiếp làm thay đổi kết quả đơn đó đạt hay không đạt SLA."
+    }
+  ]
+}

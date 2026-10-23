@@ -1,0 +1,8 @@
+draft origin: model gemini/gemini-3.8-flash via dpagent pipeline synth (llm-after-1-revision(s), attempt 2), imported from docs/evidence/demo/4fce834eb1c1582bb405121038cdf7b9eec6f5fa/20261023T052117Z-ai - source commit 4fce834eb1c1582bb405121038cdf7b9eec6f5fa, trace sha256:2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8, 2 file(s) matched the trace's sha256; no model call on this host, nothing approved
+╭─ approving fulfilment_sla means having read every line of these 2 file(s) ─╮
+│   · models/fct_delivery_sla.sql                                            │
+│   · pipeline.yaml                                                          │
+╰────────────────────────────────────────────────────────────────────────────╯
+fulfilment_sla is now maturity: reviewed (approved by 'demo.reviewer' at 
+2026-10-23T07:14:52+00:00, evidence ev-9506e4354e9ae68c) - `dpagent pipeline 
+deploy fulfilment_sla` will apply it for real.

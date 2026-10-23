@@ -1,0 +1,5 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=4
+secret scan (first): no environment-file secret or model credential in evidence

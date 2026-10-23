@@ -5,11 +5,15 @@
 # (and, for BI, the fingerprint that person reviewed).
 #   Layer 1  preflight   dpagent doctor against the demo stack (installs nothing)
 #            install     install + verify + acceptance-test every pack of the stack
+#            lock        the Python venvs at the exact versions of the accepted run (examples/demo/lock), checked
 #            source      the demo source tables (sale_order, stock_picking) from the fulfil fixture
 #   Layer 3  synth       DEMO_DRAFT=ai (default): the model drafts pipelines/fulfilment_sla from the BRD + verified
 #                        schema, validated for real against the hand-written fixture/expected, re-asked at most
 #                        DEMO_MAX_REVISIONS times within DEMO_MAX_CALLS calls. DEMO_DRAFT=reference: the hand-written
-#                        reference instead (examples/demo/reference, labelled; never reported as the model's work)
+#                        reference instead (examples/demo/reference, labelled; never reported as the model's work).
+#                        DEMO_DRAFT=artifact: an accepted ai draft from DEMO_ARTIFACT (an ai evidence directory), its
+#                        files checked against the trace's hashes (DEMO_ARTIFACT_TRACE_SHA256 pins the trace) - no
+#                        model call, no approval carried over; then validated on this host
 #            validate    validate the draft again (sealed evidence) - e.g. after reading or editing it
 #            approve     a person promotes it on that evidence (needs DEMO_APPROVED_BY)
 #   Layer 2  deploy      deploy + run once and wait
@@ -37,12 +41,27 @@ origin_file() { echo "pipelines/$P/.draft-origin"; }
 case "${1:-}" in
   preflight)
     dpagent doctor --spec "$D/stack.yaml"
+    # resources the demo needs (the stack's own footprint was measured at ~5 GB RSS)
+    awk '/MemAvailable/ {printf "memory available: %.1f GB\n", $2/1048576; if ($2 < 4194304) bad=1} END {exit bad}' /proc/meminfo \
+      || echo "WARNING: less than 4 GB of memory available" >&2
+    df -h / | awk 'NR==2 {print "disk free on /: " $4}'
+    if [ "${DEMO_DRAFT:-ai}" = ai ]; then   # layer 3 needs the LLM extra, a model name and its key (values never shown)
+      "$PY" -c 'import litellm' 2>/dev/null \
+        || { echo "litellm is not installed in $PY - bootstrap with DPAGENT_WITH_LLM=1 (pip install -e '.[llm]')" >&2; exit 2; }
+      need DPAGENT_MODEL
+      "$PY" -c 'from dpagent.llm import client; import sys; sys.exit(0 if client.available() else 1)' \
+        || { echo "no credential for $DPAGENT_MODEL in the environment" >&2; exit 2; }
+      echo "layer 3: litellm $("$PY" -c 'import importlib.metadata as m; print(m.version("litellm"))'), model $DPAGENT_MODEL, credential present"
+    fi
     ;;
   install)
     need FS_SRC_NAME FS_SRC_USER FS_SRC_PASSWORD WAREHOUSE_DB_USER WAREHOUSE_DB_PASSWORD AIRFLOW_DB_PASSWORD \
          AIRFLOW_ADMIN_PASSWORD DLT_DB_PASSWORD SUPERSET_METADATA_PASSWORD
     dpagent doctor --spec "$D/stack.yaml"
     dpagent spec "$D/stack.yaml" --yes
+    ;;
+  lock)
+    "$PY" "$D/deps_lock.py" apply
     ;;
   source)
     need FS_SRC_NAME FS_SRC_USER FS_SRC_PASSWORD
@@ -57,6 +76,13 @@ case "${1:-}" in
       rm -rf "pipelines/$P"; cp -r "$D/reference/$P" "pipelines/$P"; rm -f "pipelines/$P/ORIGIN.md"
       echo "reference (hand-written, examples/demo/reference/$P) - not drafted by a model" > "$(origin_file)"
       dpagent pipeline validate "$P" --fixture "$FX" --expected "$EX"
+    elif [ "${DEMO_DRAFT:-ai}" = artifact ]; then
+      need DEMO_ARTIFACT
+      rep=(); [ "${DEMO_REDRAFT:-0}" = 1 ] && rep=(--replace)
+      "$PY" "$D/import_ai_draft.py" "$DEMO_ARTIFACT" "pipelines/$P" \
+        ${DEMO_ARTIFACT_TRACE_SHA256:+--trace-sha256 "$DEMO_ARTIFACT_TRACE_SHA256"} "${rep[@]}"
+      dpagent pipeline lint "$P"
+      dpagent pipeline validate "$P" --fixture "$FX" --expected "$EX"
     else
       need DPAGENT_MODEL
       over=(); [ "${DEMO_REDRAFT:-0}" = 1 ] && over=(--overwrite)
@@ -66,7 +92,8 @@ case "${1:-}" in
         --secret "FS_SRC_PASSWORD=source database password" \
         --hint "Source connection fields use the secret refs above. Use the standard warehouse refs." \
         --fixture "$FX" --expected "$EX" --max-revisions "${DEMO_MAX_REVISIONS:-2}" \
-        --max-calls "${DEMO_MAX_CALLS:-6}" ${DEMO_TRACE_DIR:+--trace-dir "$DEMO_TRACE_DIR"} "${over[@]}"
+        --max-calls "${DEMO_MAX_CALLS:-6}" --transient-retries "${DEMO_TRANSIENT_RETRIES:-0}" \
+        --retry-wait "${DEMO_RETRY_WAIT:-120}" ${DEMO_TRACE_DIR:+--trace-dir "$DEMO_TRACE_DIR"} "${over[@]}"
       echo "model $DPAGENT_MODEL via dpagent pipeline synth (classification in the trace)" > "$(origin_file)"
     fi
     ;;

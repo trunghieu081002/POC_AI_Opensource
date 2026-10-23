@@ -1,0 +1,82 @@
+{
+  "attempts": [
+    {
+      "blockers": [
+        {
+          "question": "Cột ngày nào được dùng làm mốc xác định tháng (`month`) của báo cáo: `sale_order.date_order` (ngày đặt hàng), `sale_order.commitment_date` (hạn cam kết), hay `stock_picking.date_done` (ngày giao hàng thực tế)?",
+          "why_it_matters": "Quyết định đơn hàng được ghi nhận vào tháng nào; mỗi mốc thời gian sẽ cho ra số lượng đơn và tỷ lệ SLA hoàn toàn khác nhau trong từng tháng."
+        },
+        {
+          "question": "Những trạng thái nào của `sale_order` và `stock_picking` được tính vào báo cáo? Các đơn hoặc phiếu kho ở trạng thái `cancel` hoặc `draft` có bị loại trừ không?",
+          "why_it_matters": "Quyết định mẫu số (tổng số đơn) và tử số (đơn đã giao/đúng hẹn); nếu tính cả đơn nháp hoặc đơn huỷ sẽ làm sai lệch toàn bộ số liệu vận hành."
+        },
+        {
+          "question": "Nếu một đơn bán có nhiều phiếu xuất kho (`picking_type = 'outgoing'`), ví dụ do giao hàng nhiều lần, thì ngày hoàn thành giao hàng được tính theo lần giao đầu tiên hay lần giao cuối cùng để đối chiếu với `commitment_date`?",
+          "why_it_matters": "Quyết định thời điểm đơn được coi là đã giao xong để so với hạn cam kết; chọn lần đầu hay lần cuối sẽ trực tiếp thay đổi kết quả đúng hẹn hay trễ hạn."
+        },
+        {
+          "question": "Các đơn hàng không có hạn cam kết (`commitment_date IS NULL`) sẽ được xử lý ra sao trong việc tính tỷ lệ đúng hẹn?",
+          "why_it_matters": "Cần làm rõ đơn không có cam kết ngày giao có được tính vào mẫu số SLA không, hay bị loại ra, hay mặc định tính là trễ hạn."
+        }
+      ],
+      "call_indexes": [
+        1
+      ],
+      "detail": "",
+      "drafted_files": [],
+      "evidence_id": "",
+      "fed_back": "",
+      "files": {},
+      "format_repairs": 0,
+      "index": 1,
+      "outcome": "blocked",
+      "source": "llm",
+      "template_files": {},
+      "validation": {}
+    }
+  ],
+  "budget": {
+    "max_calls": 3,
+    "max_revisions": 0,
+    "transient_retries": 1,
+    "wait_s": 20.0
+  },
+  "calls": [
+    {
+      "at": "2026-10-23T06:10:09+00:00",
+      "cost": "unknown",
+      "duration_s": 26.03,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "kind": "ok",
+      "model": "gemini/gemini-3.8-flash",
+      "response_sha256": "sha256:3dcaaaa0e26f7052b800da36754de79cf6ec9dfcc8234a6d8220b77d8f691e40",
+      "system_sha256": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+      "transient": false,
+      "usage": {
+        "completion_tokens": 2141,
+        "prompt_tokens": 3112,
+        "reasoning_tokens": 1691,
+        "total_tokens": 5253
+      },
+      "usage_status": "reported",
+      "user_sha256": "sha256:02d7901d0d352a69f8c48bbe4af2ef90d4cbc64544355ee0173738966be393b4"
+    }
+  ],
+  "case": "a3_fulfilment_sla_ambiguous",
+  "classification": "asked-blocker",
+  "dpagent": "0.4.0",
+  "inputs": {
+    "brd": "sha256:aa380ca75c4295d36474f51ee8a9fbd1e866334c587be5747cf5d564b9b19738",
+    "request_yaml": "sha256:cb783b6e68ef149a06e1576f8c59e6f8e82178ec851217ede3830da627c8c50f",
+    "source_schema": "sha256:71e11b554a69cfe0699fd5e9a4bc6f20d780a45604814a25f5f6fd3610acae1c",
+    "synth_system_prompt": "sha256:2f86b1a23f236139c80e7d8fd39d72b82e892ef0777702ccd36d9c54b0a52d03",
+    "synth_system_prompt_name": "synth_pipeline"
+  },
+  "kind": "ambiguous",
+  "model": "gemini/gemini-3.8-flash",
+  "pipeline_dir": "",
+  "started_at": "2026-10-23T06:10:09+00:00",
+  "trace_version": 1
+}

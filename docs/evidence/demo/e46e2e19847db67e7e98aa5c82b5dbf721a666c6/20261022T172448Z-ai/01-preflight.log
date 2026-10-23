@@ -1,0 +1,30 @@
+╭───── target OS ─────╮
+│  id        ubuntu   │
+│  family    debian   │
+│  version   22.04    │
+│  pkg_mgr   apt      │
+│  svc_mgr   systemd  │
+│  firewall  none     │
+╰─────────────────────╯
+
+base  (no declared requirements)
+
+python-modern  (no declared requirements)
+
+dbt
+  ok   disk /opt: 34023MB free (needs 1024MB)
+  · installed=0
+
+dlt
+  ok   disk /opt: 34023MB free (needs 2048MB)
+  · installed=0
+
+postgres  (no declared requirements)
+
+airflow
+  ok   memory: 63904MB available (needs 2048MB)
+  ok   disk /opt: 34023MB free (needs 2048MB)
+
+╭────────────────────────────────────────────────╮
+│ this host satisfies every declared requirement │
+╰────────────────────────────────────────────────╯

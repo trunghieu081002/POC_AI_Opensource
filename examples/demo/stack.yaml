@@ -42,7 +42,7 @@ components:
       admin_password: "${AIRFLOW_ADMIN_PASSWORD}"
       admin_email: admin@example.com
   - dlt:
-      dlt_version: "1.*"
+      dlt_version: "1.31.0"         # the version the accepted demo run installed (docs/evidence/demo/README.md)
       host: localhost
       port: 5432
       database: dlt_selftest

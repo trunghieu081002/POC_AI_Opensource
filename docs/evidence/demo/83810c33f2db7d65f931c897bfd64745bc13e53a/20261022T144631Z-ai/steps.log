@@ -1,0 +1,8 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=0
+== 03-source: bash examples/demo/demo.sh source
+03-source rc=0
+04-synth rc=1 draft=ai
+secret scan (first): no environment-file secret or model credential in evidence

@@ -1,0 +1,55 @@
+         fulfilment_sla · run 13 ok · started 2026-10-23T07:22:07+00:00         
+ stage    status  rows  gates                         started                   
+ landing  passed     -  schema_contract, unique,      2026-10-23T07:22:14+00:00 
+                        unique                                                  
+ curated  passed     -  unique, not_null,             2026-10-23T07:22:25+00:00 
+                        business_rule, business_rule                            
+fulfilment_sla · run 13 · ok
+
+landing passed
+  schema_contract
+  unique
+  unique
+
+curated passed
+  unique
+  not_null
+  business_rule
+  business_rule
+
+events
+ time            actor   kind              message                              
+ 07:22:07+00:00  user    pipeline.trigger  triggering Airflow DAG               
+                                           'fulfilment_sla'                     
+ 07:22:10+00:00  engine  extract.start     fulfilment_sla via odoo_postgres     
+ 07:22:12+00:00  engine  extract.done      fulfilment_sla extract complete:     
+                                           sale_order +10, stock_picking +12    
+ 07:22:15+00:00  engine  gate.passed       fulfilment_sla/landing               
+                                           schema_contract: ok                  
+ 07:22:15+00:00  engine  gate.passed       fulfilment_sla/landing unique: ok    
+ 07:22:15+00:00  engine  gate.passed       fulfilment_sla/landing unique: ok    
+ 07:22:16+00:00  engine  stage.passed      fulfilment_sla/landing gates passed  
+ 07:22:17+00:00  engine  transform.start   fulfilment_sla/curated via dbt       
+ 07:22:23+00:00  engine  transform.done    fulfilment_sla/curated transform     
+                                           complete                             
+ 07:22:25+00:00  engine  gate.passed       fulfilment_sla/curated unique: ok    
+ 07:22:26+00:00  engine  gate.passed       fulfilment_sla/curated not_null: ok  
+ 07:22:26+00:00  engine  gate.passed       fulfilment_sla/curated               
+                                           business_rule: ok                    
+ 07:22:26+00:00  engine  gate.passed       fulfilment_sla/curated               
+                                           business_rule: ok                    
+ 07:22:26+00:00  engine  stage.passed      fulfilment_sla/curated gates passed  
+ 07:22:27+00:00  engine  pipeline.ok       DAG run 13 reached terminal state:   
+                                           ok                                   
+ pack             version  installed  tested    config           when           
+ airflow          1.0.0    installed  passed    c4126c2ab8b441…  2026-10-23T07… 
+ base             1.0.0    installed  passed    e429274fb41657…  2026-10-23T07… 
+ dbt              1.0.0    installed  passed    c9fb72b3e213a4…  2026-10-23T07… 
+ dlt              1.0.0    installed  passed    051051790537c0…  2026-10-23T07… 
+ postgres         1.0.0    installed  passed    8da242fe97f1e5…  2026-10-23T07… 
+ python-modern    1.0.0    installed  passed    6323f765f4459b…  2026-10-23T07… 
+ superset         0.1.1    installed  passed    b3f3f7b8e3673b…  2026-10-23T07… 
+ superset-assets  0.1.0    installed  untested  8a7036aa2a62e2…  2026-10-23T07… 
+
+1 installed component(s) have never been proven to work.
+run: dpagent test

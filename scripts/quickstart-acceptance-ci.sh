@@ -14,31 +14,61 @@
 # draft (ai: `dpagent pipeline synth` with the model named by DPAGENT_MODEL - its credential is passed into the host
 # by NAME, never written anywhere; reference: the labelled hand-written pipeline), approval, layer 2 deploy/run,
 # dashboard + viewer, schedule, bad data blocked, recovery, undeploy. Evidence: docs/evidence/demo/<sha>/<utc>-<draft>/.
+# An ai run needs DPAGENT_LLM_LEDGER: an initialised request ledger on this host (python -m dpagent.llm.ledger init,
+# src/dpagent/llm/ledger.py). Every request - the probe (part `probe`), synth on the host (part `main`, or
+# DEMO_LEDGER_SEGMENT) and any later rerun - is counted there before it is sent; it is never reset by a new run.
+# --demo artifact (normally with --show): the accepted ai draft of DEMO_ARTIFACT, checked against its trace's hashes,
+# validated on the new host - no model call and no credential on that host, no approval carried over.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 KEEP=0
 OS=ubuntu
 BENCH=""
 DEMO=""
+SHOW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1; shift ;;
     --os) OS="${2:?--os needs ubuntu or ol8}"; shift 2 ;;
     --bench) BENCH="${2:?--bench needs a scale}"; shift 2 ;;
-    --demo) DEMO="${2:?--demo needs reference or ai}"; shift 2 ;;
-    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE | --demo reference|ai]" >&2; exit 2 ;;
+    --demo) DEMO="${2:?--demo needs reference, ai or artifact}"; shift 2 ;;
+    --show) SHOW=1; KEEP=1; shift ;;         # with --demo: a host for a live demo, stopped before approval
+    *) echo "usage: quickstart-acceptance-ci.sh [--keep] [--os ubuntu|ol8] [--bench SCALE | --demo reference|ai|artifact] [--show]" >&2; exit 2 ;;
   esac
 done
 case "$BENCH" in ''|[a-z]*) ;; *) echo "invalid --bench scale" >&2; exit 2 ;; esac
 case "$BENCH" in *[!a-z]*) echo "invalid --bench scale" >&2; exit 2 ;; esac
-case "$DEMO" in ''|reference|ai) ;; *) echo "--demo must be reference or ai" >&2; exit 2 ;; esac
+case "$DEMO" in ''|reference|ai|artifact) ;; *) echo "--demo must be reference, ai or artifact" >&2; exit 2 ;; esac
 [ -z "$BENCH" ] || [ -z "$DEMO" ] || { echo "--bench and --demo are separate runs" >&2; exit 2; }
+[ "$SHOW" = 0 ] || [ -n "$DEMO" ] || { echo "--show needs --demo reference|ai" >&2; exit 2; }
 PASSENV=()
+WITH_LLM=""                                     # bootstrap's [llm] extra (litellm): only an ai demo calls a model
 if [ "$DEMO" = ai ]; then
+  WITH_LLM=1
   [ -n "${DPAGENT_MODEL:-}" ] || { echo "--demo ai needs DPAGENT_MODEL (and that provider's key, e.g. GEMINI_API_KEY) in the environment" >&2; exit 2; }
-  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_TIMEOUT DPAGENT_LLM_MAX_TOKENS; do
+  case "${DPAGENT_LLM_LEDGER:-}" in /*) ;; *) echo "--demo ai needs DPAGENT_LLM_LEDGER: the absolute path of an initialised request ledger" >&2; exit 2 ;; esac
+  [ -f "$DPAGENT_LLM_LEDGER" ] || { echo "no request ledger at $DPAGENT_LLM_LEDGER (python -m dpagent.llm.ledger init ...)" >&2; exit 2; }
+  LEDGER_DIR=$(dirname "$DPAGENT_LLM_LEDGER")
+  # the same file inside the host (bind mount): the container's requests count in the same budget
+  PASSENV+=(-e "DPAGENT_LLM_LEDGER=/var/lib/dpagent-ledger/$(basename "$DPAGENT_LLM_LEDGER")"
+            -e "DPAGENT_LLM_LEDGER_SEGMENT=${DEMO_LEDGER_SEGMENT:-main}")
+  for v in DPAGENT_MODEL GEMINI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY DPAGENT_LLM_REASONING_EFFORT \
+           DEMO_MAX_CALLS DEMO_MAX_REVISIONS DEMO_TRANSIENT_RETRIES DEMO_RETRY_WAIT; do
     [ -n "${!v:-}" ] && PASSENV+=(-e "$v")          # by name: docker reads the value from this environment
   done
+  # the same limits the A3 runner uses (scripts/m25-acceptance-ci.sh): a reasoning model's hidden thinking shares
+  # the output-token limit, and it is slow
+  PASSENV+=(-e "DPAGENT_LLM_TIMEOUT=${DPAGENT_LLM_TIMEOUT:-900}" -e "DPAGENT_LLM_MAX_TOKENS=${DPAGENT_LLM_MAX_TOKENS:-48000}")
+fi
+if [ "$DEMO" = artifact ]; then
+  # an accepted ai draft (DEMO_ARTIFACT: its committed evidence directory, relative to the repo) - no model, no key,
+  # no probe on this host; DEMO_ARTIFACT_TRACE_SHA256 pins the trace that was accepted (examples/demo/import_ai_draft.py)
+  [ -f "$ROOT/${DEMO_ARTIFACT:?--demo artifact needs DEMO_ARTIFACT}/ai-trace/trace.json" ] \
+    || { echo "no ai-trace/trace.json under $DEMO_ARTIFACT" >&2; exit 2; }
+  git -C "$ROOT" ls-files --error-unmatch "$DEMO_ARTIFACT/ai-trace/trace.json" >/dev/null 2>&1 \
+    || { echo "$DEMO_ARTIFACT is not committed - only committed files reach the host" >&2; exit 2; }
+  PASSENV+=(-e DEMO_ARTIFACT)
+  [ -z "${DEMO_ARTIFACT_TRACE_SHA256:-}" ] || PASSENV+=(-e DEMO_ARTIFACT_TRACE_SHA256)
 fi
 # what the acceptance phases use (quickstart, or the demo)
 INSIDE=tests/quickstart_acceptance/inside.sh; ENVFILE=/root/quickstart-dev.env
@@ -63,19 +93,41 @@ if [ -n "$BENCH" ]; then
   "$PYH" "$ROOT/benchmarks/synthetic/preflight.py" "$BENCH" --disk-path "$(docker info -f '{{.DockerRootDir}}')" \
     > "$OUT/preflight-host.json" || { echo "benchmark refused by the host preflight: $(cat "$OUT/preflight-host.json")" >&2; exit 4; }
 elif [ -n "$DEMO" ]; then
-  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
+  OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/demo$([ "$SHOW" = 1 ] && echo -show)/$SHA/$(date -u +%Y%m%dT%H%M%SZ)-$DEMO$SUFFIX}
   mkdir -p "$OUT"
+  if [ "$DEMO" = ai ]; then
+    # one tiny call before any host is built: key, model name, quota (it counts in the overall call budget)
+    PYH="$ROOT/.venv/bin/python"; [ -x "$PYH" ] || PYH=python3
+    if [ "${DEMO_PROBE_ATTEMPTS:-2}" = 0 ]; then
+      # a probe already passed for this model: reuse its evidence and spend no call on another one
+      [ -f "${DEMO_PROBE_EVIDENCE:-}" ] && grep -q '"ok": true' "$DEMO_PROBE_EVIDENCE" \
+        || { echo "DEMO_PROBE_ATTEMPTS=0 needs DEMO_PROBE_EVIDENCE: the probe.json of a passed probe" >&2; exit 2; }
+      printf '{"skipped": true, "reason": "a passed probe is reused, no call spent", "evidence": "%s"}\n' \
+        "${DEMO_PROBE_EVIDENCE#$ROOT/}" > "$OUT/probe.json"
+    else
+    # llm_verify probe: at most DEMO_PROBE_ATTEMPTS calls (default 2) counting retries; only a transient answer
+    # (503/429/timeout) is retried - a key, model-name or quota error stops at once
+    ( cd "$ROOT" && DPAGENT_LLM_VERIFY=1 DPAGENT_LLM_LEDGER_SEGMENT=probe PYTHONPATH=src "$PYH" -c 'import json, os, sys
+from dpagent.pipelines.llm_verify import probe
+r = probe(attempts=int(os.environ.get("DEMO_PROBE_ATTEMPTS", "2")), wait_s=30)
+print(json.dumps(r, indent=1)); sys.exit(0 if r.get("ok") else 1)' ) > "$OUT/probe.json" 2>&1 \
+      || { cat "$OUT/probe.json"; echo "the model probe failed - fix the key / model name / quota first; nothing was built" >&2; exit 2; }
+    fi
+  fi
 else
   OUT=${QUICKSTART_RESULTS_DIR:-$ROOT/docs/evidence/quickstart/$SHA/$(date -u +%Y%m%dT%H%M%SZ)$SUFFIX}
   mkdir -p "$OUT"
 fi
 git -C "$ROOT" rev-parse HEAD 'HEAD^{tree}' > "$OUT/provenance.txt"
 NAME="dpagent-quickstart-acceptance-$$"
+[ "$SHOW" = 0 ] || NAME="dpagent-demo-show-$DEMO-$$"     # never confused with an acceptance host
 docker build -q -t "$IMAGE" -f "$ROOT/scripts/$DOCKERFILE" "$ROOT" > "$OUT/image.txt"
 CID=''
 cleanup() {
   rc=$?; trap - EXIT
   echo "$rc" > "$OUT/exit-code.txt"
+  [ -z "${LEDGER_DIR:-}" ] || ( cd "$ROOT" && PYTHONPATH=src "${PYH:-python3}" -m dpagent.llm.ledger status "$DPAGENT_LLM_LEDGER" ) \
+    > "$OUT/request-ledger.json" 2>&1 || true
   if [ -n "$CID" ]; then
     docker cp "$NAME:/root/quickstart-evidence/." "$OUT/" 2>/dev/null || true
     if [ "$KEEP" -eq 0 ]; then
@@ -88,7 +140,8 @@ cleanup() {
 }
 trap cleanup EXIT
 CID=$(docker run -d --name "$NAME" --privileged --cgroupns host --tmpfs /run --tmpfs /run/lock \
-  -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$ROOT:/opt/src/dpagent-src:ro" "$IMAGE")
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$ROOT:/opt/src/dpagent-src:ro" \
+  ${LEDGER_DIR:+-v "$LEDGER_DIR:/var/lib/dpagent-ledger:rw"} "$IMAGE")
 echo "$CID" > "$OUT/container-id.txt"
 for _ in $(seq 1 30); do
   [ "$(docker exec "$NAME" systemctl is-system-running 2>/dev/null || true)" = running ] && break; sleep 1
@@ -110,7 +163,7 @@ if [ "$OS" = ol8 ]; then
     echo "bare image python3 (before the OS packages python3/python3.11 are installed): $(docker exec "$NAME" sh -c 'command -v python3 >/dev/null && python3 --version || echo none')"
     echo "system python baseline = after those OS packages, before DPAgent (system-python-before.txt); compared at the end"
   } > "$OUT/os-scope.txt"
-  docker exec "$NAME" bash -lc '
+  docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM" "$NAME" bash -lc '
     set -euo pipefail
     dnf -y install python3 python3.11 python3.11-pip >/dev/null
     PYBIN=$(readlink -f /usr/bin/python3); echo "$PYBIN $(python3 --version)" > /root/system-python-before.txt
@@ -118,7 +171,7 @@ if [ "$OS" = ol8 ]; then
     DPAGENT_PYTHON=/usr/bin/python3.11 DPAGENT_SOURCE_DIR=/opt/src/clean bash /opt/src/clean/scripts/bootstrap.sh
   ' > "$OUT/bootstrap.log" 2>&1
 else
-  docker exec "$NAME" bash -lc '
+  docker exec -e "DPAGENT_WITH_LLM=$WITH_LLM" "$NAME" bash -lc '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq && apt-get install -y -qq sudo ca-certificates curl openssl python3 python3-venv python3-pip >/dev/null
@@ -127,6 +180,11 @@ else
 fi
 if [ -n "$BENCH" ]; then
   docker exec "$NAME" bash -lc "bash /opt/dpagent/tests/quickstart_acceptance/inside.sh bench $BENCH" 2>&1 | tee "$OUT/run-bench.log"
+  exit 0
+fi
+if [ "$SHOW" = 1 ]; then
+  docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE show" 2>&1 | tee "$OUT/run-show.log"
+  echo "live-demo host: $NAME (docs/demo-show.md)" | tee "$OUT/show-host.txt"
   exit 0
 fi
 docker exec "${PASSENV[@]}" -e "DEMO_DRAFT=$DEMO" "$NAME" bash -lc "bash /opt/dpagent/$INSIDE first" 2>&1 | tee "$OUT/run-first.log"

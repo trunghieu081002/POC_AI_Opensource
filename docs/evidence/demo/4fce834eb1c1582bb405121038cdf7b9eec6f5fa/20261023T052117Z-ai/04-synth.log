@@ -1,0 +1,22 @@
+drafting fulfilment_sla with gemini/gemini-3.8-flash (at most 2 re-ask(s), 6 
+call(s))
+05:38:16 - LiteLLM:WARNING: vertex_and_google_ai_studio_gemini.py:1152 - DeprecationWarning: `temperature`, `top_p`, and `top_k` continue to function for Gemini 3+ (gemini-3.8-flash) but are planned for removal in a future release. Move sampling guidance into the `system` instructions instead.
+05:40:07 - LiteLLM:WARNING: vertex_and_google_ai_studio_gemini.py:1152 - DeprecationWarning: `temperature`, `top_p`, and `top_k` continue to function for Gemini 3+ (gemini-3.8-flash) but are planned for removal in a future release. Move sampling guidance into the `system` instructions instead.
+                    fulfilment_sla: llm-after-1-revision(s)                     
+┏━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ attempt ┃ by           ┃ outcome         ┃ detail                            ┃
+┡━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1       │ llm          │ structural-fail │ /opt/dpagent/pipelines/fulfilmen… │
+│         │              │                 │ stage 'curated': business_rule    │
+│         │              │                 │ gate's expect 0 must be 'no_rows' │
+│         │              │                 │ (the only kind implemented)       │
+│ 2       │ llm-revision │ validated       │ ev-76438bb551f38ddc               │
+└─────────┴──────────────┴─────────────────┴───────────────────────────────────┘
+requests sent: 2 (ceiling 6; provider busy/timeout: 0; token usage reported for 
+2, unknown for the rest; cost unknown); trace: 
+/root/quickstart-evidence/ai-trace
+validated (sealed evidence ev-76438bb551f38ddc). Read every file under 
+/opt/dpagent/pipelines/fulfilment_sla, then a person approves it: dpagent 
+pipeline promote fulfilment_sla --fixture 
+tests/llm_verification/cases/fulfilment_sla/fixture.yaml --expected 
+tests/llm_verification/cases/fulfilment_sla/expected.yaml --approved-by <name>

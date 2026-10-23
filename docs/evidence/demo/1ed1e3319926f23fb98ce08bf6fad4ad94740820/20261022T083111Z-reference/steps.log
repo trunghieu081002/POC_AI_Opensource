@@ -1,0 +1,41 @@
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=0
+== 03-source: bash examples/demo/demo.sh source
+03-source rc=0
+04-synth rc=0 draft=reference
+check draft-not-approved (synth/validate never approve) ok
+05a-deploy-before-approval rc=1 (want 1)
+05b-approve-without-a-person rc=2 (want 2)
+== 05-approve: bash examples/demo/demo.sh approve
+05-approve rc=0
+== 06-deploy: bash examples/demo/demo.sh deploy
+06-deploy rc=0
+check after-first-run (warehouse = hand-calculated expected; landing = source rows once) ok
+== 07-schedule: bash examples/demo/demo.sh schedule
+07-schedule rc=0
+check schedule-deployed (Airflow: 0 2 * * *, unpaused, next run known; scheduler-triggered runs so far: 1) ok
+== 08-bi-validate: bash examples/demo/demo.sh bi-validate
+08-bi-validate rc=0
+09a-bi-deploy-unreviewed rc=3 (want 3)
+check after-refused-bi (nothing deployed) ok
+== 09-bi-deploy: bash examples/demo/demo.sh bi-deploy
+09-bi-deploy rc=0
+check viewer-api (as fulfil.viewer: chart = expected, filter = expected, every write refused) ok
+PHASE first PASS
+secret scan (first): no environment-file secret or model credential in evidence
+== 10-bad-data: bash examples/demo/demo.sh bad-data
+10-bad-data rc=0
+check bad-data-blocked (run 12: failed; landing failed on exactly the stock_picking unique gate; no later stage ran; report table same relation, same rows) ok
+== 11-fix-data: bash examples/demo/demo.sh fix-data
+11-fix-data rc=0
+check recovery (source fixed, rerun = expected, landing without duplicates) ok
+== 12-status: bash examples/demo/demo.sh status
+12-status rc=0
+check runs-by-type before undeploy: {'scheduled': 1, 'manual': 3} ok
+== 13-undeploy: bash examples/demo/demo.sh undeploy
+13-undeploy rc=0
+check undeploy-audit (dashboard UUIDs, viewer, DAG via Airflow, secrets, dbt models gone; warehouse data kept by design) ok
+PASS
+secret scan (second): no environment-file secret or model credential in evidence

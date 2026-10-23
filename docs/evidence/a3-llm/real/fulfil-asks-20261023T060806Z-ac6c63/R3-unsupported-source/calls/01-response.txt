@@ -1,0 +1,8 @@
+{
+  "blockers": [
+    {
+      "question": "Hệ thống hiện không có connector hỗ trợ MongoDB (catalog hiện tại chỉ gồm: csv, elasticsearch, google_sheets, odoo_postgres, rest_api, sql_server). Dữ liệu từ MongoDB sẽ được cung cấp qua phương thức nào (ví dụ: REST API wrapper, export định kỳ ra CSV, hay bổ sung connector MongoDB vào catalog)?",
+      "why_it_matters": "Không thể cấu hình `source.connector` cho MongoDB khi connector này chưa có trong catalog; việc tự đặt tên connector ngoài catalog sẽ bị parser từ chối khi load manifest."
+    }
+  ]
+}

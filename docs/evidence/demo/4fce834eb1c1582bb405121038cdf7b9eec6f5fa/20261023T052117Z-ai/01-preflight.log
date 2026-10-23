@@ -1,0 +1,33 @@
+╭───── target OS ─────╮
+│  id        ubuntu   │
+│  family    debian   │
+│  version   22.04    │
+│  pkg_mgr   apt      │
+│  svc_mgr   systemd  │
+│  firewall  none     │
+╰─────────────────────╯
+
+base  (no declared requirements)
+
+python-modern  (no declared requirements)
+
+dbt
+  ok   disk /opt: 32978MB free (needs 1024MB)
+  · installed=0
+
+dlt
+  ok   disk /opt: 32978MB free (needs 2048MB)
+  · installed=0
+
+postgres  (no declared requirements)
+
+airflow
+  ok   memory: 63904MB available (needs 2048MB)
+  ok   disk /opt: 32978MB free (needs 2048MB)
+
+╭────────────────────────────────────────────────╮
+│ this host satisfies every declared requirement │
+╰────────────────────────────────────────────────╯
+memory available: 31.6 GB
+disk free on /: 33G
+layer 3: litellm 1.106.2, model gemini/gemini-3.8-flash, credential present

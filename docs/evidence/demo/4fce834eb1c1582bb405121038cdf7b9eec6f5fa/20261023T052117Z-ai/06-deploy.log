@@ -1,0 +1,22 @@
+written:
+  /opt/dpagent/pipelines/fulfilment_sla/build/dags/fulfilment_sla.py
+  /opt/dpagent/pipelines/fulfilment_sla/build/models/fulfilment_sla/curated/sche
+ma.yml
+schema ensured: fulfilment_sla
+dbt models published:
+  /opt/dbt/project/models/fulfilment_sla/fct_delivery_sla.sql
+  /opt/dbt/project/models/fulfilment_sla/schema_curated.yml
+pipeline files published: /opt/dpagent/pipelines/fulfilment_sla
+pipeline secrets: synced to Airflow's own environment, airflow-scheduler 
+restarted
+DAG installed: /opt/airflow/home/dags/fulfilment_sla.py
+DAG unpaused: runs on schedule '0 2 * * *' (UTC)
+deployed
+triggered — dpagent run 5
+waiting up to 1800s for run 5 to finish...
+         fulfilment_sla · run 5 ok · started 2026-10-23T05:42:52+00:00          
+ stage    status  rows  gates                         started                   
+ landing  passed     -  schema_contract, unique,      2026-10-23T05:43:16+00:00 
+                        unique                                                  
+ curated  passed     -  unique, not_null,             2026-10-23T05:43:28+00:00 
+                        business_rule, business_rule                            

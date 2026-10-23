@@ -6,6 +6,23 @@ validated (a `schema_contract` written as a list). `scripted/` is not evidence a
 `tests/llm_verification/scripted_drafts/`; it proves the chain and the blocks. "Done means" is in
 [`docs/llm-verification.md`](../../llm-verification.md).
 
+## Delivery SLA — `fulfilment_sla`: the model asks instead of guessing (`fulfil-asks`)
+
+### `real/fulfil-asks-20261023T060806Z-ac6c63` — `--a3 real --a3-suite fulfil-asks --max-calls 6 --ambiguous-runs 3`
+
+Commit `ca8e7d7`, working tree clean, host built from packs, `leaks=0`; `gemini/gemini-3.8-flash`; `A3_TRANSIENT_RETRIES=1`,
+`A3_NO_PROBE=1` (the probe of the same day passed: `docs/evidence/demo/4fce834…/20261023T052117Z-ai/probe.json`).
+Counted in the shared request ledger, part `asks`: **4 requests, all answered** (`request-ledger.json`: 7 of 14 used
+by then - probe 1, demo synth 2, asks 4).
+
+| Run | Result |
+|---|---|
+| R2 runs 1-3, ambiguous delivery BRD | **`asked-blocker` ×3**: which date defines the month, which `state`s count, orders without `commitment_date`, several outgoing transfers per order |
+| R3, the same report from a MongoDB source | **`asked-blocker`**: no connector for MongoDB in the catalog - it names the ones there are |
+
+Three answers and one refusal, not a promise the model always asks. The build of the same case is the demo run
+`docs/evidence/demo/4fce834…/20261023T052117Z-ai` (`llm-after-1-revision(s)`, full flow PASS).
+
 ## Second owned-project case — `fact_label_operation` (two tables, LEFT JOIN, filter, one row per raw ISRC)
 
 **Met for `gemini/gemini-3.8-flash`, first draft, one call** — with the caveats below.
