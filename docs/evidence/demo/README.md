@@ -36,3 +36,9 @@ imported (2 files = trace hashes, trace pinned), `demo.sh lock` (every locked ve
 the full flow **PASS**: refusals rc 1/2/3, deploy/run = expected, schedule, dashboard + viewer (API and browser),
 bad-data run 12 blocked at landing on the `stock_picking` unique gate, recovery, undeploy audit, secret scans clean.
 No model call, no credential on the host. Final versions incl. Superset: `dependency-versions-final.txt`.
+
+Release show host (`docs/evidence/demo-show/e7950852c81215f8a4c418f8b46f285832ad7564/20261023T090619Z-artifact`): built from `e795085` with `--demo artifact --show` - lock
+applied (`deps-lock-check.json`: every locked venv at the accepted versions), the accepted draft imported (2 files =
+trace hashes) and validated on the host, **stopped before approval**, no credential. Container
+`dpagent-demo-show-artifact-3474357`. The earlier show host `dpagent-demo-show-artifact-2981311` (`9c1e17d`, no
+lock) was removed when this one was ready; its evidence is kept.

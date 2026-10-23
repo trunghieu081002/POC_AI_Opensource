@@ -12,7 +12,7 @@ dashboard serves the result, bad source data is stopped, and the run recovers. G
 | Full flow on that draft | the platform installed and tested; deploy refused before approval; deploy/run = expected; daily schedule; dashboard + read-only viewer (API and browser); bad data stopped at landing on the right gate with the report unchanged; recovery; undeploy audit; no secret in evidence | same |
 | Asking instead of guessing | ambiguous BRD: the model asked 3 of 3 times; an unsupported source (MongoDB): refused, naming what exists | `docs/evidence/a3-llm/real/fulfil-asks-20261023T060806Z-ac6c63` |
 | Rebuild without a model | the accepted draft imported on a new host (files = the trace's hashes), environments at the locked versions, full flow again | `docs/evidence/demo/941f9afb5964410b4de2ba861ba3a421f8c9ccee/20261023T070034Z-artifact` |
-| Show host | the same import on a new host, stopped before approval | `docs/evidence/demo-show/__SHOW_RUN__` |
+| Show host | the same import on a new host, stopped before approval | `docs/evidence/demo-show/e7950852c81215f8a4c418f8b46f285832ad7564/20261023T090619Z-artifact` |
 | Model requests | 7 of the 14 granted (probe 1, draft 2, asks 4), all answered; 18 over the whole history | `request-ledger.json` in the runs |
 
 ## Changes since the previous state of `main`

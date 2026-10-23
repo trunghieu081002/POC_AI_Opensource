@@ -24,9 +24,9 @@ What a person still does, by design:
 
 | | |
 |---|---|
-| Source | the tagged commit; evidence for it below. Release notes: [release-notes-v0.4.0-demo-rc1.md](release-notes-v0.4.0-demo-rc1.md) |
+| Source | the tagged commit. The show host was built from `e795085`; the tag adds only its evidence and docs. Release notes: [release-notes-v0.4.0-demo-rc1.md](release-notes-v0.4.0-demo-rc1.md) |
 | AI draft | made once, in the accepted run `docs/evidence/demo/4fce834…/20261023T052117Z-ai`: `gemini/gemini-3.8-flash`, `llm-after-1-revision(s)`, trace sha256 `2cbfa2905235ee0f2f7af91fea2fff25f800fca54cb679d0a1128ba28e1b1bd8` |
-| Show host | `__SHOW_HOST__` on `ol8-19.localdomain` (section 5) |
+| Show host | `dpagent-demo-show-artifact-3474357` on `ol8-19.localdomain` (section 5) |
 
 ## Scope
 
@@ -174,7 +174,7 @@ Hosts on `ol8-19.localdomain` (Docker containers):
 
 | Host | State | Use |
 |---|---|---|
-| `__SHOW_HOST__` | built from the release commit with `--demo artifact --show`: stack installed, venvs at the locked versions, the **accepted AI draft** imported and validated on this host, **nothing approved**, no model credential | the demo |
+| `dpagent-demo-show-artifact-3474357` | built from the release commit with `--demo artifact --show`: stack installed, venvs at the locked versions, the **accepted AI draft** imported and validated on this host, **nothing approved**, no model credential | the demo |
 | `dpagent-demo-backup-reference` | older build (`3b1ca5f`), the **hand-written reference** draft, nothing approved | backup only if the main host fails; **say so** when you use it |
 
 From a Windows laptop (PowerShell, OpenSSH client). Airflow listens on the container's bridge address; Superset
@@ -182,12 +182,12 @@ listens only inside the container, so start the forwarder once after `bi-deploy`
 
 ```bash
 # on ol8-19
-docker exec -d __SHOW_HOST__ /opt/dpagent/.venv/bin/python /opt/dpagent/examples/demo/port_forward.py 0.0.0.0:18088 127.0.0.1:8088
-docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' __SHOW_HOST__     # -> __SHOW_IP__
+docker exec -d dpagent-demo-show-artifact-3474357 /opt/dpagent/.venv/bin/python /opt/dpagent/examples/demo/port_forward.py 0.0.0.0:18088 127.0.0.1:8088
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' dpagent-demo-show-artifact-3474357     # -> 172.17.0.5 (re-check after a container restart)
 ```
 ```powershell
 # on Windows: keep this window open
-ssh -N -L 8088:__SHOW_IP__:18088 -L 8090:__SHOW_IP__:8090 oracle@ol8-19.localdomain
+ssh -N -L 8088:172.17.0.5:18088 -L 8090:172.17.0.5:8090 oracle@ol8-19.localdomain
 ```
 
 Then open `http://localhost:8088` (Superset: `fulfil.viewer` / `FS_VIEWER_PASSWORD`, or `admin` /
@@ -195,7 +195,7 @@ Then open `http://localhost:8088` (Superset: `fulfil.viewer` / `FS_VIEWER_PASSWO
 passwords on the host (section 2); they are not written anywhere else.
 
 ```bash
-docker exec -it __SHOW_HOST__ bash
+docker exec -it dpagent-demo-show-artifact-3474357 bash
 cd /opt/dpagent && set -a && . /root/demo-dev.env && set +a
 D="bash examples/demo/demo.sh"
 ```
@@ -212,7 +212,7 @@ D="bash examples/demo/demo.sh"
 | 14-15 | Questions | | |
 
 After the show **leave it running** - the dashboard stays live. Cleanup is a separate decision: `$D undeploy`
-(dashboard, viewer, DAG, secrets), then `docker rm -f __SHOW_HOST__` when the host is no longer needed. To show again
+(dashboard, viewer, DAG, secrets), then `docker rm -f dpagent-demo-show-artifact-3474357` when the host is no longer needed. To show again
 from the pre-approval point without rebuilding: `$D undeploy`, `$D source`, then from `validate`.
 
 The approvals are done by a **real person** who has read the draft and the evidence; no approval is copied from
