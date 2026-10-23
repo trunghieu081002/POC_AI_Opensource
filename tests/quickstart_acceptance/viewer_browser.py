@@ -6,6 +6,7 @@ Own dashboard: the table renders the expected rows (and the chart-data response 
 gives the filtered rows, and there is no "Edit dashboard" control. Other project's dashboard: no table renders and
 no chart-data request succeeds."""
 import json
+import os
 import re
 import time
 import traceback
@@ -18,7 +19,7 @@ from playwright.sync_api import sync_playwright
 OUT = Path("/output"); OUT.mkdir(exist_ok=True)
 AUTH = json.loads(Path("/run/viewer-auth.json").read_text())
 T = json.loads(Path("/run/viewer-targets.json").read_text(), parse_float=Decimal)
-BASE = "http://127.0.0.1:8088"
+BASE = os.environ.get("VIEWER_BASE", "http://127.0.0.1:8088")
 
 
 def canon(rows):
