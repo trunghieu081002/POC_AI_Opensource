@@ -1,0 +1,5 @@
+kpis:
+- {name: eligible_orders, label: Eligible orders, meaning: "orders counted for the SLA", expression: "SUM(eligible_orders)"}
+- {name: delivered_orders, label: Delivered orders, meaning: "eligible orders delivered", expression: "SUM(delivered_orders)"}
+- {name: on_time_orders, label: On-time orders, meaning: "delivered on or before the commitment date", expression: "SUM(on_time_orders)"}
+- {name: on_time_rate, label: On-time rate (%), meaning: "the month's on-time rate; only meaningful per month", expression: "MAX(on_time_rate)"}

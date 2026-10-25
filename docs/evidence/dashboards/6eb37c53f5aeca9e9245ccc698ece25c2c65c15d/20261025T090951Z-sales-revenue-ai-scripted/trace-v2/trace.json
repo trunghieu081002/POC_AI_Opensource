@@ -1,0 +1,74 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "index": 1,
+      "outcome": "rendered",
+      "problems": [],
+      "source": "llm",
+      "spec": {
+        "charts": [
+          {
+            "groupby": [
+              "month"
+            ],
+            "metrics": [
+              "orders",
+              "revenue"
+            ],
+            "name": "revenue_by_month",
+            "title": "Completed orders and revenue by month",
+            "type": "table"
+          }
+        ],
+        "dataset": {
+          "schema": "quickstart_sales",
+          "table": "fct_monthly_revenue"
+        },
+        "filters": [
+          {
+            "column": "month",
+            "label": "Month",
+            "name": "month",
+            "type": "select"
+          }
+        ],
+        "mapping": "- per month: orders, revenue -> revenue_by_month\n- month selector -> month",
+        "title": "Monthly revenue (v2)"
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 2
+  },
+  "calls": [
+    {
+      "at": "2026-10-25T09:42:16+00:00",
+      "cost": "unknown",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "kind": "ok",
+      "model": "scripted/hand-written-spec",
+      "response_sha256": "sha256:f9224300dbc2d295e680b4c503068b504221b35c78b15e51eadd283cdd7256ff",
+      "system_sha256": "sha256:62ba261b80b4f2840567d25e3ddbd161c25d6b7281aa43c525cf4205a526174e",
+      "transient": false,
+      "usage": {},
+      "usage_status": "unknown",
+      "user_sha256": "sha256:f1575fc93ad71aaa3b8f01aca20d6a70112d30174e8dcf3eb595a5456cb7757c"
+    }
+  ],
+  "classification": "llm-first-draft",
+  "inputs": {
+    "kpis": "sha256:829ff73e3cd7628c808a8b5483d0759b8ef5bd611a32775bbcf00183b4d6481d",
+    "request": "sha256:4ed62f52c402d97504e67e989aa62e7fe031f7c1161f195013668a7c26c824a0",
+    "required": "sha256:568a9a71a884dbb2ba3ed84879bccd20ecef8b4d264aa26835df767d82af75fb",
+    "schema": "sha256:1aed989cc3411f5e1ffa191f5aad82f2652b9ddc07fd6ad37dd15e420224bbed",
+    "system_prompt": "sha256:8c1d54c74fc4034e8003b31c7b756cf9304ae5c544b6c78314edfaab194e992f"
+  },
+  "kind": "dashboard",
+  "model": "scripted/hand-written-spec",
+  "project": "sales-revenue-ai"
+}

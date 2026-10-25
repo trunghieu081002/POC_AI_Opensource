@@ -1,0 +1,10 @@
+database_name: Warehouse (fulfil-sla-ai)
+sqlalchemy_uri: postgresql://
+uuid: 61b288b8-0692-5a69-bd09-88ddbbbf9a78
+version: 1.0.0
+expose_in_sqllab: true
+allow_dml: false
+allow_ctas: false
+allow_cvas: false
+allow_file_upload: false
+extra: {}

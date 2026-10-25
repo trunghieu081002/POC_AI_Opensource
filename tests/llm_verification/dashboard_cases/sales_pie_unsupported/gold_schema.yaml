@@ -1,0 +1,9 @@
+# Verified by a person against the warehouse built by pipelines/quickstart_sales (docs/quickstart.md).
+tables:
+- schema: quickstart_sales
+  table: fct_monthly_revenue
+  grain: one row per month
+  columns:
+  - {name: month, type: text, meaning: "order month, YYYY-MM"}
+  - {name: orders, type: bigint, meaning: "completed (done) orders in the month"}
+  - {name: revenue, type: numeric, meaning: "sum of the completed orders' amounts in the month"}

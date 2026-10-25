@@ -1,0 +1,4 @@
+FAILED - harness, not the product: the host's own acceptance passed; `dpagent dashboard synth` (scripted reply)
+passed (01-synth rc=0, bundle rendered); then the harness's uuids() ran the SYSTEM python3, which has no PyYAML
+("ModuleNotFoundError: No module named 'yaml'"). Fixed: the dpagent venv's python; also the validation status check
+expected "passed" where the pack writes "pass" (found by reading the pack before the rerun). Nothing was deployed.

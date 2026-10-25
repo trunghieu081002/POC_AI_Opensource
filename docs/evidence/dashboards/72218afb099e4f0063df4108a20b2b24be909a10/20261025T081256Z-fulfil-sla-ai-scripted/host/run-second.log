@@ -1,0 +1,13 @@
+== 10-bad-data: bash examples/demo/demo.sh bad-data
+10-bad-data rc=0
+check bad-data-blocked (run 12: failed; landing failed on exactly the stock_picking unique gate; no later stage ran; report table same relation, same rows) ok
+== 11-fix-data: bash examples/demo/demo.sh fix-data
+11-fix-data rc=0
+check recovery (source fixed, rerun = expected, landing without duplicates) ok
+== 12-status: bash examples/demo/demo.sh status
+12-status rc=0
+check runs-by-type before undeploy: {'scheduled': 1, 'manual': 3} ok
+== 13-undeploy: bash examples/demo/demo.sh undeploy
+13-undeploy rc=0
+check undeploy-audit (dashboard UUIDs, viewer, DAG via Airflow, secrets, dbt models gone; warehouse data kept by design) ok
+PASS

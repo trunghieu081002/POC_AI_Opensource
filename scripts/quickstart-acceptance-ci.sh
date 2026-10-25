@@ -70,6 +70,9 @@ if [ "$DEMO" = artifact ]; then
   PASSENV+=(-e DEMO_ARTIFACT)
   [ -z "${DEMO_ARTIFACT_TRACE_SHA256:-}" ] || PASSENV+=(-e DEMO_ARTIFACT_TRACE_SHA256)
 fi
+# another runner may ask for the [llm] extra on a host whose own acceptance calls no model
+# (scripts/dashboard-acceptance-ci.sh: `dpagent dashboard synth` runs on it afterwards)
+[ -z "${HOST_WITH_LLM:-}" ] || WITH_LLM=1
 # what the acceptance phases use (quickstart, or the demo)
 INSIDE=tests/quickstart_acceptance/inside.sh; ENVFILE=/root/quickstart-dev.env
 OWN=quickstart-sales; OTHER=quickstart-ops; VIEWER=qs.sales.viewer; PWVAR=QS_SALES_VIEWER_PASSWORD
@@ -126,7 +129,7 @@ CID=''
 cleanup() {
   rc=$?; trap - EXIT
   echo "$rc" > "$OUT/exit-code.txt"
-  [ -z "${LEDGER_DIR:-}" ] || ( cd "$ROOT" && PYTHONPATH=src "${PYH:-python3}" -m dpagent.llm.ledger status "$DPAGENT_LLM_LEDGER" ) \
+  [ -z "${LEDGER_DIR:-}" ] || ( cd "$ROOT" && PYTHONPATH=src "${PYH:-python3}" -m dpagent.llm.ledger status "${DPAGENT_LLM_LEDGER:-}" ) \
     > "$OUT/request-ledger.json" 2>&1 || true
   if [ -n "$CID" ]; then
     docker cp "$NAME:/root/quickstart-evidence/." "$OUT/" 2>/dev/null || true
@@ -139,6 +142,8 @@ cleanup() {
   exit "$rc"
 }
 trap cleanup EXIT
+# another runner may mount a request ledger's directory into this host (scripts/dashboard-acceptance-ci.sh --draft ai)
+LEDGER_DIR=${LEDGER_DIR:-${MOUNT_LEDGER_DIR:-}}
 CID=$(docker run -d --name "$NAME" --privileged --cgroupns host --tmpfs /run --tmpfs /run/lock \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$ROOT:/opt/src/dpagent-src:ro" \
   ${LEDGER_DIR:+-v "$LEDGER_DIR:/var/lib/dpagent-ledger:rw"} "$IMAGE")

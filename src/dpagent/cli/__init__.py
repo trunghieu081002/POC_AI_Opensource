@@ -4,7 +4,7 @@ from __future__ import annotations
 import click
 
 from .. import __version__
-from . import authoring, doctor, install, operate, pipeline, report
+from . import authoring, dashboard, doctor, install, operate, pipeline, report
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -45,6 +45,7 @@ main.add_command(authoring.promote_cmd)
 
 # pipelines (Layer 2)
 main.add_command(pipeline.pipeline_group)
+main.add_command(dashboard.dashboard_group)
 
 
 if __name__ == "__main__":

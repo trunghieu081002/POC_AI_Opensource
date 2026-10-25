@@ -1,0 +1,29 @@
+slice_name: On-time delivery by order month
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 101
+  viz_type: table
+  query_mode: aggregate
+  groupby:
+  - month
+  metrics:
+  - eligible_orders
+  - delivered_orders
+  - on_time_orders
+  - on_time_rate
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": ["month"], "metrics": ["eligible_orders", "delivered_orders", "on_time_orders",
+  "on_time_rate"], "filters": [], "time_range": "No filter", "orderby": [], "row_limit":
+  1000, "extras": {"having": "", "where": ""}}], "form_data": {"datasource": "0__table",
+  "slice_id": 101, "viz_type": "table", "query_mode": "aggregate", "groupby": ["month"],
+  "metrics": ["eligible_orders", "delivered_orders", "on_time_orders", "on_time_rate"],
+  "adhoc_filters": [], "row_limit": 1000, "order_desc": false, "show_cell_bars": false},
+  "result_format": "json", "result_type": "full"}'
+uuid: 2dd349a2-7dee-593a-9a1b-862019ddd172
+dataset_uuid: e7f28908-f034-5494-8253-e26f13b3f180
+version: 1.0.0

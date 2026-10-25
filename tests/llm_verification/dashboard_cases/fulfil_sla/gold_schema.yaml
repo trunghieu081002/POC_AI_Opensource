@@ -1,0 +1,11 @@
+# Verified by a person against the warehouse built by pipelines fulfilment_sla (docs/demo.md).
+tables:
+- schema: fulfilment_sla
+  table: fct_delivery_sla
+  grain: one row per order month
+  columns:
+  - {name: month, type: text, meaning: "order month, YYYY-MM"}
+  - {name: eligible_orders, type: bigint, meaning: "confirmed orders with a commitment date in that month"}
+  - {name: delivered_orders, type: bigint, meaning: "eligible orders with a done outgoing transfer"}
+  - {name: on_time_orders, type: bigint, meaning: "delivered orders whose delivery was on or before the commitment date"}
+  - {name: on_time_rate, type: numeric, meaning: "on_time_orders / delivered_orders * 100, one decimal, per month"}

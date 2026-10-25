@@ -1,0 +1,5 @@
+{
+  "status": "fail",
+  "user": "dash.viewer",
+  "error": "Traceback (most recent call last):\n  File \"/viewer_browser.py\", line 99, in <module>\n    report[\"own_unfiltered\"] = wait_rows(page, own[\"rows\"], responses, 0)\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/viewer_browser.py\", line 52, in wait_rows\n    raise AssertionError(f\"rendered/API rows did not match expected; last={last}\")\nAssertionError: rendered/API rows did not match expected; last=[{'month': '2026-01', 'Eligible orders': '3', 'Delivered orders': '2', 'On-time orders': '2', 'On-time rate (%)': '66.7'}, {'month': '2026-02', 'Eligible orders': '3', 'Delivered orders': '3', 'On-time orders': '1', 'On-time rate (%)': '33.3'}]\n"
+}

@@ -1,0 +1,26 @@
+slice_name: Completed orders and revenue by month
+viz_type: table
+params:
+  datasource: 0__table
+  slice_id: 101
+  viz_type: table
+  query_mode: aggregate
+  groupby:
+  - month
+  metrics:
+  - orders
+  - revenue
+  adhoc_filters: []
+  row_limit: 1000
+  order_desc: false
+  show_cell_bars: false
+query_context: '{"datasource": {"id": 0, "type": "table"}, "force": true, "queries":
+  [{"columns": ["month"], "metrics": ["orders", "revenue"], "filters": [], "time_range":
+  "No filter", "orderby": [], "row_limit": 1000, "extras": {"having": "", "where":
+  ""}}], "form_data": {"datasource": "0__table", "slice_id": 101, "viz_type": "table",
+  "query_mode": "aggregate", "groupby": ["month"], "metrics": ["orders", "revenue"],
+  "adhoc_filters": [], "row_limit": 1000, "order_desc": false, "show_cell_bars": false},
+  "result_format": "json", "result_type": "full"}'
+uuid: 5b941c10-94c1-556b-ae79-dcbd13199c67
+dataset_uuid: 749bafee-d6da-59b6-8c8e-82dc18625d5e
+version: 1.0.0

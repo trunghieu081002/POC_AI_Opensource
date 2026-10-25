@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/opt/dpagent/tests/dashboard_acceptance/scripted_synth.py", line 12, in <module>
+    import litellm
+ModuleNotFoundError: No module named 'litellm'

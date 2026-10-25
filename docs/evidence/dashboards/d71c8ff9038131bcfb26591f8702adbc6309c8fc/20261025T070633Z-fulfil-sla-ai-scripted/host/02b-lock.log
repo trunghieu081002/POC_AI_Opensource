@@ -1,0 +1,52 @@
+No broken requirements found.
+No broken requirements found.
+No broken requirements found.
+{
+ "airflow": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dbt": {
+  "applied": {
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "dbt-protos": [
+    "1.0.615",
+    "1.0.607"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dlt": {
+  "applied": {
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dpagent": {
+  "applied": {
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "jiter": [
+    "0.18.0",
+    "0.17.0"
+   ],
+   "litellm": [
+    "1.106.3",
+    "1.106.2"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "superset": "not installed"
+}

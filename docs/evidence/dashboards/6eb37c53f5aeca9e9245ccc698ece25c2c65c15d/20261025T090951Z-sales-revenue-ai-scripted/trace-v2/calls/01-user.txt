@@ -1,0 +1,37 @@
+# Report request
+# Monthly revenue dashboard
+
+For the sales manager. For each month: the number of completed orders and the revenue. A month selector at the top.
+
+# Verified gold schema (the only tables and columns that exist)
+tables:
+- schema: quickstart_sales
+  table: fct_monthly_revenue
+  grain: one row per month
+  columns:
+  - name: month
+    type: text
+    meaning: order month, YYYY-MM
+  - name: orders
+    type: bigint
+    meaning: completed (done) orders in the month
+  - name: revenue
+    type: numeric
+    meaning: sum of the completed orders' amounts in the month
+
+# KPI definitions (the only metrics a dashboard may show; use their `name`)
+kpis:
+- name: orders
+  label: Completed orders
+  meaning: completed orders
+- name: revenue
+  label: Revenue
+  meaning: revenue of completed orders
+
+# What DPAgent can render
+chart_types:
+  table: 'a table: one row per combination of its `groupby` columns, one column per
+    metric'
+filter_types:
+  select: a dropdown of the values of one column of the dashboard's dataset; it applies
+    to every chart of that dataset

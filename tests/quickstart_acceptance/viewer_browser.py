@@ -18,6 +18,8 @@ from playwright.sync_api import sync_playwright
 OUT = Path("/output"); OUT.mkdir(exist_ok=True)
 AUTH = json.loads(Path("/run/viewer-auth.json").read_text())
 T = json.loads(Path("/run/viewer-targets.json").read_text(), parse_float=Decimal)
+# a column shown under a label (a metric's verbose_name) is compared under its metric name
+LABELS = T["own"].get("labels", {})
 BASE = "http://127.0.0.1:8088"
 
 
@@ -31,7 +33,7 @@ def canon(rows):
 
 
 def rendered(page):
-    headers = [h.strip() for h in page.locator("table").first.locator("th").all_text_contents()]
+    headers = [LABELS.get(h.strip(), h.strip()) for h in page.locator("table").first.locator("th").all_text_contents()]
     cells = page.locator("table").last.locator("tbody tr").evaluate_all(
         "(rows)=>rows.map(r=>Array.from(r.querySelectorAll('td')).map(c=>c.innerText.trim()))")
     return [dict(zip(headers, c)) for c in cells if len(c) == len(headers)], headers

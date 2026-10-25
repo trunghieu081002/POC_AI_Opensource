@@ -1,0 +1,17 @@
+# Hand-calculated from pipelines/quickstart_sales/fixture.yaml (as projects/quickstart-sales/expected.yaml): January
+# 120.00 + 80.50 = 200.50 over 2 orders, February 40.25 + 59.75 = 100.00 over 2 orders. Never computed from a chart.
+checks:
+- groupby: [month]
+  metrics: [orders, revenue]
+  sql: SELECT month, SUM(orders)::bigint AS orders, SUM(revenue)::numeric(20,2) AS revenue
+    FROM quickstart_sales.fct_monthly_revenue GROUP BY month
+  rows:
+  - {month: 2026-01, orders: 2, revenue: 200.5}
+  - {month: 2026-02, orders: 2, revenue: 100.0}
+  filters:
+  - column: month
+    values: [2026-01]
+    sql: SELECT month, SUM(orders)::bigint AS orders, SUM(revenue)::numeric(20,2) AS revenue
+      FROM quickstart_sales.fct_monthly_revenue WHERE month = '2026-01' GROUP BY month
+    rows:
+    - {month: 2026-01, orders: 2, revenue: 200.5}
