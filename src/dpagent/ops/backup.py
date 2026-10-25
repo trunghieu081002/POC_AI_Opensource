@@ -202,11 +202,20 @@ def restore(archive: Path, *, passphrase_env: str = "") -> dict:
         # password hash to the backed-up ones
         subprocess.run(["runuser", "-u", "postgres", "--", "psql", "-X", "-q", "-f", str(db_dir / "globals.sql")],
                        capture_output=True, cwd="/")
+        schemas = manifest.get("schemas")
         for db in manifest["databases"]:
             _pg(["psql", "-X", "-q", "-c", f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' "
                                             f"AND pid <> pg_backend_pid()"])
-            _pg(["psql", "-X", "-q", "-c", f'DROP DATABASE IF EXISTS "{db}"'])
-            _pg(["pg_restore", "--create", "--exit-on-error", "-d", "postgres", str(db_dir / f"{db}.dump")])
+            if db == manifest.get("warehouse") and isinstance(schemas, list):
+                # only these schemas were backed up: replace exactly them, never the rest of the warehouse
+                if db not in _databases_present():
+                    raise BackupError(f"database {db} does not exist here - a schema-only backup restores into it")
+                for sch in schemas:
+                    _pg(["psql", "-X", "-q", "-d", db, "-c", f'DROP SCHEMA IF EXISTS "{sch}" CASCADE'])
+                _pg(["pg_restore", "--exit-on-error", "-d", db, str(db_dir / f"{db}.dump")])
+            else:
+                _pg(["psql", "-X", "-q", "-c", f'DROP DATABASE IF EXISTS "{db}"'])
+                _pg(["pg_restore", "--create", "--exit-on-error", "-d", "postgres", str(db_dir / f"{db}.dump")])
         timings["databases_s"] = round(time.monotonic() - t, 1)
         t = time.monotonic()
         files = into / "files"
