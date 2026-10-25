@@ -1,0 +1,4 @@
+FAILED - harness, not the product: the host's own acceptance (--demo artifact) passed (host/steps.log: PASS), then
+step 01-synth of tests/dashboard_acceptance/inside.sh exited 1 with "ModuleNotFoundError: No module named 'litellm'":
+an artifact host is bootstrapped without the [llm] extra, and the scripted driver (and `dpagent dashboard synth`)
+needs litellm. Fix: scripts/dashboard-acceptance-ci.sh builds its host with HOST_WITH_LLM=1. Nothing was deployed.

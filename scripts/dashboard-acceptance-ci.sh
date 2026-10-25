@@ -53,7 +53,7 @@ args=(--keep); [ "$FLAVOR" = demo ] && args+=(--demo artifact)
 # (the ledger's directory is mounted into the host for an ai draft; nothing is sent while the host is built)
 MOUNT=""; [ "$DRAFT" = ai ] && MOUNT=$(dirname "$DPAGENT_LLM_LEDGER")
 env -u GEMINI_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u DPAGENT_MODEL -u DPAGENT_LLM_LEDGER \
-  MOUNT_LEDGER_DIR="$MOUNT" QUICKSTART_RESULTS_DIR="$HOSTEV" \
+  MOUNT_LEDGER_DIR="$MOUNT" HOST_WITH_LLM=1 QUICKSTART_RESULTS_DIR="$HOSTEV" \
   bash "$ROOT/scripts/quickstart-acceptance-ci.sh" "${args[@]}" > "$OUT/host-build.log" 2>&1 \
   || { tail -30 "$OUT/host-build.log"; echo "the host's own acceptance failed - see host/" >&2; exit 3; }
 NAME=$(sed -n 's/^kept \([^ ]*\) .*/\1/p' "$HOSTEV/container-kept.txt")

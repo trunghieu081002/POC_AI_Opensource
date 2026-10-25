@@ -1,0 +1,6 @@
+== 01-synth: /opt/dpagent/.venv/bin/python tests/dashboard_acceptance/scripted_synth.py tests/dashboard_acceptance/scripted/fulfil_sla.json -- dashboard synth fulfil-sla-ai --request tests/llm_verification/dashboard_cases/fulfil_sla/request.md --schema tests/llm_verification/dashboard_cases/fulfil_sla/gold_schema.yaml --kpis tests/llm_verification/dashboard_cases/fulfil_sla/kpis.yaml --expected tests/llm_verification/dashboard_cases/fulfil_sla/expected.yaml --trace-dir /root/dashboard-evidence/fulfil-sla-ai/trace-v1 --overwrite --max-calls 4 --max-revisions 2 --transient-retries 0
+01-synth rc=1
+Traceback (most recent call last):
+  File "/opt/dpagent/tests/dashboard_acceptance/scripted_synth.py", line 12, in <module>
+    import litellm
+ModuleNotFoundError: No module named 'litellm'

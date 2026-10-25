@@ -70,6 +70,9 @@ if [ "$DEMO" = artifact ]; then
   PASSENV+=(-e DEMO_ARTIFACT)
   [ -z "${DEMO_ARTIFACT_TRACE_SHA256:-}" ] || PASSENV+=(-e DEMO_ARTIFACT_TRACE_SHA256)
 fi
+# another runner may ask for the [llm] extra on a host whose own acceptance calls no model
+# (scripts/dashboard-acceptance-ci.sh: `dpagent dashboard synth` runs on it afterwards)
+[ -z "${HOST_WITH_LLM:-}" ] || WITH_LLM=1
 # what the acceptance phases use (quickstart, or the demo)
 INSIDE=tests/quickstart_acceptance/inside.sh; ENVFILE=/root/quickstart-dev.env
 OWN=quickstart-sales; OTHER=quickstart-ops; VIEWER=qs.sales.viewer; PWVAR=QS_SALES_VIEWER_PASSWORD
