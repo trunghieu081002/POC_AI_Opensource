@@ -1,0 +1,26 @@
+== 01-synth: /opt/dpagent/.venv/bin/python tests/dashboard_acceptance/scripted_synth.py tests/dashboard_acceptance/scripted/fulfil_sla.json -- dashboard synth fulfil-sla-ai --request tests/llm_verification/dashboard_cases/fulfil_sla/request.md --schema tests/llm_verification/dashboard_cases/fulfil_sla/gold_schema.yaml --kpis tests/llm_verification/dashboard_cases/fulfil_sla/kpis.yaml --expected tests/llm_verification/dashboard_cases/fulfil_sla/expected.yaml --trace-dir /root/dashboard-evidence/fulfil-sla-ai/trace-v1 --overwrite --max-calls 4 --max-revisions 2 --transient-retries 0
+01-synth rc=0
+== 02-validate: bi validate
+02-validate rc=0
+check validated-on-clones (chart and filter = the reviewer's independent SQL and rows) ok
+03a-deploy-unreviewed rc=3 (want non-zero)
+check unreviewed-fingerprint-refused (nothing in Superset) ok
+== 03-deploy: bi deploy e3cc58a2196f9b16acfdf5f61e3855133ad4027fc05a55d1e1488a17415422f3
+03-deploy rc=0
+check viewer-api (as dash.viewer: chart and filter = expected, every write refused) ok
+PHASE before-browser PASS
+== 04-redeploy: bi deploy e3cc58a2196f9b16acfdf5f61e3855133ad4027fc05a55d1e1488a17415422f3
+04-redeploy rc=0
+check redeploy (same objects, same IDs, no duplicates) ok
+== 05-synth-v2: /opt/dpagent/.venv/bin/python tests/dashboard_acceptance/scripted_synth.py tests/dashboard_acceptance/scripted/fulfil_sla-v2.json -- dashboard synth fulfil-sla-ai --request tests/llm_verification/dashboard_cases/fulfil_sla/request.md --schema tests/llm_verification/dashboard_cases/fulfil_sla/gold_schema.yaml --kpis tests/llm_verification/dashboard_cases/fulfil_sla/kpis.yaml --expected tests/llm_verification/dashboard_cases/fulfil_sla/expected.yaml --trace-dir /root/dashboard-evidence/fulfil-sla-ai/trace-v2 --overwrite
+05-synth-v2 rc=0
+== 06-validate-v2: bi validate
+06-validate-v2 rc=0
+07a-deploy-stale rc=3 (want non-zero)
+== 07-deploy-v2: bi deploy bfbf6f5463e49d655c9057e32125725d7bf5c64ae490b8558f49b8cf33401fdc
+07-deploy-v2 rc=0
+check update (stale fingerprint refused; same UUIDs and IDs; title 'Delivery SLA by month (v2)'; viewer = expected) ok
+== 08-undeploy: bi undeploy
+08-undeploy rc=0
+check undeploy (this project's objects and viewer gone; every other Superset object unchanged) ok
+PASS

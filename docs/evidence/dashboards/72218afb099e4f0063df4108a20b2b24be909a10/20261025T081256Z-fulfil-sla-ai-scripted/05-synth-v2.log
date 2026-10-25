@@ -1,0 +1,4 @@
+attempt 1 (llm): rendered
+requests sent: 1 (ceiling 4; provider busy/timeout: 0; token usage reported for 0, unknown for the rest; cost unknown)
+classification: llm-first-draft   trace: /root/dashboard-evidence/fulfil-sla-ai/trace-v2/trace.json
+rendered projects/fulfil-sla-ai/bundle (+ expected.yaml: yes) - next: validate it with the superset-assets pack (mode: validate); a person approves the fingerprint
