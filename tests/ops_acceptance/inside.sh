@@ -73,17 +73,19 @@ PY
     step s6-fix-data $D fix-data
     "$PY" examples/demo/check_fulfil.py "$EX" > "$OUT/s-check-recovered.json"
     ok "alerts (bad data: failed run + the stock_picking gate, notified once) and recovery = expected"
-    # ---- least privilege
+    # ---- least privilege (each refusal is the FIRST line of psql's answer; a refusal exits non-zero: not fatal here)
+    set +e
     {
       stat -c '%n %U %a' /opt/airflow/home/pipelines.env /root/demo-dev.env /var/lib/dpagent/evidence.key /opt/superset/superset.env
       export PGPASSWORD="$SUPERSET_WAREHOUSE_PASSWORD"
-      psql -X -h localhost -U superset_reader -d warehouse -c "CREATE TABLE fulfilment_sla.x (i int)" 2>&1 | tail -1
-      psql -X -h localhost -U superset_reader -d warehouse -c "DELETE FROM fulfilment_sla.fct_delivery_sla" 2>&1 | tail -1
+      psql -X -h localhost -U superset_reader -d warehouse -c "CREATE TABLE fulfilment_sla.x (i int)" 2>&1 | head -1
+      psql -X -h localhost -U superset_reader -d warehouse -c "DELETE FROM fulfilment_sla.fct_delivery_sla" 2>&1 | head -1
       export PGPASSWORD="$WAREHOUSE_DB_PASSWORD"
-      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d airflow_meta -c "SELECT 1" 2>&1 | tail -1
-      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d superset_meta -c "SELECT 1" 2>&1 | tail -1
+      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d airflow_meta -c "SELECT 1" 2>&1 | head -1
+      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d superset_meta -c "SELECT 1" 2>&1 | head -1
       unset PGPASSWORD
     } > "$OUT/s-privileges.txt" 2>&1
+    set -e
     "$PY" - "$OUT/s-privileges.txt" > "$OUT/s-privileges.json" <<'PY'
 import json, sys
 t = open(sys.argv[1]).read().splitlines()

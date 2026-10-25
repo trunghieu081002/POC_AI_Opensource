@@ -1,0 +1,5 @@
+/opt/airflow/home/pipelines.env airflow 600
+/root/demo-dev.env root 600
+/var/lib/dpagent/evidence.key root 600
+/opt/superset/superset.env superset 600
+                     ^
