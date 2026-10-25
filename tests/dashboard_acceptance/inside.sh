@@ -31,7 +31,7 @@ step() { local label="$1"; shift; echo "== $label: $*" | tee -a "$OUT/steps.log"
 ok() { echo "check $1 ok" | tee -a "$OUT/steps.log"; }
 meta() { runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d superset_meta -c "$1"; }
 fp() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["fingerprint"])' "/var/lib/dpagent-bi-assets/$PROJECT/validation.json"; }
-uuids() { python3 - "$PROJECT" <<'PY'
+uuids() { "$PY" - "$PROJECT" <<'PY'
 import sys, yaml
 from pathlib import Path
 b = Path("projects") / sys.argv[1] / "bundle"
@@ -87,7 +87,7 @@ PY
   others > "$OUT/others-before.txt"
   step 02-validate bi validate
   fp > "$OUT/fingerprint-v1.txt"
-  python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["status"]=="passed", r["status"]' \
+  python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["status"]=="pass" and r["cleanup"]=="pass", (r["status"], r["cleanup"])' \
     "/var/lib/dpagent-bi-assets/$PROJECT/validation.json"
   ok "validated-on-clones (chart and filter = the reviewer's independent SQL and rows)"
   [ -z "$(owned)" ] || { echo "validation left live objects" >&2; exit 1; }
@@ -137,7 +137,7 @@ echo "07a-deploy-stale rc=$rc (want non-zero)" | tee -a "$OUT/steps.log"; [ "$rc
 step 07-deploy-v2 bi deploy "$(cat "$OUT/fingerprint-v2.txt")"
 owned > "$OUT/owned-v2.txt"
 diff "$OUT/owned-v1.txt" "$OUT/owned-v2.txt" || { echo "the update created new objects instead of updating" >&2; exit 1; }
-dash_uuid=$(python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["uuid"])' "projects/$PROJECT/bundle/dashboards/overview.yaml")
+dash_uuid=$("$PY" -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["uuid"])' "projects/$PROJECT/bundle/dashboards/overview.yaml")
 title=$(meta "SELECT dashboard_title FROM dashboards WHERE uuid::text = '$dash_uuid'")
 case "$title" in *"(v2)") ;; *) echo "title not updated: $title" >&2; exit 1 ;; esac
 "$SPY" tests/quickstart_acceptance/check_viewer.py dash.viewer DASH_VIEWER_PASSWORD "$PROJECT" - > "$OUT/check-viewer-api-v2.json" \
