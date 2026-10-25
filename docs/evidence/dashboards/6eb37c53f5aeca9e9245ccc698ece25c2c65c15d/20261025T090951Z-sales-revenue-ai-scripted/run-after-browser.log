@@ -1,0 +1,15 @@
+== 04-redeploy: bi deploy dac061e86a7ef9ff63aa0c278573060364a929c70234b36ebfaed76949a64815
+04-redeploy rc=0
+check redeploy (same objects, same IDs, no duplicates) ok
+== 05-synth-v2: /opt/dpagent/.venv/bin/python tests/dashboard_acceptance/scripted_synth.py tests/dashboard_acceptance/scripted/sales_revenue-v2.json -- dashboard synth sales-revenue-ai --request tests/llm_verification/dashboard_cases/sales_revenue/request.md --schema tests/llm_verification/dashboard_cases/sales_revenue/gold_schema.yaml --kpis tests/llm_verification/dashboard_cases/sales_revenue/kpis.yaml --expected tests/llm_verification/dashboard_cases/sales_revenue/expected.yaml --trace-dir /root/dashboard-evidence/sales-revenue-ai/trace-v2 --overwrite
+05-synth-v2 rc=0
+== 06-validate-v2: bi validate
+06-validate-v2 rc=0
+07a-deploy-stale rc=3 (want non-zero)
+== 07-deploy-v2: bi deploy e4e6cf1a0ef94178da5ec1c6e6cc08cde6eb25f0e8bdd7a3d20565f18297d4c2
+07-deploy-v2 rc=0
+check update (stale fingerprint refused; same UUIDs and IDs; title 'Monthly revenue (v2)'; viewer = expected) ok
+== 08-undeploy: bi undeploy
+08-undeploy rc=0
+check undeploy (this project's objects and viewer gone; every other Superset object unchanged) ok
+PASS

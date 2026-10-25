@@ -1,0 +1,11 @@
+== 01-synth: /opt/dpagent/.venv/bin/python tests/dashboard_acceptance/scripted_synth.py tests/dashboard_acceptance/scripted/sales_revenue.json -- dashboard synth sales-revenue-ai --request tests/llm_verification/dashboard_cases/sales_revenue/request.md --schema tests/llm_verification/dashboard_cases/sales_revenue/gold_schema.yaml --kpis tests/llm_verification/dashboard_cases/sales_revenue/kpis.yaml --expected tests/llm_verification/dashboard_cases/sales_revenue/expected.yaml --trace-dir /root/dashboard-evidence/sales-revenue-ai/trace-v1 --overwrite --max-calls 4 --max-revisions 2 --transient-retries 0
+01-synth rc=0
+== 02-validate: bi validate
+02-validate rc=0
+check validated-on-clones (chart and filter = the reviewer's independent SQL and rows) ok
+03a-deploy-unreviewed rc=3 (want non-zero)
+check unreviewed-fingerprint-refused (nothing in Superset) ok
+== 03-deploy: bi deploy dac061e86a7ef9ff63aa0c278573060364a929c70234b36ebfaed76949a64815
+03-deploy rc=0
+check viewer-api (as dash.viewer: chart and filter = expected, every write refused) ok
+PHASE before-browser PASS

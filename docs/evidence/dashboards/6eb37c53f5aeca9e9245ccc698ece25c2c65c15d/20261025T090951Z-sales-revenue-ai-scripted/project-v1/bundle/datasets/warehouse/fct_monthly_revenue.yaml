@@ -1,0 +1,29 @@
+table_name: fct_monthly_revenue
+schema: quickstart_sales
+uuid: 749bafee-d6da-59b6-8c8e-82dc18625d5e
+database_uuid: 65cee171-064d-5049-9cec-11539f0f9d68
+version: 1.0.0
+filter_select_enabled: true
+columns:
+- column_name: month
+  type: TEXT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: orders
+  type: BIGINT
+  groupby: true
+  filterable: true
+  is_dttm: false
+- column_name: revenue
+  type: NUMERIC
+  groupby: true
+  filterable: true
+  is_dttm: false
+metrics:
+- metric_name: orders
+  verbose_name: Completed orders
+  expression: SUM(orders)
+- metric_name: revenue
+  verbose_name: Revenue
+  expression: SUM(revenue)

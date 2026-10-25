@@ -1,0 +1,10 @@
+database_name: Warehouse (sales-revenue-ai)
+sqlalchemy_uri: postgresql://
+uuid: 65cee171-064d-5049-9cec-11539f0f9d68
+version: 1.0.0
+expose_in_sqllab: true
+allow_dml: false
+allow_ctas: false
+allow_cvas: false
+allow_file_upload: false
+extra: {}

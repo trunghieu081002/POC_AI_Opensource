@@ -1,0 +1,19 @@
+== 09-bi-validate-v2: bash examples/quickstart/walkthrough.sh bi-validate
+09-bi-validate-v2 rc=0
+== 10-bi-deploy-v2: bash examples/quickstart/walkthrough.sh bi-deploy
+10-bi-deploy-v2 rc=0
+check after-update ok
+check identities-stable-on-update ok {'dashboards': [12], 'slices': [12], 'tables': [12], 'dbs': [13]}
+check viewer-sales-api-after-update ok
+== 11-rerun: bash examples/quickstart/walkthrough.sh rerun
+11-rerun rc=0
+check after-rerun (no duplicates) ok
+check after-rerun-bi ok
+== 12-status: bash examples/quickstart/walkthrough.sh status
+12-status rc=0
+== 13-undeploy: bash examples/quickstart/walkthrough.sh undeploy
+13-undeploy rc=0
+check after-undeploy-sales ok
+check after-undeploy-ops ok
+check scoped-undeploy ok (DAG, dbt models, secrets, BI assets and viewer accounts gone; source kept; Superset up)
+PASS
