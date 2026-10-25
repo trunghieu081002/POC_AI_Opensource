@@ -89,7 +89,9 @@ did = subprocess.check_output(["runuser", "-u", "postgres", "--", "psql", "-X", 
                                "-c", f"SELECT id FROM dashboards WHERE uuid = '{key}'"], cwd="/", text=True).strip()
 check = yaml.safe_load(Path(f"/opt/dpagent/projects/{own}/expected.yaml").read_text())["checks"][0]
 f = check["filters"][0]
-print(json.dumps({"own": {"url": f"/superset/dashboard/{did}/", "rows": check["rows"],
+labels = {m["verbose_name"]: m["metric_name"] for p in Path(f"/opt/dpagent/projects/{own}/bundle/datasets").rglob("*.yaml")
+          for m in yaml.safe_load(p.read_text()).get("metrics", []) if m.get("verbose_name")}
+print(json.dumps({"own": {"url": f"/superset/dashboard/{did}/", "rows": check["rows"], "labels": labels,
                           "filter_values": [str(v) for v in f["values"]], "filtered_rows": f["rows"]}}, default=str))
 PY
 mkdir -p "$OUT/browser"; set +e

@@ -1,0 +1,76 @@
+{
+  "attempts": [
+    {
+      "blockers": [],
+      "index": 1,
+      "outcome": "rendered",
+      "problems": [],
+      "source": "llm",
+      "spec": {
+        "charts": [
+          {
+            "groupby": [
+              "month"
+            ],
+            "metrics": [
+              "eligible_orders",
+              "delivered_orders",
+              "on_time_orders",
+              "on_time_rate"
+            ],
+            "name": "sla_by_month",
+            "title": "On-time delivery by order month",
+            "type": "table"
+          }
+        ],
+        "dataset": {
+          "schema": "fulfilment_sla",
+          "table": "fct_delivery_sla"
+        },
+        "filters": [
+          {
+            "column": "month",
+            "label": "Month",
+            "name": "month",
+            "type": "select"
+          }
+        ],
+        "mapping": "- per order month: eligible, delivered, on time, rate -> sla_by_month\n- pick months -> month",
+        "title": "Delivery SLA by month"
+      }
+    }
+  ],
+  "budget": {
+    "max_calls": 4,
+    "max_revisions": 2
+  },
+  "calls": [
+    {
+      "at": "2026-10-25T07:32:28+00:00",
+      "cost": "unknown",
+      "duration_s": 0.0,
+      "error": "",
+      "finish_reason": "stop",
+      "index": 1,
+      "kind": "ok",
+      "model": "scripted/hand-written-spec",
+      "response_sha256": "sha256:b1e3d9bf23307dc8879c48471923b672e1867332b7d759822bfdcab97d2f38df",
+      "system_sha256": "sha256:62ba261b80b4f2840567d25e3ddbd161c25d6b7281aa43c525cf4205a526174e",
+      "transient": false,
+      "usage": {},
+      "usage_status": "unknown",
+      "user_sha256": "sha256:1b3a4357dcf65ebf57147a78566c59267ab10079d3d825b076e130d08b852215"
+    }
+  ],
+  "classification": "llm-first-draft",
+  "inputs": {
+    "kpis": "sha256:964b6a21852cd0072a0ccec02dbaed02bdd5dc33b55ca127ae730c4dea54d9cc",
+    "request": "sha256:801ca6a4fc074066dc686a32319dcebc3f44113f4e4c42054122b1beec044279",
+    "required": "sha256:a61f78e12dbd15623abed3f39df5134e538b6aed7b0169f22b60b567e4ebc302",
+    "schema": "sha256:f98765c4359fde24a903e01bbc6578b8b93fdcde8fae748181671d9c3add3ee2",
+    "system_prompt": "sha256:8c1d54c74fc4034e8003b31c7b756cf9304ae5c544b6c78314edfaab194e992f"
+  },
+  "kind": "dashboard",
+  "model": "scripted/hand-written-spec",
+  "project": "fulfil-sla-ai"
+}

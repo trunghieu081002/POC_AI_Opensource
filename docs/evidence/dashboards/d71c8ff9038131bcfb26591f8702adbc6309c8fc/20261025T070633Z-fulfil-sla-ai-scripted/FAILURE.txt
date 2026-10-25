@@ -1,0 +1,6 @@
+FAILED at the browser check (harness): draft, validation on clones, the unreviewed-fingerprint refusal (rc=3, nothing
+deployed), deploy and the viewer API check all PASSED. The browser compared the table's column headers with metric
+names, but DPAgent renders each KPI's label as the metric's verbose_name ("Eligible orders"); the rendered VALUES were
+the expected ones (browser/run.log). Fix: the runner passes the label -> metric map from the rendered dataset and the
+browser check compares under metric names. On this kept host (debugging, not evidence) the fixed browser check and the
+after-browser phase (redeploy, update v2, undeploy) then passed; the clean rerun is the evidence.
