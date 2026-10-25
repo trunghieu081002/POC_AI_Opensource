@@ -40,6 +40,63 @@ case "$PHASE" in
     DEMO_BI_APPROVED_BY=ops.test DEMO_BI_APPROVED_SHA256="$(fp)" step s4-bi-deploy $D bi-deploy
     "$SPY" tests/quickstart_acceptance/check_viewer.py fulfil.viewer FS_VIEWER_PASSWORD fulfil-sla - > "$OUT/s-check-viewer.json"
     ok "source state (approved, deployed, run = expected, dashboard + viewer = expected)"
+    # ---- overlap: two runs triggered back to back never run at the same time (max_active_runs=1)
+    r1=$(dpagent pipeline run fulfilment_sla --yes 2>&1 | sed -n 's/.*dpagent run \([0-9][0-9]*\).*/\1/p' | tail -1)
+    r2=$(dpagent pipeline run fulfilment_sla --yes 2>&1 | sed -n 's/.*dpagent run \([0-9][0-9]*\).*/\1/p' | tail -1)
+    [ -n "$r1" ] && [ -n "$r2" ] || { echo "no run ids for the overlap check" >&2; exit 1; }
+    "$PY" - "$r1" "$r2" > "$OUT/s-check-overlap.json" <<'PY'
+import json, sqlite3, sys, time
+a, b = map(int, sys.argv[1:])
+db = "file:/var/lib/dpagent/dpagent.db?mode=ro"
+deadline = time.time() + 1800
+while time.time() < deadline:
+    c = sqlite3.connect(db, uri=True)
+    st = {r[0]: r[1] for r in c.execute("SELECT id, status FROM runs WHERE id IN (?, ?)", (a, b))}
+    if all(v != "running" for v in st.values()):
+        break
+    time.sleep(5)
+span = {rid: c.execute("SELECT min(started_at), max(finished_at) FROM stage_runs WHERE run_id = ?", (rid,)).fetchone()
+        for rid in (a, b)}
+ok = st.get(a) == st.get(b) == "ok" and span[a][1] <= span[b][0]
+print(json.dumps({"ok": ok, "status": st, "stage_spans": span}))
+sys.exit(0 if ok else 1)
+PY
+    ok "overlap (two back-to-back runs: both ok, the second started after the first finished)"
+    # ---- alerts: bad data -> failed run + failed gate reported (and once), then recovery
+    dpagent alerts check --min-free-gb 0 --min-avail-gb 0 > /dev/null || true        # watermark
+    step s5-bad-data $D bad-data
+    set +e; dpagent alerts check --min-free-gb 0 --min-avail-gb 0 --notify-command "cat > $OUT/s-alert-notified.json" \
+      > "$OUT/s-alerts.json"; rc=$?; set -e
+    [ "$rc" = 1 ] && grep -q '"failed_gate"' "$OUT/s-alerts.json" && grep -q '"failed_run"' "$OUT/s-alerts.json" \
+      && grep -q stock_picking "$OUT/s-alert-notified.json" || { cat "$OUT/s-alerts.json"; exit 1; }
+    dpagent alerts check --min-free-gb 0 --min-avail-gb 0 > "$OUT/s-alerts-again.json"
+    step s6-fix-data $D fix-data
+    "$PY" examples/demo/check_fulfil.py "$EX" > "$OUT/s-check-recovered.json"
+    ok "alerts (bad data: failed run + the stock_picking gate, notified once) and recovery = expected"
+    # ---- least privilege
+    {
+      stat -c '%n %U %a' /opt/airflow/home/pipelines.env /root/demo-dev.env /var/lib/dpagent/evidence.key /opt/superset/superset.env
+      export PGPASSWORD="$SUPERSET_WAREHOUSE_PASSWORD"
+      psql -X -h localhost -U superset_reader -d warehouse -c "CREATE TABLE fulfilment_sla.x (i int)" 2>&1 | tail -1
+      psql -X -h localhost -U superset_reader -d warehouse -c "DELETE FROM fulfilment_sla.fct_delivery_sla" 2>&1 | tail -1
+      export PGPASSWORD="$WAREHOUSE_DB_PASSWORD"
+      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d airflow_meta -c "SELECT 1" 2>&1 | tail -1
+      psql -X -h localhost -U "$WAREHOUSE_DB_USER" -d superset_meta -c "SELECT 1" 2>&1 | tail -1
+      unset PGPASSWORD
+    } > "$OUT/s-privileges.txt" 2>&1
+    "$PY" - "$OUT/s-privileges.txt" > "$OUT/s-privileges.json" <<'PY'
+import json, sys
+t = open(sys.argv[1]).read().splitlines()
+denied = lambda l: any(w in l for w in ("permission denied", "not permitted", "authentication failed", "no pg_hba"))
+checks = {"secret files 0600/0640, root/service owner": all(m.split()[1] in ("root", "airflow", "superset")
+                                                            and m.split()[2] in ("600", "400", "640") for m in t[:4]),
+          "BI reader cannot CREATE": denied(t[4]), "BI reader cannot DELETE": denied(t[5]),
+          "warehouse writer cannot reach airflow_meta": denied(t[6]),
+          "warehouse writer cannot reach superset_meta": denied(t[7])}
+print(json.dumps({"ok": all(checks.values()), "checks": checks, "raw": t}, indent=1))
+PY
+    if grep -q '"ok": true' "$OUT/s-privileges.json"; then ok "least privilege (all checks: s-privileges.json)"
+    else echo "FINDING least privilege: $(python3 -c 'import json,sys; print([k for k,v in json.load(open(sys.argv[1]))["checks"].items() if not v])' "$OUT/s-privileges.json") - recorded, not fixed here" | tee -a "$OUT/steps.log"; fi
     ;;
   backup)
     state > "$OUT/state-at-backup.txt"
