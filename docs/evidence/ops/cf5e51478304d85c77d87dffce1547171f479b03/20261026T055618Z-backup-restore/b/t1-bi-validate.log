@@ -1,0 +1,74 @@
+project: demo-bi
+╭─── plan · ubuntu 22.04 (debian/apt) ────╮
+│  #  pack             steps  why         │
+│  1  base                 3  dependency  │
+│  2  python-modern        1  dependency  │
+│  3  postgres             5  dependency  │
+│  4  superset             6  requested   │
+│  5  superset-assets      1  requested   │
+╰─────────────────────────────────────────╯
+= base — already installed at v1.0.0 - a dependency is not reconfigured with 
+default params (name it in the spec to change it)
+= python-modern — already installed at v1.0.0 - a dependency is not reconfigured
+with default params (name it in the spec to change it)
+= postgres — already installed at v1.0.0 - a dependency is not reconfigured with
+default params (name it in the spec to change it)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ superset v0.1.1  DRAFT                                                       │
+│ Apache Superset in its own virtualenv with PostgreSQL metadata and a         │
+│ read-only warehouse role                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  params: {"version": "6.1.0", "install_dir": "/opt/superset", "bind_host": 
+"127.0.0.1", "webserver_port": 8088, "backend_host": "localhost", 
+"backend_port": 5432, "backend_db": "superset_meta", "backend_user": 
+"superset_meta", "backend_password": "***REDACTED***", "secret_key": 
+"***REDACTED***", "admin_user": "admin", "admin_password": "***REDACTED***", 
+"admin_email": "admin@example.com", "warehouse_host": "localhost", 
+"warehouse_port": 5432, "warehouse_db": "warehouse", "warehouse_role": 
+"superset_reader", "warehouse_password": "***REDACTED***", "warehouse_schemas": 
+["fulfilment_sla"], "warehouse_creator_roles": ["dbt_user"]}
+  preflight ok
+      Superset preflight passed
+  1/6 runtime · Create a dedicated OS user and virtualenv without replacing 
+system Python
+      ok 17826ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 175677ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 49ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      no catalog entry matched this failure
+      $ python3 /opt/dpagent/packs/superset/manage.py reader
+      Traceback (most recent call last):
+        File "/opt/superset/reader.py", line 25, in <module>
+          cur.execute("SELECT 
+has_schema_privilege(%s,%s,'CREATE')",(role,schema))
+      psycopg2.errors.InvalidSchemaName: schema "fulfilment_sla" does not exist
+      Traceback (most recent call last):
+        File "/opt/dpagent/packs/superset/manage.py", line 172, in <module>
+          actions[sys.argv[1]]()
+        File "/opt/dpagent/packs/superset/manage.py", line 97, in reader
+          run(["runuser","-u","postgres","--",VENV/"bin/python",ROOT/"reader.py"
+],input=json.dumps(payload).encode())
+        File "/opt/dpagent/packs/superset/manage.py", line 23, in run
+          return subprocess.run([str(x) for x in args], check=True, cwd="/", 
+**kw)
+        File "/usr/lib/python3.10/subprocess.py", line 526, in run
+          raise CalledProcessError(retcode, process.args,
+      subprocess.CalledProcessError: Command '['runuser', '-u', 'postgres', 
+'--', '/opt/superset/.venv/bin/python', '/opt/superset/reader.py']' returned 
+non-zero exit status 1.
+  superset: no catalog entry matched this failure
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ halted on superset                                                           │
+│ no catalog entry matched this failure                                        │
+│                                                                              │
+│ This failure is not in the catalog yet.                                      │
+│ Run dpagent audit 5 to see the output, then add an entry to                  │
+│ superset/errors.yaml.                                                        │
+│                                                                              │
+│ re-run to resume — completed steps are skipped                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

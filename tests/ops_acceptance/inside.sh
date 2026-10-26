@@ -113,6 +113,10 @@ PY
     state > "$OUT/state-after-later-run.txt"
     ;;
   target)
+    # the same stack in use, as on the source: Superset's pack grants on warehouse schemas that exist, i.e. after the
+    # pipeline's first run - so this host runs it once, then installs Superset; the restore replaces all of it
+    DEMO_APPROVED_BY=ops.test step t0-approve $D approve
+    step t0-deploy $D deploy
     step t1-bi-validate $D bi-validate                      # installs Superset, like the source had
     state > "$OUT/state-before-restore.txt"
     ;;

@@ -1,0 +1,42 @@
+== t1-bi-validate: bash examples/demo/demo.sh bi-validate
+t1-bi-validate rc=3
+      ok 17826ms
+  2/6 install · Install the pinned Superset application and PostgreSQL adapter
+      ok 175677ms
+  3/6 config · Write the protected environment and Superset configuration
+      ok 49ms
+  4/6 warehouse-reader · Provision an owned reader with SELECT defaults for the 
+real table creators
+      no catalog entry matched this failure
+      $ python3 /opt/dpagent/packs/superset/manage.py reader
+      Traceback (most recent call last):
+        File "/opt/superset/reader.py", line 25, in <module>
+          cur.execute("SELECT 
+has_schema_privilege(%s,%s,'CREATE')",(role,schema))
+      psycopg2.errors.InvalidSchemaName: schema "fulfilment_sla" does not exist
+      Traceback (most recent call last):
+        File "/opt/dpagent/packs/superset/manage.py", line 172, in <module>
+          actions[sys.argv[1]]()
+        File "/opt/dpagent/packs/superset/manage.py", line 97, in reader
+          run(["runuser","-u","postgres","--",VENV/"bin/python",ROOT/"reader.py"
+],input=json.dumps(payload).encode())
+        File "/opt/dpagent/packs/superset/manage.py", line 23, in run
+          return subprocess.run([str(x) for x in args], check=True, cwd="/", 
+**kw)
+        File "/usr/lib/python3.10/subprocess.py", line 526, in run
+          raise CalledProcessError(retcode, process.args,
+      subprocess.CalledProcessError: Command '['runuser', '-u', 'postgres', 
+'--', '/opt/superset/.venv/bin/python', '/opt/superset/reader.py']' returned 
+non-zero exit status 1.
+  superset: no catalog entry matched this failure
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ halted on superset                                                           │
+│ no catalog entry matched this failure                                        │
+│                                                                              │
+│ This failure is not in the catalog yet.                                      │
+│ Run dpagent audit 5 to see the output, then add an entry to                  │
+│ superset/errors.yaml.                                                        │
+│                                                                              │
+│ re-run to resume — completed steps are skipped                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

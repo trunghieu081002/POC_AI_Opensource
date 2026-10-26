@@ -1,0 +1,20 @@
+{
+ "ok": false,
+ "checks": {
+  "secret files 0600/0640, root/service owner": true,
+  "BI reader cannot CREATE": true,
+  "BI reader cannot DELETE": true,
+  "warehouse writer cannot reach airflow_meta": false,
+  "warehouse writer cannot reach superset_meta": false
+ },
+ "raw": [
+  "/opt/airflow/home/pipelines.env airflow 600",
+  "/root/demo-dev.env root 600",
+  "/var/lib/dpagent/evidence.key root 600",
+  "/opt/superset/superset.env superset 600",
+  "ERROR:  permission denied for schema fulfilment_sla",
+  "ERROR:  permission denied for table fct_delivery_sla",
+  " ?column? ",
+  " ?column? "
+ ]
+}

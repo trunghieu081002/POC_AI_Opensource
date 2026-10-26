@@ -1,0 +1,15 @@
+running
+== 01-preflight: bash examples/demo/demo.sh preflight
+01-preflight rc=0
+== 02-install: bash examples/demo/demo.sh install
+02-install rc=0
+== 02b-lock: bash examples/demo/demo.sh lock
+02b-lock rc=0
+== 03-source: bash examples/demo/demo.sh source
+03-source rc=0
+04-synth rc=0 draft=artifact
+check artifact-imported (files = the accepted trace's hashes; no model, no credential on this host) ok
+check draft-not-approved (synth/validate never approve) ok
+SHOW READY: draft validated, nothing approved - a person approves live (docs/demo-show.md)
+live-demo host: dpagent-demo-show-artifact-3427923 (docs/demo-show.md)
+kept dpagent-demo-show-artifact-3427923 (ca2767bf481890b30b2e2ea27de5b73a18bd44a2b0c6a77418a39da0343e594b) for inspection: docker rm -f ca2767bf481890b30b2e2ea27de5b73a18bd44a2b0c6a77418a39da0343e594b
