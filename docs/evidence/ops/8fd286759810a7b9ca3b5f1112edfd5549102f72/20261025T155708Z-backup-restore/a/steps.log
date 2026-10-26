@@ -1,0 +1,16 @@
+== s1-approve: bash examples/demo/demo.sh approve
+s1-approve rc=0
+== s2-deploy: bash examples/demo/demo.sh deploy
+s2-deploy rc=0
+== s3-bi-validate: bash examples/demo/demo.sh bi-validate
+s3-bi-validate rc=0
+== s4-bi-deploy: bash examples/demo/demo.sh bi-deploy
+s4-bi-deploy rc=0
+check source state (approved, deployed, run = expected, dashboard + viewer = expected) ok
+check overlap (two back-to-back runs: both ok, the second started after the first finished) ok
+== s5-bad-data: bash examples/demo/demo.sh bad-data
+s5-bad-data rc=0
+== s6-fix-data: bash examples/demo/demo.sh fix-data
+s6-fix-data rc=0
+check alerts (bad data: failed run + the stock_picking gate, notified once) and recovery = expected ok
+FINDING least privilege: ['warehouse writer cannot reach airflow_meta', 'warehouse writer cannot reach superset_meta'] - recorded, not fixed here

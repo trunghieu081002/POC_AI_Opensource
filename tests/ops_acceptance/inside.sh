@@ -24,7 +24,7 @@ fp() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["fingerpr
 health() { for _ in $(seq 1 90); do curl -fsS --noproxy '*' -o /dev/null "$1" 2>/dev/null && return 0; sleep 2; done; return 1; }
 state() {   # what must survive: journal runs, deployed pipelines, the DAG, dashboards, viewer accounts, the report
   echo "runs=$(runs)"
-  dpagent pipeline list 2>/dev/null | grep fulfilment_sla | tr -s ' '
+  COLUMNS=250 dpagent pipeline list 2>/dev/null | grep fulfilment_sla | tr -s ' '
   echo "dag=$(runuser -u postgres -- psql -X -At -d airflow_meta -c "SELECT is_paused FROM dag WHERE dag_id='fulfilment_sla'")"
   echo "dashboards=$(runuser -u postgres -- psql -X -At -d superset_meta -c 'SELECT count(*) FROM dashboards')"
   echo "viewer=$(runuser -u postgres -- psql -X -At -d superset_meta -c "SELECT count(*) FROM ab_user WHERE username='fulfil.viewer'")"

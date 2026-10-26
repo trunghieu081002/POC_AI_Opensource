@@ -52,8 +52,11 @@ def _sha(path: Path) -> str:
 
 def _pg(args: list[str], *, out: Path | None = None, timeout: int = 3600) -> None:
     cmd = ["runuser", "-u", "postgres", "--", *args]
-    with (open(out, "wb") if out else subprocess.DEVNULL) as f:
-        proc = subprocess.run(cmd, stdout=f if out else subprocess.PIPE, stderr=subprocess.PIPE, cwd="/", timeout=timeout)
+    if out:
+        with open(out, "wb") as f:
+            proc = subprocess.run(cmd, stdout=f, stderr=subprocess.PIPE, cwd="/", timeout=timeout)
+    else:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd="/", timeout=timeout)
     if proc.returncode != 0:
         raise BackupError(f"{' '.join(args[:2])} failed: {proc.stderr.decode(errors='replace')[-500:]}")
 
@@ -195,51 +198,61 @@ def restore(archive: Path, *, passphrase_env: str = "") -> dict:
         timings["verify_s"] = round(time.monotonic() - t0, 1)
         t = time.monotonic()
         _systemctl("stop", SERVICES)
-        db_dir = into / "databases"
-        subprocess.run(["chown", "-R", "postgres", str(db_dir)], check=True)
-        os.chmod(into, 0o755)
-        # roles: CREATE ROLE of an existing role fails harmlessly; the ALTER ROLE that follows sets its attributes and
-        # password hash to the backed-up ones
-        subprocess.run(["runuser", "-u", "postgres", "--", "psql", "-X", "-q", "-f", str(db_dir / "globals.sql")],
-                       capture_output=True, cwd="/")
-        schemas = manifest.get("schemas")
-        for db in manifest["databases"]:
-            _pg(["psql", "-X", "-q", "-c", f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' "
-                                            f"AND pid <> pg_backend_pid()"])
-            if db == manifest.get("warehouse") and isinstance(schemas, list):
-                # only these schemas were backed up: replace exactly them, never the rest of the warehouse
-                if db not in _databases_present():
-                    raise BackupError(f"database {db} does not exist here - a schema-only backup restores into it")
-                for sch in schemas:
-                    _pg(["psql", "-X", "-q", "-d", db, "-c", f'DROP SCHEMA IF EXISTS "{sch}" CASCADE'])
-                _pg(["pg_restore", "--exit-on-error", "-d", db, str(db_dir / f"{db}.dump")])
-            else:
-                _pg(["psql", "-X", "-q", "-c", f'DROP DATABASE IF EXISTS "{db}"'])
-                _pg(["pg_restore", "--create", "--exit-on-error", "-d", "postgres", str(db_dir / f"{db}.dump")])
-        timings["databases_s"] = round(time.monotonic() - t, 1)
-        t = time.monotonic()
-        files = into / "files"
-        for p in map(Path, FILES + [str(JOURNAL)]):     # replace each backed-up path as a whole
-            src = files / p.relative_to("/")
-            if not src.exists() and not src.is_symlink():
-                continue
-            p.parent.mkdir(parents=True, exist_ok=True)
-            if p.is_dir() and not p.is_symlink():
-                shutil.rmtree(p)
-            elif p.exists() or p.is_symlink():
-                p.unlink()
-            if src.is_dir() and not src.is_symlink():
-                shutil.copytree(src, p, symlinks=True)
-            else:
-                shutil.copy2(src, p, follow_symlinks=False)
-            _copy_owner_tree(src, p)
-        timings["files_s"] = round(time.monotonic() - t, 1)
-        t = time.monotonic()
-        _systemctl("start", SERVICES)
-        timings["start_s"] = round(time.monotonic() - t, 1)
+        try:
+            timings.update(_replace(manifest, into))
+        finally:
+            # whatever happened, the services come back (on the restored state, or on what was there if it failed)
+            t = time.monotonic()
+            _systemctl("start", SERVICES)
+            timings["start_s"] = round(time.monotonic() - t, 1)
     timings["total_s"] = round(time.monotonic() - t0, 1)
     return {"ok": True, "restored_from": manifest["created"], "source_host": manifest["host"],
             "databases": manifest["databases"], "timings": timings}
+
+
+def _replace(manifest: dict, into: Path) -> dict:
+    timings = {}
+    t = time.monotonic()
+    db_dir = into / "databases"
+    subprocess.run(["chown", "-R", "postgres", str(db_dir)], check=True)
+    os.chmod(into, 0o755)
+    # roles: CREATE ROLE of an existing role fails harmlessly; the ALTER ROLE that follows sets its attributes and
+    # password hash to the backed-up ones
+    subprocess.run(["runuser", "-u", "postgres", "--", "psql", "-X", "-q", "-f", str(db_dir / "globals.sql")],
+                   capture_output=True, cwd="/")
+    schemas = manifest.get("schemas")
+    for db in manifest["databases"]:
+        _pg(["psql", "-X", "-q", "-c", f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' "
+                                        f"AND pid <> pg_backend_pid()"])
+        if db == manifest.get("warehouse") and isinstance(schemas, list):
+            # only these schemas were backed up: replace exactly them, never the rest of the warehouse
+            if db not in _databases_present():
+                raise BackupError(f"database {db} does not exist here - a schema-only backup restores into it")
+            for sch in schemas:
+                _pg(["psql", "-X", "-q", "-d", db, "-c", f'DROP SCHEMA IF EXISTS "{sch}" CASCADE'])
+            _pg(["pg_restore", "--exit-on-error", "-d", db, str(db_dir / f"{db}.dump")])
+        else:
+            _pg(["psql", "-X", "-q", "-c", f'DROP DATABASE IF EXISTS "{db}"'])
+            _pg(["pg_restore", "--create", "--exit-on-error", "-d", "postgres", str(db_dir / f"{db}.dump")])
+    timings["databases_s"] = round(time.monotonic() - t, 1)
+    t = time.monotonic()
+    files = into / "files"
+    for p in map(Path, FILES + [str(JOURNAL)]):     # replace each backed-up path as a whole
+        src = files / p.relative_to("/")
+        if not src.exists() and not src.is_symlink():
+            continue
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if p.is_dir() and not p.is_symlink():
+            shutil.rmtree(p)
+        elif p.exists() or p.is_symlink():
+            p.unlink()
+        if src.is_dir() and not src.is_symlink():
+            shutil.copytree(src, p, symlinks=True)
+        else:
+            shutil.copy2(src, p, follow_symlinks=False)
+        _copy_owner_tree(src, p)
+    timings["files_s"] = round(time.monotonic() - t, 1)
+    return timings
 
 
 def _copy_owner_tree(src: Path, dest: Path) -> None:

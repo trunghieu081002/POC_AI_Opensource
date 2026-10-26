@@ -1,0 +1,18 @@
+{
+ "alerts": [
+  {
+   "kind": "failed_run",
+   "pipeline": "fulfilment_sla",
+   "run_id": 13,
+   "at": "2026-10-25T16:21:16+00:00",
+   "detail": "run 13 of fulfilment_sla failed - dpagent pipeline audit 13"
+  },
+  {
+   "kind": "failed_gate",
+   "pipeline": "fulfilment_sla",
+   "run_id": 13,
+   "at": "2026-10-25T16:21:14+00:00",
+   "detail": "unique gate failed at stage landing: 2/13 row(s) in stock_picking failed unique, no quarantine declared"
+  }
+ ]
+}

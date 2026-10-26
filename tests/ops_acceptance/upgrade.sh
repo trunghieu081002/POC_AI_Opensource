@@ -23,7 +23,7 @@ health() { for _ in $(seq 1 90); do curl -fsS --noproxy '*' -o /dev/null "$1" 2>
 works() {   # works LABEL: the pipeline is still approved and runs = expected; the viewer still sees the expected rows
   health http://127.0.0.1:8090/health && health http://127.0.0.1:8088/health
   dpagent --version > "$OUT/$1-version.txt"
-  dpagent pipeline list > "$OUT/$1-list.txt" 2>&1; grep fulfilment_sla "$OUT/$1-list.txt" | grep -q reviewed
+  COLUMNS=250 dpagent pipeline list > "$OUT/$1-list.txt" 2>&1; grep fulfilment_sla "$OUT/$1-list.txt" | grep -q reviewed
   step "$1-run" dpagent pipeline run fulfilment_sla --yes --wait --timeout 1800
   "$PY" examples/demo/check_fulfil.py "$EX" > "$OUT/$1-check-run.json"
   "$SPY" tests/quickstart_acceptance/check_viewer.py fulfil.viewer FS_VIEWER_PASSWORD fulfil-sla - > "$OUT/$1-check-viewer.json"
