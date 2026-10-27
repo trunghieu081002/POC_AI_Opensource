@@ -1,0 +1,5 @@
+FINDING (product, not yet diagnosed): upgrade from c3c1340 (v0.4.0-demo-rc1) to 06e797f in place. The old release's
+baseline passed (approved, deployed, run = expected, viewer = expected), the backup was taken, bootstrap from the new
+source and `dpagent spec examples/demo/stack.yaml` both exited 0 with every acceptance suite passing - but the next
+`dpagent pipeline run` never started a task within 1800 s ("no stage ever reported in": the DAG paused or the scheduler
+not running). Rollback was not reached. Next: the same run with --keep and diagnostics captured on failure.

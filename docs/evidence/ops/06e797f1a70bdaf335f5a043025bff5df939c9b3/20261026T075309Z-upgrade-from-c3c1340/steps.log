@@ -1,0 +1,19 @@
+== b1-approve: bash examples/demo/demo.sh approve
+b1-approve rc=0
+== b2-deploy: bash examples/demo/demo.sh deploy
+b2-deploy rc=0
+== b3-bi-validate: bash examples/demo/demo.sh bi-validate
+b3-bi-validate rc=0
+== b4-bi-deploy: bash examples/demo/demo.sh bi-deploy
+b4-bi-deploy rc=0
+== old-baseline-run: dpagent pipeline run fulfilment_sla --yes --wait --timeout 1800
+old-baseline-run rc=0
+check old-baseline (dpagent, version 0.4.0: pipeline still reviewed, run = expected, viewer = expected) ok
+== k1-backup: env PYTHONPATH=/opt/src/new/src /opt/dpagent/.venv/bin/python -m dpagent backup create /root/backup --schema fulfilment_sla --passphrase-env OPS_BACKUP_PASSPHRASE
+k1-backup rc=0
+== u1-bootstrap-new: bootstrap_from /opt/src/new
+u1-bootstrap-new rc=0
+== u2-spec: dpagent spec examples/demo/stack.yaml --yes
+u2-spec rc=0
+== upgraded-run: dpagent pipeline run fulfilment_sla --yes --wait --timeout 1800
+upgraded-run rc=3

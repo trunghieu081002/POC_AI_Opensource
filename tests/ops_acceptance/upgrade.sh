@@ -24,7 +24,19 @@ works() {   # works LABEL: the pipeline is still approved and runs = expected; t
   health http://127.0.0.1:8090/health && health http://127.0.0.1:8088/health
   dpagent --version > "$OUT/$1-version.txt"
   COLUMNS=250 dpagent pipeline list > "$OUT/$1-list.txt" 2>&1; grep fulfilment_sla "$OUT/$1-list.txt" | grep -q reviewed
-  step "$1-run" dpagent pipeline run fulfilment_sla --yes --wait --timeout 1800
+  set +e; dpagent pipeline run fulfilment_sla --yes --wait --timeout 900 > "$OUT/$1-run.log" 2>&1; rc=$?; set -e
+  echo "$1-run rc=$rc" | tee -a "$OUT/steps.log"
+  if [ "$rc" -ne 0 ]; then
+    {
+      echo "== services"; systemctl is-active airflow-scheduler airflow-webserver superset postgresql
+      echo "== dag"; runuser -u postgres -- psql -X -At -d airflow_meta -c "SELECT dag_id, is_paused, is_active, fileloc FROM dag WHERE dag_id='fulfilment_sla'"
+      echo "== import errors"; runuser -u postgres -- psql -X -At -d airflow_meta -c "SELECT filename, left(stacktrace, 1500) FROM import_error"
+      echo "== dag runs"; runuser -u postgres -- psql -X -At -d airflow_meta -c "SELECT run_id, state, queued_at FROM dag_run WHERE dag_id='fulfilment_sla' ORDER BY queued_at DESC LIMIT 5"
+      echo "== airflow venv dpagent"; /opt/airflow/.venv/bin/python -c "import dpagent, sys; print(dpagent.__file__)" 2>&1 | tail -2
+      echo "== scheduler log"; journalctl -u airflow-scheduler --no-pager -n 60 2>&1 | tail -60
+    } > "$OUT/$1-diagnostics.txt" 2>&1
+    exit "$rc"
+  fi
   "$PY" examples/demo/check_fulfil.py "$EX" > "$OUT/$1-check-run.json"
   "$SPY" tests/quickstart_acceptance/check_viewer.py fulfil.viewer FS_VIEWER_PASSWORD fulfil-sla - > "$OUT/$1-check-viewer.json"
   ok "$1 ($(cat "$OUT/$1-version.txt"): pipeline still reviewed, run = expected, viewer = expected)"
