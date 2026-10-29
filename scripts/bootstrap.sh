@@ -251,7 +251,12 @@ say "creating the virtualenv"
 "${PREFIX}/.venv/bin/pip" install --quiet -e "${PREFIX}${EXTRA}"
 
 ln -sf "${PREFIX}/.venv/bin/dpagent" /usr/local/bin/dpagent
-install -d -m 0750 /var/lib/dpagent /var/log/dpagent
+# Created once with these modes; never re-moded: a re-run (an upgrade) must not take back what deploy granted
+# later (the journal directory is group-writable for the Airflow worker once a pipeline is deployed - found by the
+# upgrade acceptance: a re-run reset it to 0750 and every task then failed on a read-only journal).
+for d in /var/lib/dpagent /var/log/dpagent; do
+  [ -d "$d" ] || install -d -m 0750 "$d"
+done
 
 ok "dpagent installed"
 dpagent --version || die "the dpagent CLI does not run"

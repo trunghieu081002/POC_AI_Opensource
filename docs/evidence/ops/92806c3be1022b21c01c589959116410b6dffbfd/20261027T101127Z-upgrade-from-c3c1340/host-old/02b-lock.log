@@ -1,0 +1,61 @@
+No broken requirements found.
+No broken requirements found.
+{
+ "airflow": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dbt": {
+  "applied": {
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "dbt-protos": [
+    "1.0.615",
+    "1.0.607"
+   ],
+   "msgpack": [
+    "1.2.4",
+    "1.2.3"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dlt": {
+  "applied": {
+   "boto3": [
+    "1.43.119",
+    "1.43.118"
+   ],
+   "botocore": [
+    "1.43.119",
+    "1.43.118"
+   ],
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "pyasn1": [
+    "0.6.5",
+    "0.6.4"
+   ],
+   "pymssql": [
+    "2.4.6",
+    "2.4.5"
+   ],
+   "sqlglot": [
+    "30.25.0",
+    "30.24.0"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dpagent": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "superset": "not installed"
+}

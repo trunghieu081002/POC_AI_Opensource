@@ -255,3 +255,11 @@ def test_with_llm_set_adds_the_llm_extra(tmp_path):
     })
     assert result.returncode == 0, result.stdout + result.stderr
     assert "resolved extra=[llm]" in result.stderr
+
+
+def test_a_rerun_never_re_modes_the_state_directories():
+    """Found by the upgrade acceptance: re-running bootstrap (an upgrade) reset /var/lib/dpagent to 0750 and took back
+    the group write that deploy grants the Airflow worker - every task then failed on a read-only journal."""
+    text = (Path(__file__).resolve().parents[1] / "scripts" / "bootstrap.sh").read_text()
+    assert "install -d -m 0750 /var/lib/dpagent /var/log/dpagent" not in text
+    assert '[ -d "$d" ] || install -d -m 0750 "$d"' in text

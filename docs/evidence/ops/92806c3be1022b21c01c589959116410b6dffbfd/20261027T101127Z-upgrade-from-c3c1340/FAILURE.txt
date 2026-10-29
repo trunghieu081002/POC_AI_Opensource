@@ -1,0 +1,7 @@
+FAILED - PRODUCT BUG found and fixed: after the in-place upgrade (bootstrap from the new source + `dpagent spec`, every
+suite passing) the next run's extract task failed in 0.5 s with "sqlite3.OperationalError: attempt to write a readonly
+database" (Airflow task log), and the DAG's failure callback could not record the end, so the DPAgent run stayed
+"running" (diagnostics: upgraded-diagnostics.txt on the host). Cause: bootstrap.sh's `install -d -m 0750 /var/lib/dpagent`
+re-moded the existing journal directory from 0770 (granted to the dpagent group by deploy) to 0750. Fix: bootstrap only
+creates the state directories when missing. Verified on the kept host (dir restored to 0770, fixed bootstrap re-run:
+stays 0770, the run passes = expected); the clean rerun is the evidence.

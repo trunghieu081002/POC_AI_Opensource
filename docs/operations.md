@@ -74,6 +74,11 @@ sudo -E dpagent backup restore /backups/dpagent-backup-<utc>.tar.enc --passphras
    stack file). The journal schema migrates forward on first use.
 3. Re-validate and re-approve any pipeline whose files changed.
 
+**Known issue fixed in this release:** before it, re-running `bootstrap.sh` reset `/var/lib/dpagent` to 0750 and took
+back the group write that `deploy` grants the Airflow worker. Every task then failed on a read-only journal and the run
+stayed "running" (found by the upgrade acceptance). On a host already upgraded with an older bootstrap, run
+`dpagent pipeline deploy <name> --yes` once (it grants the journal again), or `chmod 0770 /var/lib/dpagent`.
+
 Rollback means reinstalling the previous release, then `dpagent backup restore` of the backup taken in step 1.
 **Not accepted yet:** the upgrade/rollback acceptance (from `v0.4.0-demo-rc1` to the new release and back) has not
 run. See release-criteria row 10.

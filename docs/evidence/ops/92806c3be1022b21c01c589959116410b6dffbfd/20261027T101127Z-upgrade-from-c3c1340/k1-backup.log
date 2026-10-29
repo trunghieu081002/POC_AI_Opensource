@@ -1,0 +1,14 @@
+{
+ "archive": "/root/backup/dpagent-backup-20261027T103528Z.tar.enc",
+ "archive_sha256": "121d1f43c5eebee98493252605013f5b2c465501bcb6f6b8756545520d832615",
+ "databases": [
+  "airflow_meta",
+  "superset_meta",
+  "warehouse"
+ ],
+ "timings": {
+  "databases_s": 0.5,
+  "total_s": 0.8
+ },
+ "encrypted": true
+}

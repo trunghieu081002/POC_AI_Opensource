@@ -1,0 +1,11 @@
+triggered — dpagent run 14
+waiting up to 900s for run 14 to finish...
+  fulfilment_sla · run 14 running ·  
+  started 2026-10-27T10:37:20+00:00  
+ stage  status  rows  gates  started 
+triggered but no stage has reported in yet - Airflow may still be scheduling it
+still running after 900s - it was not stopped; check: dpagent pipeline status 
+fulfilment_sla
+no stage ever reported in - the DAG's tasks never started. Usual causes: the DAG
+is paused (airflow dags unpause fulfilment_sla) or airflow-scheduler is not 
+running (systemctl status airflow-scheduler).
