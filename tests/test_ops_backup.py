@@ -84,3 +84,4 @@ def test_the_scope_is_dpagents_own_state():
     assert "airflow_meta" in bk.DATABASES and "superset_meta" in bk.DATABASES
     assert any("pipelines.env" in f for f in bk.FILES) and "/var/lib/dpagent/evidence.key" in bk.FILES
     assert not any("logs" in f for f in bk.FILES)
+    assert "/var/lib/dpagent" in bk.DIR_MODES                   # deploy's journal grant survives a restore

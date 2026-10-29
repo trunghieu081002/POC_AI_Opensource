@@ -16,9 +16,11 @@ with its sha256; `verify` checks them; `restore` refuses an archive that does no
 """
 from __future__ import annotations
 
+import grp
 import hashlib
 import json
 import os
+import pwd
 import shutil
 import sqlite3
 import subprocess
@@ -35,6 +37,9 @@ FILES = ["/var/lib/dpagent/evidence.key", "/var/lib/dpagent-bi-assets", "/opt/dp
          "/opt/dbt/profiles", "/opt/dbt/project"]
 JOURNAL = Path("/var/lib/dpagent/dpagent.db")
 DATABASES = ["airflow_meta", "superset_meta"]
+# directories whose owner/group/mode a restore puts back (deploy grants the journal directory to a group; an older or a
+# re-run bootstrap may have re-moded it - found by the upgrade/rollback acceptance)
+DIR_MODES = ["/var/lib/dpagent", "/var/lib/dpagent-bi-assets"]
 SERVICES = ["airflow-scheduler", "airflow-webserver", "superset"]
 
 
@@ -108,7 +113,13 @@ def create(out_dir: Path, *, warehouse: str = "warehouse", schemas: list[str] | 
         for path in sorted(stage.rglob("*")):
             if path.is_file():
                 members[path.relative_to(stage).as_posix()] = {"sha256": _sha(path), "bytes": path.stat().st_size}
-        manifest = {"kind": "dpagent-backup", "created": stamp, "host": os.uname().nodename,
+        dirs = {}
+        for d in map(Path, DIR_MODES):
+            if d.is_dir():
+                st = d.stat()
+                dirs[str(d)] = {"mode": oct(st.st_mode & 0o7777), "owner": pwd.getpwuid(st.st_uid).pw_name,
+                                "group": grp.getgrgid(st.st_gid).gr_name}
+        manifest = {"kind": "dpagent-backup", "created": stamp, "dirs": dirs, "host": os.uname().nodename,
                     "warehouse": warehouse, "schemas": schemas or "all", "databases": sorted(
                         p.stem for p in db_dir.glob("*.dump")), "members": members, "timings": timings,
                     "encrypted": bool(passphrase_env)}
@@ -251,6 +262,10 @@ def _replace(manifest: dict, into: Path) -> dict:
         else:
             shutil.copy2(src, p, follow_symlinks=False)
         _copy_owner_tree(src, p)
+    for d, m in (manifest.get("dirs") or {}).items():
+        if Path(d).is_dir():
+            shutil.chown(d, m["owner"], m["group"])
+            os.chmod(d, int(m["mode"], 8))
     timings["files_s"] = round(time.monotonic() - t, 1)
     return timings
 
