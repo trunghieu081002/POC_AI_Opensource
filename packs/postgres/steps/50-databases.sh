@@ -16,6 +16,7 @@ PORT="$(dp_param port 5432)"
 
 DATABASES="$(dp_param databases)"
 USERS="$(dp_param users)"
+REVOKE_PUBLIC="$(dp_param revoke_public_connect false)"
 
 if [ -z "$DATABASES" ] || [ "$DATABASES" = "[]" ]; then
   if [ -z "$USERS" ] || [ "$USERS" = "[]" ]; then
@@ -27,7 +28,7 @@ SQL_FILE="$(mktemp /tmp/dpagent-pg-XXXXXX.sql)"
 trap 'rm -f "$SQL_FILE"' EXIT
 chmod 0600 "$SQL_FILE"
 
-DP_DATABASES="$DATABASES" DP_USERS="$USERS" python3 - "$SQL_FILE" <<'PY'
+DP_DATABASES="$DATABASES" DP_USERS="$USERS" DP_REVOKE_PUBLIC="$REVOKE_PUBLIC" python3 - "$SQL_FILE" <<'PY'
 import json, os, sys
 
 def ident(name: str) -> str:
@@ -108,6 +109,11 @@ for user in users:
         out.append(f"GRANT ALL ON SCHEMA public TO {ident(name)};")
 if any(user.get("databases") if not isinstance(user, str) else None for user in users):
     out.append("\\connect postgres")
+
+if os.environ.get("DP_REVOKE_PUBLIC", "false").lower() in ("true", "1", "yes"):
+    for db in databases:
+        name = db if isinstance(db, str) else db.get("name")
+        out.append(f"REVOKE CONNECT, TEMPORARY ON DATABASE {ident(name)} FROM PUBLIC;")
 
 with open(sys.argv[1], "w", encoding="utf-8") as fh:
     fh.write("\n".join(out) + "\n")

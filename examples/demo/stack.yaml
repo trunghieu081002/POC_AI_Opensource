@@ -11,6 +11,7 @@ components:
       port: 5432
       listen_addresses: localhost
       max_connections: 200
+      revoke_public_connect: true   # only the listed roles (and the Superset reader) may connect - docs/operations.md
       databases: [warehouse, airflow_meta, dlt_selftest, superset_meta, "${FS_SRC_NAME}"]
       users:
         - {name: "${WAREHOUSE_DB_USER}", password: "${WAREHOUSE_DB_PASSWORD}", databases: [warehouse]}

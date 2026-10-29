@@ -1,0 +1,160 @@
+project: demo
+╭── plan · ubuntu 22.04 (debian/apt) ──╮
+│  #  pack           steps  why        │
+│  1  base               3  requested  │
+│  2  python-modern      1  requested  │
+│  3  dbt                4  requested  │
+│  4  dlt                4  requested  │
+│  5  postgres           5  requested  │
+│  6  airflow            7  requested  │
+╰──────────────────────────────────────╯
+= base — already installed at v1.0.0 with identical params
+= python-modern — already installed at v1.0.0 with identical params
+= dbt — already installed at v1.0.0 with identical params
+= dlt — already installed at v1.0.0 with identical params
+= postgres — already installed at v1.0.0 with identical params
+= airflow — already installed at v1.0.0 with identical params
+
+
+╭──────────────────────────── acceptance suite ─────────────────────────────╮
+│ airflow                                                                   │
+│ Prove Airflow actually schedules, runs and correctly reports on real DAGs │
+╰───────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Deploy a DAG that succeeds and one that deliberately fails 7510ms
+  checks
+    PASS The scheduler and webserver systemd units are active 13ms
+    PASS The webserver's own /health endpoint reports the metadatabase healthy 
+74ms
+    PASS A triggered DAG actually runs its task and is reported as succeeded 
+3900ms
+    PASS A DAG whose task fails is reported as failed, not lost or silently 
+green (negative) 11599ms
+  teardown
+    PASS Remove the throwaway DAGs and their run history 4503ms
+  airflow: 4 checks passed
+
+╭──────────────────────── acceptance suite ────────────────────────╮
+│ base                                                             │
+│ Prove the shared tooling every other pack assumes actually works │
+╰──────────────────────────────────────────────────────────────────╯
+  checks
+    PASS curl genuinely rejects an untrusted cert and accepts a trusted one 
+(negative) 474ms
+    PASS A file with awkward content survives a tar/untar round trip 
+byte-for-byte 17ms
+    PASS The generated locale actually changes collation, not just `locale -a`'s
+listing 32ms
+    PASS NTP reports the clock as actually synchronised, when install_time_sync 
+is on 81ms
+  teardown
+    PASS Kill any leftover test TLS server and remove temp files 10ms
+  base: 4 checks passed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ dbt                                                                          │
+│ Prove dbt actually connects to Postgres, transforms data, and catches bad    │
+│ data                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Write a good and a deliberately-broken throwaway dbt model 29ms
+  checks
+    PASS dbt can actually connect to the configured Postgres target 3284ms
+    PASS dbt run builds a model whose output matches the source data 7315ms
+    PASS A dbt test fails when the underlying data violates it (negative) 7952ms
+    PASS A dbtread member other than whoever ran dbt first can still write to 
+the project 256ms
+  teardown
+    PASS Remove the throwaway models and the tables they built 128ms
+  dbt: 4 checks passed
+
+╭───────────────────────────── acceptance suite ──────────────────────────────╮
+│ dlt                                                                         │
+│ Prove dlt actually extracts and loads real data through both MVP connectors │
+╰─────────────────────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create a throwaway source table and a throwaway CSV file 244ms
+  checks
+    PASS sql_database source lands a real Postgres table as-received 3956ms
+    PASS A CSV file lands as-received through the csv connector's mechanism 
+2480ms
+    PASS A source table that does not exist halts extraction instead of moving 
+nothing (negative) 1150ms
+  teardown
+    PASS Remove the throwaway schemas, CSV fixture, and dlt run state 101ms
+  dlt: 3 checks passed
+
+╭───────────────────── acceptance suite ──────────────────────╮
+│ postgres                                                    │
+│ Prove PostgreSQL actually stores, returns and protects data │
+╰─────────────────────────────────────────────────────────────╯
+  setup
+    PASS Create an isolated database for the checks to work in 295ms
+  checks
+    PASS A row written is the same row read back 528ms
+    FAIL Committed data is still there after a service restart
+      :: data directory in use: /var/lib/postgresql/15/main
+      :: filesystem: overlay
+      :: restarting postgresql
+      $ systemctl restart postgresql
+      [dpagent] timed out after 300s
+    FAIL A wrong password is refused (negative)
+      psql: error: connection to server on socket 
+"/var/run/postgresql/.s.PGSQL.5432" failed: No such file or directory
+        Is the server running locally and accepting connections on that socket?
+    FAIL Every database in the spec accepts a connection and a write
+      XX warehouse: exists in the catalog but refuses a connection
+      XX airflow_meta: exists in the catalog but refuses a connection
+      XX dlt_selftest: exists in the catalog but refuses a connection
+      XX superset_meta: exists in the catalog but refuses a connection
+      XX fs_source: exists in the catalog but refuses a connection
+      XX one or more declared databases are not actually usable
+    FAIL The running server reports the port and limits that were asked for
+      XX port is '', the spec asked for '5432' — the drop-in was not applied, or
+another config sets it later
+      XX max_connections is '', the spec asked for '200' — the drop-in was not 
+applied
+      XX running PostgreSQL , the spec asked for 15 — an older cluster is 
+probably still bound to this port
+      :: config_file = 
+      XX no setting in the running server comes from 10-dpagent.conf — the 
+drop-in exists but is not being read
+      XX password_encryption is '' — new passwords will be stored weakly
+      XX the running server does not match the spec
+    FAIL With listen_addresses=localhost, the server is not reachable off-host 
+(negative)
+      XX nothing is bound to port 5432 at all
+  teardown
+    PASS Remove everything the suite created 127ms
+  postgres: 5 of 6 checks failed
+
+╭────────────────────────────── acceptance suite ──────────────────────────────╮
+│ python-modern                                                                │
+│ Prove the modern interpreter actually creates working venvs, and the system  │
+│ python3 is untouched                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  checks
+    PASS A real venv built from the resolved interpreter has working pip and 
+stdlib TLS/db modules 4329ms
+    PASS The system python3 still runs and is a different binary than the one 
+this pack provides 23ms
+  python-modern: 2 checks passed
+
+╭────────── acceptance ───────────╮
+│  suite          result  checks  │
+│  airflow        passed     4/4  │
+│  base           passed     4/4  │
+│  dbt            passed     4/4  │
+│  dlt            passed     3/3  │
+│  postgres       FAILED     1/6  │
+│  python-modern  passed     2/2  │
+╰─────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────╮
+│ the installer finished, but the system does not work                   │
+│                                                                        │
+│ Every step succeeded and verify passed. The acceptance suite found the │
+│ system failing anyway — which is the entire reason it runs.            │
+│                                                                        │
+│ what failed: dpagent audit 13                                          │
+│ re-run just the tests: dpagent test                                    │
+╰────────────────────────────────────────────────────────────────────────╯

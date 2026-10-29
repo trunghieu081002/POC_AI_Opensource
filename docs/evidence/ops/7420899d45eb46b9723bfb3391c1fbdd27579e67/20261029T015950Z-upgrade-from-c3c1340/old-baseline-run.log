@@ -1,0 +1,8 @@
+triggered — dpagent run 11
+waiting up to 900s for run 11 to finish...
+         fulfilment_sla · run 11 ok · started 2026-10-29T02:22:43+00:00         
+ stage    status  rows  gates                         started                   
+ landing  passed     -  schema_contract, unique,      2026-10-29T02:22:50+00:00 
+                        unique                                                  
+ curated  passed     -  unique, not_null,             2026-10-29T02:23:03+00:00 
+                        business_rule, business_rule                            
