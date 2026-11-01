@@ -3,3 +3,4 @@ baseline passed (approved, deployed, run = expected, viewer = expected), the bac
 source and `dpagent spec examples/demo/stack.yaml` both exited 0 with every acceptance suite passing - but the next
 `dpagent pipeline run` never started a task within 1800 s ("no stage ever reported in": the DAG paused or the scheduler
 not running). Rollback was not reached. Next: the same run with --keep and diagnostics captured on failure.
+Diagnosed by the later run docs/evidence/ops/92806c3…/20261027T101127Z-upgrade-from-c3c1340 (read-only journal after bootstrap re-moded /var/lib/dpagent); fixed; PASS in 3ef2b89…/20261029T043133Z-upgrade-from-c3c1340.
