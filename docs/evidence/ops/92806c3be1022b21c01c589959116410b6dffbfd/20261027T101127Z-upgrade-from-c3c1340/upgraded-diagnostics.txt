@@ -1,0 +1,76 @@
+== services
+active
+active
+active
+active
+== dag
+fulfilment_sla|f|t|/opt/airflow/home/dags/fulfilment_sla.py
+== import errors
+== dag runs
+manual__2026-10-27T10:37:21+00:00|failed|2026-10-27 10:37:21.956199+00
+manual__2026-10-27T10:35:04+00:00|success|2026-10-27 10:35:04.147309+00
+manual__2026-10-27T10:27:47+00:00|success|2026-10-27 10:27:47.450218+00
+scheduled__2026-10-26T02:00:00+00:00|success|2026-10-27 10:27:44.684259+00
+== airflow venv dpagent
+/opt/dpagent/src/dpagent/__init__.py
+== scheduler log
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 630, in get_connection
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     self.__connect()
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 690, in __connect
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     with util.safe_reraise():
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/util/langhelpers.py", line 70, in __exit__
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     compat.raise_(
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/util/compat.py", line 211, in raise_
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     raise exception
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 686, in __connect
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     self.dbapi_connection = connection = pool._invoke_creator(self)
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/engine/create.py", line 574, in connect
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     return dialect.connect(*cargs, **cparams)
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 598, in connect
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     return self.dbapi.connect(*cargs, **cparams)
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:   File "/opt/airflow/.venv/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]:     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]: sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: FATAL:  the database system is shutting down
+Oct 27 10:36:48 5ba649b1d92c airflow[15947]: (Background on this error at: https://sqlalche.me/e/14/e3q8)
+Oct 27 10:36:48 5ba649b1d92c airflow[16034]: [2026-10-27 10:36:48 +0000] [16034] [INFO] Shutting down: Master
+Oct 27 10:36:48 5ba649b1d92c systemd[1]: airflow-scheduler.service: Main process exited, code=exited, status=1/FAILURE
+Oct 27 10:36:48 5ba649b1d92c systemd[1]: airflow-scheduler.service: Failed with result 'exit-code'.
+Oct 27 10:36:53 5ba649b1d92c systemd[1]: airflow-scheduler.service: Scheduled restart job, restart counter is at 2.
+Oct 27 10:36:53 5ba649b1d92c systemd[1]: Stopped Airflow scheduler (managed by dpagent).
+Oct 27 10:37:04 5ba649b1d92c systemd[1]: Started Airflow scheduler (managed by dpagent).
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]:   ____________       _____________
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]:  ____    |__( )_________  __/__  /________      __
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: ____  /| |_  /__  ___/_  /_ __  /_  __ \_ | /| / /
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: ___  ___ |  / _  /   _  __/ _  / / /_/ /_ |/ |/ /
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]:  _/_/  |_/_/  /_/    /_/    /_/  \____/____/|__/
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.193+0000] {task_context_logger.py:63} INFO - Task context logging is enabled
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.194+0000] {executor_loader.py:235} INFO - Loaded executor: LocalExecutor
+Oct 27 10:37:06 5ba649b1d92c airflow[19173]: [2026-10-27 10:37:06 +0000] [19173] [INFO] Starting gunicorn 22.0.0
+Oct 27 10:37:06 5ba649b1d92c airflow[19173]: [2026-10-27 10:37:06 +0000] [19173] [INFO] Listening at: http://[::]:8793 (19173)
+Oct 27 10:37:06 5ba649b1d92c airflow[19173]: [2026-10-27 10:37:06 +0000] [19173] [INFO] Using worker: sync
+Oct 27 10:37:06 5ba649b1d92c airflow[19175]: [2026-10-27 10:37:06 +0000] [19175] [INFO] Booting worker with pid: 19175
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.269+0000] {scheduler_job_runner.py:799} INFO - Starting the scheduler
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.269+0000] {scheduler_job_runner.py:806} INFO - Processing each file at most -1 times
+Oct 27 10:37:06 5ba649b1d92c airflow[19204]: [2026-10-27 10:37:06 +0000] [19204] [INFO] Booting worker with pid: 19204
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.371+0000] {manager.py:170} INFO - Launched DagFileProcessorManager with pid: 19314
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.373+0000] {scheduler_job_runner.py:1598} INFO - Adopting or resetting orphaned tasks for active dag runs
+Oct 27 10:37:06 5ba649b1d92c airflow[19314]: [2026-10-27T10:37:06.378+0000] {settings.py:60} INFO - Configured default timezone UTC
+Oct 27 10:37:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:06.411+0000] {scheduler_job_runner.py:1621} INFO - Marked 1 SchedulerJob instances as failed
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:23.187+0000] {scheduler_job_runner.py:417} INFO - 1 tasks up for execution:
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]:         <TaskInstance: fulfilment_sla.extract manual__2026-10-27T10:37:21+00:00 [scheduled]>
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:23.187+0000] {scheduler_job_runner.py:480} INFO - DAG fulfilment_sla has 0/16 running and queued tasks
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:23.187+0000] {scheduler_job_runner.py:596} INFO - Setting the following tasks to queued state:
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]:         <TaskInstance: fulfilment_sla.extract manual__2026-10-27T10:37:21+00:00 [scheduled]>
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:23.190+0000] {scheduler_job_runner.py:639} INFO - Sending TaskInstanceKey(dag_id='fulfilment_sla', task_id='extract', run_id='manual__2026-10-27T10:37:21+00:00', try_number=1, map_index=-1) to executor with priority 4 and queue default
+Oct 27 10:37:23 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:23.190+0000] {base_executor.py:149} INFO - Adding to queue: ['airflow', 'tasks', 'run', 'fulfilment_sla', 'extract', 'manual__2026-10-27T10:37:21+00:00', '--local', '--subdir', 'DAGS_FOLDER/fulfilment_sla.py']
+Oct 27 10:37:23 5ba649b1d92c airflow[19184]: [2026-10-27T10:37:23.200+0000] {local_executor.py:90} INFO - QueuedLocalWorker running ['airflow', 'tasks', 'run', 'fulfilment_sla', 'extract', 'manual__2026-10-27T10:37:21+00:00', '--local', '--subdir', 'DAGS_FOLDER/fulfilment_sla.py']
+Oct 27 10:37:23 5ba649b1d92c airflow[19516]: [2026-10-27T10:37:23.257+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/home/dags/fulfilment_sla.py
+Oct 27 10:37:23 5ba649b1d92c airflow[19516]: [2026-10-27T10:37:23.340+0000] {task_command.py:426} INFO - Running <TaskInstance: fulfilment_sla.extract manual__2026-10-27T10:37:21+00:00 [queued]> on host 5ba649b1d92c
+Oct 27 10:37:24 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:24.324+0000] {scheduler_job_runner.py:689} INFO - Received executor event with state success for task instance TaskInstanceKey(dag_id='fulfilment_sla', task_id='extract', run_id='manual__2026-10-27T10:37:21+00:00', try_number=1, map_index=-1)
+Oct 27 10:37:24 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:24.332+0000] {scheduler_job_runner.py:721} INFO - TaskInstance Finished: dag_id=fulfilment_sla, task_id=extract, run_id=manual__2026-10-27T10:37:21+00:00, map_index=-1, run_start_date=2026-10-27 10:37:23.485464+00:00, run_end_date=2026-10-27 10:37:23.988601+00:00, run_duration=0.503137, state=failed, executor_state=success, try_number=1, max_tries=0, job_id=32, pool=default_pool, queue=default, priority_weight=4, operator=PythonOperator, queued_dttm=2026-10-27 10:37:23.188453+00:00, queued_by_job_id=31, pid=19522
+Oct 27 10:37:26 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:26.427+0000] {dagrun.py:819} ERROR - Marking run <DagRun fulfilment_sla @ 2026-10-27 10:37:21+00:00: manual__2026-10-27T10:37:21+00:00, state:running, queued_at: 2026-10-27 10:37:21.956199+00:00. externally triggered: True> failed
+Oct 27 10:37:26 5ba649b1d92c airflow[19109]: [2026-10-27T10:37:26.428+0000] {dagrun.py:901} INFO - DagRun Finished: dag_id=fulfilment_sla, execution_date=2026-10-27 10:37:21+00:00, run_id=manual__2026-10-27T10:37:21+00:00, run_start_date=2026-10-27 10:37:23.055106+00:00, run_end_date=2026-10-27 10:37:26.428121+00:00, run_duration=3.373015, state=failed, external_trigger=True, run_type=manual, data_interval_start=2026-10-26 02:00:00+00:00, data_interval_end=2026-10-27 02:00:00+00:00, dag_hash=3155ab0bf5bc38db428d97145ceedbc2
+Oct 27 10:42:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:42:06.477+0000] {scheduler_job_runner.py:1598} INFO - Adopting or resetting orphaned tasks for active dag runs
+Oct 27 10:42:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:42:06.480+0000] {scheduler_job_runner.py:1621} INFO - Marked 1 SchedulerJob instances as failed
+Oct 27 10:47:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:47:06.751+0000] {scheduler_job_runner.py:1598} INFO - Adopting or resetting orphaned tasks for active dag runs
+Oct 27 10:52:06 5ba649b1d92c airflow[19109]: [2026-10-27T10:52:06.802+0000] {scheduler_job_runner.py:1598} INFO - Adopting or resetting orphaned tasks for active dag runs

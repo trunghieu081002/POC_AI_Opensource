@@ -1,0 +1,8 @@
+triggered — dpagent run 13
+waiting up to 1800s for run 13 to finish...
+       fulfilment_sla · run 13 failed · started 2026-11-01T16:41:41+00:00       
+ stage    status  rows  gates                         started                   
+ landing  failed     -  schema_contract, unique,      2026-11-01T16:41:47+00:00 
+                        unique                                                  
+run 13 failed - why: dpagent pipeline audit 13
+run with a repeated source id: rc=1 (must be non-zero)

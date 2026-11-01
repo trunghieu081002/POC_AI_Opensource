@@ -1,0 +1,79 @@
+name: fulfilment_sla
+summary: Monthly delivery SLA report tracking eligible orders, delivered orders, and
+  on-time fulfillment rate
+schedule: 0 2 * * *
+source:
+  connector: odoo_postgres
+  connection:
+    host: ${FS_SRC_HOST}
+    port: ${FS_SRC_PORT}
+    database: ${FS_SRC_NAME}
+    user: ${FS_SRC_USER}
+    password: ${FS_SRC_PASSWORD}
+  tables:
+  - sale_order
+  - stock_picking
+warehouse:
+  host: ${WAREHOUSE_DB_HOST:-localhost}
+  port: ${WAREHOUSE_DB_PORT:-5432}
+  database: ${WAREHOUSE_DB_NAME:-warehouse}
+  user: ${WAREHOUSE_DB_USER}
+  password: ${WAREHOUSE_DB_PASSWORD}
+  schema: fulfilment_sla
+stages:
+- name: landing
+  gates:
+  - type: schema_contract
+    tables:
+      sale_order:
+        id: bigint
+        name: text
+        state: text
+        date_order: timestamp
+        commitment_date: timestamp
+      stock_picking:
+        id: bigint
+        sale_id: bigint
+        picking_type: text
+        state: text
+        date_done: timestamp
+  - type: unique
+    table: sale_order
+    columns:
+    - id
+  - type: unique
+    table: stock_picking
+    columns:
+    - id
+- name: curated
+  engine: dbt
+  depends_on: landing
+  models:
+  - fct_delivery_sla
+  gates:
+  - type: unique
+    table: fct_delivery_sla
+    columns:
+    - month
+  - type: not_null
+    table: fct_delivery_sla
+    columns:
+    - month
+    - eligible_orders
+    - delivered_orders
+    - on_time_orders
+    - on_time_rate
+  - type: business_rule
+    name: on_time_orders_le_delivered_orders
+    table: fct_delivery_sla
+    id_column: month
+    sql: SELECT month FROM fulfilment_sla.fct_delivery_sla WHERE on_time_orders >
+      delivered_orders
+    expect: no_rows
+  - type: business_rule
+    name: delivered_orders_le_eligible_orders
+    table: fct_delivery_sla
+    id_column: month
+    sql: SELECT month FROM fulfilment_sla.fct_delivery_sla WHERE delivered_orders
+      > eligible_orders
+    expect: no_rows

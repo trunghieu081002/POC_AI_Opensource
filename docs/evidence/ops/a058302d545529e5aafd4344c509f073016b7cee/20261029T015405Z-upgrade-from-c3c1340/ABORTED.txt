@@ -1,0 +1,1 @@
+ABORTED on purpose before the old host finished building: the rollback would run the old release's bootstrap (the same 0750 bug), so the backup must carry the journal directory's mode; this run was stopped to add that. Nothing was tested.

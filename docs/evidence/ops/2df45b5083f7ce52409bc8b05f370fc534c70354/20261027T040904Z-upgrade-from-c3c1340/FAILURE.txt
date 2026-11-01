@@ -1,0 +1,1 @@
+FAILED - infrastructure, before any upgrade step: the old release's host build failed its postgres acceptance ('Committed data is still there after a service restart': systemctl restart postgresql under host load ~14), the known flake on this shared host. Nothing of the upgrade was exercised.

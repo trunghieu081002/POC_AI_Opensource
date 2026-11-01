@@ -1,0 +1,6 @@
+runs=14
+ fulfilment_sla odoo_postgres reviewed + verified 0 2 * * * yes ok #14 2026-10-26T07:08:11+00:00 
+dag=f
+dashboards=1
+viewer=1
+report=631bbcd7f98e3cc6ef3a85cd5133c438

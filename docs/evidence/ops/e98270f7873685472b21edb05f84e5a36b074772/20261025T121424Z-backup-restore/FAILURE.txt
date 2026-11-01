@@ -1,0 +1,5 @@
+FAILED - harness, before the backup: on host A the source state, the overlap check (two back-to-back runs, the
+second started after the first finished) and the alerts check (bad data: failed run + the stock_picking gate,
+notified once; recovery = expected) PASSED. The least-privilege block then exited the script: psql's refusal
+exits non-zero and, under `set -euo pipefail`, `psql ... | tail -1` ended the phase (its last line was only the
+error caret '^'). Fix: the block runs with `set +e` and keeps the first line of each answer. No backup was taken.

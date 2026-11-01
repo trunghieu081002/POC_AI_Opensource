@@ -1,0 +1,8 @@
+/opt/airflow/home/pipelines.env airflow 600
+/root/demo-dev.env root 600
+/var/lib/dpagent/evidence.key root 600
+/opt/superset/superset.env superset 600
+ERROR:  permission denied for schema fulfilment_sla
+ERROR:  permission denied for table fct_delivery_sla
+psql: error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  permission denied for database "airflow_meta"
+psql: error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  permission denied for database "superset_meta"

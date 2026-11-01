@@ -1,0 +1,17 @@
+{
+ "ok": true,
+ "restored_from": "20261029T051140Z",
+ "source_host": "66c110d1be92",
+ "databases": [
+  "airflow_meta",
+  "superset_meta",
+  "warehouse"
+ ],
+ "timings": {
+  "verify_s": 0.1,
+  "databases_s": 48.8,
+  "files_s": 0.1,
+  "start_s": 0.0,
+  "total_s": 51.4
+ }
+}

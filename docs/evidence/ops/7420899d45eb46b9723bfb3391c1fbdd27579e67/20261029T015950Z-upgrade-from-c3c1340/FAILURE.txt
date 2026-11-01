@@ -1,0 +1,1 @@
+FAILED - infrastructure: old baseline, backup and the fixed bootstrap passed; the upgrade's `dpagent spec` then failed its postgres suite because `systemctl restart postgresql` timed out after 300 s (the same restart hang as two earlier old-host builds; host load ~15, Docker host disk 98 %). The upgrade itself and the rollback were not reached.

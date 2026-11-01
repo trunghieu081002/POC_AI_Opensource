@@ -199,6 +199,10 @@ class Pipeline:
     stages: list[Stage]
     schedule: str | None = None   # None = manual-only (`dpagent pipeline run`)
     timeouts: dict = field(default_factory=dict)   # seconds, by kind; see DEFAULT_TIMEOUTS
+    # Airflow task retries: {"count": N, "delay_seconds": S}; {} = none (a failed task fails the run at once).
+    # Safe because every task is a full-snapshot step that can be run again (a bronze load retry reads the same
+    # batch from XCom).
+    retries: dict = field(default_factory=dict)
     # "draft" (default - missing the key means draft, never "assume reviewed")
     # or "reviewed" - gates `deploy()`'s real side effects (approval.py,
     # docs/layer2.md "Authoring pipelines with a model"). A pipeline hand-
@@ -643,6 +647,19 @@ def _validate_timeouts(raw, where: str) -> dict:
     return dict(raw)
 
 
+def _validate_retries(raw, where: str) -> dict:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict) or set(raw) - {"count", "delay_seconds"} or "count" not in raw:
+        raise PipelineError(f"{where}: retries must be {{count: N, delay_seconds: S}}")
+    count, delay = raw["count"], raw.get("delay_seconds", 60)
+    if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= 5:
+        raise PipelineError(f"{where}: retries.count must be a whole number 0-5, got {count!r}")
+    if isinstance(delay, bool) or not isinstance(delay, int) or not 1 <= delay <= 3600:
+        raise PipelineError(f"{where}: retries.delay_seconds must be a whole number 1-3600, got {delay!r}")
+    return {"count": count, "delay_seconds": delay} if count else {}
+
+
 def _validate_stage(raw: dict, index: int, is_first: bool,
                     known_names: set[str], where_pipeline: str) -> Stage:
     where = f"{where_pipeline} stages[{index}]"
@@ -781,6 +798,7 @@ def load(name: str, pipelines_dir: Path | None = None) -> Pipeline:
         stages=stages,
         schedule=_validate_schedule(data.get("schedule"), where),
         timeouts=_validate_timeouts(data.get("timeouts"), where),
+        retries=_validate_retries(data.get("retries"), where),
         maturity=maturity,
         landing_dataset_name=landing_dataset_name,
         bronze_staging=bronze_staging,

@@ -1,0 +1,93 @@
+No broken requirements found.
+No broken requirements found.
+{
+ "airflow": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dbt": {
+  "applied": {
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "dbt-protos": [
+    "1.0.615",
+    "1.0.607"
+   ],
+   "msgpack": [
+    "1.2.4",
+    "1.2.3"
+   ],
+   "pydantic": [
+    "2.14.2",
+    "2.14.1"
+   ],
+   "pydantic-core": [
+    "2.50.2",
+    "2.50.1"
+   ],
+   "pytz": [
+    "2026.6",
+    "2026.5"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dlt": {
+  "applied": {
+   "boto3": [
+    "1.43.123",
+    "1.43.118"
+   ],
+   "botocore": [
+    "1.43.123",
+    "1.43.118"
+   ],
+   "certifi": [
+    "2026.10.23",
+    "2026.10.19"
+   ],
+   "google-api-core": [
+    "2.43.2",
+    "2.43.0"
+   ],
+   "httplib2": [
+    "0.32.1",
+    "0.32.0"
+   ],
+   "opentelemetry-api": [
+    "1.45.2",
+    "1.45.1"
+   ],
+   "pyasn1": [
+    "0.6.5",
+    "0.6.4"
+   ],
+   "pymssql": [
+    "2.4.6",
+    "2.4.5"
+   ],
+   "pytz": [
+    "2026.6",
+    "2026.5"
+   ],
+   "sqlglot": [
+    "30.27.0",
+    "30.24.0"
+   ],
+   "tzdata": [
+    "2026.6",
+    "2026.5"
+   ]
+  },
+  "differs": {},
+  "not_in_lock": []
+ },
+ "dpagent": {
+  "differs": {},
+  "not_in_lock": []
+ },
+ "superset": "not installed"
+}

@@ -1,0 +1,1 @@
+FAILED - infrastructure again, before any upgrade step: the old release's postgres acceptance failed because postgresql@15-main hung in 'deactivating' on restart (systemd in the container, host load ~16, Docker host disk 98 %). The same pack passed its restart check on every host built from the new code that day.

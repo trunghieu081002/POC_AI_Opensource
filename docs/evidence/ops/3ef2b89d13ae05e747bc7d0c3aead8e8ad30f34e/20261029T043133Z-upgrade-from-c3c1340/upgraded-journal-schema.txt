@@ -1,0 +1,1 @@
+0 ['id', 'kind', 'target', 'status', 'dry_run', 'os_json', 'meta_json', 'started_at', 'finished_at']

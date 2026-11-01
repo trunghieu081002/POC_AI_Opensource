@@ -1,0 +1,7 @@
+FAILED - harness, at the start of the backup phase: source state, overlap and alerts PASSED and the least-privilege
+FINDING was recorded (the warehouse writer can connect to airflow_meta and superset_meta: PostgreSQL grants CONNECT
+to PUBLIC by default). state() then grepped `dpagent pipeline list` for fulfilment_sla, but without COLUMNS the table
+truncates the name ("fulfilment_s…"). Fixed (COLUMNS=250, also in upgrade.sh). Debugging on the kept host A (not
+evidence) then found a real bug in `dpagent backup restore`: _pg() used subprocess.DEVNULL as a context manager
+(AttributeError after the services were stopped). Fixed, and restore now always starts the services again, even
+after a failure. On that host backup (1.0 s) + verify + restore (38.4 s, services healthy) then worked.

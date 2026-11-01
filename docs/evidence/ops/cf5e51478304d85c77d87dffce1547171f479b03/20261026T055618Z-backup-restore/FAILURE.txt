@@ -1,0 +1,5 @@
+FAILED - test plan, before the restore: on host A everything passed (source state, overlap, alerts, the least-privilege
+FINDING recorded, backup 2.8 s, verify, a run after the backup). On the clean host B, installing Superset (bi-validate)
+failed: "schema fulfilment_sla does not exist" - the Superset pack grants its reader on warehouse schemas that exist,
+i.e. after the pipeline's first run (examples/demo/bi.yaml says so). Fix: host B approves (test stand-in) and deploys
+once before installing Superset - "the same stack in use"; the restore then replaces that state with A's.

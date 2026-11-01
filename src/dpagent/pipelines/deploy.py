@@ -147,6 +147,12 @@ def render_dag(pipeline: Pipeline) -> str:
         "    on_failure_callback=_on_dag_failure,",
         ") as dag:",
     ]
+    if pipeline.retries:
+        # only when the manifest asks for it: every other pipeline's DAG stays byte-for-byte what it was
+        lines.insert(lines.index("from datetime import datetime"), "from datetime import timedelta")
+        lines.insert(lines.index(") as dag:"),
+                     f"    default_args={{\"retries\": {pipeline.retries['count']}, "
+                     f"\"retry_delay\": timedelta(seconds={pipeline.retries['delay_seconds']})}},")
 
     if pipeline.bronze_staging:
         # Only bronze DAGs import this - every other pipeline's rendered DAG

@@ -39,6 +39,12 @@ params:
   open_firewall:
     type: bool
     default: false
+  # least privilege: no CONNECT/TEMP on the listed databases for PUBLIC - only the roles granted below (and roles
+  # other packs grant explicitly, e.g. the Superset reader) can connect. Off by default: a stack whose consumers rely
+  # on PUBLIC's default CONNECT must list them first.
+  revoke_public_connect:
+    type: bool
+    default: false
 
 preflight: preflight.sh
 verify: verify.sh
