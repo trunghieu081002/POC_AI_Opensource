@@ -9,9 +9,14 @@
 # Evidence: docs/evidence/hg-load/<sha>/<utc>/.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-KEEP=0; SCALES=()
-for a in "$@"; do
-  case "$a" in --keep) KEEP=1 ;; *[!0-9]*|'') echo "usage: hg-load-bench.sh [--keep] SCALE [SCALE ...]" >&2; exit 2 ;; *) SCALES+=("$a") ;; esac
+KEEP=0; SCALES=(); HOST=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --keep) KEEP=1; shift ;;
+    --host) HOST="${2:?}"; shift 2 ;;     # a bronze host this runner (or the M2.5 runner) built and kept, whose scenario passed
+    *[!0-9]*|'') echo "usage: hg-load-bench.sh [--keep] [--host NAME] SCALE [SCALE ...]" >&2; exit 2 ;;
+    *) SCALES+=("$1"); shift ;;
+  esac
 done
 [ "${#SCALES[@]}" -gt 0 ] || { echo "usage: hg-load-bench.sh [--keep] SCALE [SCALE ...]" >&2; exit 2; }
 test -z "$(git -C "$ROOT" status --porcelain --untracked-files=all -- . ':!docs/evidence')" \
@@ -25,11 +30,20 @@ free=$(df -BG --output=avail "$(docker info -f '{{.DockerRootDir}}')" | tail -1 
 trap 'rc=$?; echo "$rc" > "$OUT/exit-code.txt"; exit $rc' EXIT
 
 # ---- the host: the M2.5 runner, bronze profile, one bronze fixture scenario, kept
-M25_RESULTS_DIR="$OUT/host" bash "$ROOT/scripts/m25-acceptance-ci.sh" --profile bronze --scenarios usage-correct-twice --keep \
-  > "$OUT/host-build.log" 2>&1 &
-RUNNER=$!
-wait "$RUNNER" || { tail -30 "$OUT/host-build.log"; echo "the bronze host did not pass its own scenario" >&2; exit 3; }
-NAME="dpagent-m25-acceptance-$RUNNER"
+if [ -z "$HOST" ]; then
+  # exit 3 from the M2.5 runner = "ran clean, but not the whole profile" - expected for one requested scenario
+  set +e
+  M25_RESULTS_DIR="$OUT/host" bash "$ROOT/scripts/m25-acceptance-ci.sh" --profile bronze --scenarios usage-correct-twice --keep \
+    > "$OUT/host-build.log" 2>&1 &
+  RUNNER=$!; wait "$RUNNER"; rc=$?; set -e
+  grep -q "^1/1 requested scenarios matched" "$OUT/host-build.log" && { [ "$rc" = 0 ] || [ "$rc" = 3 ]; } \
+    || { tail -30 "$OUT/host-build.log"; echo "the bronze host did not pass its own scenario (rc=$rc)" >&2; exit 3; }
+  NAME="dpagent-m25-acceptance-$RUNNER"
+else
+  NAME="$HOST"
+  [ "$(docker inspect -f '{{.Config.Image}}' "$NAME")" = dpagent-m25-disposable ] || { echo "$NAME is not an M2.5 disposable host" >&2; exit 2; }
+  echo "reused host $NAME (built and checked by an earlier run of this runner; see its host/ evidence)" > "$OUT/host-reused.txt"
+fi
 CID=$(docker inspect -f '{{.Id}}' "$NAME")
 cleanup() {
   rc=$?; trap - EXIT; echo "$rc" > "$OUT/exit-code.txt"
