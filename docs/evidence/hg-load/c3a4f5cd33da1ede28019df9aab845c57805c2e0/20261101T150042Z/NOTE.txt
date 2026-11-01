@@ -1,0 +1,1 @@
+Correctness PASS at all three scales (per-scale result.json: first run = answer key, rerun = answer key without duplicates, mid-run fault failed the run with gold kept, recovery = answer key, cleanup complete). Resource measurement GAP: bench.py found no container cgroup (private cgroup namespace), so CPU/memory/IO are null; the next run samples docker stats from the Docker host.

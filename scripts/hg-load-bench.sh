@@ -55,7 +55,14 @@ trap cleanup EXIT
 # the committed benchmark files (the host's /opt/dpagent is this commit's copy; be explicit about it)
 git -C "$ROOT" archive --format=tar HEAD benchmarks/hg_usage tests/m25_acceptance pipelines/hg_resources_useage_number \
   | docker exec -i "$NAME" tar -C /opt/dpagent -xf -
+# the container's CPU, memory and block I/O from the Docker host (bench.py's own cgroup reading is unavailable when the
+# container has a private cgroup namespace): one sample every 5 s, for the whole benchmark
+( while docker inspect "$NAME" >/dev/null 2>&1; do
+    printf '%s %s\n' "$(date -u +%s)" "$(docker stats --no-stream --format '{{json .}}' "$NAME")"; sleep 5
+  done ) > "$OUT/docker-stats.log" 2>/dev/null &
+STATS=$!
 docker exec "$NAME" bash -lc "cd /opt/dpagent && .venv/bin/python benchmarks/hg_usage/bench.py ${SCALES[*]} \
   --timeout ${HGBENCH_TIMEOUT:-3600} --min-free-gb ${HGBENCH_MIN_FREE_GB:-10} --min-avail-gb ${HGBENCH_MIN_AVAIL_GB:-3}" \
   2>&1 | tee "$OUT/bench.log"
-exit "${PIPESTATUS[0]}"
+rc=${PIPESTATUS[0]}; kill "$STATS" 2>/dev/null || true
+exit "$rc"

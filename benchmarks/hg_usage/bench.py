@@ -165,7 +165,7 @@ def load_source(data: Path, db) -> dict:
 
 def run_once(name: str, timeout: int, wh_user: str | None = None, fault_at: str | None = None) -> dict:
     run_id = state.start_run("data", name)
-    t0 = time.monotonic()
+    t0, e0 = time.monotonic(), time.time()
     deploy_mod.trigger_dag(name, run_id)
     status, faulted = "running", False
     while time.monotonic() - t0 < timeout:
@@ -188,7 +188,7 @@ def run_once(name: str, timeout: int, wh_user: str | None = None, fault_at: str 
             d = round((datetime.fromisoformat(s["finished_at"]) - datetime.fromisoformat(s["started_at"])).total_seconds(), 1)
         stages.append({"stage": s["stage"], "status": s["status"], "seconds": d, "rows": s["row_count"]})
     return {"run_id": run_id, "status": status, "wall_seconds": round(time.monotonic() - t0, 1), "stages": stages,
-            "fault_injected": faulted}
+            "fault_injected": faulted, "started_epoch": round(e0, 1), "ended_epoch": round(time.time(), 1)}
 
 
 def time_queries(db: str) -> dict:
@@ -311,7 +311,7 @@ def main(argv: list[str]) -> int:
         r["preflight"] = pre
         summary["scales"].append({k: r.get(k) for k in ("scale", "ok", "error", "preflight", "profile", "load",
                                                          "answer_key", "first_run", "first_check", "resources_first_run",
-                                                         "rerun", "fault_run", "fault_check", "recovery",
+                                                         "rerun", "rerun_check", "fault_run", "fault_check", "recovery", "recovery_check",
                                                          "dashboard_sql", "source_db_mb", "warehouse_db_mb", "db_timezone",
                                                          "cleanup")})
         if not r["ok"] or r.get("first_run", {}).get("status") == "timeout":

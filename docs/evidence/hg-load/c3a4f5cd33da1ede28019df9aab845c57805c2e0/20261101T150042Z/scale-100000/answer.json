@@ -1,0 +1,12 @@
+{
+ "rows": 59985,
+ "digest": "5db64b46ec9f777f4a926b3195274433",
+ "distinct_videos": 3034,
+ "distinct_stock": 7193,
+ "position_groups": {
+  "1": 3110,
+  "2-3": 5886,
+  "4-5": 5407,
+  ">5": 45582
+ }
+}

@@ -1,0 +1,4 @@
+docker host free disk: 64 GB
+ 22:00:43 up 38 days,  5:03,  5 users,  load average: 0.66, 1.45, 1.62
+Mem:             62          24           1          11          36          25
+72
