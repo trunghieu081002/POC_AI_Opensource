@@ -49,7 +49,8 @@ How to read it:
   failed the run and left gold at its previous result. Cleanup was complete.
 - Times are wall times from trigger to finish, Airflow scheduling included. The journal's stage times have 1 s
   resolution, so the per-stage split is in `result.json`, not here. The first run of a scale is slower than the rerun
-  (346 s vs 115 s at 1M): the first run also builds dbt packages and warms caches.
+  (346 s vs 115 s at 1M). The cause was not measured; a first run on a new
+  deployment (cold caches, first dbt invocation) is the likely reason, but this run does not show it.
 - **Measured bottleneck: the dashboard's audit SQL** (four `COUNT(DISTINCT …)` over gold): 1.7 s at 690k gold rows,
   growing about linearly. Nothing was optimised. There is no SLA to measure it against, and the dashboard's business
   output must not change. A pre-aggregated table or indexes on `video_id`/`hg_stock_id` are the candidates once HG
