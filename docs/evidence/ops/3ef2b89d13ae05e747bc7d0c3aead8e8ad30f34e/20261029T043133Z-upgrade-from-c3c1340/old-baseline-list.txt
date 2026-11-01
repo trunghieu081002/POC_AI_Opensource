@@ -1,0 +1,12 @@
+ pipeline                    connector      maturity                schedule   deployed  last run                        
+ demo                        odoo_postgres  reviewed (no evidence)  manual     yes       never                           
+ fulfilment_sla              odoo_postgres  reviewed + verified     0 2 * * *  yes       ok #6 2026-10-29T04:48:23+00:00 
+ hg_bronze_pair              odoo_postgres  draft                   manual     yes       never                           
+ hg_bronze_poc               odoo_postgres  draft                   manual     yes       never                           
+ hg_dbt_branch               odoo_postgres  draft                   manual     yes       never                           
+ hg_fact_artist_assignment   odoo_postgres  draft                   manual     yes       never                           
+ hg_resources_useage_number  odoo_postgres  draft                   manual     yes       never                           
+ m25_monthly_sales           odoo_postgres  draft                   manual     yes       never                           
+ quickstart                  csv            reviewed (no evidence)  manual     yes       never                           
+ quickstart_dbt              csv            reviewed (no evidence)  manual     yes       never                           
+ quickstart_sales            odoo_postgres  draft                   manual     yes       never                           
