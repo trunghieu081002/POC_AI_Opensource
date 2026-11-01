@@ -27,3 +27,31 @@ Evidence: `docs/evidence/hg-load/<sha>/<utc>/` (`summary.json`; per scale `resul
 - One shared Docker host, other services included. The cgroup numbers are the container's own; wall times include
   Airflow scheduling and vary with the host's load (the preflight records it).
 - The dashboard's SQL is timed with `psql` on the warehouse, not through Superset's API or a browser.
+
+## Runs
+
+Every run is kept (`docs/evidence/hg-load/`).
+
+| Run | Result |
+|---|---|
+| `a0ba1d8/20261101T144006Z` | the runner stopped before measuring: it read the M2.5 runner's exit 3 ("one requested scenario of the profile, ran clean") as a failure. The host was fine and was reused |
+| `c3a4f5c/20261101T150042Z` | **correct** at 10k / 100k / 1M; CPU/memory/IO **not recorded** (the container has a private cgroup namespace) |
+| `66843c2/20261101T152602Z` | **PASS** at all three scales, with resources sampled by `docker stats` on the Docker host (load average ~2 then; 72 cores; 66 GB free) |
+
+| scale (resource_editings) | gold rows | correct (first / rerun / recovery) | fault: failed + gold kept | load s | first run s | rerun s | peak mem GB | avg / peak CPU cores | write MB | source / warehouse MB | dashboard SQL median ms (all / one video) | cleanup |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 10,000 | 5,693 | True / True / True | True + True | 1.0 | 75.7 | 72.7 | 1.59 | 0.74 / 1.17 | 40.0 | 8.8 / 12.0 | 49.5 / 43.7 | True |
+| 100,000 | 59,985 | True / True / True | True + True | 1.3 | 103.4 | 75.2 | 1.69 | 0.75 / 1.23 | 130.0 | 17.1 / 34.5 | 172.6 / 45.7 | True |
+| 1,000,000 | 690,171 | True / True / True | True + True | 2.9 | 346.6 | 114.6 | 2.37 | 2.22 / 3.44 | 1340.0 | 99.6 / 277.3 | 1671.3 / 89.2 | True |
+
+How to read it:
+- Every scale is correct: the first run, the rerun and the recovery all equal the answer key (row digest). The fault
+  failed the run and left gold at its previous result. Cleanup was complete.
+- Times are wall times from trigger to finish, Airflow scheduling included. The journal's stage times have 1 s
+  resolution, so the per-stage split is in `result.json`, not here. The first run of a scale is slower than the rerun
+  (346 s vs 115 s at 1M): the first run also builds dbt packages and warms caches.
+- **Measured bottleneck: the dashboard's audit SQL** (four `COUNT(DISTINCT …)` over gold): 1.7 s at 690k gold rows,
+  growing about linearly. Nothing was optimised. There is no SLA to measure it against, and the dashboard's business
+  output must not change. A pre-aggregated table or indexes on `video_id`/`hg_stock_id` are the candidates once HG
+  gives a latency target.
+- Synthetic, in HG's table shape. **Not HG's load.** Full snapshot only; incremental loading was not measured.
