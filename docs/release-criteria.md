@@ -35,3 +35,23 @@ Rules for every row:
 | 3 | a request budget for the real-model dashboard acceptance (proposed: probe 1 + 2 projects × ≤ 6 + asks ≤ 4 = ≤ 17) |
 | 5 | permitted data, row counts per table, skew, update schedule, timezone, SLA, resource budget, a disposable host for the larger scales |
 | 9 | the required RPO/RTO and which data is in backup scope (warehouse, or configuration and metadata only) |
+
+## Status - 2026-11-01
+
+Each status is backed only by the evidence named next to it. Scripted runs prove the mechanism, never a model.
+
+| # | Status | Evidence / PR | Remaining |
+|---|---|---|---|
+| 1 | **BLOCKED** | runner + runbook (#56); not run | a clean OL8.10 VM with a snapshot (spec in `docs/native-ol8.md`) |
+| 2 | PASS (scoped) | `docs/evidence/demo/4fce834…` | - |
+| 3 | mechanism **PASS** (scripted spec) on two projects; model **not run** | #57: `evidence/dashboards/72218af…` (delivery SLA), `6eb37c5…` (sales) | a model budget for the real acceptance (proposed ≤ 13 requests) |
+| 4 | PASS | matrix, demo | - |
+| 5 | synthetic HG-shaped **PASS** at 10k / 100k / 1M `resource_editings` (690k gold rows): correct first run, rerun, mid-run fault + recovery, cleanup; times, CPU/memory/IO, sizes, dashboard SQL (1.7 s at 1M, not optimised: no target). HG-representative: **BLOCKED** | #59: `evidence/hg-load/66843c2…` | the owner's data, scale, skew, schedule, SLA, resource budget |
+| 6 | secret files 0600 and BI reader SELECT-only: PASS. **Finding fixed in code** (#58: postgres `revoke_public_connect`, on in the demo stack): the warehouse writer could reach the metadata DBs | #58: `evidence/ops/ab5dd38…/…/a/s-privileges.json` (finding) | the re-check run on a host |
+| 7 | PASS: overlap (two back-to-back runs never concurrent), rerun, recovery; retries implemented (unit-tested), not exercised on a host | #58 | a host check of a retried transient failure |
+| 8 | PASS: bad data → `failed_run` + `failed_gate` alerts, notified once, recorded | #58 | - |
+| 9 | PASS: backup on host A, restore on a clean host B: state = at backup, RTO 53.2 s, RPO shown | #58: `evidence/ops/ab5dd38…/20261026T064550Z-backup-restore` | the owner's RPO/RTO targets |
+| 10 | PASS: v0.4.0-demo-rc1 → `3ef2b89` in place and rollback (old release + restore); found and fixed a **read-only journal after upgrade** (bootstrap re-moded `/var/lib/dpagent`) | #58: `evidence/ops/3ef2b89…/…-upgrade-from-c3c1340` | - |
+| 11 | not started | - | after #56-#59 are merged: one integrated acceptance from a release archive on a clean host |
+
+**Stable is not proposed:** row 1 (native OL8) and row 5 (HG-representative) are blocked on inputs; row 3 needs a model budget; row 11 needs the merges.
