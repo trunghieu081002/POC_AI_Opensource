@@ -1,0 +1,234 @@
+{
+ "scale": 100000,
+ "synthetic": true,
+ "profile": {
+  "synthetic": true,
+  "not_hg_data": true,
+  "scale": 100000,
+  "seed": 20261023,
+  "rows": {
+   "channel": 50,
+   "channel_company": 50,
+   "channel_video_info": 5293,
+   "editings": 4650,
+   "resource": 10000,
+   "resource_editings": 100000
+  }
+ },
+ "generate_seconds": 0.5,
+ "answer_key": {
+  "rows": 59985,
+  "digest": "5db64b46ec9f777f4a926b3195274433",
+  "distinct_videos": 3034,
+  "distinct_stock": 7193,
+  "position_groups": {
+   "1": 3110,
+   "2-3": 5886,
+   "4-5": 5407,
+   ">5": 45582
+  }
+ },
+ "answer_seconds": 0.5,
+ "load": {
+  "seconds": 1.3
+ },
+ "source_db_mb": 17.1,
+ "db_timezone": "Etc/UTC",
+ "resources_first_run": {
+  "samples": 52,
+  "min_host_mem_available_gb": 25.03,
+  "min_disk_free_gb": 67.88,
+  "container_cgroup": "None",
+  "peak_db_mb_hgbench_src_47b2c01b4a": 17.1,
+  "peak_db_mb_hgbench_wh_0084de741b": 34.1
+ },
+ "first_run": {
+  "run_id": 9,
+  "status": "ok",
+  "wall_seconds": 103.4,
+  "stages": [
+   {
+    "stage": "landing",
+    "status": "passed",
+    "seconds": 3.0,
+    "rows": 100000
+   },
+   {
+    "stage": "silver",
+    "status": "passed",
+    "seconds": 3.0,
+    "rows": null
+   },
+   {
+    "stage": "gold",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": null
+   }
+  ],
+  "fault_injected": false,
+  "started_epoch": 1793548050.8,
+  "ended_epoch": 1793548154.2
+ },
+ "first_check": {
+  "ok": true,
+  "gold": {
+   "rows": 59985,
+   "digest": "5db64b46ec9f777f4a926b3195274433",
+   "distinct_videos": 3034,
+   "distinct_stock": 7193,
+   "position_groups": {
+    "1": 3110,
+    "2-3": 5886,
+    "4-5": 5407,
+    ">5": 45582
+   }
+  }
+ },
+ "rerun": {
+  "run_id": 10,
+  "status": "ok",
+  "wall_seconds": 75.2,
+  "stages": [
+   {
+    "stage": "landing",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": 100000
+   },
+   {
+    "stage": "silver",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": null
+   },
+   {
+    "stage": "gold",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": null
+   }
+  ],
+  "fault_injected": false,
+  "started_epoch": 1793548154.6,
+  "ended_epoch": 1793548229.8
+ },
+ "rerun_check": {
+  "ok": true,
+  "gold": {
+   "rows": 59985,
+   "digest": "5db64b46ec9f777f4a926b3195274433",
+   "distinct_videos": 3034,
+   "distinct_stock": 7193,
+   "position_groups": {
+    "1": 3110,
+    "2-3": 5886,
+    "4-5": 5407,
+    ">5": 45582
+   }
+  }
+ },
+ "fault_run": {
+  "run_id": 11,
+  "status": "failed",
+  "wall_seconds": 47.8,
+  "stages": [
+   {
+    "stage": "landing",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": 100000
+   },
+   {
+    "stage": "silver",
+    "status": "failed",
+    "seconds": 1.0,
+    "rows": null
+   }
+  ],
+  "fault_injected": true,
+  "started_epoch": 1793548230.2,
+  "ended_epoch": 1793548278.0
+ },
+ "fault_check": {
+  "failed_as_expected": true,
+  "gold_kept_previous_result": true,
+  "gold": {
+   "rows": 59985,
+   "digest": "5db64b46ec9f777f4a926b3195274433",
+   "distinct_videos": 3034,
+   "distinct_stock": 7193,
+   "position_groups": {
+    "1": 3110,
+    "2-3": 5886,
+    "4-5": 5407,
+    ">5": 45582
+   }
+  }
+ },
+ "recovery": {
+  "run_id": 12,
+  "status": "ok",
+  "wall_seconds": 77.9,
+  "stages": [
+   {
+    "stage": "landing",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": 100000
+   },
+   {
+    "stage": "silver",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": null
+   },
+   {
+    "stage": "gold",
+    "status": "passed",
+    "seconds": 1.0,
+    "rows": null
+   }
+  ],
+  "fault_injected": false,
+  "started_epoch": 1793548278.5,
+  "ended_epoch": 1793548356.4
+ },
+ "recovery_check": {
+  "ok": true,
+  "gold": {
+   "rows": 59985,
+   "digest": "5db64b46ec9f777f4a926b3195274433",
+   "distinct_videos": 3034,
+   "distinct_stock": 7193,
+   "position_groups": {
+    "1": 3110,
+    "2-3": 5886,
+    "4-5": 5407,
+    ">5": 45582
+   }
+  }
+ },
+ "dashboard_sql": {
+  "audit_measures": {
+   "samples": 20,
+   "median_ms": 172.6,
+   "max_ms": 201.8,
+   "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+  },
+  "one_video": {
+   "samples": 20,
+   "median_ms": 45.7,
+   "max_ms": 55.2,
+   "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+  }
+ },
+ "warehouse_db_mb": 34.5,
+ "cleanup": {
+  "undeploy": true,
+  "bronze_objects_left": 0,
+  "databases_dropped": true,
+  "generated_files_removed": true
+ },
+ "ok": true
+}

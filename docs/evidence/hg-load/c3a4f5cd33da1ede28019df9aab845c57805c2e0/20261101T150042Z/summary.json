@@ -1,0 +1,605 @@
+{
+ "synthetic": true,
+ "not_hg_data": true,
+ "scales": [
+  {
+   "scale": 10000,
+   "ok": true,
+   "error": null,
+   "preflight": {
+    "free_gb": 68.0,
+    "avail_gb": 25.3
+   },
+   "profile": {
+    "synthetic": true,
+    "not_hg_data": true,
+    "scale": 10000,
+    "seed": 20261023,
+    "rows": {
+     "channel": 8,
+     "channel_company": 8,
+     "channel_video_info": 524,
+     "editings": 465,
+     "resource": 1000,
+     "resource_editings": 10000
+    }
+   },
+   "load": {
+    "seconds": 1.0
+   },
+   "answer_key": {
+    "rows": 5693,
+    "digest": "5ce673d3ab8b675fdb1d6f962d3994e9",
+    "distinct_videos": 293,
+    "distinct_stock": 732,
+    "position_groups": {
+     "1": 306,
+     "2-3": 553,
+     "4-5": 505,
+     ">5": 4329
+    }
+   },
+   "first_run": {
+    "run_id": 5,
+    "status": "ok",
+    "wall_seconds": 78.1,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 10000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "first_check": {
+    "ok": true,
+    "gold": {
+     "rows": 5693,
+     "digest": "5ce673d3ab8b675fdb1d6f962d3994e9",
+     "distinct_videos": 293,
+     "distinct_stock": 732,
+     "position_groups": {
+      "1": 306,
+      "2-3": 553,
+      "4-5": 505,
+      ">5": 4329
+     }
+    }
+   },
+   "resources_first_run": {
+    "samples": 39,
+    "min_host_mem_available_gb": 25.05,
+    "min_disk_free_gb": 67.97,
+    "container_cgroup": "None",
+    "peak_db_mb_hgbench_src_60d2d5e08c": 8.8,
+    "peak_db_mb_hgbench_wh_c67f59e28d": 11.5
+   },
+   "rerun": {
+    "run_id": 6,
+    "status": "ok",
+    "wall_seconds": 73.7,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": 10000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 0.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "fault_run": {
+    "run_id": 7,
+    "status": "failed",
+    "wall_seconds": 44.8,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": 10000
+     },
+     {
+      "stage": "silver",
+      "status": "failed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": true
+   },
+   "fault_check": {
+    "failed_as_expected": true,
+    "gold_kept_previous_result": true,
+    "gold": {
+     "rows": 5693,
+     "digest": "5ce673d3ab8b675fdb1d6f962d3994e9",
+     "distinct_videos": 293,
+     "distinct_stock": 732,
+     "position_groups": {
+      "1": 306,
+      "2-3": 553,
+      "4-5": 505,
+      ">5": 4329
+     }
+    }
+   },
+   "recovery": {
+    "run_id": 8,
+    "status": "ok",
+    "wall_seconds": 73.0,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 10000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "dashboard_sql": {
+    "audit_measures": {
+     "samples": 20,
+     "median_ms": 47.5,
+     "max_ms": 56.2,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    },
+    "one_video": {
+     "samples": 20,
+     "median_ms": 38.9,
+     "max_ms": 40.7,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    }
+   },
+   "source_db_mb": 8.8,
+   "warehouse_db_mb": 11.9,
+   "db_timezone": "Etc/UTC",
+   "cleanup": {
+    "undeploy": true,
+    "bronze_objects_left": 0,
+    "databases_dropped": true,
+    "generated_files_removed": true
+   }
+  },
+  {
+   "scale": 100000,
+   "ok": true,
+   "error": null,
+   "preflight": {
+    "free_gb": 68.0,
+    "avail_gb": 25.2
+   },
+   "profile": {
+    "synthetic": true,
+    "not_hg_data": true,
+    "scale": 100000,
+    "seed": 20261023,
+    "rows": {
+     "channel": 50,
+     "channel_company": 50,
+     "channel_video_info": 5293,
+     "editings": 4650,
+     "resource": 10000,
+     "resource_editings": 100000
+    }
+   },
+   "load": {
+    "seconds": 1.1
+   },
+   "answer_key": {
+    "rows": 59985,
+    "digest": "5db64b46ec9f777f4a926b3195274433",
+    "distinct_videos": 3034,
+    "distinct_stock": 7193,
+    "position_groups": {
+     "1": 3110,
+     "2-3": 5886,
+     "4-5": 5407,
+     ">5": 45582
+    }
+   },
+   "first_run": {
+    "run_id": 9,
+    "status": "ok",
+    "wall_seconds": 99.8,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 100000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "first_check": {
+    "ok": true,
+    "gold": {
+     "rows": 59985,
+     "digest": "5db64b46ec9f777f4a926b3195274433",
+     "distinct_videos": 3034,
+     "distinct_stock": 7193,
+     "position_groups": {
+      "1": 3110,
+      "2-3": 5886,
+      "4-5": 5407,
+      ">5": 45582
+     }
+    }
+   },
+   "resources_first_run": {
+    "samples": 50,
+    "min_host_mem_available_gb": 24.94,
+    "min_disk_free_gb": 67.9,
+    "container_cgroup": "None",
+    "peak_db_mb_hgbench_src_e885907e81": 17.1,
+    "peak_db_mb_hgbench_wh_487904a280": 34.1
+   },
+   "rerun": {
+    "run_id": 10,
+    "status": "ok",
+    "wall_seconds": 78.2,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 100000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "fault_run": {
+    "run_id": 11,
+    "status": "failed",
+    "wall_seconds": 49.4,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 100000
+     },
+     {
+      "stage": "silver",
+      "status": "failed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": true
+   },
+   "fault_check": {
+    "failed_as_expected": true,
+    "gold_kept_previous_result": true,
+    "gold": {
+     "rows": 59985,
+     "digest": "5db64b46ec9f777f4a926b3195274433",
+     "distinct_videos": 3034,
+     "distinct_stock": 7193,
+     "position_groups": {
+      "1": 3110,
+      "2-3": 5886,
+      "4-5": 5407,
+      ">5": 45582
+     }
+    }
+   },
+   "recovery": {
+    "run_id": 12,
+    "status": "ok",
+    "wall_seconds": 75.5,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 100000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "dashboard_sql": {
+    "audit_measures": {
+     "samples": 20,
+     "median_ms": 173.2,
+     "max_ms": 191.9,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    },
+    "one_video": {
+     "samples": 20,
+     "median_ms": 46.1,
+     "max_ms": 55.9,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    }
+   },
+   "source_db_mb": 17.1,
+   "warehouse_db_mb": 34.5,
+   "db_timezone": "Etc/UTC",
+   "cleanup": {
+    "undeploy": true,
+    "bronze_objects_left": 0,
+    "databases_dropped": true,
+    "generated_files_removed": true
+   }
+  },
+  {
+   "scale": 1000000,
+   "ok": true,
+   "error": null,
+   "preflight": {
+    "free_gb": 67.9,
+    "avail_gb": 25.1
+   },
+   "profile": {
+    "synthetic": true,
+    "not_hg_data": true,
+    "scale": 1000000,
+    "seed": 20261023,
+    "rows": {
+     "channel": 500,
+     "channel_company": 500,
+     "channel_video_info": 53012,
+     "editings": 46500,
+     "resource": 100000,
+     "resource_editings": 1000000
+    }
+   },
+   "load": {
+    "seconds": 2.9
+   },
+   "answer_key": {
+    "rows": 690171,
+    "digest": "9387ab561faaf6d656e8aa02607c106f",
+    "distinct_videos": 32366,
+    "distinct_stock": 71696,
+    "position_groups": {
+     "1": 33247,
+     "2-3": 62666,
+     "4-5": 57536,
+     ">5": 536722
+    }
+   },
+   "first_run": {
+    "run_id": 13,
+    "status": "ok",
+    "wall_seconds": 335.2,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": 1000000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 3.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 2.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "first_check": {
+    "ok": true,
+    "gold": {
+     "rows": 690171,
+     "digest": "9387ab561faaf6d656e8aa02607c106f",
+     "distinct_videos": 32366,
+     "distinct_stock": 71696,
+     "position_groups": {
+      "1": 33247,
+      "2-3": 62666,
+      "4-5": 57536,
+      ">5": 536722
+     }
+    }
+   },
+   "resources_first_run": {
+    "samples": 168,
+    "min_host_mem_available_gb": 24.34,
+    "min_disk_free_gb": 67.0,
+    "container_cgroup": "None",
+    "peak_db_mb_hgbench_src_ee28ea905b": 99.7,
+    "peak_db_mb_hgbench_wh_f2d47a6106": 276.9
+   },
+   "rerun": {
+    "run_id": 14,
+    "status": "ok",
+    "wall_seconds": 113.8,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 1000000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 3.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "fault_run": {
+    "run_id": 15,
+    "status": "failed",
+    "wall_seconds": 80.5,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 1000000
+     },
+     {
+      "stage": "silver",
+      "status": "failed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": true
+   },
+   "fault_check": {
+    "failed_as_expected": true,
+    "gold_kept_previous_result": true,
+    "gold": {
+     "rows": 690171,
+     "digest": "9387ab561faaf6d656e8aa02607c106f",
+     "distinct_videos": 32366,
+     "distinct_stock": 71696,
+     "position_groups": {
+      "1": 33247,
+      "2-3": 62666,
+      "4-5": 57536,
+      ">5": 536722
+     }
+    }
+   },
+   "recovery": {
+    "run_id": 16,
+    "status": "ok",
+    "wall_seconds": 112.2,
+    "stages": [
+     {
+      "stage": "landing",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": 1000000
+     },
+     {
+      "stage": "silver",
+      "status": "passed",
+      "seconds": 3.0,
+      "rows": null
+     },
+     {
+      "stage": "gold",
+      "status": "passed",
+      "seconds": 1.0,
+      "rows": null
+     }
+    ],
+    "fault_injected": false
+   },
+   "dashboard_sql": {
+    "audit_measures": {
+     "samples": 20,
+     "median_ms": 1647.1,
+     "max_ms": 2006.5,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    },
+    "one_video": {
+     "samples": 20,
+     "median_ms": 88.7,
+     "max_ms": 97.9,
+     "note": "psql round trip incl. process start, directly on the warehouse - not through Superset"
+    }
+   },
+   "source_db_mb": 99.6,
+   "warehouse_db_mb": 277.4,
+   "db_timezone": "Etc/UTC",
+   "cleanup": {
+    "undeploy": true,
+    "bronze_objects_left": 0,
+    "databases_dropped": true,
+    "generated_files_removed": true
+   }
+  }
+ ],
+ "thresholds": {
+  "timeout_s": 3600,
+  "min_free_gb": 10.0,
+  "min_avail_gb": 3.0
+ }
+}

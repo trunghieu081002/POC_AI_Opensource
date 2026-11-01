@@ -1,0 +1,1 @@
+NOT a failure of the host: its scenario matched (1/1); the runner misread the M2.5 runner's exit 3 (profile not fully requested) as a failure and stopped before measuring. The kept host was reused by the next run (--host).
