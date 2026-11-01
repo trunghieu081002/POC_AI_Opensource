@@ -1,0 +1,16 @@
+== t0-approve: bash examples/demo/demo.sh approve
+t0-approve rc=0
+== t0-deploy: bash examples/demo/demo.sh deploy
+t0-deploy rc=0
+== t1-bi-validate: bash examples/demo/demo.sh bi-validate
+t1-bi-validate rc=0
+== r1-restore: dpagent backup restore /root/backup/dpagent-backup-20261101T164212Z.tar.enc --passphrase-env OPS_BACKUP_PASSPHRASE --yes
+r1-restore rc=0
+rto_seconds=46.6 (restore start -> Airflow and Superset healthy)
+check restored = state at backup time (journal runs, pipeline deployed+reviewed, DAG unpaused, dashboards, viewer, report rows) ok
+check rpo (the run made after the backup is not in the restored host - data since the last backup is lost by design) ok
+check viewer after restore (API: chart and filter = expected, writes refused) ok
+== r2-run-after-restore: dpagent pipeline run fulfilment_sla --yes --wait --timeout 1800
+r2-run-after-restore rc=0
+check run on the restored host = expected ok
+PASS
